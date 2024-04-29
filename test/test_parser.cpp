@@ -853,9 +853,9 @@ TEST(Parser_LinksToDifferentTable)
     verify_query(test_context, t, "items = obj('Items', 'coffee')", 0); // nobody buys coffee
     verify_query(test_context, t, "items = obj('Items', 'milk')", 2);   // but milk
     verify_query(test_context, t, "items = O0", 2);                     // how many people bought milk?
-    verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
-    verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
-    verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
+    verify_query(test_context, t, "items.@count > 2", 3);               // how many people bought more than two items?
+    verify_query(test_context, t, "items.price > 3.0", 3);              // how many people buy items over $3.0?
+    verify_query(test_context, t, "items.name ==[c] 'milk'", 2);        // how many people buy milk?
     // how many people bought items with an active sale?
     verify_query(test_context, t, "items.discount.active == true", 3);
     // how many people bought an item marked down by more than $2.0?
@@ -3974,7 +3974,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NULL IN items.price", 0);                // null
     verify_query(test_context, t, "'dairy' IN fav_item.allergens.name", 2); // through link prefix
     verify_query(test_context, items, "20 IN @links.Person.items.account_balance", 1); // backlinks
-    verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
+    verify_query(test_context, t, "fav_item.price IN items.price", 2);                 // single property in list
 
     // list property compared to a constant list
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ANY items.price", 2);
@@ -4770,7 +4770,7 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed contains bin(\"trin\")", 1);
     verify_query(test_context, table, "mixed like \"Strin*\"", 24);
     verify_query(test_context, table, "mixed like bin(\"Strin*\")", 1); // 28
-    verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
+    verify_query(test_context, table, "mixed endswith \"4\"", 5);       // 4, 24, 44, 64, 84
     verify_query(test_context, table, "mixed endswith bin(\"4\")", 0);
     verify_query(test_context, table, "mixed endswith bin(\"Binary\")", 1);
     verify_query(test_context, table, "mixed.@size > 7", 22);
@@ -5353,6 +5353,12 @@ TEST(Parser_NestedMixedDictionaryList)
     list_george.add(2);
     list_george.add(3);
 
+    Obj ringo = persons->create_object_with_primary_key("Ringo");
+    ringo.set(col_self, ringo.get_key());
+    ringo.set_collection(col, CollectionType::Dictionary);
+    auto dict_ringo = ringo.get_dictionary(col);
+    dict_ringo.insert("Foo", "Bar");
+
     auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
     CHECK_EQUAL(q.count(), 1);
 
@@ -5369,15 +5375,16 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties[*] == {3, 2, 1}", 0);
     verify_query(test_context, persons, "properties[*] == {1, 2, 3}", 1);
     verify_query(test_context, persons, "ANY properties[*] == 2", 1);
-    verify_query(test_context, persons, "NONE properties[*] == 2", 2);
+    verify_query(test_context, persons, "NONE properties[*] == 2", 3);
     verify_query(test_context, persons, "properties.@keys == 'instruments'", 2);
     verify_query(test_context, persons, "properties.@keys == 'pets'", 2);
     verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
     verify_query(test_context, persons, "properties.@size == 3", 2);
     verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
-    verify_query(test_context, persons, "properties.@type == 'object'", 2);
+    verify_query(test_context, persons, "properties.@type == 'object'", 3);
     verify_query(test_context, persons, "properties.@type == 'array'", 1);
-    verify_query(test_context, persons, "properties.@type == 'collection'", 3);
+    verify_query(test_context, persons, "properties.@type == 'collection'", 4);
+    verify_query(test_context, persons, "properties.Foo == 'Bar'", 1);
 }
 
 TEST(Parser_NestedDictionaryDeep)

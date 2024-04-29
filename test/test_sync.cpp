@@ -6188,7 +6188,6 @@ TEST(Sync_CollectionInMixed)
         CHECK_EQUAL(list.size(), 0);
         // Replace list with Dictionary on property
         obj.set_collection(col_any, CollectionType::Dictionary);
-
     });
 
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -6311,6 +6310,72 @@ TEST(Sync_CollectionInCollection)
         auto list = obj.get_list_ptr<Mixed>(col_any);
         auto l = list->get_list(2);
         CHECK_EQUAL(l->get_any(0).get_int(), 47);
+    }
+}
+
+TEST(Sync_DeleteCollectionInCollection)
+{
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+    session_1.bind();
+    session_2.bind();
+
+    Timestamp now{std::chrono::system_clock::now()};
+
+    write_transaction(db_1, [&](WriteTransaction& tr) {
+        auto& g = tr.get_group();
+        auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+
+        auto foo = table->create_object_with_primary_key(123);
+
+        // Create list in Mixed property
+        foo.set_json(col_any, R"([
+            {
+              "1_map": {
+                "2_string": "map value"
+               },
+              "1_list": ["list value"]
+            }
+        ])");
+    });
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_2, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+        CHECK_EQUAL(table->size(), 1);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto list = obj.get_list<Mixed>(col_any);
+        auto dict = list.get_dictionary(0);
+        dict->erase("1_map");
+    });
+
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+
+        auto table = read_1.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+
+        CHECK_EQUAL(table->size(), 1);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto list = obj.get_list<Mixed>(col_any);
+        auto dict = list.get_dictionary(0);
+        CHECK_EQUAL(dict->size(), 1);
     }
 }
 
@@ -7230,6 +7295,18 @@ TEST(Sync_RowForGlobalKey)
             CHECK_NOT(row_ndx);
         }
     }
+}
+
+TEST(Sync_FirstPromoteToWriteAdvancesRead)
+{
+    TEST_CLIENT_DB(db);
+    auto db2 = DB::create(make_client_replication(), db_path);
+    auto read = db->start_read();
+    db2->start_write()->commit();
+    // This will hit `ClientHistory::update_from_ref_and_version()` with m_group
+    // unset since it's advancing the read transaction without ever having been
+    // in a write transaction before.
+    read->promote_to_write();
 }
 
 

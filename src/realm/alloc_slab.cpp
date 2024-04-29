@@ -74,7 +74,7 @@ size_t SlabAlloc::get_total_slab_size() noexcept
 
 SlabAlloc::SlabAlloc()
 {
-    m_initial_section_size = 1UL << section_shift; // page_size();
+    m_initial_section_size = section_size();
     m_free_space_state = free_space_Clean;
     m_baseline = 0;
 }
@@ -718,16 +718,9 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
     // check if online compaction allows us to shrink the file:
     if (top_ref) {
         // Get the expected file size by looking up logical file size stored in top array
-        constexpr size_t max_top_size = (Group::s_file_size_ndx + 1) * 8 + sizeof(Header);
-        size_t top_page_base = top_ref & ~(page_size() - 1);
-        size_t top_offset = top_ref - top_page_base;
-        size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
-        File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0, m_write_observer);
-        realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
-        auto top_header = map_top.get_addr() + top_offset;
-        auto top_data = NodeHeader::get_data_from_header(top_header);
-        auto w = NodeHeader::get_width_from_header(top_header);
-        auto logical_size = size_t(get_direct(top_data, w, Group::s_file_size_ndx)) >> 1;
+        Array top(*this);
+        top.init_from_ref(top_ref);
+        size_t logical_size = Group::get_logical_file_size(top);
         // make sure we're page aligned, so the code below doesn't first
         // truncate the file, then expand it again
         expected_size = round_up_to_page_size(logical_size);
@@ -738,7 +731,6 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
         detach(true); // keep m_file open
         m_file.resize(expected_size);
         m_file.close();
-        size = expected_size;
         return true;
     }
 
@@ -849,7 +841,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         if (REALM_UNLIKELY(cfg.read_only))
             throw InvalidDatabase("Read-only access to empty Realm file", path);
 
-        size_t initial_size = page_size(); // m_initial_section_size;
+        size_t initial_size = page_size();
         // exFAT does not allocate a unique id for the file until it is non-empty. It must be
         // valid at this point because File::get_unique_id() is used to distinguish
         // mappings_for_file in the encryption layer. So the prealloc() is required before
@@ -882,6 +874,12 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
     DetachGuard dg(*this);
 
     reset_free_space_tracking();
+
+    // the file could have been produced on a device with a different
+    // page size than our own so don't expect the size to be aligned
+    if (cfg.encryption_key && size != 0 && size != round_up_to_page_size(size)) {
+        size = round_up_to_page_size(size);
+    }
     update_reader_view(size);
     REALM_ASSERT(m_mappings.size());
     m_data = m_mappings[0].primary_mapping.get_addr();

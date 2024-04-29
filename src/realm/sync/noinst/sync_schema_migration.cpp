@@ -116,10 +116,12 @@ void perform_schema_migration(DB& db)
     sync::TempShortCircuitReplication sync_history_guard(repl);
     repl.set_write_validator_factory(nullptr);
 
-    // Delete all tables (and their columns).
-    const bool ignore_backlinks = true;
-    for (const auto& tk : tr->get_table_keys()) {
-        tr->remove_table(tk, ignore_backlinks);
+    // Delete all columns before deleting tables to avoid complications with links
+    for (auto tk : tr->get_table_keys()) {
+        tr->get_table(tk)->remove_columns();
+    }
+    for (auto tk : tr->get_table_keys()) {
+        tr->remove_table(tk);
     }
 
     // Clear sync history, reset the file ident and the server version in the download and upload progress.

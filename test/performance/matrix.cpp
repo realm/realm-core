@@ -26,7 +26,7 @@
 
 #include "../util/timer.hpp"
 
-//#define ONLY_CN_TESTS
+// #define ONLY_CN_TESTS
 /************************************************************************************
 
 // In Visual Studio, enable this matrix.cpp in compilation and disable test.cpp, else
@@ -263,9 +263,7 @@ private:
 };
 class columns2 {
 public:
-    columns2()
-    {
-    }
+    columns2() {}
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3;
@@ -273,9 +271,7 @@ public:
 };
 class columns3 {
 public:
-    columns3()
-    {
-    }
+    columns3() {}
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15;
@@ -283,9 +279,7 @@ public:
 };
 class columns4 {
 public:
-    columns4()
-    {
-    }
+    columns4() {}
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL;
@@ -293,9 +287,7 @@ public:
 };
 class columns5 {
 public:
-    columns5()
-    {
-    }
+    columns5() {}
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL;
@@ -303,9 +295,7 @@ public:
 };
 class columns6 {
 public:
-    columns6()
-    {
-    }
+    columns6() {}
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL &&
@@ -314,9 +304,7 @@ public:
 };
 class columns7 {
 public:
-    columns7()
-    {
-    }
+    columns7() {}
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL &&

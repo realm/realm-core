@@ -63,8 +63,7 @@ template <class>
 class SubQuery;
 class TableView;
 
-struct Link {
-};
+struct Link {};
 typedef Link BackLink;
 
 
@@ -204,6 +203,7 @@ public:
 
     CollectionType get_collection_type(ColKey col_key) const;
 
+    void remove_columns();
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
@@ -727,13 +727,13 @@ private:
     {
         m_alloc.refresh_ref_translation();
     }
-    Spec m_spec;                                    // 1st slot in m_top
-    ClusterTree m_clusters;                         // 3rd slot in m_top
-    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
-    TableKey m_key;                                 // 4th slot in m_top
-    Array m_index_refs;                             // 5th slot in m_top
-    Array m_opposite_table;                         // 7th slot in m_top
-    Array m_opposite_column;                        // 8th slot in m_top
+    Spec m_spec;                               // 1st slot in m_top
+    ClusterTree m_clusters;                    // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
+    TableKey m_key;                            // 4th slot in m_top
+    Array m_index_refs;                        // 5th slot in m_top
+    Array m_opposite_table;                    // 7th slot in m_top
+    Array m_opposite_column;                   // 8th slot in m_top
     std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;

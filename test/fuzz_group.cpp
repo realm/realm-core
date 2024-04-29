@@ -52,8 +52,7 @@ using namespace realm::util;
 
 namespace {
 
-struct EndOfFile {
-};
+struct EndOfFile {};
 
 enum INS {
     ADD_TABLE,

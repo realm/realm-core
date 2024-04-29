@@ -107,6 +107,6 @@ inline BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& al
         return ArrayBigBlobs::get(header, ndx, alloc);
     }
 }
-}
+} // namespace realm
 
 #endif /* SRC_REALM_ARRAY_BINARY_HPP_ */

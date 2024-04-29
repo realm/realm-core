@@ -19,6 +19,8 @@
 #ifndef REALM_INDEX_SET_HPP
 #define REALM_INDEX_SET_HPP
 
+#include <realm/util/features.h>
+
 #include <cstddef>
 #include <initializer_list>
 #include <iterator>
@@ -385,7 +387,12 @@ inline ChunkedRangeVectorIterator<T> ChunkedRangeVectorIterator<T>::operator--(i
 }
 
 template <typename T>
-inline void ChunkedRangeVectorIterator<T>::next_chunk() noexcept
+#if REALM_WINDOWS && REALM_ARCHITECTURE_ARM64
+// Inlining this function crashes msvc when targeting arm64 in as of 19.39.33523
+__declspec(noinline)
+#endif
+inline void
+ChunkedRangeVectorIterator<T>::next_chunk() noexcept
 {
     ++m_outer;
     m_inner = m_outer != m_end ? &m_outer->data[0] : nullptr;

@@ -168,7 +168,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
                             ctrl.matches.back().push_back(k);
                         });
                     }
-                    else {
+                    else if (end_of_path) {
                         ctrl.matches.back().push_back(Mixed());
                     }
                     return;
@@ -243,10 +243,6 @@ UpdateStatus CollectionBase::do_init_from_parent(BPlusTreeBase* tree, ref_type r
         tree->init_from_ref(ref);
     }
     else {
-        if (tree->init_from_parent()) {
-            // All is well
-            return UpdateStatus::Updated;
-        }
         if (!allow_create) {
             tree->detach();
             return UpdateStatus::Detached;

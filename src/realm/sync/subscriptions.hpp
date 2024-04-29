@@ -190,8 +190,7 @@ public:
 
 protected:
     friend class SubscriptionStore;
-    struct SupersededTag {
-    };
+    struct SupersededTag {};
     using MakingMutableCopy = util::TaggedBool<class MakingMutableCopyTag>;
 
     explicit SubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, int64_t version, SupersededTag);

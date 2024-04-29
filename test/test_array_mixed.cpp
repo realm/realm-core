@@ -102,7 +102,7 @@ TEST(ArrayMixed_Basics)
     arr.erase(5); // Erase string
     CHECK_EQUAL(arr.get(5).get_binary(), BinaryData(bin.data(), bin.size()));
 
-    arr.insert(2, Mixed());    // null
+    arr.insert(2, Mixed());             // null
     arr.insert(2, int64_t(4500000000)); // Requires more than 32 bit
 
     CHECK_EQUAL(arr.get(2).get_int(), 4500000000);

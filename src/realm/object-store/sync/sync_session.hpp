@@ -27,7 +27,6 @@
 
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/future.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
 #include <mutex>
@@ -43,7 +42,7 @@ namespace sync {
 class Session;
 struct SessionErrorInfo;
 class MigrationStore;
-}
+} // namespace sync
 
 namespace _impl {
 class RealmCoordinator;
@@ -80,12 +79,14 @@ private:
     // can register upon this session.
     struct NotifierPackage {
         std::function<ProgressNotifierCallback> notifier;
-        util::Optional<uint64_t> captured_transferrable;
         uint64_t snapshot_version;
         bool is_streaming;
         bool is_download;
-
-        util::UniqueFunction<void()> create_invocation(const Progress&, bool&);
+        bool started_notifying = false;
+        uint64_t initial_transferred = 0;
+        std::optional<uint64_t> captured_transferable;
+        util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired,
+                                                       bool initial_registration = false);
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.
@@ -99,7 +100,7 @@ private:
     // event more up-to-date information isn't yet available.  FIXME: If we support transparent
     // client reset in the future, we might need to reset the progress state variables if the Realm
     // is rolled back.
-    util::Optional<Progress> m_current_progress;
+    std::optional<Progress> m_current_progress;
 
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
 };
@@ -235,7 +236,7 @@ public:
 
     // The access token needs to periodically be refreshed and this is how to
     // let the sync session know to update it's internal copy.
-    void update_access_token(const std::string& signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
+    void update_access_token(std::string_view signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
 
     // Request an updated access token from this session's sync user.
     void initiate_access_token_refresh() REQUIRES(!m_config_mutex);
@@ -387,13 +388,13 @@ private:
                                                const RealmConfig& config, SyncManager* sync_manager)
     {
         REALM_ASSERT(config.sync_config);
-        return std::make_shared<SyncSession>(Private(), client, std::move(db), config, std::move(sync_manager));
+        return std::make_shared<SyncSession>(Private(), client, std::move(db), config, sync_manager);
     }
     // }
 
     std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
 
-    static util::UniqueFunction<void(util::Optional<app::AppError>)>
+    static util::UniqueFunction<void(std::optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&, bool);
 
     // Initialize or tear down the subscription store based on whether or not flx_sync_requested is true

@@ -152,7 +152,7 @@ TEST(JSONParser_UnescapeString)
         "\"\\ud87e\\udd10\"", // Emoji 'zipper-mouth face' (surrogate pair)
     };
     static const char* expected[] = {
-        "\\u0abg", "A",    "א", "⼈",
+        "\\u0abg", "A",  "א", "⼈",
         "人", // NOTE! This character looks identical to the one above, but is a different codepoint.
         "�",       "🤐",
     };

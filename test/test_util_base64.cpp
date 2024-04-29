@@ -42,15 +42,7 @@ TEST(Base64_Decode)
         "SGVsb G8sIF\ndvc mxkIQ==", // contains whitespace
     };
 
-    static const char* expected[] = {
-        "",
-        "f",
-        "fo",
-        "foo",
-        "floo",
-        "floor",
-        "Hello, World!"
-    };
+    static const char* expected[] = {"", "f", "fo", "foo", "floo", "floor", "Hello, World!"};
 
     static const size_t num_tests = sizeof(inputs) / sizeof(inputs[0]);
 
@@ -61,11 +53,11 @@ TEST(Base64_Decode)
     }
 
     static const char* bad_inputs[] = {
-        "!",       // invalid char
-        ":",       // invalid char
-        "Zg===",   // invalid length
-        "====",    // only padding
-        "()",      // invalid chars
+        "!",        // invalid char
+        ":",        // invalid char
+        "Zg===",    // invalid length
+        "====",     // only padding
+        "()",       // invalid chars
         "Zm9v====", // wrong amount of padding
     };
     static const size_t num_bad_tests = sizeof(bad_inputs) / sizeof(bad_inputs[0]);

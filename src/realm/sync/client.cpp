@@ -110,7 +110,7 @@ public:
     bool wait_for_upload_complete_or_client_stopped();
     bool wait_for_download_complete_or_client_stopped();
 
-    void refresh(std::string signed_access_token);
+    void refresh(std::string_view signed_access_token);
 
     static void abandon(util::bind_ptr<SessionWrapper>) noexcept;
 
@@ -1131,6 +1131,11 @@ void SessionImpl::init_progress_handler()
     m_wrapper.init_progress_handler();
 }
 
+void SessionImpl::enable_progress_notifications()
+{
+    m_wrapper.m_reliable_download_progress = true;
+}
+
 void SessionImpl::notify_upload_progress()
 {
     if (m_state != State::Active)
@@ -1392,7 +1397,7 @@ void SessionWrapper::on_commit(version_type new_version)
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
-        sess.recognize_sync_version(new_version); // Throws
+        sess.recognize_sync_version(new_version);                           // Throws
         self->on_upload_progress(/* only_if_new_uploadable_data = */ true); // Throws
     });
 }
@@ -1557,13 +1562,13 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 }
 
 
-void SessionWrapper::refresh(std::string signed_access_token)
+void SessionWrapper::refresh(std::string_view signed_access_token)
 {
     // Thread safety required
     REALM_ASSERT(m_initiated);
     REALM_ASSERT(!m_abandoned);
 
-    m_client.post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
+    m_client.post([self = util::bind_ptr(this), token = std::string(signed_access_token)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -1751,20 +1756,12 @@ inline void SessionWrapper::finalize_before_actualization() noexcept
 inline void SessionWrapper::on_upload_progress(bool only_if_new_uploadable_data)
 {
     REALM_ASSERT(!m_finalized);
-
-    // don't set the flag in case of the progress change of local origin
-    // progress should be delayed until first DOWNLOAD message received
-    // since uploads are not allowed before that and can't progress
-    if (!only_if_new_uploadable_data)
-        m_reliable_download_progress = true;
-
     report_progress(/* is_download = */ false, only_if_new_uploadable_data); // Throws
 }
 
 inline void SessionWrapper::on_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes)
 {
     REALM_ASSERT(!m_finalized);
-    m_reliable_download_progress = true;
     m_bootstrap_store_bytes = bootstrap_store_bytes;
     report_progress(/* is_download = */ true); // Throws
 }
@@ -2279,7 +2276,7 @@ bool Session::wait_for_download_complete_or_client_stopped()
 }
 
 
-void Session::refresh(const std::string& signed_access_token)
+void Session::refresh(std::string_view signed_access_token)
 {
     m_impl->refresh(signed_access_token); // Throws
 }

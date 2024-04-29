@@ -176,9 +176,18 @@ struct QueryInitHelper {
     // This is to allow type-erasing a function that can be passed either an lvalue- or rvalue-reference,
     // but needs to use it as a mutable reference.
     struct QueryAnyRef {
-        QueryAnyRef(Query& q) : ptr(&q) {}
-        QueryAnyRef(Query&& q) : ptr(&q) {}
-        operator Query&() { return *ptr; }
+        QueryAnyRef(Query& q)
+            : ptr(&q)
+        {
+        }
+        QueryAnyRef(Query&& q)
+            : ptr(&q)
+        {
+        }
+        operator Query&()
+        {
+            return *ptr;
+        }
 
         Query* ptr;
     };
@@ -238,7 +247,9 @@ size_t QueryInitHelper::run(const TestFunc& fn)
     auto table = rt->get_table(TableKey(0));
     size_t count;
     Query query = table->where();
-    fn(query, [&](auto&& q2) { count = Compose<Mutations..., GetCount>{*this}(q2); });
+    fn(query, [&](auto&& q2) {
+        count = Compose<Mutations..., GetCount>{*this}(q2);
+    });
     rt->end_read();
     return count;
 }
@@ -316,9 +327,15 @@ TEST(Query_TableInitialization)
     QueryInitHelper helper{test_context, sg, {}, initial_version, extra_col_version};
 
     // links_to
-    helper([&](Query& q, auto&& test) { test(q.links_to(col_link, keys[0])); });
-    helper([&](Query& q, auto&& test) { test(q.links_to(col_list, keys[0])); });
-    helper([&](Query& q, auto&& test) { test(q.Not().links_to(col_link, keys[0])); });
+    helper([&](Query& q, auto&& test) {
+        test(q.links_to(col_link, keys[0]));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.links_to(col_list, keys[0]));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.Not().links_to(col_link, keys[0]));
+    });
     helper([&](Query& q, auto&& test) {
         auto it = q.get_table()->begin();
         ObjKey k0 = it->get_key();
@@ -328,39 +345,95 @@ TEST(Query_TableInitialization)
     });
 
     // compare to null
-    helper([&](Query& q, auto&& test) { test(q.equal(col_int_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.equal(col_float_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.equal(col_bool_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.equal(col_double_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.equal(col_string_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.equal(col_binary_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.equal(col_timestamp_null, null{})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_int_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_float_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_bool_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_double_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_string_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_binary_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_timestamp_null, null{}));
+    });
 
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_int_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_float_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_bool_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_double_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_binary_null, null{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_timestamp_null, null{})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_int_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_float_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_bool_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_double_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_string_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_binary_null, null{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_timestamp_null, null{}));
+    });
 
     // Conditions: int64_t
-    helper([&](Query& q, auto&& test) { test(q.equal(col_int, int64_t{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_int, int64_t{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater(col_int, int64_t{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_int, int64_t{})); });
-    helper([&](Query& q, auto&& test) { test(q.less(col_int, int64_t{})); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal(col_int, int64_t{})); });
-    helper([&](Query& q, auto&& test) { test(q.between(col_int, int64_t{}, {})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_int, int64_t{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_int, int64_t{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_int, int64_t{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_int, int64_t{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_int, int64_t{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_int, int64_t{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.between(col_int, int64_t{}, {}));
+    });
 
     // Conditions: int
-    helper([&](Query& q, auto&& test) { test(q.equal(col_int, int{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_int, int{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater(col_int, int{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_int, int{})); });
-    helper([&](Query& q, auto&& test) { test(q.less(col_int, int{})); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal(col_int, int{})); });
-    helper([&](Query& q, auto&& test) { test(q.between(col_int, int{}, {})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_int, int{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_int, int{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_int, int{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_int, int{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_int, int{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_int, int{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.between(col_int, int{}, {}));
+    });
 
     // Conditions: 2 int columns
     helper([&](Query& q, auto&& test) {
@@ -383,13 +456,27 @@ TEST(Query_TableInitialization)
     });
 
     // Conditions: float
-    helper([&](Query& q, auto&& test) { test(q.equal(col_float, float{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_float, float{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater(col_float, float{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_float, float{})); });
-    helper([&](Query& q, auto&& test) { test(q.less(col_float, float{})); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal(col_float, float{})); });
-    helper([&](Query& q, auto&& test) { test(q.between(col_float, float{}, {})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_float, float{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_float, float{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_float, float{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_float, float{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_float, float{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_float, float{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.between(col_float, float{}, {}));
+    });
 
     // Conditions: 2 float columns
     helper([&](Query& q, auto&& test) {
@@ -412,13 +499,27 @@ TEST(Query_TableInitialization)
     });
 
     // Conditions: double
-    helper([&](Query& q, auto&& test) { test(q.equal(col_double, double{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_double, double{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater(col_double, double{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_double, double{})); });
-    helper([&](Query& q, auto&& test) { test(q.less(col_double, double{})); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal(col_double, double{})); });
-    helper([&](Query& q, auto&& test) { test(q.between(col_double, double{}, {})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_double, double{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_double, double{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_double, double{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_double, double{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_double, double{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_double, double{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.between(col_double, double{}, {}));
+    });
 
     // Conditions: 2 double columns
     helper([&](Query& q, auto&& test) {
@@ -441,51 +542,123 @@ TEST(Query_TableInitialization)
     });
 
     // Conditions: timestamp
-    helper([&](Query& q, auto&& test) { test(q.equal(col_timestamp, Timestamp{5, 5})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_timestamp, Timestamp{5, 5})); });
-    helper([&](Query& q, auto&& test) { test(q.greater(col_timestamp, Timestamp{5, 5})); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_timestamp, Timestamp{5, 5})); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal(col_timestamp, Timestamp{5, 5})); });
-    helper([&](Query& q, auto&& test) { test(q.less(col_timestamp, Timestamp{5, 5})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_timestamp, Timestamp{5, 5}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_timestamp, Timestamp{5, 5}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_timestamp, Timestamp{5, 5}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_timestamp, Timestamp{5, 5}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_timestamp, Timestamp{5, 5}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_timestamp, Timestamp{5, 5}));
+    });
 
     // Conditions: bool
-    helper([&](Query& q, auto&& test) { test(q.equal(col_bool, bool{})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_bool, bool{}));
+    });
 
     // Conditions: strings
-    helper([&](Query& q, auto&& test) { test(q.equal(col_string, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_string, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_string, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.begins_with(col_string, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.ends_with(col_string, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.contains(col_string, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.like(col_string, StringData{}));
+    });
 
-    helper([&](Query& q, auto&& test) { test(q.equal(col_string, StringData{}, false)); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string, StringData{}, false)); });
-    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{}, false)); });
-    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{}, false)); });
-    helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{}, false)); });
-    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_string, StringData{}, false));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_string, StringData{}, false));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.begins_with(col_string, StringData{}, false));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.ends_with(col_string, StringData{}, false));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.contains(col_string, StringData{}, false));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.like(col_string, StringData{}, false));
+    });
 
-    helper([&](Query& q, auto&& test) { test(q.equal(col_string_enum, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_enum, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_enum, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_enum, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.contains(col_string_enum, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.like(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_string_enum, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_string_enum, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.begins_with(col_string_enum, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.ends_with(col_string_enum, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.contains(col_string_enum, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.like(col_string_enum, StringData{}));
+    });
 
-    helper([&](Query& q, auto&& test) { test(q.equal(col_string_indexed, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_indexed, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_indexed, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_indexed, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.contains(col_string_indexed, StringData{})); });
-    helper([&](Query& q, auto&& test) { test(q.like(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_string_indexed, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_string_indexed, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.begins_with(col_string_indexed, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.ends_with(col_string_indexed, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.contains(col_string_indexed, StringData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.like(col_string_indexed, StringData{}));
+    });
 
     // Conditions: binary data
-    helper([&](Query& q, auto&& test) { test(q.equal(col_binary, BinaryData{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_binary, BinaryData{})); });
-    helper([&](Query& q, auto&& test) { test(q.begins_with(col_binary, BinaryData{})); });
-    helper([&](Query& q, auto&& test) { test(q.ends_with(col_binary, BinaryData{})); });
-    helper([&](Query& q, auto&& test) { test(q.contains(col_binary, BinaryData{})); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_binary, BinaryData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_binary, BinaryData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.begins_with(col_binary, BinaryData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.ends_with(col_binary, BinaryData{}));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.contains(col_binary, BinaryData{}));
+    });
 
     enum class Mode { Direct, Link, LinkList };
 
@@ -493,12 +666,18 @@ TEST(Query_TableInitialization)
     auto test_query_expression = [&](util::FunctionRef<Table&()> get_table, Mode mode) {
         auto test_operator = [&](auto&& op, auto&& column, auto&& v) {
             if (mode != Mode::LinkList)
-                helper([&](Query&, auto&& test) { test(op(column(), column())); });
-            helper([&](Query&, auto&& test) { test(op(column(), v)); });
+                helper([&](Query&, auto&& test) {
+                    test(op(column(), column()));
+                });
+            helper([&](Query&, auto&& test) {
+                test(op(column(), v));
+            });
         };
         auto test_numeric = [&](auto value, ColKey col, ColKey null_col) {
             using Type = decltype(value);
-            auto get_column = [&] { return get_table().template column<Type>(col); };
+            auto get_column = [&] {
+                return get_table().template column<Type>(col);
+            };
             test_operator(std::equal_to<>(), get_column, value);
             test_operator(std::not_equal_to<>(), get_column, value);
             test_operator(std::greater<>(), get_column, value);
@@ -506,17 +685,23 @@ TEST(Query_TableInitialization)
             test_operator(std::greater_equal<>(), get_column, value);
             test_operator(std::less_equal<>(), get_column, value);
 
-            auto get_null_column = [&] { return get_table().template column<Type>(null_col); };
+            auto get_null_column = [&] {
+                return get_table().template column<Type>(null_col);
+            };
             test_operator(std::equal_to<>(), get_null_column, null{});
             test_operator(std::not_equal_to<>(), get_null_column, null{});
         };
         auto test_bool = [&](auto value, ColKey col, ColKey null_col) {
             using Type = decltype(value);
-            auto get_column = [&] { return get_table().template column<Type>(col); };
+            auto get_column = [&] {
+                return get_table().template column<Type>(col);
+            };
             test_operator(std::equal_to<>(), get_column, value);
             test_operator(std::not_equal_to<>(), get_column, value);
 
-            auto get_null_column = [&] { return get_table().template column<Type>(null_col); };
+            auto get_null_column = [&] {
+                return get_table().template column<Type>(null_col);
+            };
             test_operator(std::equal_to<>(), get_null_column, null{});
             test_operator(std::not_equal_to<>(), get_null_column, null{});
         };
@@ -527,64 +712,162 @@ TEST(Query_TableInitialization)
         test_numeric(Double(), col_double, col_double_null);
         test_numeric(Timestamp(), col_timestamp, col_timestamp_null);
 
-        auto string_col = [&] { return get_table().template column<String>(col_string); };
+        auto string_col = [&] {
+            return get_table().template column<String>(col_string);
+        };
         test_operator(std::equal_to<>(), string_col, StringData());
         test_operator(std::not_equal_to<>(), string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.begins_with(b); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.ends_with(b); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.contains(b); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.like(b); }, string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.begins_with(b);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.ends_with(b);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.contains(b);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.like(b);
+            },
+            string_col, StringData());
 
-        test_operator([](auto&& a, auto&& b) { return a.equal(b, false); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.not_equal(b, false); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.begins_with(b, false); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.ends_with(b, false); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.contains(b, false); }, string_col, StringData());
-        test_operator([](auto&& a, auto&& b) { return a.like(b, false); }, string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.equal(b, false);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.not_equal(b, false);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.begins_with(b, false);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.ends_with(b, false);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.contains(b, false);
+            },
+            string_col, StringData());
+        test_operator(
+            [](auto&& a, auto&& b) {
+                return a.like(b, false);
+            },
+            string_col, StringData());
 
-        auto null_string_col = [&] { return get_table().template column<String>(col_string_null); };
+        auto null_string_col = [&] {
+            return get_table().template column<String>(col_string_null);
+        };
         test_operator(std::equal_to<>(), null_string_col, null());
         test_operator(std::not_equal_to<>(), null_string_col, null());
 
-        auto binary_col = [&] { return get_table().template column<Binary>(col_binary); };
-        helper([&](Query&, auto&& test) { test(binary_col() == BinaryData()); });
-        helper([&](Query&, auto&& test) { test(binary_col() != BinaryData()); });
-        helper([&](Query&, auto&& test) { test(binary_col().size() != 0); });
+        auto binary_col = [&] {
+            return get_table().template column<Binary>(col_binary);
+        };
+        helper([&](Query&, auto&& test) {
+            test(binary_col() == BinaryData());
+        });
+        helper([&](Query&, auto&& test) {
+            test(binary_col() != BinaryData());
+        });
+        helper([&](Query&, auto&& test) {
+            test(binary_col().size() != 0);
+        });
 
-        auto link_col = [&] { return get_table().template column<Link>(col_link); };
-        auto list_col = [&] { return get_table().template column<Link>(col_list); };
-        auto get_obj0 = [&] { return get_table().get_object(keys[0]); };
+        auto link_col = [&] {
+            return get_table().template column<Link>(col_link);
+        };
+        auto list_col = [&] {
+            return get_table().template column<Link>(col_list);
+        };
+        auto get_obj0 = [&] {
+            return get_table().get_object(keys[0]);
+        };
 
         if (mode == Mode::Direct) { // link equality over links isn't implemented
-            helper([&](Query&, auto&& test) { test(link_col().is_null()); });
-            helper([&](Query&, auto&& test) { test(link_col().is_not_null()); });
+            helper([&](Query&, auto&& test) {
+                test(link_col().is_null());
+            });
+            helper([&](Query&, auto&& test) {
+                test(link_col().is_not_null());
+            });
 
-            helper([&](Query&, auto&& test) { test(link_col() == get_obj0()); });
-            helper([&](Query&, auto&& test) { test(link_col() != get_obj0()); });
+            helper([&](Query&, auto&& test) {
+                test(link_col() == get_obj0());
+            });
+            helper([&](Query&, auto&& test) {
+                test(link_col() != get_obj0());
+            });
 
-            helper([&](Query&, auto&& test) { test(list_col() == get_obj0()); });
-            helper([&](Query&, auto&& test) { test(list_col() != get_obj0()); });
+            helper([&](Query&, auto&& test) {
+                test(list_col() == get_obj0());
+            });
+            helper([&](Query&, auto&& test) {
+                test(list_col() != get_obj0());
+            });
         }
 
-        helper([&](Query&, auto&& test) { test(list_col().count() == 1); });
-        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).max() > 0); });
-        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).min() > 0); });
-        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).sum() > 0); });
-        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).average() > 0); });
+        helper([&](Query&, auto&& test) {
+            test(list_col().count() == 1);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_col().column<Int>(col_int).max() > 0);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_col().column<Int>(col_int).min() > 0);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_col().column<Int>(col_int).sum() > 0);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_col().column<Int>(col_int).average() > 0);
+        });
 
-        auto list_int = [&] { return get_table().template column<Lst<Int>>(col_list_int); };
+        auto list_int = [&] {
+            return get_table().template column<Lst<Int>>(col_list_int);
+        };
 
-        helper([&](Query&, auto&& test) { test(list_int().size() == 1); });
-        helper([&](Query&, auto&& test) { test(list_int() > 0); });
-        helper([&](Query&, auto&& test) { test(list_int().max() > 0); });
-        helper([&](Query&, auto&& test) { test(list_int().min() > 0); });
-        helper([&](Query&, auto&& test) { test(list_int().sum() > 0); });
-        helper([&](Query&, auto&& test) { test(list_int().average() > 0); });
+        helper([&](Query&, auto&& test) {
+            test(list_int().size() == 1);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_int() > 0);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_int().max() > 0);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_int().min() > 0);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_int().sum() > 0);
+        });
+        helper([&](Query&, auto&& test) {
+            test(list_int().average() > 0);
+        });
     };
 
     // Test all of the query expressions directly, over a link, over a backlink
     // over a linklist, and over two links
-    test_query_expression([&]() -> Table& { return helper.get_table(); }, Mode::Direct);
+    test_query_expression(
+        [&]() -> Table& {
+            return helper.get_table();
+        },
+        Mode::Direct);
     test_query_expression(
         [&]() -> Table& {
             Table& t = helper.get_table();
