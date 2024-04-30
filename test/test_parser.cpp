@@ -4129,7 +4129,8 @@ TEST_TYPES(Parser_7642, std::true_type, std::false_type)
 
     using Vec = std::vector<Mixed>;
     verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
-    verify_query(test_context, cars, "value IN $0", {Vec{456, 789.0f, 123.0}}, 3);
+    // do not compare to floats, and do not compare to doubles that are not an exact integer
+    verify_query(test_context, cars, "value IN $0", {Vec{456, 789.0f, 123.0, 789.10}}, 2);
 }
 
 TEST(Parser_KeyPathSubstitution)

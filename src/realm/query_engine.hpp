@@ -514,10 +514,10 @@ public:
             }
             else if (const double* val = it->get_if<double>()) {
                 // JS encodes numbers as double
-                m_needles.insert(int64_t(*val));
-            }
-            else if (const float* val = it->get_if<float>()) {
-                m_needles.insert(int64_t(*val));
+                // only add this value if it represents an integer
+                if (*val == double(int64_t(*val))) {
+                    m_needles.insert(int64_t(*val));
+                }
             }
         }
     }
