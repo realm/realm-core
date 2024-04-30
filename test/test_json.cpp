@@ -28,7 +28,6 @@
 
 #include <realm.hpp>
 #include <external/json/json.hpp>
-#include <external/bson/bson.h>
 
 #include "util/misc.hpp"
 
@@ -784,28 +783,6 @@ TEST(Json_Timestamp)
     t2 = steady_clock::now();
     std::cout << "   gm_time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
     */
-}
-
-TEST(Bson_bson)
-{
-    bson_t bs[1];
-    bson_t child[1];
-    bson_init(bs);
-    BSON_APPEND_ARRAY_BEGIN(bs, "Hello", child);
-    BSON_APPEND_UTF8(child, "0", "awesome");
-    BSON_APPEND_DOUBLE(child, "1", 5.125);
-    BSON_APPEND_INT32(child, "2", 1986);
-    bson_append_array_end(bs, child);
-    BSON_APPEND_ARRAY_BEGIN(bs, "World", child);
-    BSON_APPEND_UTF8(child, "0", "pink");
-    bson_append_array_end(bs, child);
-
-    size_t len;
-    char* str = bson_as_canonical_extended_json(bs, &len);
-    // std::cout << str << std::endl;
-    CHECK(strstr(str, "awesome") != nullptr);
-    bson_free(str);
-    bson_destroy(bs);
 }
 
 } // anonymous namespace

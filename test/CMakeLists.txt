@@ -154,7 +154,7 @@ file(GLOB REQUIRED_TEST_FILES
 
 add_library(CoreTestLib OBJECT ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 enable_stdfilesystem(CoreTestLib)
-target_link_libraries(CoreTestLib QueryParser Bson)
+target_link_libraries(CoreTestLib QueryParser)
 
 add_executable(CoreTests main.cpp test_all.cpp ${REQUIRED_TEST_FILES})
 target_link_libraries(CoreTests CoreTestLib TestUtil)
