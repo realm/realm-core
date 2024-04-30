@@ -4956,6 +4956,15 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                                       }));
         }
     };
+
+    enum TestState { not_ready, start, reconnect_received, downloading, downloaded, complete };
+    TestingStateMachine<TestState> state_machina(TestState::not_ready);
+    std::mutex callback_mutex;
+    int64_t query_version = 0;
+    bool did_client_reset = false;
+    size_t msg_count = 0;
+    bool role_change_bootstrap = false;
+
     auto logger = util::Logger::get_default_logger();
     FLXSyncTestHarness harness("flx_role_change_bootstrap", {person_schema, {"role", "firstName", "lastName"}});
     auto& app_session = harness.session().app_session();
@@ -4977,19 +4986,58 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
     auto config = harness.make_test_file();
 
-    std::mutex callback_mutex;
-    std::function<SyncClientHookAction(std::weak_ptr<SyncSession>, const SyncClientHookData&)> hook_callback;
-    bool did_client_reset = false;
+    config.sync_config->on_sync_client_event_hook = [&state_machina, &callback_mutex, &msg_count,
+                                                     &role_change_bootstrap, &query_version](
+                                                        std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
+        state_machina.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+            if (cur_state == TestState::not_ready)
+                return std::nullopt;
 
-    config.sync_config->on_sync_client_event_hook =
-        [&hook_callback, &callback_mutex](std::weak_ptr<SyncSession> session, const SyncClientHookData& data) {
-            std::lock_guard lock(callback_mutex);
-            if (hook_callback) {
-                return hook_callback(session, data);
+            using BatchState = sync::DownloadBatchState;
+            using Event = SyncClientHookEvent;
+            switch (data.event) {
+                case Event::ErrorMessageReceived:
+                    REQUIRE(cur_state == TestState::start);
+                    REQUIRE(data.error_info);
+                    REQUIRE(data.error_info->raw_error_code == 200);
+                    REQUIRE(data.error_info->server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
+                    REQUIRE_FALSE(data.error_info->is_fatal);
+                    return TestState::reconnect_received;
+
+                // A bootstrap message was processed - used for multi-message or
+                // single message multi changeset bootstraps
+                case Event::BootstrapMessageProcessed: {
+                    REQUIRE(data.batch_state != BatchState::SteadyState);
+                    REQUIRE((cur_state == TestState::reconnect_received || cur_state == TestState::downloading));
+                    if (data.batch_state != BatchState::SteadyState) {
+                        std::lock_guard lock(callback_mutex);
+                        ++msg_count;
+                        if (data.query_version == query_version) {
+                            role_change_bootstrap = true;
+                        }
+                    }
+                    // multi-message bootstrap in progress..
+                    if (data.batch_state == BatchState::MoreToCome) {
+                        return TestState::downloading;
+                    }
+                    // single bootstrap message or last message in the multi-message bootstrap
+                    else if (data.batch_state == BatchState::LastInBatch) {
+                        return TestState::downloaded;
+                    }
+                    return std::nullopt;
+                }
+                // The bootstrap has been received and processed
+                case Event::BootstrapProcessed:
+                    REQUIRE(cur_state == TestState::downloaded);
+                    return TestState::complete;
+                default:
+                    return std::nullopt;
             }
-            return SyncClientHookAction::NoAction;
-        };
-    config.sync_config->notify_before_client_reset = [&did_client_reset, &callback_mutex](std::shared_ptr<Realm>) {
+        });
+        return SyncClientHookAction::NoAction;
+    };
+
+    config.sync_config->notify_before_client_reset = [&callback_mutex, &did_client_reset](std::shared_ptr<Realm>) {
         std::lock_guard lock(callback_mutex);
         did_client_reset = true;
     };
@@ -5017,70 +5065,17 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         REQUIRE(results.size() == num_total);
     }
 
-    auto session = realm->sync_session();
-    int64_t query_version = realm->get_active_subscription_set().version();
-
     auto update_perms_and_verify = [&](std::optional<nlohmann::json> doc_filter, size_t cnt_emps, size_t cnt_mgrs,
                                        size_t cnt_dirs) {
-        using BatchState = sync::DownloadBatchState;
-        using Event = SyncClientHookEvent;
-        std::mutex bootstrap_mutex;
-        size_t msg_count = 0;
-        bool role_change_bootstrap = false;
-
-        enum TestState { start, reconnect_received, downloading, downloaded, complete };
-        TestingStateMachine<TestState> state_machina(TestState::start);
-
-        auto bootstrap_callback = [&bootstrap_mutex, &msg_count, query_version, &role_change_bootstrap,
-                                   &state_machina](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
-            state_machina.transition_with([&](TestState cur_state) -> std::optional<TestState> {
-                switch (data.event) {
-                    case Event::ErrorMessageReceived:
-                        REQUIRE(cur_state == TestState::start);
-                        REQUIRE(data.error_info);
-                        REQUIRE(data.error_info->raw_error_code == 200);
-                        REQUIRE(data.error_info->server_requests_action ==
-                                sync::ProtocolErrorInfo::Action::Transient);
-                        REQUIRE_FALSE(data.error_info->is_fatal);
-                        return TestState::reconnect_received;
-
-                    // A bootstrap message was processed - used for multi-message or
-                    // single message multi changeset bootstraps
-                    case Event::BootstrapMessageProcessed: {
-                        REQUIRE(data.batch_state != BatchState::SteadyState);
-                        REQUIRE((cur_state == TestState::reconnect_received || cur_state == TestState::downloading));
-                        if (data.batch_state != BatchState::SteadyState) {
-                            std::lock_guard lock(bootstrap_mutex);
-                            ++msg_count;
-                            if (data.query_version == query_version) {
-                                role_change_bootstrap = true;
-                            }
-                        }
-                        // multi-message bootstrap in progress..
-                        if (data.batch_state == BatchState::MoreToCome) {
-                            return TestState::downloading;
-                        }
-                        // single bootstrap message or last message in the multi-message bootstrap
-                        else if (data.batch_state == BatchState::LastInBatch) {
-                            return TestState::downloaded;
-                        }
-                        return std::nullopt;
-                    }
-                    // The bootstrap has been received and processed
-                    case Event::BootstrapProcessed:
-                        REQUIRE(cur_state == TestState::downloaded);
-                        return TestState::complete;
-                    default:
-                        return std::nullopt;
-                }
-            });
-            return SyncClientHookAction::NoAction;
-        };
         {
             std::lock_guard lock(callback_mutex);
-            hook_callback = std::move(bootstrap_callback);
             did_client_reset = false;
+            msg_count = 0;
+            role_change_bootstrap = false;
+            query_version = realm->get_active_subscription_set().version();
         }
+        // Reset the state machine
+        state_machina.transition_to(TestState::start);
 
         rule["roles"][0]["document_filters"]["read"] = doc_filter.value_or(true);
         rule["roles"][0]["document_filters"]["write"] = doc_filter.value_or(true);
@@ -5106,19 +5101,15 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
         bool multi_msg = false;
         {
-            std::lock_guard lock(bootstrap_mutex);
+            std::lock_guard lock(callback_mutex);
             if (msg_count > 1) {
                 multi_msg = true;
                 // verify a role change server initiated bootstrap was performed if it
                 // contained more than one bootstrap message
                 REQUIRE(role_change_bootstrap);
             }
-        }
-
-        // Make sure a client reset did not occur while waiting for the role change to
-        // be applied
-        {
-            std::lock_guard lock(callback_mutex);
+            // Make sure a client reset did not occur while waiting for the role change to
+            // be applied
             CHECK_FALSE(did_client_reset);
         }
 
@@ -5149,11 +5140,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             results = Results(realm, table_query);
             CHECK(results.size() == cnt_dirs);
         }
-        {
-            // Clear out the hook callback before leaving
-            std::lock_guard lock(callback_mutex);
-            hook_callback = nullptr;
-        }
+        // Reset the state machine to "not ready" before leaving
+        state_machina.transition_to(TestState::not_ready);
     };
     {
         // Single message bootstrap - remove employees, keep mgrs/dirs
