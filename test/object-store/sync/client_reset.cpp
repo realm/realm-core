@@ -1633,11 +1633,14 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
             err = error;
         };
-        auto make_fake_previous_reset = [&local_config](ClientResyncMode type) {
-            local_config.sync_config->notify_before_client_reset = [previous_type = type](SharedRealm realm) {
+        auto make_fake_previous_reset = [&local_config](ClientResyncMode mode,
+                                                        sync::ProtocolErrorInfo::Action action =
+                                                            sync::ProtocolErrorInfo::Action::ClientReset) {
+            local_config.sync_config->notify_before_client_reset = [mode, action](SharedRealm realm) {
                 auto db = TestHelper::get_db(realm);
                 auto wt = db->start_write();
-                _impl::client_reset::track_reset(*wt, previous_type);
+                Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
+                _impl::client_reset::track_reset(*wt, mode, true, action, error);
                 wt->commit();
             };
         };
@@ -1653,7 +1656,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref), util::Scheduler::make_default());
                 auto flag = has_reset_cycle_flag(realm);
                 REQUIRE(bool(flag));
-                REQUIRE(flag->type == ClientResyncMode::Recover);
+                REQUIRE(flag->mode == ClientResyncMode::Recover);
                 REQUIRE(did_recover);
                 std::lock_guard lock(mtx);
                 ++after_callback_invocations;
@@ -1681,7 +1684,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             auto realm = Realm::get_shared_realm(local_config);
             auto flag = has_reset_cycle_flag(realm);
             REQUIRE(flag);
-            CHECK(flag->type == ClientResyncMode::Recover);
+            CHECK(flag->mode == ClientResyncMode::Recover);
         }
 
         SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {

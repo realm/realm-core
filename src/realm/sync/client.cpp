@@ -1983,35 +1983,41 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 
     auto pending_reset = _impl::client_reset::has_pending_reset(*m_db->start_frozen());
     REALM_ASSERT(pending_reset);
-    m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
-                        pending_reset->time);
+    m_sess->logger.info(util::LogCategory::reset, "Tracking pending %1", pending_reset->to_string());
+    if (pending_reset->error) {
+        m_sess->logger.info(util::LogCategory::reset, "Originating client reset error: %1", *pending_reset->error);
+    }
+    // Now that the client reset merge is complete, wait for the changes to synchronize with the server
     async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset = *pending_reset](Status status) {
         if (status == ErrorCodes::OperationAborted) {
             return;
         }
         auto& logger = self->m_sess->logger;
         if (!status.is_ok()) {
-            logger.error("Error while tracking client reset acknowledgement: %1", status);
+            logger.error(util::LogCategory::reset, "Error while tracking client reset acknowledgement: %1", status);
             return;
+        }
+
+        logger.debug(util::LogCategory::reset, "%1 has been acknowledged by the server. ", pending_reset.to_string());
+        if (pending_reset.error) {
+            logger.info(util::LogCategory::reset, "Originating client reset error: %1", *pending_reset.error);
         }
 
         auto wt = self->m_db->start_write();
         auto cur_pending_reset = _impl::client_reset::has_pending_reset(*wt);
         if (!cur_pending_reset) {
-            logger.debug(
-                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
-                pending_reset.type, pending_reset.time);
+            logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
             return;
         }
-        else if (cur_pending_reset->type != pending_reset.type || cur_pending_reset->time != pending_reset.time) {
-            logger.debug(
-                "Was going to remove client reset tracker for type \"%1\" from %2, but found type \"%3\" from %4.",
-                pending_reset.type, pending_reset.time, cur_pending_reset->type, cur_pending_reset->time);
+        if (cur_pending_reset->mode != pending_reset.mode || cur_pending_reset->action != pending_reset.action ||
+            cur_pending_reset->time != pending_reset.time) {
+            logger.info(util::LogCategory::reset, "Found new pending %1", cur_pending_reset->to_string());
+            if (cur_pending_reset->error) {
+                logger.info(util::LogCategory::reset, "New client reset error: %1", *cur_pending_reset->error);
+            }
         }
         else {
-            logger.debug("Client reset of type \"%1\" from %2 has been acknowledged by the server. "
-                         "Removing cycle detection tracker.",
-                         pending_reset.type, pending_reset.time);
+            logger.debug(util::LogCategory::reset, "Removing client reset cycle detection tracker.");
         }
         _impl::client_reset::remove_pending_client_resets(*wt);
         wt->commit();
