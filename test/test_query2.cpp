@@ -6007,6 +6007,14 @@ TEST_TYPES(Query_ManyIn, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Pro
     bool order = first == mixed_vals[1];
     CHECK_EQUAL(first, order ? mixed_vals[1] : mixed_vals[2]);
     CHECK_EQUAL(second, order ? mixed_vals[2] : mixed_vals[1]);
+    size_t count_of_two_ins = t->where()
+                                  .in(col, mixed_vals.data() + 1, mixed_vals.data() + 2)
+                                  .Or()
+                                  .in(col, mixed_vals.data() + 2, mixed_vals.data() + 3)
+                                  .count();
+    size_t count_of_one_in = t->where().in(col, mixed_vals.data() + 1, mixed_vals.data() + 3).count();
+    CHECK_EQUAL(count_of_one_in, 2);
+    CHECK_EQUAL(count_of_two_ins, 2);
 }
 
 TEST(Query_ManyIntConditionsAgg)

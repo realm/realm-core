@@ -40,11 +40,6 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
-realm_app_user_subscription_token::~realm_app_user_subscription_token()
-{
-    user->unsubscribe(token);
-}
-
 namespace realm::c_api {
 
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL);
@@ -117,6 +112,10 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Su
               RLM_SYNC_SUBSCRIPTION_SUPERSEDED);
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
               RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
+
+static_assert(realm_sync_file_action(SyncFileAction::DeleteRealm) == RLM_SYNC_FILE_ACTION_DELETE_REALM);
+static_assert(realm_sync_file_action(SyncFileAction::BackUpThenDeleteRealm) ==
+              RLM_SYNC_FILE_ACTION_BACK_UP_THEN_DELETE_REALM);
 
 } // namespace
 

@@ -1236,7 +1236,6 @@ classes:
       path_for_realm: '(config: SyncConfig&, custom_file_name: std::optional<std::string>&) -> std::string'
       access_token_refresh_required: '() -> bool'
 # #      request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      request_refresh_user: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       track_realm: '(path: std::string_view)'
