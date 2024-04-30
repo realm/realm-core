@@ -143,8 +143,8 @@ public:
     constexpr bool begins_with(StringData) const noexcept;
     constexpr bool ends_with(StringData) const noexcept;
     constexpr bool contains(StringData) const noexcept;
-    bool contains(StringData d, const std::array<uint8_t, 256> &charmap) const noexcept;
-    
+    bool contains(StringData d, const std::array<uint8_t, 256>& charmap) const noexcept;
+
     // Wildcard matching ('?' for single char, '*' for zero or more chars)
     // case insensitive version in unicode.hpp
     bool like(StringData) const noexcept;
@@ -312,40 +312,40 @@ constexpr inline bool StringData::contains(StringData d) const noexcept
 /// This method takes an array that maps chars to distance that can be moved (and zero for chars not in needle),
 /// allowing the method to apply Boyer-Moore for quick substring search
 /// The map is calculated in the StringNode<Contains> class (so it can be reused across searches)
-inline bool StringData::contains(StringData d, const std::array<uint8_t, 256> &charmap) const noexcept
+inline bool StringData::contains(StringData d, const std::array<uint8_t, 256>& charmap) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
-    
+
     size_t needle_size = d.size();
     if (needle_size == 0)
         return true;
-    
+
     // Prepare vars to avoid lookups in loop
-    size_t last_char_pos = d.size()-1;
+    size_t last_char_pos = d.size() - 1;
     unsigned char lastChar = d[last_char_pos];
-    
+
     // Do Boyer-Moore search
     size_t p = last_char_pos;
     while (p < m_size) {
         unsigned char c = m_data[p]; // Get candidate for last char
-        
+
         if (c == lastChar) {
-            StringData candidate = substr(p-needle_size+1, needle_size);
+            StringData candidate = substr(p - needle_size + 1, needle_size);
             if (candidate == d)
                 return true; // text found!
         }
-        
+
         // If we don't have a match, see how far we can move char_pos
         if (charmap[c] == 0)
             p += needle_size; // char was not present in search string
         else
             p += charmap[c];
     }
-    
+
     return false;
 }
-    
+
 inline bool StringData::like(StringData d) const noexcept
 {
     if (is_null() || d.is_null()) {

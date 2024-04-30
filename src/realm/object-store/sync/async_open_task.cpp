@@ -195,25 +195,25 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
     //  * Then, pause the session, delete all tables, re-initialize the metadata, and finally restart the session.
     // The lifetime of the task is extended until the bootstrap completes.
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_upload_completion([callback = std::move(callback), coordinator, session, self,
-                                         this](Status status) mutable {
-        {
-            util::CheckedLockGuard lock(m_mutex);
-            if (!m_session)
-                return; // Swallow all events if the task has been cancelled.
-        }
+    session->wait_for_upload_completion(
+        [callback = std::move(callback), coordinator, session, self, this](Status status) mutable {
+            {
+                util::CheckedLockGuard lock(m_mutex);
+                if (!m_session)
+                    return; // Swallow all events if the task has been cancelled.
+            }
 
-        if (!status.is_ok()) {
-            self->async_open_complete(std::move(callback), coordinator, status);
-            return;
-        }
+            if (!status.is_ok()) {
+                self->async_open_complete(std::move(callback), coordinator, status);
+                return;
+            }
 
-        auto migration_completed_callback = [callback = std::move(callback), coordinator = std::move(coordinator),
-                                             self](Status status) mutable {
-            self->wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
-        };
-        SyncSession::Internal::migrate_schema(*session, std::move(migration_completed_callback));
-    });
+            auto migration_completed_callback = [callback = std::move(callback), coordinator = std::move(coordinator),
+                                                 self](Status status) mutable {
+                self->wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
+            };
+            SyncSession::Internal::migrate_schema(*session, std::move(migration_completed_callback));
+        });
 }
 
 void AsyncOpenTask::wait_for_bootstrap_or_complete(AsyncOpenCallback&& callback,

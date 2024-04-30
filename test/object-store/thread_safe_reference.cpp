@@ -804,16 +804,15 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("object results") {
-            auto results =
-                create_ref([](auto& r) {
-                    auto obj =
-                        create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-                    Results results =
-                        List(r, obj.get_obj(), get_table(*r, "int array object")->get_column_key("value"))
-                            .sort({{"value", true}});
-                    REQUIRE(results.size() == 1);
-                    return results;
-                }).resolve<Results>(r);
+            auto results = create_ref([](auto& r) {
+                               auto obj = create_object(r, "int array object",
+                                                        {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                               Results results =
+                                   List(r, obj.get_obj(), get_table(*r, "int array object")->get_column_key("value"))
+                                       .sort({{"value", true}});
+                               REQUIRE(results.size() == 1);
+                               return results;
+                           }).resolve<Results>(r);
             REQUIRE(results.is_valid());
             REQUIRE(results.size() == 1);
         }
@@ -937,16 +936,15 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("object results") {
-            auto results =
-                create_ref([](auto& r) {
-                    auto obj =
-                        create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-                    Results results =
-                        List(r, obj.get_obj(), get_table(*r, "int array object")->get_column_key("value"))
-                            .sort({{"value", true}});
-                    REQUIRE(results.size() == 1);
-                    return results;
-                }).resolve<Results>(r);
+            auto results = create_ref([](auto& r) {
+                               auto obj = create_object(r, "int array object",
+                                                        {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                               Results results =
+                                   List(r, obj.get_obj(), get_table(*r, "int array object")->get_column_key("value"))
+                                       .sort({{"value", true}});
+                               REQUIRE(results.size() == 1);
+                               return results;
+                           }).resolve<Results>(r);
             REQUIRE(results.is_valid());
             REQUIRE(results.size() == 1);
         }

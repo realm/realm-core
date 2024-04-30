@@ -53,8 +53,7 @@ constexpr static bool is_future<Future<T>> = true;
 
 // FakeVoid is a helper type for futures for callbacks or values that return/are void but need to be represented
 // as a value. It should not be visible to callers outside of future_details.
-struct FakeVoid {
-};
+struct FakeVoid {};
 
 template <typename T>
 using VoidToFakeVoid = std::conditional_t<std::is_void_v<T>, FakeVoid, T>;

@@ -180,7 +180,7 @@ int64_t round_to_int64(double x)
     // FIXME: The adding of 0.5 is error-prone, see: http://blog.frama-c.com/index.php?post/2013/05/02/nearbyintf1
     return static_cast<int64_t>(x + 0.5);
 }
-}
+} // namespace
 
 
 void Timer::format(double seconds_float, std::ostream& out)

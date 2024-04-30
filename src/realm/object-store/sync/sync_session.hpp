@@ -42,7 +42,7 @@ namespace sync {
 class Session;
 struct SessionErrorInfo;
 class MigrationStore;
-}
+} // namespace sync
 
 namespace _impl {
 class RealmCoordinator;

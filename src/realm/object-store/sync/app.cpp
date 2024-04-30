@@ -842,6 +842,7 @@ void App::log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
         return;
     }
 
+    log_debug("App: log_out(%1)", user->user_id());
     auto request =
         make_request(HttpMethod::del, url_for_path("/auth/session"), user, RequestTokenType::RefreshToken, "");
 
@@ -976,6 +977,22 @@ void App::link_user(const std::shared_ptr<User>& user, const AppCredentials& cre
     log_in_with_credentials(credentials, user, std::move(completion));
 }
 
+std::shared_ptr<User> App::create_fake_user_for_testing(const std::string& user_id, const std::string& access_token,
+                                                        const std::string& refresh_token)
+{
+    std::shared_ptr<User> user;
+    {
+        m_metadata_store->create_user(user_id, refresh_token, access_token, "fake_device");
+        util::CheckedLockGuard lock(m_user_mutex);
+        user_data_updated(user_id); // FIXME: needs to be callback from metadata store
+        user = get_user_for_id(user_id);
+    }
+
+    switch_user(user);
+    return user;
+}
+
+
 void App::refresh_custom_data(const std::shared_ptr<User>& user,
                               UniqueFunction<void(Optional<AppError>)>&& completion)
 {
@@ -1041,48 +1058,48 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
 
     log_debug("App: request location: %1", req.url);
 
-    m_config.transport->send_request_to_server(
-        req, [self = shared_from_this(), completion = std::move(completion), base_url = std::move(base_url),
-              redirect_count](const Response& response) mutable {
-            // Check to see if a redirect occurred
-            if (AppUtils::is_redirect_status_code(response.http_status_code)) {
-                // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
-                if (redirect_count >= s_max_http_redirects) {
-                    completion(AppError{ErrorCodes::ClientTooManyRedirects,
-                                        util::format("number of redirections exceeded %1", s_max_http_redirects),
-                                        {},
-                                        response.http_status_code});
-                    return;
-                }
-                // Handle the redirect response when requesting the location - extract the
-                // new location header field and resend the request.
-                auto redir_location = AppUtils::extract_redir_location(response.headers);
-                if (!redir_location) {
-                    // Location not found in the response, pass error response up the chain
-                    completion(AppError{ErrorCodes::ClientRedirectError,
-                                        "Redirect response missing location header",
-                                        {},
-                                        response.http_status_code});
-                    return;
-                }
-                // try to request the location info at the new location in the redirect response
-                // retry_count is passed in to track the number of subsequent redirection attempts
-                self->request_location(std::move(completion), std::move(base_url), std::move(redir_location),
-                                       redirect_count + 1);
+    m_config.transport->send_request_to_server(req, [self = shared_from_this(), completion = std::move(completion),
+                                                     base_url = std::move(base_url),
+                                                     redirect_count](const Response& response) mutable {
+        // Check to see if a redirect occurred
+        if (AppUtils::is_redirect_status_code(response.http_status_code)) {
+            // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
+            if (redirect_count >= s_max_http_redirects) {
+                completion(AppError{ErrorCodes::ClientTooManyRedirects,
+                                    util::format("number of redirections exceeded %1", s_max_http_redirects),
+                                    {},
+                                    response.http_status_code});
                 return;
             }
-
-            // Location request was successful - update the location info
-            auto update_response = self->update_location(response, base_url);
-            if (update_response) {
-                self->log_error("App: request location failed (%1%2): %3", update_response->code_string(),
-                                update_response->additional_status_code
-                                    ? util::format(" %1", *update_response->additional_status_code)
-                                    : "",
-                                update_response->reason());
+            // Handle the redirect response when requesting the location - extract the
+            // new location header field and resend the request.
+            auto redir_location = AppUtils::extract_redir_location(response.headers);
+            if (!redir_location) {
+                // Location not found in the response, pass error response up the chain
+                completion(AppError{ErrorCodes::ClientRedirectError,
+                                    "Redirect response missing location header",
+                                    {},
+                                    response.http_status_code});
+                return;
             }
-            completion(update_response);
-        });
+            // try to request the location info at the new location in the redirect response
+            // retry_count is passed in to track the number of subsequent redirection attempts
+            self->request_location(std::move(completion), std::move(base_url), std::move(redir_location),
+                                   redirect_count + 1);
+            return;
+        }
+
+        // Location request was successful - update the location info
+        auto update_response = self->update_location(response, base_url);
+        if (update_response) {
+            self->log_error("App: request location failed (%1%2): %3", update_response->code_string(),
+                            update_response->additional_status_code
+                                ? util::format(" %1", *update_response->additional_status_code)
+                                : "",
+                            update_response->reason());
+        }
+        completion(update_response);
+    });
 }
 
 std::optional<AppError> App::update_location(const Response& response, const std::string& base_url)
@@ -1284,14 +1301,17 @@ void App::refresh_access_token(const std::shared_ptr<User>& user, bool update_lo
         return;
     }
 
-    log_debug("App: refresh_access_token: email: %1 %2", user->user_profile().email(),
-              update_location ? "(updating location)" : "");
+    log_debug("App: refresh_access_token: user_id: %1%2", user->user_id(),
+              update_location ? " (updating location)" : "");
 
     // If update_location is set, force the location info to be updated before sending the request
     do_request(
         make_request(HttpMethod::post, url_for_path("/auth/session"), user, RequestTokenType::RefreshToken, ""),
         [completion = std::move(completion), self = shared_from_this(), user](auto&&, const Response& response) {
             if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: refresh_access_token: %1 -> %2 ERROR: %3", user->user_id(),
+                                response.http_status_code, error->what());
+
                 return completion(std::move(error));
             }
 
@@ -1331,17 +1351,17 @@ void App::call_function(const std::shared_ptr<User>& user, const std::string& na
     auto args = util::format("{\"arguments\":%1,\"name\":%2%3}", args_ejson, nlohmann::json(name).dump(),
                              service_name_opt ? (",\"service\":" + nlohmann::json(service_name).dump()) : "");
 
-    do_authenticated_request(
-        HttpMethod::post, function_call_url_path(), std::move(args), user, RequestTokenType::AccessToken,
-        [self = shared_from_this(), name = name, service_name = std::move(service_name),
-         completion = std::move(completion)](const Response& response) {
-            if (auto error = AppUtils::check_for_errors(response)) {
-                self->log_error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
-                                response.http_status_code, error->what());
-                return completion(nullptr, error);
-            }
-            completion(&response.body, util::none);
-        });
+    do_authenticated_request(HttpMethod::post, function_call_url_path(), std::move(args), user,
+                             RequestTokenType::AccessToken,
+                             [self = shared_from_this(), name = name, service_name = std::move(service_name),
+                              completion = std::move(completion)](const Response& response) {
+                                 if (auto error = AppUtils::check_for_errors(response)) {
+                                     self->log_error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name,
+                                                     service_name, response.http_status_code, error->what());
+                                     return completion(nullptr, error);
+                                 }
+                                 completion(&response.body, util::none);
+                             });
 }
 
 void App::call_function(const std::shared_ptr<User>& user, const std::string& name, const BsonArray& args_bson,

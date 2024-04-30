@@ -593,12 +593,8 @@ std::error_code decompress(InputStream& compressed, Span<const char> compressed_
     }
 
 #if REALM_USE_LIBCOMPRESSION
-    // All of our non-macOS deployment targets are high enough to have libcompression,
-    // but we support some older macOS versions
-    if (__builtin_available(macOS 10.11, *)) {
-        if (algorithm != Algorithm::None)
-            return decompress_libcompression(compressed, compressed_buf, decompressed_buf, algorithm, has_header);
-    }
+    if (algorithm != Algorithm::None)
+        return decompress_libcompression(compressed, compressed_buf, decompressed_buf, algorithm, has_header);
 #endif
 
     switch (algorithm) {
@@ -689,7 +685,7 @@ std::error_code compress_lzfse_or_zlib(Span<const char> uncompressed_buf, Span<c
 {
     using namespace compression;
 #if REALM_USE_LIBCOMPRESSION
-    if (__builtin_available(macOS 10.11, *)) {
+    {
         size_t len = write_header({Algorithm::Lzfse, uncompressed_buf.size()}, compressed_buf);
         auto ec = compress_lzfse(uncompressed_buf, compressed_buf.sub_span(len), compressed_size, custom_allocator);
         if (ec != error::compress_input_too_long)
@@ -936,10 +932,8 @@ std::unique_ptr<InputStream> compression::decompress_nonportable_input_stream(In
     if (header.algorithm == Algorithm::None)
         return std::make_unique<DecompressInputStreamNone>(source, first_block);
 #if REALM_USE_LIBCOMPRESSION
-    if (__builtin_available(macOS 10.11, *)) {
-        if (header.algorithm == Algorithm::Deflate || header.algorithm == Algorithm::Lzfse)
-            return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, header);
-    }
+    if (header.algorithm == Algorithm::Deflate || header.algorithm == Algorithm::Lzfse)
+        return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, header);
 #endif
     if (header.algorithm == Algorithm::Deflate)
         return std::make_unique<DecompressInputStreamZlib>(source, first_block, total_size);

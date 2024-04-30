@@ -88,9 +88,7 @@ struct RegisterTypeTests<Test, Type, Types...> {
 };
 template <template <class> class Test>
 struct RegisterTypeTests<Test> {
-    RegisterTypeTests(TestList&, bool, const char*, const char*, const char*, long)
-    {
-    }
+    RegisterTypeTests(TestList&, bool, const char*, const char*, const char*, long) {}
 };
 
 } // namespace unit_test

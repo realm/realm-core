@@ -80,7 +80,7 @@ int64_t next_null_candidate(int64_t previous_candidate)
     x += 0xfffffffbULL;
     return int64_t(x);
 }
-}
+} // namespace
 
 int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming) const
 {
