@@ -25,6 +25,8 @@
 
 #include <unordered_map>
 #include <vector>
+#include <deque>
+
 template <>
 struct std::hash<CompressedString> {
     std::size_t operator()(const CompressedString& c) const noexcept
@@ -72,6 +74,13 @@ private:
     std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
     std::unordered_map<CompressedString, size_t> m_compressed_string_map;
+    // At the moment we need to keep decompressed strings around if they've been
+    // returned to the caller, since we're handing
+    // out StringData references to their storage. This is a temporary solution.
+    // Further: access need to be lock free, so we can not decompress on demand,
+    // but must do so when the interner is created or updated_from_parent.
+    // This is also not a viable long term solution.
+    std::vector<std::unique_ptr<std::string>> m_decompressed_strings;
 };
 } // namespace realm
 

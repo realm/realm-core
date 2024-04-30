@@ -92,7 +92,7 @@ void StringInterner::update_from_parent(bool writable)
         m_compressor.reset();
         return;
     }
-    if (!m_compressor) // Will likely need to also get passed 'writable'
+    if (!m_compressor)
         m_compressor = std::make_unique<StringCompressor>(m_top->get_alloc(), *m_top, Pos_Compressor, writable);
     else
         m_compressor->refresh(writable);
@@ -104,6 +104,7 @@ void StringInterner::rebuild_internal()
 {
     m_compressed_strings.clear();
     m_compressed_string_map.clear();
+    m_decompressed_strings.clear();
     size_t size = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     for (size_t hi_idx = 0; hi_idx < size; hi_idx += 256) {
         m_current_leaf->set_parent(m_data.get(), hi_idx >> 8);
@@ -125,6 +126,9 @@ void StringInterner::rebuild_internal()
             REALM_ASSERT_DEBUG(id == m_compressed_strings.size());
             m_compressed_strings.push_back(cpr);
             m_compressed_string_map[cpr] = id + 1;
+            REALM_ASSERT(m_compressor);
+            auto decompressed = m_compressor->decompress(cpr);
+            m_decompressed_strings.push_back(std::make_unique<std::string>(decompressed));
         }
     }
 }
@@ -141,9 +145,12 @@ StringID StringInterner::intern(StringData sd)
     auto c_str = m_compressor->compress(sd, learn);
     auto it = m_compressed_string_map.find(c_str);
     if (it != m_compressed_string_map.end()) {
+        // it's an already interned string
         return it->second;
     }
+    // it's a new string!
     m_compressed_strings.push_back(c_str);
+    m_decompressed_strings.push_back(std::make_unique<std::string>(sd));
     auto id = m_compressed_strings.size();
     m_compressed_string_map[c_str] = id;
     size_t index = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
@@ -215,14 +222,6 @@ int StringInterner::compare(StringData s, StringID A)
     return m_compressor->compare(s, m_compressed_strings[A]);
 }
 
-// We're handing out StringData which has no ownership, but must be able to
-// access the underlying decompressed string. We keep only a limited number of these
-// decompressed strings available. A value of 8 allows Core Unit tests to pass.
-// A value of 4 does not. This approach is called empirical software construction :-D
-constexpr size_t per_thread_decompressed = 800;
-
-thread_local std::vector<std::string> keep_alive(per_thread_decompressed);
-thread_local size_t string_index = 0;
 
 StringData StringInterner::get(StringID id)
 {
@@ -230,19 +229,11 @@ StringData StringInterner::get(StringID id)
     if (id == 0)
         return StringData{nullptr};
     REALM_ASSERT_DEBUG(id <= m_compressed_strings.size());
+    REALM_ASSERT_DEBUG(id <= m_decompressed_strings.size());
     std::string str = m_compressor->decompress(m_compressed_strings[id - 1]);
-    // decompressed string must be kept in memory for a while....
-    if (keep_alive.size() < per_thread_decompressed) {
-        keep_alive.push_back(str);
-        return keep_alive.back();
-    }
-    keep_alive[string_index] = str;
-    auto return_index = string_index;
-    // bump index with wrap-around
-    string_index++;
-    if (string_index == keep_alive.size())
-        string_index = 0;
-    return keep_alive[return_index];
+    std::string* ref_str = m_decompressed_strings[id - 1].get();
+    REALM_ASSERT(str == *ref_str);
+    return {ref_str->c_str(), ref_str->size()};
 }
 
 } // namespace realm

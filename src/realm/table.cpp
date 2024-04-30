@@ -1071,7 +1071,7 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         m_interner_data.add(0);
     }
     REALM_ASSERT(!m_string_interners[col_ndx]);
-    // FIX: Limit creation of interners to EXACTLY the columns, where they can be
+    // FIXME: Limit creation of interners to EXACTLY the columns, where they can be
     // relevant.
     // if (col_key.get_type() == col_type_String)
     m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, true);
@@ -2251,6 +2251,11 @@ void Table::refresh_string_interners(bool writable)
             // and searches will not find any matching interned strings.
             m_string_interners[idx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, writable);
         }
+    }
+    if (m_string_interners.size() > m_leaf_ndx2colkey.size()) {
+        // remove any string interners which are no longer reachable,
+        // e.g. after a rollback
+        m_string_interners.resize(m_leaf_ndx2colkey.size());
     }
 }
 
