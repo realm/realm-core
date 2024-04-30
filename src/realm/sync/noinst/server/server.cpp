@@ -4052,8 +4052,8 @@ void ServerImpl::handle_accept(std::error_code ec)
     else {
         HTTPConnection& conn = *m_next_http_conn;
         if (m_config.tcp_no_delay)
-            conn.get_socket().set_option(network::SocketBase::no_delay(true));       // Throws
-        m_http_connections.emplace(conn.get_id(), std::move(m_next_http_conn));      // Throws
+            conn.get_socket().set_option(network::SocketBase::no_delay(true));  // Throws
+        m_http_connections.emplace(conn.get_id(), std::move(m_next_http_conn)); // Throws
         Formatter& formatter = m_misc_buffers.formatter;
         formatter.reset();
         formatter << "[" << m_next_http_conn_endpoint.address() << "]:" << m_next_http_conn_endpoint.port(); // Throws

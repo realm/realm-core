@@ -145,8 +145,7 @@ public:
 
 /******************************** Value Nodes ********************************/
 
-class ValueNode : public ExpressionNode {
-};
+class ValueNode : public ExpressionNode {};
 
 class ConstantNode : public ValueNode {
 public:

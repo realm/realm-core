@@ -174,66 +174,65 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
     ColKey pk_col = table->get_primary_key_column();
     m_last_object_key = instr.object;
 
-    mpark::visit(
-        util::overload{
-            [&](mpark::monostate) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(NULL) on table without a primary key");
-                }
-                if (!table->is_nullable(pk_col)) {
-                    bad_transaction_log("CreateObject(NULL) on a table with a non-nullable primary key");
-                }
-                m_last_object = table->create_object_with_primary_key(util::none);
-            },
-            [&](int64_t pk) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(Int) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_Int) {
-                    bad_transaction_log("CreateObject(Int) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                m_last_object = table->create_object_with_primary_key(pk);
-            },
-            [&](InternString pk) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(String) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_String) {
-                    bad_transaction_log("CreateObject(String) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                StringData str = get_string(pk);
-                m_last_object = table->create_object_with_primary_key(str);
-            },
-            [&](const ObjectId& id) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(ObjectId) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_ObjectId) {
-                    bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                m_last_object = table->create_object_with_primary_key(id);
-            },
-            [&](const UUID& id) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(UUID) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_UUID) {
-                    bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                m_last_object = table->create_object_with_primary_key(id);
-            },
-            [&](GlobalKey key) {
-                if (pk_col) {
-                    bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
-                }
-                m_last_object = table->create_object(key);
-            },
-        },
-        instr.object);
+    mpark::visit(util::overload{
+                     [&](mpark::monostate) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(NULL) on table without a primary key");
+                         }
+                         if (!table->is_nullable(pk_col)) {
+                             bad_transaction_log("CreateObject(NULL) on a table with a non-nullable primary key");
+                         }
+                         m_last_object = table->create_object_with_primary_key(util::none);
+                     },
+                     [&](int64_t pk) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(Int) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_Int) {
+                             bad_transaction_log("CreateObject(Int) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         m_last_object = table->create_object_with_primary_key(pk);
+                     },
+                     [&](InternString pk) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(String) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_String) {
+                             bad_transaction_log("CreateObject(String) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         StringData str = get_string(pk);
+                         m_last_object = table->create_object_with_primary_key(str);
+                     },
+                     [&](const ObjectId& id) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(ObjectId) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_ObjectId) {
+                             bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         m_last_object = table->create_object_with_primary_key(id);
+                     },
+                     [&](const UUID& id) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(UUID) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_UUID) {
+                             bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         m_last_object = table->create_object_with_primary_key(id);
+                     },
+                     [&](GlobalKey key) {
+                         if (pk_col) {
+                             bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
+                         }
+                         m_last_object = table->create_object(key);
+                     },
+                 },
+                 instr.object);
 }
 
 void InstructionApplier::operator()(const Instruction::EraseObject& instr)

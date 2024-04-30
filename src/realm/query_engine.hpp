@@ -180,9 +180,7 @@ public:
         cluster_changed();
     }
 
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     virtual size_t find_all_local(size_t start, size_t end);
@@ -286,9 +284,7 @@ protected:
     }
 
 private:
-    virtual void table_changed()
-    {
-    }
+    virtual void table_changed() {}
     virtual void cluster_changed()
     {
         // TODO: Should eventually be pure
@@ -311,7 +307,6 @@ protected:
         : ParentNode(from)
     {
     }
-
 };
 
 class IndexEvaluator {
@@ -537,11 +532,17 @@ public:
     {
         auto& other = static_cast<ThisType&>(node);
         REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
-        REALM_ASSERT(other.m_needles.empty());
         if (m_needles.empty()) {
             m_needles.insert(this->m_value);
         }
-        m_needles.insert(other.m_value);
+        if (other.m_needles.empty()) {
+            m_needles.insert(other.m_value);
+        }
+        else {
+            for (const auto& val : other.m_needles) {
+                m_needles.insert(val);
+            }
+        }
         return true;
     }
 
@@ -1299,11 +1300,17 @@ public:
     {
         auto& other = static_cast<ThisType&>(node);
         REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
-        REALM_ASSERT(other.m_needles.empty());
         if (m_needles.empty()) {
             m_needles.insert(this->m_value_is_null ? std::nullopt : std::make_optional(this->m_value));
         }
-        m_needles.insert(other.m_value_is_null ? std::nullopt : std::make_optional(other.m_value));
+        if (other.m_needles.empty()) {
+            m_needles.insert(other.m_value_is_null ? std::nullopt : std::make_optional(other.m_value));
+        }
+        else {
+            for (const auto& val : other.m_needles) {
+                m_needles.insert(val);
+            }
+        }
         return true;
     }
 

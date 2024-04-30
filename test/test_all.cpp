@@ -204,7 +204,9 @@ class AggressiveGovernor : public util::PageReclaimGovernor {
 public:
     util::UniqueFunction<int64_t()> current_target_getter(size_t) override
     {
-        return []() { return 4096; };
+        return []() {
+            return 4096;
+        };
     }
     void report_target_result(int64_t) override {}
 };
@@ -292,9 +294,7 @@ public:
     {
     }
 
-    ~CustomReporter() noexcept
-    {
-    }
+    ~CustomReporter() noexcept {}
 
     void end(const TestContext& context, double elapsed_seconds) override
     {

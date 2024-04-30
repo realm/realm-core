@@ -160,6 +160,6 @@ inline StringData ArrayString::get(const char* header, size_t ndx, Allocator& al
     }
 }
 
-}
+} // namespace realm
 
 #endif /* REALM_ARRAY_STRING_HPP */

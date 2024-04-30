@@ -358,7 +358,7 @@ size_t lower_bound_string(const T* arr, U value)
     }
     return i;
 }
-}
+} // namespace
 
 size_t ArrayString::lower_bound(StringData value)
 {
