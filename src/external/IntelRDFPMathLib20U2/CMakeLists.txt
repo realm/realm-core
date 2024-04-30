@@ -26,10 +26,13 @@ if(MSVC)
     target_compile_options(Bid PUBLIC /sdl-)
 endif()
 
-# Note: checking for -Wfoo since unknown -Wno-foo flags are ignored.
-check_cxx_compiler_flag(-Wunused-but-set-variable HAVE-Wunused-but-set-variable)
-if(HAVE-Wunused-but-set-variable)
-    target_compile_options(Bid PRIVATE -Wno-unused-but-set-variable)
+# disable warnings in this project
+# warnings should be checked when updating the library code
+if (MSVC)
+  target_compile_options(Bid PUBLIC /W0)
+else()
+  target_compile_options(Bid PUBLIC -w)
 endif()
+
 
 set_target_properties(Bid PROPERTIES CXX_VISIBILITY_PRESET hidden)
