@@ -99,8 +99,8 @@ CFPtr<Ref> retainCF(Ref ptr)
     CFRetain(ptr);
     return CFPtr<Ref>(ptr);
 }
-}
-}
+} // namespace util
+} // namespace realm
 
 
 #endif // REALM_PLATFORM_APPLE

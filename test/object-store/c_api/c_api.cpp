@@ -569,6 +569,179 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier == 1010);
     }
 
+#if !REALM_APP_SERVICES
+    SECTION("realm sync manager") {
+        auto config = cptr(realm_sync_client_config_new());
+        auto sync_manager = cptr(realm_sync_manager_create(config.get()));
+    }
+
+    SECTION("realm custom user") {
+        struct CustomUser {
+            CustomUser(std::string app_id, std::string user_id)
+                : m_app_id(app_id)
+                , m_user_id(user_id)
+                , m_access_token(util::format("access token for %1", m_user_id))
+                , m_refresh_token(util::format("refresh token for %1", m_user_id))
+            {
+                m_fake_app_error.message = "my fake error message";
+                m_fake_app_error.error = RLM_ERR_CUSTOM_ERROR;
+                m_fake_app_error.http_status_code = 42;
+                m_fake_app_error.link_to_server_logs = "link to fake logs";
+                m_fake_app_error.categories = 0;
+            }
+
+            std::string m_app_id;
+            std::string m_user_id;
+            std::string m_access_token;
+            std::string m_refresh_token;
+            SyncUser::State m_state = SyncUser::State::LoggedIn;
+            bool m_access_token_refresh_required = false;
+            std::shared_ptr<SyncManager> m_sync_manager;
+            size_t m_log_out_requested_count = 0;
+            realm_app_error_t m_fake_app_error;
+            std::string m_track_realm_state;
+            std::string m_file_action_state;
+
+            const char* get_access_token()
+            {
+                return m_access_token.data();
+            }
+            const char* get_refresh_token()
+            {
+                return m_refresh_token.data();
+            }
+        };
+
+        auto cb_access_token = [](realm_userdata_t data) -> const char* {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            return user->get_access_token();
+        };
+        auto cb_refresh_token = [](realm_userdata_t data) -> const char* {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            return user->get_refresh_token();
+        };
+        auto cb_state = [](realm_userdata_t data) -> realm_user_state_e {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            return realm_user_state_e(user->m_state);
+        };
+        auto cb_atrr = [](realm_userdata_t data) -> bool {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            return user->m_access_token_refresh_required;
+        };
+        auto cb_sync_manager = [](realm_userdata_t data) -> realm_sync_manager_t* {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            return static_cast<realm_sync_manager_t*>(&user->m_sync_manager);
+        };
+        auto cb_request_log_out = [](realm_userdata_t data) {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            ++user->m_log_out_requested_count;
+        };
+        auto cb_request_refresh_location = [](realm_userdata_t data, realm_user_void_completion_func_t cb,
+                                              realm_userdata_t cb_data) {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            cb(cb_data, &user->m_fake_app_error);
+        };
+        auto cb_request_access_token = [](realm_userdata_t data, realm_user_void_completion_func_t cb,
+                                          realm_userdata_t cb_data) {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            cb(cb_data, &user->m_fake_app_error);
+        };
+        auto cb_track_realm = [](realm_userdata_t data, const char* path) {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            user->m_track_realm_state = util::format("tracked_%1", path);
+        };
+        auto cb_create_file_action = [](realm_userdata_t data, realm_sync_file_action_e action,
+                                        const char* original_path,
+                                        const char* requested_recovery_dir) -> const char* {
+            CustomUser* user = static_cast<CustomUser*>(data);
+            user->m_file_action_state =
+                util::format("action_%1_%2_%3", action, original_path, requested_recovery_dir);
+            return user->m_file_action_state.data();
+        };
+
+        TestSyncManager test_sync_manager;
+        CustomUser custom_user("my_app_id", "User1");
+
+        realm_sync_user_create_config_t config;
+        config.userdata = &custom_user;
+        config.free_func = nullptr;
+        config.app_id = custom_user.m_app_id.data();
+        config.user_id = custom_user.m_user_id.data();
+        config.access_token_cb = cb_access_token;
+        config.refresh_token_cb = cb_refresh_token;
+        config.state_cb = cb_state;
+        config.atrr_cb = cb_atrr;
+        config.sync_manager_cb = cb_sync_manager;
+        config.request_log_out_cb = cb_request_log_out;
+        config.request_refresh_location_cb = cb_request_refresh_location;
+        config.request_access_token_cb = cb_request_access_token;
+        config.track_realm_cb = cb_track_realm;
+        config.create_fa_cb = cb_create_file_action;
+
+        auto sync_user = cptr(realm_user_new(config));
+        SyncUser* cxx_user = (*(sync_user.get())).get();
+
+        {
+            auto access_token = cxx_user->access_token();
+            CHECK(access_token == "access token for User1");
+        }
+        {
+            auto refresh_token = cxx_user->refresh_token();
+            CHECK(refresh_token == "refresh token for User1");
+        }
+        {
+            CHECK(cxx_user->state() == SyncUser::State::LoggedIn);
+            custom_user.m_state = SyncUser::State::LoggedOut;
+            CHECK(cxx_user->state() == SyncUser::State::LoggedOut);
+            custom_user.m_state = SyncUser::State::Removed;
+            CHECK(cxx_user->state() == SyncUser::State::Removed);
+        }
+        {
+            CHECK(!cxx_user->access_token_refresh_required());
+            custom_user.m_access_token_refresh_required = true;
+            CHECK(cxx_user->access_token_refresh_required());
+        }
+        {
+            CHECK(!cxx_user->sync_manager());
+            custom_user.m_sync_manager = test_sync_manager.sync_manager();
+            CHECK(cxx_user->sync_manager());
+        }
+        {
+            CHECK(custom_user.m_log_out_requested_count == 0);
+            cxx_user->request_log_out();
+            cxx_user->request_log_out();
+            CHECK(custom_user.m_log_out_requested_count == 2);
+        }
+        size_t completions = 0;
+        auto verify_completion = [&custom_user, &completions](std::optional<realm::app::AppError> err) {
+            CHECK(err);
+            CHECK(int(err->code()) == int(custom_user.m_fake_app_error.error));
+            CHECK(err->reason() == custom_user.m_fake_app_error.message);
+            CHECK(err->link_to_server_logs == custom_user.m_fake_app_error.link_to_server_logs);
+            CHECK(err->additional_status_code == custom_user.m_fake_app_error.http_status_code);
+            ++completions;
+        };
+        {
+            cxx_user->request_refresh_location(verify_completion);
+            CHECK(completions == 1);
+        }
+        {
+            cxx_user->request_access_token(verify_completion);
+            CHECK(completions == 2);
+        }
+        {
+            CHECK(custom_user.m_track_realm_state == "");
+            cxx_user->track_realm("foobar");
+            CHECK(custom_user.m_track_realm_state == "tracked_foobar");
+        }
+        {
+            CHECK(custom_user.m_file_action_state == "");
+            cxx_user->create_file_action(SyncFileAction::BackUpThenDeleteRealm, "some-path", "dir-requested");
+            CHECK(custom_user.m_file_action_state == "action_1_some-path_dir-requested");
+        }
+    }
+#endif // !REALM_APP_SERVICES
+
 #if REALM_APP_SERVICES
     SECTION("realm_app_config_t") {
         const uint64_t request_timeout = 2500;

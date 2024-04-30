@@ -85,16 +85,10 @@ const char* to_lead_cstr(DBOptions::Durability level);
 const char* to_ident_cstr(DBOptions::Durability level);
 
 struct Benchmark {
-    Benchmark()
-    {
-    }
-    virtual ~Benchmark()
-    {
-    }
+    Benchmark() {}
+    virtual ~Benchmark() {}
     virtual const char* name() const = 0;
-    virtual void before_all(DBRef)
-    {
-    }
+    virtual void before_all(DBRef) {}
     virtual void after_all(DBRef)
     {
         m_keys.clear();
@@ -869,7 +863,8 @@ struct BenchmarkWithTimestamps : Benchmark {
             if (r.draw_int<int64_t>(0, 100) / 100.0 < percent_chance_of_null) {
                 time = Timestamp{};
                 ++num_nulls_added;
-            } else {
+            }
+            else {
                 values.insert(time);
             }
             auto obj = t->create_object();
@@ -895,7 +890,8 @@ struct BenchmarkWithTimestamps : Benchmark {
 };
 
 struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.10f;
         percent_results_to_needle = 0.80f;
         BenchmarkWithTimestamps::before_all(group);
@@ -910,7 +906,8 @@ struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
         ConstTableRef table = m_table;
         Query query = table->where().greater(m_col, needle);
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(), num_results_to_needle, values.size());
+        REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(),
+                        num_results_to_needle, values.size());
         static_cast<void>(results);
     }
 };
@@ -959,7 +956,8 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
 
 
 struct BenchmarkQueryTimestampGreaterEqual : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.10f;
         percent_results_to_needle = 0.80f;
         BenchmarkWithTimestamps::before_all(group);
@@ -974,14 +972,16 @@ struct BenchmarkQueryTimestampGreaterEqual : BenchmarkWithTimestamps {
         ConstTableRef table = m_table;
         Query query = table->where().greater_equal(m_col, needle);
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle, results.size(), num_results_to_needle, values.size());
+        REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle, results.size(),
+                        num_results_to_needle, values.size());
         static_cast<void>(results);
     }
 };
 
 
 struct BenchmarkQueryTimestampLess : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.10f;
         percent_results_to_needle = 0.20f;
         BenchmarkWithTimestamps::before_all(group);
@@ -996,13 +996,15 @@ struct BenchmarkQueryTimestampLess : BenchmarkWithTimestamps {
         ConstTableRef table = m_table;
         Query query = table->where().less(m_col, needle);
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == num_results_to_needle, results.size(), num_results_to_needle, values.size());
+        REALM_ASSERT_EX(results.size() == num_results_to_needle, results.size(), num_results_to_needle,
+                        values.size());
         static_cast<void>(results);
     }
 };
 
 struct BenchmarkQueryTimestampLessEqual : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.10f;
         percent_results_to_needle = 0.20f;
         BenchmarkWithTimestamps::before_all(group);
@@ -1017,14 +1019,16 @@ struct BenchmarkQueryTimestampLessEqual : BenchmarkWithTimestamps {
         ConstTableRef table = m_table;
         Query query = table->where().less_equal(m_col, needle);
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == num_results_to_needle + 1, results.size(), num_results_to_needle, values.size());
+        REALM_ASSERT_EX(results.size() == num_results_to_needle + 1, results.size(), num_results_to_needle,
+                        values.size());
         static_cast<void>(results);
     }
 };
 
 
 struct BenchmarkQueryTimestampEqual : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.10f;
         percent_results_to_needle = 0.33f;
         BenchmarkWithTimestamps::before_all(group);
@@ -1039,13 +1043,15 @@ struct BenchmarkQueryTimestampEqual : BenchmarkWithTimestamps {
         ConstTableRef table = m_table;
         Query query = table->where().equal(m_col, needle);
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == values.count(needle), results.size(), num_results_to_needle, values.count(needle), values.size());
+        REALM_ASSERT_EX(results.size() == values.count(needle), results.size(), num_results_to_needle,
+                        values.count(needle), values.size());
         static_cast<void>(results);
     }
 };
 
 struct BenchmarkQueryTimestampNotEqual : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.60f;
         percent_results_to_needle = 0.10f;
         BenchmarkWithTimestamps::before_all(group);
@@ -1060,13 +1066,15 @@ struct BenchmarkQueryTimestampNotEqual : BenchmarkWithTimestamps {
         ConstTableRef table = m_table;
         Query query = table->where().not_equal(m_col, needle);
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == values.size() - values.count(needle) + num_nulls_added, results.size(), values.size(), values.count(needle));
+        REALM_ASSERT_EX(results.size() == values.size() - values.count(needle) + num_nulls_added, results.size(),
+                        values.size(), values.count(needle));
         static_cast<void>(results);
     }
 };
 
 struct BenchmarkQueryTimestampNotNull : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.60f;
         percent_results_to_needle = 0.0;
         BenchmarkWithTimestamps::before_all(group);
@@ -1082,13 +1090,15 @@ struct BenchmarkQueryTimestampNotNull : BenchmarkWithTimestamps {
         ConstTableRef table = m_table;
         Query query = table->where().not_equal(m_col, realm::null());
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == values.size(), results.size(), num_nulls_added, num_results_to_needle, values.size());
+        REALM_ASSERT_EX(results.size() == values.size(), results.size(), num_nulls_added, num_results_to_needle,
+                        values.size());
         static_cast<void>(results);
     }
 };
 
 struct BenchmarkQueryTimestampEqualNull : BenchmarkWithTimestamps {
-    void before_all(DBRef group) {
+    void before_all(DBRef group)
+    {
         percent_chance_of_null = 0.10;
         percent_results_to_needle = 0.0;
         BenchmarkWithTimestamps::before_all(group);
@@ -1929,7 +1939,8 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         return str;
     }
 
-    size_t rand() {
+    size_t rand()
+    {
         return seeded_rand.draw_int<size_t>();
     }
 
@@ -2047,7 +2058,6 @@ struct BenchmarkQueryNot : Benchmark {
         tr.get_group().remove_table(name());
         tr.commit();
     }
-
 };
 
 struct BenchmarkGetLinkList : Benchmark {

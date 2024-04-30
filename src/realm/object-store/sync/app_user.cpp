@@ -230,15 +230,6 @@ void User::request_log_out()
     }
 }
 
-void User::request_refresh_user(util::UniqueFunction<void(util::Optional<app::AppError>)>&& completion)
-{
-    if (auto app = this->app()) {
-        app->get_profile(shared_from_this(), [completion = std::move(completion)](auto, auto error) {
-            completion(std::move(error));
-        });
-    }
-}
-
 void User::request_refresh_location(util::UniqueFunction<void(util::Optional<app::AppError>)>&& completion)
 {
     if (auto app = this->app()) {

@@ -67,8 +67,7 @@ public:
 
 namespace _impl::ForEventLoopDispatcher {
 template <typename Sig>
-struct ExtractSignatureImpl {
-};
+struct ExtractSignatureImpl {};
 template <typename T, typename... Args>
 struct ExtractSignatureImpl<void (T::*)(Args...)> {
     using signature = void(Args...);

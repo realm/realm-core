@@ -171,12 +171,12 @@ public:
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
         m_out << "<?xml version=\"1.0\"?>\n"
-                 "<unittest-results "
-                 "tests=\"" << results_summary.num_executed_tests << "\" "
-                 "failedtests=\"" << results_summary.num_failed_tests << "\" "
-                 "checks=\"" << results_summary.num_executed_checks << "\" "
-                 "failures=\"" << results_summary.num_failed_checks << "\" "
-                 "time=\"" << results_summary.elapsed_seconds << "\">\n";
+              << "<unittest-results "
+              << "tests=\"" << results_summary.num_executed_tests << "\" "
+              << "failedtests=\"" << results_summary.num_failed_tests << "\" "
+              << "checks=\"" << results_summary.num_executed_checks << "\" "
+              << "failures=\"" << results_summary.num_failed_checks << "\" "
+              << "time=\"" << results_summary.elapsed_seconds << "\">\n";
 
         for (const auto& p : m_tests) {
             auto key = p.first;
@@ -190,8 +190,8 @@ public:
             }
 
             m_out << "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
-                     "name=\"" << xml_escape(test_name) << "\" "
-                     "time=\"" << t.elapsed_seconds << "\"";
+                  << "name=\"" << xml_escape(test_name) << "\" "
+                  << "time=\"" << t.elapsed_seconds << "\"";
             if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
@@ -200,8 +200,8 @@ public:
 
             for (auto& i_2 : t.failures) {
                 std::string msg = xml_escape(i_2.message);
-                m_out << "    <failure message=\"" << i_2.file_name
-                      << "(" << i_2.line_number << ") : " << msg << "\"/>\n";
+                m_out << "    <failure message=\"" << i_2.file_name << "(" << i_2.line_number << ") : " << msg
+                      << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
@@ -641,7 +641,9 @@ bool TestList::run(Config config)
             };
             std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
             for (int i = 0; i < num_threads; ++i)
-                threads[i].start([=] { thread(i); });
+                threads[i].start([=] {
+                    thread(i);
+                });
             for (int i = 0; i < num_threads; ++i)
                 threads[i].join();
         }
@@ -847,8 +849,7 @@ void TestContext::inexact_compare_failed(const char* file, long line, const char
     std::ostringstream out;
     out.precision(std::numeric_limits<long double>::digits10 + 1);
     out << macro_name << "(" << a_text << ", " << b_text << ", " << eps_text << ") "
-                                                                                "failed with ("
-        << a << ", " << b << ", " << eps << ")";
+        << "failed with (" << a << ", " << b << ", " << eps << ")";
     check_failed(file, line, out.str());
 }
 
@@ -922,29 +923,17 @@ void TestContext::nothrow_failed(const char* file, long line, const char* expr_t
 }
 
 
-void Reporter::thread_begin(const ThreadContext&)
-{
-}
+void Reporter::thread_begin(const ThreadContext&) {}
 
-void Reporter::begin(const TestContext&)
-{
-}
+void Reporter::begin(const TestContext&) {}
 
-void Reporter::fail(const TestContext&, const char*, long, const std::string&)
-{
-}
+void Reporter::fail(const TestContext&, const char*, long, const std::string&) {}
 
-void Reporter::end(const TestContext&, double)
-{
-}
+void Reporter::end(const TestContext&, double) {}
 
-void Reporter::thread_end(const ThreadContext&)
-{
-}
+void Reporter::thread_end(const ThreadContext&) {}
 
-void Reporter::summary(const SharedContext&, const Summary&)
-{
-}
+void Reporter::summary(const SharedContext&, const Summary&) {}
 
 
 class PatternBasedFileOrder::state : public RefCountBase {
@@ -992,9 +981,7 @@ PatternBasedFileOrder::wrap::wrap(const char** patterns_begin, const char** patt
 {
 }
 
-PatternBasedFileOrder::wrap::~wrap()
-{
-}
+PatternBasedFileOrder::wrap::~wrap() {}
 
 PatternBasedFileOrder::wrap::wrap(const wrap& w)
     : m_state(w.m_state)

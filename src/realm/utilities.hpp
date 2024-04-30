@@ -271,16 +271,13 @@ struct InternalFindResult {
 // realm::is_any<T, U1, U2, U3, ...> ==
 // std::is_same<T, U1>::value || std::is_same<T, U2>::value || std::is_same<T, U3>::value ...
 template <typename... T>
-struct is_any : std::false_type {
-};
+struct is_any : std::false_type {};
 
 template <typename T, typename... Ts>
-struct is_any<T, T, Ts...> : std::true_type {
-};
+struct is_any<T, T, Ts...> : std::true_type {};
 
 template <typename T, typename U, typename... Ts>
-struct is_any<T, U, Ts...> : is_any<T, Ts...> {
-};
+struct is_any<T, U, Ts...> : is_any<T, Ts...> {};
 
 template <typename... Ts>
 inline constexpr bool is_any_v = is_any<Ts...>::value;
