@@ -865,11 +865,13 @@ inline void Array::erase(size_t ndx)
 {
     // This can throw, but only if array is currently in read-only
     // memory.
-    move(ndx + 1, size(), ndx);
 
-    // Update size (also in header)
-    --m_size;
-    set_header_size(m_size);
+    if (ndx < size()) {
+        // Update size (also in header)
+        move(ndx + 1, size(), ndx);
+        --m_size;
+        set_header_size(m_size);
+    }
 }
 
 
