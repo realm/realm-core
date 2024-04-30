@@ -202,13 +202,7 @@ bool PendingBootstrapStore::has_pending()
 
 void PendingBootstrapStore::clear()
 {
-    auto tr = m_db->start_read();
-    auto bootstrap_table = tr->get_table(m_table);
-    // Just make sure the state is reset if the bootstrap table is empty
-    if (bootstrap_table->is_empty()) {
-        return;
-    }
-    tr->promote_to_write();
+    auto tr = m_db->start_write();
     clear(*tr);
     tr->commit();
 }
