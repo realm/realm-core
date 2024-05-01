@@ -70,8 +70,7 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy policy_mode)
 // Aggregates ----------------------------------------------------
 
 template <typename T, Action AggregateOpType>
-struct Aggregator {
-};
+struct Aggregator {};
 
 template <typename T>
 struct Aggregator<T, act_Sum> {

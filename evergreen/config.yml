@@ -23,13 +23,15 @@ functions:
           set -o pipefail
           set -o verbose
 
-          if [[ "$OS" = "Windows_NT" ]]; then
-            curl -LsSo cmake_binaries.zip ${cmake_url}
-            unzip -q cmake_binaries.zip
-          elif [[ -n "${cmake_url|}" ]]; then
-            mkdir cmake_binaries && cd cmake_binaries
-            curl -LsS ${cmake_url} | tar -xz --strip-components=1
-            cd ..
+          if [[ -n "${cmake_url}" ]]; then
+            if [[ "$OS" = "Windows_NT" ]]; then
+              curl -LsSo cmake_binaries.zip ${cmake_url}
+              unzip -q cmake_binaries.zip
+            else
+              mkdir cmake_binaries && cd cmake_binaries
+              curl -LsS ${cmake_url} | tar -xz --strip-components=1
+              cd ..
+            fi
           fi
 
           if [[ -n "${clang_url|}" ]]; then
@@ -135,8 +137,8 @@ functions:
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
 
-          set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
-          set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+          set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL "${build_command_line_tools|On}"
+          set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL "${enable_realm_encryption|On}"
 
           if [[ -n "${fetch_missing_dependencies|}" ]]; then
               set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
@@ -182,6 +184,10 @@ functions:
 
           if [[ -n "${target_to_build|}" ]]; then
               target="--target ${target_to_build|}"
+          fi
+
+          if [[ -n "${cmake_build_tool_options}" ]]; then
+              target="$target -- ${cmake_build_tool_options}"
           fi
 
           $CMAKE \
@@ -232,10 +238,10 @@ functions:
         script: |-
           set -o errexit
           set -o verbose
-          if [[ -n "${cmake_bindir|}" ]]; then
-              CTEST=$(pwd)/${cmake_bindir}/ctest
+          if [ -n "${cmake_bindir|}" ]; then
+              CTEST=$(./evergreen/abspath.sh ${cmake_bindir}/ctest)
           else
-              CTEST=ctest
+              CTEST="ctest"
           fi
 
           if [ -n "${xcode_developer_dir}" ]; then
@@ -296,15 +302,19 @@ functions:
               fi
           fi
 
+          # on later MacOS's the system curl is built against an old version of openssl that
+          # can't talk to baasaas over TLS.
+          if [[ "$(uname -s)" = "Darwin" ]]; then
+            export CURL_SSL_BACKEND=Secure-Transport
+          fi
+
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           if [[ -n "$UNITTEST_EVERGREEN_TEST_RESULTS" && -f "$UNITTEST_EVERGREEN_TEST_RESULTS" ]]; then
               rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
           fi
           export UNITTEST_PROGRESS=1
+          export UNITTEST_ENCRYPT_ALL="${run_with_encryption|0}"
 
-          if [[ -n "${run_with_encryption}" ]]; then
-              export UNITTEST_ENCRYPT_ALL=1
-          fi
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 $TSAN_OPTIONS"
           export UBSAN_OPTIONS="print_stacktrace=1"
 
@@ -806,7 +816,7 @@ tasks:
         find core/include/realm -name '*.hpp' -print0 | xargs -0 -P "${max_jobs}" -n 1 clang++ -c -o /dev/null -Icore/include -std=c++17
 
 - name: test-on-exfat
-  exec_timeout_secs: 2700
+  exec_timeout_secs: 3600
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -815,6 +825,8 @@ tasks:
     params:
       working_dir: realm-core/build
       shell: /bin/bash
+      env:
+        UNITTEST_ENCRYPT_ALL: "${run_with_encryption|0}"
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
@@ -1278,6 +1290,31 @@ buildvariants:
   tasks:
   - name: compile_test
 
+- name: ubuntu-small-bpnode-size
+  display_name: "Ubuntu (Small BPNode size)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    extra_flags: -DREALM_MAX_BPNODE_SIZE=4
+    build_command_line_tools: Off
+  tasks:
+  - name: compile_local_tests
+
+- name: ubuntu-no-encryption
+  display_name: "Ubuntu (No encryption support)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    enable_realm_encryption: Off
+    build_command_line_tools: Off
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
+
 - name: ubuntu-encryption-tsan
   display_name: "Ubuntu (Encryption Enabled w/TSAN)"
   run_on: ubuntu2204-arm64-small
@@ -1298,7 +1335,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    run_with_encryption: On
+    run_with_encryption: 1 
     enable_asan: On
     cmake_build_type: RelWithDebInfo
   tasks:
@@ -1388,7 +1425,6 @@ buildvariants:
     clang_sha256_sum: "feab4b0f5fba325bfe0f4245710fd19fd74f813f44b5e81eda794f4f75bca343"
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
-    fetch_missing_dependencies: On
     enable_asan: On
     cmake_build_type: RelWithDebInfo
   tasks:
@@ -1427,7 +1463,7 @@ buildvariants:
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
     cmake_build_type: RelWithDebInfo
-    run_with_encryption: On
+    run_with_encryption: 1
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
@@ -1519,34 +1555,18 @@ buildvariants:
   tasks:
   - name: compile_test_and_package
 
-- name: macos
-  display_name: "MacOS 11.0 x86_64"
-  run_on: macos-1100
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-  tasks:
-  - name: compile_test
-  - name: swift-build-and-test
-  - name: validate-installed-headers
-
 - name: macos-encrypted
-  display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
-  run_on: macos-1100
+  display_name: "MacOS 14.0 arm64 (Encryption enabled)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-    run_with_encryption: On
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+    run_with_encryption: 1
   tasks:
   - name: core_tests_group
 
@@ -1563,29 +1583,12 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-  - name: compile_test_and_package
   - name: benchmarks
-  - name: long-running-tests
-  - name: swift-build-and-test
+  - name: compile_test
   - name: test-on-exfat
 
-- name: macos-1100-arm64
-  display_name: "MacOS 11 arm64"
-  run_on: macos-1100-arm64
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 -DREALM_ENABLE_GEOSPATIAL=OFF
-  tasks:
-  - name: compile_test
-  - name: swift-build-and-test
-
 - name: macos-1100-arm64-release
-  display_name: "MacOS 11 arm64 (Release build)"
+  display_name: "MacOS 11 arm64 (Release benchmarks)"
   run_on: macos-1100-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
@@ -1597,87 +1600,85 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
-  - name: compile_test_and_package
   - name: benchmarks
+
+- name: macos
+  display_name: "MacOS 14 arm64"
+  run_on: macos-14-arm64
+  expansions:
+    cmake_bindir: "/opt/homebrew/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+  tasks:
+  - name: compile_test
+  - name: swift-build-and-test
+  - name: validate-installed-headers
+
+- name: macos-14-release
+  display_name: "MacOS 14 arm64 (Release build)"
+  run_on: macos-14-arm64
+  expansions:
+    cmake_bindir: "/opt/homebrew/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    cmake_build_type: Release
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+  tasks:
+  - name: compile_test_and_package
+  # benchmarks are disabled for now because of perf problems on AWS macos instances.
+  # - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
 
-- name: macos-1100-x64-asan
-  display_name: "MacOS 11.0 x86_64 (ASAN)"
-  run_on: macos-1100
+- name: macos-asan
+  display_name: "MacOS 14 arm64 (ASAN)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-    cmake_build_type: RelWithDebInfo
-    enable_asan: On
-  tasks:
-  - name: compile_test
-
-- name: macos-1100-x64-tsan
-  display_name: "MacOS 11.0 x86_64 (TSAN)"
-  run_on: macos-1100
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-    cmake_build_type: RelWithDebInfo
-    enable_tsan: On
-  tasks:
-  - name: compile_test
-
-- name: macos-1100-arm64-asan
-  display_name: "MacOS 11 arm64 (ASAN)"
-  run_on: macos-1100-arm64
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_asan: On
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-tsan
-  display_name: "MacOS 11 arm64 (TSAN)"
-  run_on: macos-1100-arm64
+- name: macos-tsan
+  display_name: "MacOS 14 arm64 (TSAN)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
   tasks:
-  # FIXME: tsan is not stable on arm64, fails often with internal errors
-  # - name: compile_test
   - name: compile_test
 
 - name: macos-coverage
-  display_name: "MacOS 11 arm64 (Code Coverage)"
-  run_on: macos-1100-arm64
+  display_name: "MacOS 14 arm64 (Code Coverage)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     enable_llvm_coverage: On
     coveralls_flag_name: "macos-arm64"

@@ -274,18 +274,14 @@ public:
     virtual void end(const TestContext&, double elapsed_seconds);
     virtual void thread_end(const ThreadContext&);
     virtual void summary(const SharedContext&, const Summary&);
-    virtual ~Reporter() noexcept
-    {
-    }
+    virtual ~Reporter() noexcept {}
 };
 
 
 class Filter {
 public:
     virtual bool include(const TestDetails&) = 0;
-    virtual ~Filter() noexcept
-    {
-    }
+    virtual ~Filter() noexcept {}
 };
 
 
@@ -646,7 +642,9 @@ struct RegisterTest {
 template <class Compare>
 inline void TestList::sort(Compare compare)
 {
-    auto compare_2 = [&](const Test* a, const Test* b) { return compare(a->details, b->details); };
+    auto compare_2 = [&](const Test* a, const Test* b) {
+        return compare(a->details, b->details);
+    };
     std::stable_sort(m_tests.begin(), m_tests.end(), compare_2);
 }
 
@@ -754,9 +752,7 @@ inline bool definitely_less(long double a, long double b, long double epsilon)
 
 template <class T, bool is_float>
 struct SetPrecision {
-    static void exec(std::ostream&)
-    {
-    }
+    static void exec(std::ostream&) {}
 };
 
 template <class T>

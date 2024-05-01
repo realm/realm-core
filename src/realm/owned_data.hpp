@@ -30,9 +30,7 @@ namespace realm {
 class OwnedData {
 public:
     /// Construct a null reference.
-    OwnedData() noexcept
-    {
-    }
+    OwnedData() noexcept {}
 
     /// If \a data_to_copy is 'null', \a data_size must be zero.
     OwnedData(const char* data_to_copy, size_t data_size)

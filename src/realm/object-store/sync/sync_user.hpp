@@ -80,8 +80,6 @@ public:
     // The sync server has told the client to log out the user
     // No completion handler as the user is already logged out server-side
     virtual void request_log_out() = 0;
-    // The sync server has told the client to refresh the user's profile
-    virtual void request_refresh_user(CompletionHandler&&) = 0;
     // The sync server has told the client to refresh the user's location
     virtual void request_refresh_location(CompletionHandler&&) = 0;
     // The sync server has told the client to refresh the user's access token

@@ -6188,7 +6188,6 @@ TEST(Sync_CollectionInMixed)
         CHECK_EQUAL(list.size(), 0);
         // Replace list with Dictionary on property
         obj.set_collection(col_any, CollectionType::Dictionary);
-
     });
 
     session_2.wait_for_upload_complete_or_client_stopped();

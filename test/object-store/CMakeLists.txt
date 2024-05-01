@@ -167,7 +167,8 @@ if(REALM_ENABLE_SYNC)
         endif()
 
         find_package(CURL REQUIRED)
-        target_link_libraries(ObjectStoreTestLib CURL::libcurl)
+        target_link_libraries(ObjectStoreTestLib "${CURL_LIBRARY}")
+        target_include_directories(ObjectStoreTestLib PRIVATE "${CURL_INCLUDE_DIRS}")
     endif()
 endif()
 

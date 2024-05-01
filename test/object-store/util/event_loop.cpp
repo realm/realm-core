@@ -264,7 +264,7 @@ void EventLoop::Impl::perform(util::UniqueFunction<void()> func)
 {
     __block auto f = std::move(func);
     CFRunLoopPerformBlock(m_loop.get(), kCFRunLoopDefaultMode, ^{
-      f();
+        f();
     });
     CFRunLoopWakeUp(m_loop.get());
 }

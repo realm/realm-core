@@ -153,7 +153,7 @@ private:
     bool m_upgraded = false;
     std::unique_ptr<BinaryColumn> m_arr;
 };
-}
+} // namespace realm
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 

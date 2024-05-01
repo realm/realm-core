@@ -184,6 +184,14 @@ public:
                      util::UniqueFunction<void(std::optional<AppError>)>&& completion)
         REQUIRES(!m_route_mutex, !m_user_mutex);
 
+    /// Creates a fake user with the provided access and refresh tokens. No validation is done to ensure that the
+    /// credentials are actually valid and as such, this should only be used for testing purposes.
+    /// @param user_id The id of the user that will be created
+    /// @param access_token The access token of the user
+    /// @param refresh_token The refresh token of the user
+    std::shared_ptr<User> create_fake_user_for_testing(const std::string& user_id, const std::string& access_token,
+                                                       const std::string& refresh_token) REQUIRES(!m_user_mutex);
+
     // MARK: - Provider Clients
 
     /// A struct representing a user API key as returned by the App server.

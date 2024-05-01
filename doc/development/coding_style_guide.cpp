@@ -3,7 +3,7 @@
 //
 
 /*
- * The layout of the code is enforced by the use of clang-format - currently in version 3.9. The layout is
+ * The layout of the code is enforced by the use of clang-format - currently in version 16. The layout is
  * defined by the .clang-format configuration file in the project root. You can ensure that a code change
  * complies with the formatting rules in the following ways:
  *

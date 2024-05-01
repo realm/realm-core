@@ -59,6 +59,7 @@ std::shared_ptr<Realm> get_metadata_realm()
 using realm::util::adoptCF;
 using realm::util::CFPtr;
 
+#if REALM_ENABLE_ENCRYPTION
 constexpr const char* access_group = "";
 bool can_access_keychain()
 {
@@ -74,6 +75,7 @@ bool can_access_keychain()
     }();
     return can_access_keychain;
 }
+#endif
 
 CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service)
 {
@@ -607,6 +609,7 @@ TEST_CASE("app metadata: persisted", "[sync][metadata]") {
     }
 }
 
+#if REALM_ENABLE_ENCRYPTION
 TEST_CASE("app metadata: encryption", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
 
@@ -732,6 +735,8 @@ TEST_CASE("app metadata: encryption", "[sync][metadata]") {
 #endif // REALM_PLATFORM_APPLE
 }
 
+#endif
+
 #ifndef SWIFT_PACKAGE // The SPM build currently doesn't copy resource files
 TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
@@ -779,7 +784,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
                 user->set_identities({{"identity 1", "a"}, {"shared identity", "shared"}});
                 user->add_realm_file_path("file 1");
                 user->add_realm_file_path("file 2");
-                
+
                 user = manager.get_or_make_user_metadata(name, "b");
                 user->set_state_and_tokens(state2, token_2, refresh_token_2);
                 user->set_identities({{"identity 2", "b"}, {"shared identity", "shared"}});
@@ -890,7 +895,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
 }
 #endif // SWIFT_PACKAGE
 
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE && REALM_ENABLE_ENCRYPTION
 TEST_CASE("keychain", "[sync][metadata]") {
     if (!can_access_keychain()) {
         return;

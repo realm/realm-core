@@ -25,12 +25,12 @@ namespace compatibility {
 DB::DurabilityLevel durability(RealmDurability level)
 {
     switch (level) {
-    case RealmDurability::Full:
-        return DB::durability_Full;
-    case RealmDurability::MemOnly:
-        return DB::durability_MemOnly;
-    case RealmDurability::Async:
-        return DB::durability_Async;
+        case RealmDurability::Full:
+            return DB::durability_Full;
+        case RealmDurability::MemOnly:
+            return DB::durability_MemOnly;
+        case RealmDurability::Async:
+            return DB::durability_Async;
     }
     REALM_ASSERT(false); // unhandled case
     return DB::durability_Full;
@@ -42,4 +42,3 @@ DB* create_new_shared_group(std::string path, RealmDurability level, const char*
 }
 
 } // namespace compatibility
-

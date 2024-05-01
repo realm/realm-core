@@ -6,9 +6,7 @@
 #include <vector>
 #include <cstring>
 
-std::vector<std::string> tokenize(const char* src,
-    char delim,
-    bool want_empty_tokens = true)
+std::vector<std::string> tokenize(const char* src, char delim, bool want_empty_tokens = true)
 {
     std::vector<std::string> tokens;
 
@@ -49,20 +47,20 @@ int main()
 
     std::cout << "static const uint32_t upper_lower[" << last_unicode << " + 1][2] = {";
 
-    while (std::getline(infile, line))
-    {
+    while (std::getline(infile, line)) {
         std::istringstream iss(line);
         std::vector<std::string> v = tokenize(line.c_str(), ';');
 
         uint32_t in = hex2int(v[0]);
     gap:
-        // The unicode characters in UnicodeData.txt can have gaps, i.e. increase by more than 1 for each new line. For skipped
-        // characters (i.e. characters that have no case conversion that makes sense), we want to just return the same character
-        // as we got as input. Signal that by a {0, 0}-entry.
+        // The unicode characters in UnicodeData.txt can have gaps, i.e. increase by more than 1 for each new line.
+        // For skipped characters (i.e. characters that have no case conversion that makes sense), we want to just
+        // return the same character as we got as input. Signal that by a {0, 0}-entry.
         if (in > code)
             std::cout << "{0, 0}";
         else
-            std::cout << "{" << (v[12] != "" ? "0x" + v[12] : "0") << ", " << (v[13] != "" ? "0x" + v[13] : "0") << "}";
+            std::cout << "{" << (v[12] != "" ? "0x" + v[12] : "0") << ", " << (v[13] != "" ? "0x" + v[13] : "0")
+                      << "}";
 
         if (code != last_unicode)
             std::cout << ", ";
@@ -83,4 +81,3 @@ int main()
 
     return 0;
 }
-
