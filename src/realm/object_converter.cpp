@@ -297,18 +297,14 @@ void InterRealmValueConverter::copy_value(const Obj& src_obj, Obj& dst_obj, bool
             Lst<Mixed> dst_list{dst_obj, m_dst_col};
             handle_list_in_mixed(src_list, dst_list);
         }
-        else if (src_mixed.is_type(type_Set)) {
-            dst_obj.set_collection(m_dst_col, CollectionType::Set);
-            realm::Set<Mixed> src_set{src_obj, m_src_col};
-            realm::Set<Mixed> dst_set{dst_obj, m_dst_col};
-            // sets cannot be nested, so we just need to copy the values
-            copy_set(src_set, dst_set, nullptr);
-        }
         else if (src_mixed.is_type(type_Dictionary)) {
             dst_obj.set_collection(m_dst_col, CollectionType::Dictionary);
             Dictionary src_dict{src_obj, m_src_col};
             Dictionary dst_dict{dst_obj, m_dst_col};
             handle_dictionary_in_mixed(src_dict, dst_dict);
+        }
+        else if (src_mixed.is_type(type_Set)) {
+            REALM_COMPILER_HINT_UNREACHABLE();
         }
         else {
             InterRealmValueConverter::ConversionResult converted_src;
@@ -381,7 +377,17 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
         }
         else if (dst_any != src_any) {
             // Mixed vs Mixed
-            dst_list.set_any(left, src_any);
+            InterRealmValueConverter::ConversionResult converted_src;
+            bool update_out = false;
+            cmp_src_to_dst(src_any, dst_any, &converted_src, &update_out);
+            if(update_out) {
+                // we do not support embedded objects
+                REALM_ASSERT(!converted_src.requires_new_embedded_object);
+                dst_list.set_any(left, converted_src.converted_value);
+            }
+            else {
+                dst_list.set_any(left, src_any);
+            }
         }
         left += 1;
     }
@@ -403,7 +409,19 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
             copy_list_in_mixed(src_list, dst_list, i, coll_type);
         }
         else {
-            dst_list.insert_any(i, src_any);
+            InterRealmValueConverter::ConversionResult converted_src;
+            bool update_out = false;
+            cmp_src_to_dst(src_any, Mixed{}, &converted_src, &update_out);
+            if(update_out) {
+                // we do not support embedded objects
+                REALM_ASSERT(!converted_src.requires_new_embedded_object);
+                //dst_list.set_any(left, converted_src.converted_value);
+                dst_list.insert_any(i, converted_src.converted_value);
+
+            }
+            else {
+                dst_list.insert_any(i, src_any);
+            }
         }
     }
 }
@@ -467,7 +485,19 @@ void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictio
             copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key.get_string(), coll_type);
         }
         else {
-            dst_dictionary.insert(key, any);
+            
+            InterRealmValueConverter::ConversionResult converted_src;
+            bool update_out = false;
+            cmp_src_to_dst(any, Mixed{}, &converted_src, &update_out);
+            if(update_out) {
+                // we do not support embedded objects
+                REALM_ASSERT(!converted_src.requires_new_embedded_object);
+                //dst_list.set_any(left, converted_src.converted_value);
+                //dst_list.insert_any(i, converted_src.converted_value);
+                dst_dictionary.insert(key, converted_src.converted_value);
+            }
+            else
+                dst_dictionary.insert(key, any);
         }
     }
 }
