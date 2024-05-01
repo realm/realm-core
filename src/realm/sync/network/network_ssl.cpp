@@ -207,15 +207,10 @@ std::string SecureTransportErrorCategory::message(int value) const
     const char* message = "Unknown error";
 #if REALM_HAVE_SECURE_TRANSPORT
     std::unique_ptr<char[]> buffer;
-    if (__builtin_available(iOS 11.3, macOS 10.3, tvOS 11.3, watchOS 4.3, *)) {
-        auto status = OSStatus(value);
-        void* reserved = nullptr;
-        if (auto cf_message = adoptCF(SecCopyErrorMessageString(status, reserved)))
-            message = cfstring_to_cstring(cf_message.get(), buffer);
-    }
-    else {
-        static_cast<void>(buffer);
-    }
+    auto status = OSStatus(value);
+    void* reserved = nullptr;
+    if (auto cf_message = adoptCF(SecCopyErrorMessageString(status, reserved)))
+        message = cfstring_to_cstring(cf_message.get(), buffer);
 #endif // REALM_HAVE_SECURE_TRANSPORT
 
     return util::format("SecureTransport error: %1 (%2)", message, value); // Throws

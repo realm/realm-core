@@ -118,16 +118,6 @@ public:
                 struct timespec now;
 #ifdef _WIN32
                 timespec_get(&now, TIME_UTC);
-#elif REALM_PLATFORM_APPLE
-                if (__builtin_available(iOS 10, macOS 12, tvOS 10, watchOS 3, *)) {
-                    clock_gettime(CLOCK_REALTIME, &now);
-                }
-                else {
-                    timeval tv;
-                    gettimeofday(&tv, 0);
-                    now.tv_sec = tv.tv_sec;
-                    now.tv_nsec = tv.tv_usec * 1000;
-                }
 #else
                 clock_gettime(CLOCK_REALTIME, &now);
 #endif

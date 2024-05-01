@@ -26,9 +26,7 @@
 #include <realm/version.hpp>
 
 #if REALM_PLATFORM_APPLE
-
 #include <os/log.h>
-#include <asl.h>
 
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -78,18 +76,10 @@ void nslog(const char* message) noexcept
     // Standard error goes nowhere for applications managed by launchd,
     // so log to ASL/unified logging system logs as well.
     fputs(message, stderr);
-    if (__builtin_available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)) {
-        // The unified logging system considers dynamic strings to be private in
-        // order to protect users. This means we must specify "%{public}s" to get
-        // the message here. See `man os_log` for more details.
-        os_log_error(OS_LOG_DEFAULT, "%{public}s", message);
-    }
-    else {
-        REALM_DIAG_PUSH();
-        REALM_DIAG(ignored "-Wdeprecated");
-        asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
-        REALM_DIAG_POP();
-    }
+    // The unified logging system considers dynamic strings to be private in
+    // order to protect users. This means we must specify "%{public}s" to get
+    // the message here. See `man os_log` for more details.
+    os_log_error(OS_LOG_DEFAULT, "%{public}s", message);
     // Log the message to Crashlytics if it's loaded into the process
     void* addr = dlsym(RTLD_DEFAULT, "CLSLog");
     if (addr) {
