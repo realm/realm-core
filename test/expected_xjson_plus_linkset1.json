@@ -5,7 +5,12 @@
       "$numberLong": "100"
     },
     "linkA": [
-      "t2o2"
+      {
+        "$link": {
+          "table": "table2",
+          "key": "t2o2"
+        }
+      }
     ]
   },
   {
@@ -21,8 +26,18 @@
       "$numberLong": "200"
     },
     "linkA": [
-      "t2o2",
-      "t2o3"
+      {
+        "$link": {
+          "table": "table2",
+          "key": "t2o2"
+        }
+      },
+      {
+        "$link": {
+          "table": "table2",
+          "key": "t2o3"
+        }
+      }
     ]
   }
 ]

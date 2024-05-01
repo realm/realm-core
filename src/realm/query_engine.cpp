@@ -380,6 +380,28 @@ size_t IndexEvaluator::do_search_index(const Cluster* cluster, size_t start, siz
     return not_found;
 }
 
+StringNode<Equal>::StringNode(ColKey col, const Mixed* begin, const Mixed* end)
+    : StringNodeEqualBase(StringData(), col)
+{
+    // Don't use the search index if present since we're in a scenario where
+    // it'd be slower
+    m_index_evaluator.reset();
+
+    for (const Mixed* it = begin; it != end; ++it) {
+        if (it->is_null()) {
+            m_needles.emplace();
+        }
+        else if (const StringData* str = it->get_if<StringData>()) {
+            m_needle_storage.push_back(std::make_unique<char[]>(str->size()));
+            std::copy(str->data(), str->data() + str->size(), m_needle_storage.back().get());
+            m_needles.insert(StringData(m_needle_storage.back().get(), str->size()));
+        }
+    }
+    if (m_needles.empty()) {
+        throw InvalidArgument("No string arguments in query");
+    }
+}
+
 void StringNode<Equal>::_search_index_init()
 {
     REALM_ASSERT(bool(m_index_evaluator));
@@ -395,17 +417,31 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 
     auto& other = static_cast<StringNode<Equal>&>(node);
     REALM_ASSERT(m_condition_column_key == other.m_condition_column_key);
-    REALM_ASSERT(other.m_needles.empty());
+
     if (m_needles.empty()) {
         m_needles.insert(m_string_value);
     }
-    if (auto& str = other.m_value) {
-        m_needle_storage.push_back(std::make_unique<char[]>(str->size()));
-        std::copy(str->data(), str->data() + str->size(), m_needle_storage.back().get());
-        m_needles.insert(StringData(m_needle_storage.back().get(), str->size()));
+    auto add_string = [&](const StringData& str) {
+        if (m_needles.count(str) == 0) {
+            if (str.size()) {
+                m_needle_storage.push_back(std::make_unique<char[]>(str.size()));
+                std::copy(str.data(), str.data() + str.size(), m_needle_storage.back().get());
+                m_needles.insert(StringData(m_needle_storage.back().get(), str.size()));
+            }
+            else {
+                // this code path is different because we need to
+                // distinguish null from the empty string
+                m_needles.insert(str);
+            }
+        }
+    };
+    if (!other.m_needles.empty()) {
+        for (const auto& str : other.m_needles) {
+            add_string(str);
+        }
     }
     else {
-        m_needles.emplace();
+        add_string(other.m_string_value);
     }
     return true;
 }

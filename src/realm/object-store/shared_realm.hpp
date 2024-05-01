@@ -184,6 +184,13 @@ struct RealmConfig {
     // everything can be done deterministically on one thread, and
     // speeds up tests that don't need notifications.
     bool automatic_change_notifications = true;
+
+    // For internal use and should not be exposed by SDKs.
+    //
+    // If the file is invalid or can't be decrypted with the given encryption
+    // key, clear it and reinitialize it as a new file. This is used for the
+    // sync metadata realm which is automatically deleted if it can't be used.
+    bool clear_on_invalid_file = false;
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {

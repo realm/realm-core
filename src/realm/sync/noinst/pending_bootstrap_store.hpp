@@ -82,6 +82,7 @@ public:
                    const std::vector<RemoteChangeset>& changesets, bool* created_new_batch);
 
     void clear();
+    void clear(Transaction& wt);
 
 
 private:

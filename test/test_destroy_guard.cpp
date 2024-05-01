@@ -83,9 +83,7 @@ public:
         m_baseline = 8;
     }
 
-    ~FooAlloc() noexcept
-    {
-    }
+    ~FooAlloc() noexcept {}
 
     MemRef do_alloc(const size_t size) override
     {
@@ -141,9 +139,7 @@ public:
         m_map.clear();
     }
 
-    void verify() const override
-    {
-    }
+    void verify() const override {}
     void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) override
     {
         REALM_ASSERT(false);

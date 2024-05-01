@@ -161,13 +161,18 @@ ErrorCategory ErrorCodes::error_categories(Error code)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::http_error);
 
-        case ClientAppDeallocated:
         case ClientRedirectError:
         case ClientTooManyRedirects:
-        case ClientUserNotFound:
-        case ClientUserNotLoggedIn:
             return ErrorCategory()
                 .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::app_error)
+                .set(ErrorCategory::client_error);
+
+        case ClientUserNotFound:
+        case ClientUserNotLoggedIn:
+        case ClientUserAlreadyNamed:
+            return ErrorCategory()
+                .set(ErrorCategory::logic_error)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::client_error);
 
@@ -176,7 +181,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case MalformedJson:
         case MissingJsonKey:
             return ErrorCategory()
-                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::logic_error)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::json_error);
 
@@ -253,7 +258,7 @@ struct MapElem {
 };
 
 // Note: this array must be kept in sorted order
-static const MapElem string_to_error_code[] = {
+static const constexpr MapElem string_to_error_code[] = {
     {"APIKeyAlreadyExists", ErrorCodes::APIKeyAlreadyExists},
     {"APIKeyNotFound", ErrorCodes::APIKeyNotFound},
     {"AWSError", ErrorCodes::AWSError},
@@ -277,9 +282,9 @@ static const MapElem string_to_error_code[] = {
     {"BrokenInvariant", ErrorCodes::BrokenInvariant},
     {"BrokenPromise", ErrorCodes::BrokenPromise},
     {"CallbackFailed", ErrorCodes::CallbackFailed},
-    {"ClientAppDeallocated", ErrorCodes::ClientAppDeallocated},
     {"ClientRedirectError", ErrorCodes::ClientRedirectError},
     {"ClientTooManyRedirects", ErrorCodes::ClientTooManyRedirects},
+    {"ClientUserAlreadyNamed", ErrorCodes::ClientUserAlreadyNamed},
     {"ClientUserNotFound", ErrorCodes::ClientUserNotFound},
     {"ClientUserNotLoggedIn", ErrorCodes::ClientUserNotLoggedIn},
     {"ClosedRealm", ErrorCodes::ClosedRealm},

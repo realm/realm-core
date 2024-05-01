@@ -23,26 +23,23 @@
 
 #if REALM_PLATFORM_APPLE
 
-#include <realm/util/optional.hpp>
+#include <optional>
+#include <string_view>
 #include <vector>
 
 namespace realm::keychain {
 
 // Get the stored encryption key for the metadata realm if one exists.
-util::Optional<std::vector<char>> get_existing_metadata_realm_key();
+std::optional<std::vector<char>> get_existing_metadata_realm_key(std::string_view app_id,
+                                                                 std::string_view access_group);
 // Create a new encryption key and store it in the keychain. Returns none if
 // the key could not be stored.
-util::Optional<std::vector<char>> create_new_metadata_realm_key();
+std::optional<std::vector<char>> create_new_metadata_realm_key(std::string_view app_id,
+                                                               std::string_view access_group);
 
 // Delete the encryption key for the metadata realm from the keychain.
-void delete_metadata_realm_encryption_key();
+void delete_metadata_realm_encryption_key(std::string_view app_id, std::string_view access_group);
 
-} // namespace realm::keychain
-
-#else // REALM_PLATFORM_APPLE
-
-namespace realm::keychain {
-inline void delete_metadata_realm_encryption_key() {}
 } // namespace realm::keychain
 
 #endif // REALM_PLATFORM_APPLE

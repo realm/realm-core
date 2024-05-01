@@ -203,6 +203,7 @@ public:
 
     CollectionType get_collection_type(ColKey col_key) const;
 
+    void remove_columns();
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
@@ -595,7 +596,11 @@ public:
     {
         return Query(m_own_ref, list);
     }
-    Query where(const DictionaryLinkValues& dictionary_of_links) const;
+    Query where(const Dictionary& dict) const;
+    Query where(LinkCollectionPtr&& list) const
+    {
+        return Query(m_own_ref, std::move(list));
+    }
 
     Query query(const std::string& query_string,
                 const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments = {}) const;
@@ -690,6 +695,8 @@ public:
         Table& m_table;
         Replication* const* m_repl;
     };
+
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const;
 
 private:
     enum LifeCycleCookie {

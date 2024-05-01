@@ -5,9 +5,19 @@
       "$numberLong": "100"
     },
     "linkA": [
-      "t2o2"
+      {
+        "$link": {
+          "table": "table2",
+          "key": "t2o2"
+        }
+      }
     ],
-    "linkB": "t2o1"
+    "linkB": {
+      "$link": {
+        "table": "table2",
+        "key": "t2o1"
+      }
+    }
   },
   {
     "primaryKey": "t1o3",
@@ -23,8 +33,18 @@
       "$numberLong": "200"
     },
     "linkA": [
-      "t2o2",
-      "t2o3"
+      {
+        "$link": {
+          "table": "table2",
+          "key": "t2o2"
+        }
+      },
+      {
+        "$link": {
+          "table": "table2",
+          "key": "t2o3"
+        }
+      }
     ],
     "linkB": null
   }

@@ -118,17 +118,17 @@ int main(int argc, char const* argv[])
             print(db->start_read());
             return 0;
         }
-        catch (const realm::FileFormatUpgradeRequired&) {
-            options.allow_file_format_upgrade = true;
-            options.is_immutable = false;
-        }
         catch (const realm::IncompatibleHistories&) {
             hist = realm::sync::make_client_replication();
             options.allow_file_format_upgrade = false;
             options.is_immutable = true;
         }
-        catch (...) {
-            break;
+        catch (const realm::FileAccessError& e) {
+            if (e.code() != realm::ErrorCodes::FileFormatUpgradeRequired) {
+                throw;
+            }
+            options.allow_file_format_upgrade = true;
+            options.is_immutable = false;
         }
     }
 

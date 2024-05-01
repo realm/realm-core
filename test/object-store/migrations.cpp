@@ -2279,7 +2279,7 @@ TEST_CASE("migration: Additive", "[migration]") {
         REQUIRE_NOTHROW(realm->update_schema(schema, 1));
         REQUIRE(realm->schema_version() == 1);
         REQUIRE_NOTHROW(realm->update_schema(schema, 0));
-        REQUIRE(realm->schema_version() == 1);
+        REQUIRE(realm->schema_version() == 0);
     }
 
     SECTION("migration function is not used") {

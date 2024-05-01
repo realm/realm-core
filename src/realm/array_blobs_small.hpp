@@ -54,9 +54,7 @@ in set(), etc). This way no file format upgrade is needed to support nulls for B
 class ArraySmallBlobs : public Array {
 public:
     explicit ArraySmallBlobs(Allocator&) noexcept;
-    ~ArraySmallBlobs() noexcept override
-    {
-    }
+    ~ArraySmallBlobs() noexcept override {}
 
     // Disable copying, this is not allowed.
     ArraySmallBlobs& operator=(const ArraySmallBlobs&) = delete;

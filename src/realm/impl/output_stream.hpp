@@ -59,9 +59,7 @@ inline OutputStream::OutputStream(std::ostream& out)
 {
 }
 
-inline OutputStream::~OutputStream() noexcept
-{
-}
+inline OutputStream::~OutputStream() noexcept {}
 
 inline size_t OutputStream::get_ref_of_next_array() const noexcept
 {

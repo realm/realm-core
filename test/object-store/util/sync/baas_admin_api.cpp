@@ -346,8 +346,11 @@ app::Response do_http_request(const app::Request& request)
 
     auto logger = util::Logger::get_default_logger();
     if (response_code != CURLE_OK) {
+        std::string message = curl_easy_strerror(response_code);
         logger->error("curl_easy_perform() failed when sending request to '%1' with body '%2': %3", request.url,
-                      request.body, curl_easy_strerror(response_code));
+                      request.body, message);
+        // Return a failing response with the CURL error as the custom code
+        return {0, response_code, {}, message};
     }
     if (logger->would_log(util::Logger::Level::trace)) {
         std::string coid = [&] {
@@ -358,8 +361,8 @@ app::Response do_http_request(const app::Request& request)
             return util::format("BaaS Coid: \"%1\"", coid_header->second);
         }();
 
-        logger->trace("Baas API %1 request to %2 took %3 %4\n", app::httpmethod_to_string(request.method),
-                      request.url, std::chrono::duration_cast<std::chrono::milliseconds>(total_time), coid);
+        logger->trace("Baas API %1 request to %2 took %3 %4\n", request.method, request.url,
+                      std::chrono::duration_cast<std::chrono::milliseconds>(total_time), coid);
     }
 
     int http_code = 0;
@@ -610,7 +613,7 @@ public:
 
     void testRunEnded(Catch::TestRunStats const&) override
     {
-        if (auto& baasaas_holder = get_baasaas_holder(); baasaas_holder.has_value()) {
+        if (auto& baasaas_holder = get_baasaas_holder()) {
             baasaas_holder->stop();
         }
     }

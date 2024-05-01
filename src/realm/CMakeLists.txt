@@ -12,14 +12,11 @@ set(REALM_SOURCES
     array_blobs_small.cpp
     array_blobs_big.cpp
     array_decimal128.cpp
-    array_encode.cpp
     array_fixed_bytes.cpp
-    array_flex.cpp
-    array_packed.cpp
+    array_aggregate_optimizations.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
-    array_packed.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
@@ -40,6 +37,9 @@ set(REALM_SOURCES
     db.cpp
     group_writer.cpp
     history.cpp
+    integer_compressor.cpp
+    integer_flex_compressor.cpp
+    integer_packed_compressor.cpp
     impl/copy_replication.cpp
     impl/output_stream.cpp
     impl/simulated_failure.cpp
@@ -128,15 +128,12 @@ set(REALM_INSTALL_HEADERS
     array_bool.hpp
     array_decimal128.hpp
     array_direct.hpp
-    array_encode.hpp
     array_fixed_bytes.hpp
-    array_flex.hpp
     array_integer.hpp
     array_integer_tpl.hpp
     array_key.hpp
     array_list.hpp
     array_mixed.hpp
-    array_packed.hpp
     array_ref.hpp
     array_string.hpp
     array_string_short.hpp
@@ -172,6 +169,9 @@ set(REALM_INSTALL_HEADERS
     handover_defs.hpp
     history.hpp
     index_string.hpp
+    integer_compressor.hpp
+    integer_flex_compressor.hpp
+    integer_packed_compressor.hpp
     keys.hpp
     list.hpp
     mixed.hpp
@@ -363,7 +363,7 @@ endif()
 # On systems without a built-in SHA-2 implementation (or one provided by a dependency)
 # we need to bundle the public domain implementation.
 # Note: This is also used on Windows because Windows lacks a native SHA224 hash needed for realm encryption
-if(NOT APPLE AND NOT REALM_HAVE_OPENSSL OR WIN32)
+if(NOT APPLE AND NOT REALM_HAVE_OPENSSL)
     add_library(sha2 OBJECT ../external/sha-2/sha224.cpp ../external/sha-2/sha256.cpp)
     target_include_directories(Storage PRIVATE ../external/sha-2)
     target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha2>)
@@ -398,7 +398,7 @@ if(REALM_HAVE_BACKTRACE AND NOT CMAKE_GENERATOR STREQUAL Xcode)
     target_link_libraries(Storage PUBLIC ${Backtrace_LIBRARIES})
 endif()
 
-if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
+if(REALM_HAVE_OPENSSL AND (UNIX OR WIN32))
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 

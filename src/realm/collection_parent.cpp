@@ -75,13 +75,13 @@ CollectionParent::~CollectionParent() {}
 
 void CollectionParent::check_level() const
 {
-    if (m_level + 1 > (int)s_max_level) {
+    if (size_t(m_level) + 1 > s_max_level) {
         throw LogicError(ErrorCodes::LimitExceeded, "Max nesting level reached");
     }
 }
 
 template <typename Base, template <typename> typename Collection, typename LinkCol>
-std::unique_ptr<Base> create_collection(ColKey col_key, size_t level)
+std::unique_ptr<Base> create_collection(ColKey col_key, uint8_t level)
 {
     bool nullable = col_key.get_attrs().test(col_attr_Nullable);
     switch (col_key.get_type()) {
@@ -128,19 +128,19 @@ std::unique_ptr<Base> create_collection(ColKey col_key, size_t level)
     }
 }
 
-LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key, size_t level)
+LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key, uint8_t level)
 {
     REALM_ASSERT(col_key.get_attrs().test(col_attr_List) || col_key.get_type() == col_type_Mixed);
     return create_collection<LstBase, Lst, LnkLst>(col_key, level);
 }
 
-SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key, size_t level)
+SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key, uint8_t level)
 {
     REALM_ASSERT(col_key.get_attrs().test(col_attr_Set));
     return create_collection<SetBase, Set, LnkSet>(col_key, level);
 }
 
-CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key, size_t level)
+CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key, uint8_t level)
 {
     if (col_key.is_list()) {
         return get_listbase_ptr(col_key, level);

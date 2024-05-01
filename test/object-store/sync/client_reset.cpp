@@ -326,7 +326,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             recovery_path = recovery_path_it->second;
             REQUIRE(util::File::exists(orig_path));
             REQUIRE(!util::File::exists(recovery_path));
-            bool did_reset_files = test_app_session.sync_manager()->immediately_run_file_actions(orig_path);
+            bool did_reset_files = test_app_session.app()->immediately_run_file_actions(orig_path);
             REQUIRE(did_reset_files);
             REQUIRE(!util::File::exists(orig_path));
             REQUIRE(util::File::exists(recovery_path));
@@ -618,7 +618,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  partition_prop,
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
                 })
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
@@ -646,7 +646,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  remotely_added_property,
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
 
                     create_object(*local, new_table_name, {pk1}, partition);
                     create_object(*local, existing_table_name, {pk1}, partition);
@@ -719,7 +719,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  {prop_name, PropertyType::Float},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
                 })
                 ->make_remote_changes([&](SharedRealm remote) {
                     remote->update_schema(
@@ -1249,7 +1249,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
                     create_object(*local, "object2", ObjectId::gen(), partition);
                     create_object(*local, "object2", ObjectId::gen(), partition);
                 })
@@ -1285,7 +1285,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
                     auto table = ObjectStore::table_for_object_type(local->read_group(), "object");
                     table->begin()->set(table->get_column_key("value2"), 123);
                 })
@@ -1321,7 +1321,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
                 })
                 ->make_remote_changes([](SharedRealm remote) {
                     remote->update_schema(
@@ -1367,7 +1367,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
                 })
                 ->make_remote_changes([](SharedRealm remote) {
                     remote->update_schema(
@@ -1409,7 +1409,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        1, nullptr, nullptr, true);
                 })
                 ->make_remote_changes([](SharedRealm remote) {
                     remote->update_schema(

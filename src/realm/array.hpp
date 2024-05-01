@@ -24,7 +24,7 @@
 #include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
-#include <realm/array_encode.hpp>
+#include <realm/integer_compressor.hpp>
 
 namespace realm {
 
@@ -333,8 +333,8 @@ public:
     /// by doing a linear search for short sequences.
     size_t lower_bound_int(int64_t value) const noexcept;
     size_t upper_bound_int(int64_t value) const noexcept;
-    size_t lower_bound_int_encoded(int64_t value) const noexcept;
-    size_t upper_bound_int_encoded(int64_t value) const noexcept;
+    size_t lower_bound_int_compressed(int64_t value) const noexcept;
+    size_t upper_bound_int_compressed(int64_t value) const noexcept;
     //@}
 
     int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const
@@ -366,16 +366,16 @@ public:
     void destroy_deep(bool ro_only = false) noexcept;
 
     /// check if the array is encoded (in B format)
-    inline bool is_encoded() const;
+    inline bool is_compressed() const;
 
-    inline const ArrayEncode& get_encoder() const;
+    inline const IntegerCompressor& integer_compressor() const;
 
     /// used only for testing, encode the array passed as argument
-    bool try_encode(Array&) const;
+    bool try_compress(Array&) const;
 
     /// used only for testing, decode the array, on which this method is invoked. If the array is not encoded, this is
     /// a NOP
-    bool try_decode();
+    bool try_decompress();
 
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
     static void destroy_deep(ref_type ref, Allocator& alloc, bool ro_only = false) noexcept;
@@ -498,7 +498,7 @@ public:
 
     /// Takes a 64-bit value and returns the minimum number of bits needed
     /// to fit the value. For alignment this is rounded up to nearest
-    /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
+    /// log2. Possible results {0, 1, 2, 4, 8, 16, 32, 64}
     static size_t bit_width(int64_t value);
 
     void typed_print(std::string prefix) const;
@@ -579,19 +579,20 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    ArrayEncode m_encoder;
-    // encode/decode this array
-    bool encode_array(Array&) const;
-    bool decode_array(Array& arr) const;
-    int64_t get_encoded(size_t ndx) const noexcept;
-    void set_encoded(size_t ndx, int64_t);
-    void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
+    IntegerCompressor m_integer_compressor;
+    // compress/decompress this array
+    bool compress_array(Array&) const;
+    bool decompress_array(Array& arr) const;
+    int64_t get_from_compressed_array(size_t ndx) const noexcept;
+    void set_compressed_array(size_t ndx, int64_t);
+    void get_chunk_compressed_array(size_t, int64_t[8]) const noexcept;
 
 #ifdef REALM_DEBUG
 public: // make it public for testing
 #endif
     template <class cond>
-    bool find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    bool find_compressed_array(int64_t value, size_t start, size_t end, size_t baseindex,
+                               QueryStateBase* state) const;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -609,22 +610,39 @@ private:
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class ArrayWithFind;
-    friend class ArrayFlex;
-    friend class ArrayPacked;
-    friend class ArrayEncode;
+    friend class IntegerCompressor;
+    friend class PackedCompressor;
+    friend class FlexCompressor;
+};
+
+class TempArray : public Array {
+public:
+    TempArray(size_t sz, Type type = Type::type_HasRefs)
+        : Array(Allocator::get_default())
+    {
+        create(type, false, sz);
+    }
+    ~TempArray()
+    {
+        destroy();
+    }
+    ref_type write(_impl::ArrayWriterBase& out)
+    {
+        return Array::write(out, false, false, false);
+    }
 };
 
 // Implementation:
 
-inline bool Array::is_encoded() const
+inline bool Array::is_compressed() const
 {
-    auto enc = m_encoder.get_encoding();
+    const auto enc = m_integer_compressor.get_encoding();
     return enc == NodeHeader::Encoding::Flex || enc == NodeHeader::Encoding::Packed;
 }
 
-inline const ArrayEncode& Array::get_encoder() const
+inline const IntegerCompressor& Array::integer_compressor() const
 {
-    return m_encoder;
+    return m_integer_compressor;
 }
 
 inline int64_t Array::get(size_t ndx) const noexcept
@@ -982,6 +1000,21 @@ inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
     }
 }
 
+
+//-------------------------------------------------
+
+
+inline size_t Array::get_byte_size() const noexcept
+{
+    const char* header = get_header_from_data(m_data);
+    size_t num_bytes = NodeHeader::get_byte_size_from_header(header);
+
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+
+    return num_bytes;
+}
+
+
 //-------------------------------------------------
 
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
@@ -1017,6 +1050,73 @@ inline void Array::ensure_minimum_width(int_fast64_t value)
     if (value >= m_lbound && value <= m_ubound)
         return;
     do_ensure_minimum_width(value);
+}
+
+inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified,
+                             bool compress_in_flight) const
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT_DEBUG(!only_if_modified || &m_alloc != &Allocator::get_default());
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs) {
+        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
+        // it only works by accident, because the whole slab area is reinitialized after commit.
+        // We should have: Array encoded_array{Allocator::get_default()};
+        Array compressed_array{Allocator::get_default()};
+        if (compress_in_flight && size() != 0 && compress_array(compressed_array)) {
+#ifdef REALM_DEBUG
+            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
+            REALM_ASSERT_DEBUG(size() == compressed_array.size());
+            for (size_t i = 0; i < compressed_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(get(i) == compressed_array.get(i));
+            }
+#endif
+            auto ref = compressed_array.do_write_shallow(out);
+            compressed_array.destroy();
+            return ref;
+        }
+        return do_write_shallow(out); // Throws
+    }
+
+    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
+}
+
+inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
+                             bool compress_in_flight)
+{
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT_DEBUG(!only_if_modified || &alloc != &Allocator::get_default());
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc);
+    array.init_from_ref(ref);
+    REALM_ASSERT_DEBUG(array.is_attached());
+
+    if (!array.m_has_refs) {
+        Array compressed_array{Allocator::get_default()};
+        if (compress_in_flight && array.size() != 0 && array.compress_array(compressed_array)) {
+#ifdef REALM_DEBUG
+            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
+            REALM_ASSERT_DEBUG(array.size() == compressed_array.size());
+            for (size_t i = 0; i < compressed_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(array.get(i) == compressed_array.get(i));
+            }
+#endif
+            auto ref = compressed_array.do_write_shallow(out);
+            compressed_array.destroy();
+            return ref;
+        }
+        else {
+            return array.do_write_shallow(out); // Throws
+        }
+    }
+    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
 }
 
 
