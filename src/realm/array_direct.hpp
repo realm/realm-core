@@ -1158,19 +1158,20 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value,
                           const impl::CompressedDataFetcher<T>& fetcher) noexcept
 {
     return impl::lower_bound(data, 0, size, value, fetcher);
+}
 
-    template <int width>
-    inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
-    {
-        return impl::upper_bound(data, 0, size, value, impl::default_fetcher<width>);
-    }
+template <int width>
+inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::upper_bound(data, 0, size, value, impl::default_fetcher<width>);
+}
 
-    template <typename T>
-    inline size_t upper_bound(const char* data, size_t size, int64_t value,
-                              const impl::CompressedDataFetcher<T>& fetcher) noexcept
-    {
-        return impl::upper_bound(data, 0, size, value, fetcher);
-    }
+template <typename T>
+inline size_t upper_bound(const char* data, size_t size, int64_t value,
+                          const impl::CompressedDataFetcher<T>& fetcher) noexcept
+{
+    return impl::upper_bound(data, 0, size, value, fetcher);
+}
 
 } // namespace realm
 
