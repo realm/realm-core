@@ -1295,7 +1295,7 @@ classes:
       unsubscribe: '(token: AppSubscriptionToken)'
       call_function: '(user: const SharedUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
       make_streaming_request: '(user: SharedUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
-      update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      update_base_url: '(base_url: std::string_view, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       get_base_url: '() const -> std::string'
       immediately_run_file_actions: '(realm_path: std::string) -> bool'
 
