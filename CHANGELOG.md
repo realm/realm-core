@@ -8,6 +8,8 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix assertion failure or wrong results when evaluating a RQL query with multiple IN conditions on the same property. Applies to non-indexed int/string/ObjectId/UUID properties, or if they were indexed and had > 100 conditions. ((RCORE-2098) [PR #7628](https://github.com/realm/realm-core/pull/7628) since v14.6.0).
 * Fixed a bug when running a IN query (or a query of the pattern `x == 1 OR x == 2 OR x == 3`) when evaluating on a string property with an empty string in the search condition. Matches with an empty string would have been evaluated as if searching for a null string instead. ([PR #7628](https://github.com/realm/realm-core/pull/7628) since v10.0.0-beta.9)
+* Fixed a bug when running a IN query on a String/Int/UUID/ObjectId property that was indexed. ([7642](https://github.com/realm/realm-core/issues/7642) since v14.6.0)
+* Fixed a bug when running a IN query on a integer property where double/float parameters were ignored. ([7642](https://github.com/realm/realm-core/issues/7642) since v14.6.0)
 
 ### Breaking changes
 * None.

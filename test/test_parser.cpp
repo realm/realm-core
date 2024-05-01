@@ -4112,6 +4112,27 @@ TEST(Parser_OrOfIn)
                  "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null} OR name IN {''}", 5);
 }
 
+TEST_TYPES(Parser_7642, std::true_type, std::false_type)
+{
+    Group g;
+    auto cars = g.add_table("class_Car");
+    auto col_make = cars->add_column(type_String, "make");
+    auto col_int = cars->add_column(type_Int, "value");
+    if (TEST_TYPE::value) {
+        cars->add_search_index(col_make);
+        cars->add_search_index(col_int);
+    }
+
+    cars->create_object().set(col_make, "Tesla").set(col_int, 123);
+    cars->create_object().set(col_make, "Ford").set(col_int, 456);
+    cars->create_object().set(col_make, "Audi").set(col_int, 789);
+
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
+    // do not compare to floats, and do not compare to doubles that are not an exact integer
+    verify_query(test_context, cars, "value IN $0", {Vec{456, 789.0f, 123.0, 789.10}}, 2);
+}
+
 TEST(Parser_KeyPathSubstitution)
 {
     Group g;
