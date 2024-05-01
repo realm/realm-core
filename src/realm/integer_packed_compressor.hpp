@@ -34,12 +34,13 @@ namespace realm {
 class PackedCompressor {
 public:
     // encoding/decoding
-    void init_array(char*, uint8_t, size_t, size_t) const;
+    void init_array(char*, uint8_t, uint8_t, size_t) const;
     void copy_data(const Array&, Array&) const;
     // get or set
-    inline int64_t get(bf_iterator& it, size_t, uint64_t) const;
-    inline void get_chunk(bf_iterator& it, size_t, uint64_t, int64_t res[8]) const;
-    inline void set_direct(bf_iterator& it, size_t, int64_t) const;
+    inline int64_t get(const IntegerCompressor&, size_t) const;
+    inline std::vector<int64_t> get_all(const IntegerCompressor& c, size_t b, size_t e) const;
+    inline void get_chunk(const IntegerCompressor&, size_t, int64_t res[8]) const;
+    inline void set_direct(const IntegerCompressor&, size_t, int64_t) const;
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
@@ -53,14 +54,75 @@ private:
     template <typename Cond>
     inline bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
-    inline bool run_parallel_scan(size_t width, size_t range) const;
+    template <typename Cond>
+    inline bool run_parallel_scan(size_t, size_t) const;
 };
 
-inline int64_t PackedCompressor::get(bf_iterator& it, size_t ndx, uint64_t mask) const
+inline int64_t PackedCompressor::get(const IntegerCompressor& c, size_t ndx) const
 {
-    it.move(ndx);
-    return sign_extend_field_by_mask(mask, *it);
+    bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
+    return sign_extend_field_by_mask(c.v_mask(), *it);
 }
+
+inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
+{
+    const auto range = (e - b);
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    const auto starting_bit = b * v_w;
+    const auto total_bits = starting_bit + (v_w * range);
+    const auto mask = (1ULL << v_w) - 1;
+    const auto bit_per_it = num_bits_for_width(v_w);
+    const auto values_per_word = num_fields_for_width(v_w);
+
+    std::vector<int64_t> res;
+    res.reserve(range);
+
+    unaligned_word_iter unaligned_data_iterator(data, starting_bit);
+    auto cnt_bits = starting_bit;
+    while (cnt_bits + bit_per_it < total_bits) {
+        auto word = unaligned_data_iterator.get(bit_per_it);
+        for (int i = 0; i < values_per_word; ++i) {
+            res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
+            word >>= v_w;
+        }
+        cnt_bits += bit_per_it;
+        unaligned_data_iterator.bump(bit_per_it);
+    }
+    if (cnt_bits < total_bits) {
+        auto last_word = unaligned_data_iterator.get(static_cast<unsigned>(total_bits - cnt_bits));
+        while (cnt_bits < total_bits) {
+            res.push_back(sign_extend_field_by_mask(sign_mask, last_word & mask));
+            cnt_bits += v_w;
+            last_word >>= v_w;
+        }
+    }
+    return res;
+}
+
+inline void PackedCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value) const
+{
+    bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
+    it.set_value(value);
+}
+
+inline void PackedCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8]) const
+{
+    auto sz = 8;
+    std::memset(res, 0, sizeof(int64_t) * sz);
+    auto supposed_end = ndx + sz;
+    size_t i = ndx;
+    size_t index = 0;
+    // this can be done better, in one go, retrieve both!!!
+    for (; i < supposed_end; ++i) {
+        res[index++] = get(c, i);
+    }
+    for (; index < 8; ++index) {
+        res[index++] = get(c, i++);
+    }
+}
+
 
 template <typename Cond>
 inline bool PackedCompressor::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -87,32 +149,10 @@ inline bool PackedCompressor::find_all(const Array& arr, int64_t value, size_t s
 
     REALM_ASSERT_DEBUG(arr.m_width != 0);
 
-    if (!run_parallel_scan(arr.m_width, end - start))
+    if (!run_parallel_scan<Cond>(arr.m_width, end - start))
         return find_linear<Cond>(arr, value, start, end, baseindex, state);
 
     return find_parallel<Cond>(arr, value, start, end, baseindex, state);
-}
-
-inline void PackedCompressor::set_direct(bf_iterator& it, size_t ndx, int64_t value) const
-{
-    it.move(ndx);
-    it.set_value(value);
-}
-
-inline void PackedCompressor::get_chunk(bf_iterator& it, size_t ndx, uint64_t mask, int64_t res[8]) const
-{
-    auto sz = 8;
-    std::memset(res, 0, sizeof(int64_t) * sz);
-    auto supposed_end = ndx + sz;
-    size_t i = ndx;
-    size_t index = 0;
-    // this can be done better, in one go, retrieve both!!!
-    for (; i < supposed_end; ++i) {
-        res[index++] = get(it, i, mask);
-    }
-    for (; index < 8; ++index) {
-        res[index++] = get(it, i++, mask);
-    }
 }
 
 template <typename Cond>
@@ -174,22 +214,30 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
         if constexpr (std::is_same_v<Cond, Less>)
             return a < b;
     };
-    const auto mask = arr.integer_compressor().width_mask();
-    auto& data_it = arr.integer_compressor().data_iterator();
-    data_it.move(start);
-    while (start < end) {
-        const auto sv = sign_extend_field_by_mask(mask, *data_it);
+    const auto& c = arr.integer_compressor();
+    bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), start};
+    for (; start < end; ++start) {
+        it.move(start);
+        const auto sv = sign_extend_field_by_mask(c.v_mask(), *it);
         if (compare(sv, value) && !state->match(start + baseindex))
             return false;
-        ++start;
-        ++data_it;
     }
     return true;
 }
 
+template <typename Cond>
 inline bool PackedCompressor::run_parallel_scan(size_t width, size_t range) const
 {
-    return width < 32 && range >= 32;
+    if constexpr (std::is_same_v<Cond, NotEqual>) {
+        // we seem to be particularly slow doing parallel scan in packed for NotEqual.
+        // we are much better with a linear scan. TODO: investigate this.
+        return false;
+    }
+    if constexpr (std::is_same_v<Cond, Equal>) {
+        return width < 32 && range >= 20;
+    }
+    // > and < need a different heuristic
+    return width <= 20 && range >= 20;
 }
 
 } // namespace realm

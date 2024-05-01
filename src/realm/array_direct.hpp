@@ -242,8 +242,8 @@ private:
 // supports arrays of pairs by differentiating field size and step size.
 class bf_ref;
 class bf_iterator {
-    friend class ArrayPacked;
-    friend class ArrayFlex;
+    friend class FlexCompressor;
+    friend class PackedCompressor;
     uint64_t* data_area = nullptr;
     uint64_t* first_word_ptr = nullptr;
     size_t field_position = 0;
@@ -258,12 +258,18 @@ public:
     bf_iterator(bf_iterator&&) = default;
     bf_iterator& operator=(const bf_iterator&) = default;
     bf_iterator& operator=(bf_iterator&&) = default;
-    bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
-        : data_area(data_area)
-        , field_size(static_cast<uint8_t>(field_size))
-        , step_size(static_cast<uint8_t>(step_size))
-        , offset(initial_offset)
+    bf_iterator(const uint64_t* data_area, size_t initial_offset, uint8_t field_size, uint8_t step_size, size_t index)
     {
+        init(data_area, initial_offset, field_size, step_size, index);
+    }
+
+    inline void init(const uint64_t* data_area, size_t initial_offset, uint8_t field_size, uint8_t step_size,
+                     size_t index)
+    {
+        this->data_area = (uint64_t*)data_area;
+        this->field_size = field_size;
+        this->step_size = step_size;
+        this->offset = initial_offset;
         if (field_size < 64)
             mask = (1ULL << field_size) - 1;
         move(index);
@@ -504,7 +510,7 @@ bool inline any_field_NE(int width, uint64_t A, uint64_t B)
 
 // Populate all fields in a vector with a given value of a give width.
 // Bits outside of the given field are ignored.
-constexpr uint64_t populate(size_t width, uint64_t value)
+inline constexpr uint64_t populate(uint8_t width, uint64_t value)
 {
     value &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
     if (width < 8) {
@@ -530,13 +536,13 @@ constexpr uint64_t populate(size_t width, uint64_t value)
 }
 
 // provides a set bit in pos 0 of each field, remaining bits zero
-constexpr uint64_t field_bit0(int width)
+inline constexpr uint64_t field_bit0(int width)
 {
     return populate(width, 1);
 }
 
 // provides a set sign-bit in each field, remaining bits zero
-constexpr uint64_t field_sign_bit(int width)
+inline constexpr uint64_t field_sign_bit(int width)
 {
     return populate(width, 1ULL << (width - 1));
 }
@@ -1171,7 +1177,7 @@ template <typename T>
 inline size_t upper_bound(const char* data, size_t size, int64_t value,
                           const impl::EncodedFetcher<T>& encoder) noexcept
 {
-    return impl::lower_bound<0>(data, 0, size, value, encoder);
+    return impl::upper_bound<0>(data, 0, size, value, encoder);
 }
 
 } // namespace realm

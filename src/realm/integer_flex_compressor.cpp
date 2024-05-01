@@ -30,7 +30,7 @@
 
 using namespace realm;
 
-void FlexCompressor::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
+void FlexCompressor::init_array(char* h, uint8_t flags, uint8_t v_width, uint8_t ndx_width, size_t v_size,
                                 size_t ndx_size) const
 {
     using Encoding = NodeHeader::Encoding;
@@ -44,7 +44,7 @@ void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& val
     REALM_ASSERT_DEBUG(arr.is_attached());
     const auto& compressor = arr.integer_compressor();
     REALM_ASSERT_DEBUG(compressor.get_encoding() == Encoding::Flex);
-    const auto v_width = compressor.width();
+    const auto v_width = compressor.v_width();
     const auto ndx_width = compressor.ndx_width();
     const auto v_size = values.size();
     const auto data = (uint64_t*)arr.m_data;

@@ -366,9 +366,9 @@ private:
     static inline void set_num_elements(char* header, size_t num_elements, Encoding);
 
     static inline size_t calc_size(size_t num_elements);
-    static inline size_t calc_size(size_t num_elements, size_t element_size, Encoding);
-    static inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
-                                   size_t elementB_size);
+    static inline size_t calc_size(size_t num_elements, uint8_t element_size, Encoding);
+    static inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, uint8_t elementA_size,
+                                   uint8_t elementB_size);
 
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
     {
@@ -643,7 +643,7 @@ inline size_t NodeHeader::calc_size(size_t num_elements)
     return calc_byte_size(wtype_Ignore, num_elements, 0);
 }
 
-inline size_t NodeHeader::calc_size(size_t num_elements, size_t element_size, Encoding encoding)
+inline size_t NodeHeader::calc_size(size_t num_elements, uint8_t element_size, Encoding encoding)
 {
     using Encoding = NodeHeader::Encoding;
     switch (encoding) {
@@ -660,8 +660,8 @@ inline size_t NodeHeader::calc_size(size_t num_elements, size_t element_size, En
     }
 }
 
-inline size_t NodeHeader::calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
-                                    size_t elementB_size)
+inline size_t NodeHeader::calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, uint8_t elementA_size,
+                                    uint8_t elementB_size)
 {
     return NodeHeader::header_size +
            align_bits_to8(arrayA_num_elements * elementA_size + arrayB_num_elements * elementB_size);
