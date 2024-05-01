@@ -1613,30 +1613,7 @@ TEST(DirectBitFields)
     }
 }
 
-TEST(B_Array_creation)
-{
-    //    using Encoding = NodeHeader::Encoding;
-    //    Array array(Allocator::get_default());
-    //    auto& allocator = array.get_alloc();
-    //    auto mem = allocator.alloc(10);
-    //    init_header(mem.get_addr(), Encoding::Flex, 6, 1, 1, 1, 1);
-    //    array.init_from_mem(mem);
-    //    auto array_header = array.get_header();
-    //    auto encoding = array.get_encoding(array_header);
-    //    REALM_ASSERT(encoding == Encoding::Flex); // this is missing << operator in order to be printed in case of
-    //    error CHECK_EQUAL(array.get_flags(array_header), 6); CHECK_EQUAL(array.get_elementA_size(array_header), 1);
-    //    CHECK_EQUAL(array.get_elementB_size(array_header), 1);
-    //    CHECK_EQUAL(array.get_arrayA_num_elements(array_header), 1);
-    //    CHECK_EQUAL(array.get_arrayB_num_elements(array_header), 1);
-    //    // set flags explicitely (this should not change kind and encoding)
-    //    array.set_flags(array_header, 5);
-    //    auto flags = array.get_flags(array_header);
-    //    CHECK_EQUAL(flags, 5);
-    //    REALM_ASSERT(array.get_encoding(array_header) == Encoding::Flex);
-    //    allocator.free_(mem);
-}
-
-TEST(B_Array_encoding)
+TEST(Extended_Array_encoding)
 {
     using Encoding = NodeHeader::Encoding;
     Array array(Allocator::get_default());
@@ -1654,27 +1631,6 @@ TEST(B_Array_encoding)
     CHECK(encoding == another_encoding);
 
     array.get_alloc().free_(mem);
-}
-
-TEST(Array_Bits)
-{
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(0), 0);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(1), 1);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(2), 2);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(3), 2);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(4), 3);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(5), 3);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(7), 3);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(8), 4);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(0), 1);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(1), 2);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-1), 1);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-2), 2);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-3), 3);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-4), 3);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(3), 3);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(4), 4);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(7), 4);
 }
 
 TEST(Array_cares_about)

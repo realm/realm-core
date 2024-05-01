@@ -26,48 +26,48 @@
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */
 #define REALM_TEMPEX(fun, wid, arg) \
-    if (wid == 16) {fun<16> arg;} \
-    else if (wid == 32) {fun<32> arg;} \
-    else if (wid == 0) {fun<0> arg;} \
-    else if (wid == 1) {fun<1> arg;} \
-    else if (wid == 2) {fun<2> arg;} \
-    else if (wid == 4) {fun<4> arg;} \
-    else if (wid == 8) {fun<8> arg;} \
-    else if (wid == 64) {fun<64> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<0> arg;}
+if (wid == 16) {fun<16> arg;} \
+else if (wid == 32) {fun<32> arg;} \
+else if (wid == 0) {fun<0> arg;} \
+else if (wid == 1) {fun<1> arg;} \
+else if (wid == 2) {fun<2> arg;} \
+else if (wid == 4) {fun<4> arg;} \
+else if (wid == 8) {fun<8> arg;} \
+else if (wid == 64) {fun<64> arg;} \
+else {REALM_ASSERT_DEBUG(false); fun<0> arg;}
 
 #define REALM_TEMPEX2(fun, targ, wid, arg) \
-    if (wid == 16) {fun<targ, 16> arg;} \
-    else if (wid == 32) {fun<targ, 32> arg;} \
-    else if (wid == 0) {fun<targ, 0> arg;} \
-    else if (wid == 1) {fun<targ, 1> arg;} \
-    else if (wid == 2) {fun<targ, 2> arg;} \
-    else if (wid == 4) {fun<targ, 4> arg;} \
-    else if (wid == 8) {fun<targ, 8> arg;} \
-    else if (wid == 64) {fun<targ, 64> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<targ, 0> arg;}
+if (wid == 16) {fun<targ, 16> arg;} \
+else if (wid == 32) {fun<targ, 32> arg;} \
+else if (wid == 0) {fun<targ, 0> arg;} \
+else if (wid == 1) {fun<targ, 1> arg;} \
+else if (wid == 2) {fun<targ, 2> arg;} \
+else if (wid == 4) {fun<targ, 4> arg;} \
+else if (wid == 8) {fun<targ, 8> arg;} \
+else if (wid == 64) {fun<targ, 64> arg;} \
+else {REALM_ASSERT_DEBUG(false); fun<targ, 0> arg;}
 
 #define REALM_TEMPEX3(fun, targ1, wid, targ3, arg) \
-    if (wid == 16) {fun<targ1, 16, targ3> arg;} \
-    else if (wid == 32) {fun<targ1, 32, targ3> arg;} \
-    else if (wid == 0) {fun<targ1, 0, targ3> arg;} \
-    else if (wid == 1) {fun<targ1, 1, targ3> arg;} \
-    else if (wid == 2) {fun<targ1, 2, targ3> arg;} \
-    else if (wid == 4) {fun<targ1, 4, targ3> arg;} \
-    else if (wid == 8) {fun<targ1, 8, targ3> arg;} \
-    else if (wid == 64) {fun<targ1, 64, targ3> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<targ1, 0, targ3> arg;}
+if (wid == 16) {fun<targ1, 16, targ3> arg;} \
+else if (wid == 32) {fun<targ1, 32, targ3> arg;} \
+else if (wid == 0) {fun<targ1, 0, targ3> arg;} \
+else if (wid == 1) {fun<targ1, 1, targ3> arg;} \
+else if (wid == 2) {fun<targ1, 2, targ3> arg;} \
+else if (wid == 4) {fun<targ1, 4, targ3> arg;} \
+else if (wid == 8) {fun<targ1, 8, targ3> arg;} \
+else if (wid == 64) {fun<targ1, 64, targ3> arg;} \
+else {REALM_ASSERT_DEBUG(false); fun<targ1, 0, targ3> arg;}
 
 #define REALM_TEMPEX4(fun, targ1, targ3, targ4, wid, arg) \
-    if (wid == 16) {fun<targ1, targ3, targ4, 16> arg;} \
-    else if (wid == 32) {fun<targ1, targ3, targ4, 32> arg;} \
-    else if (wid == 0) {fun<targ1, targ3, targ4, 0> arg;} \
-    else if (wid == 1) {fun<targ1, targ3, targ4, 1> arg;} \
-    else if (wid == 2) {fun<targ1, targ3, targ4, 2> arg;} \
-    else if (wid == 4) {fun<targ1, targ3, targ4, 4> arg;} \
-    else if (wid == 8) {fun<targ1, targ3, targ4, 8> arg;} \
-    else if (wid == 64) {fun<targ1, targ3, targ4, 64> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ3, targ4, 0> arg;}
+if (wid == 16) {fun<targ1, targ3, targ4, 16> arg;} \
+else if (wid == 32) {fun<targ1, targ3, targ4, 32> arg;} \
+else if (wid == 0) {fun<targ1, targ3, targ4, 0> arg;} \
+else if (wid == 1) {fun<targ1, targ3, targ4, 1> arg;} \
+else if (wid == 2) {fun<targ1, targ3, targ4, 2> arg;} \
+else if (wid == 4) {fun<targ1, targ3, targ4, 4> arg;} \
+else if (wid == 8) {fun<targ1, targ3, targ4, 8> arg;} \
+else if (wid == 64) {fun<targ1, targ3, targ4, 64> arg;} \
+else {REALM_ASSERT_DEBUG(false); fun<targ1, targ3, targ4, 0> arg;}
 // clang-format on
 
 namespace realm {
@@ -320,6 +320,15 @@ public:
     inline uint64_t get_last_unaligned_word() const
     {
         const auto in_word_position = field_position & 0x3F;
+        const auto first_word = first_word_ptr[0];
+        const uint64_t result = first_word >> in_word_position;
+        // note: above shifts in zeroes above the bitfield
+        return result;
+    }
+
+    void set_value(uint64_t value) const
+    {
+        const auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
         uint64_t mask = 0ULL - 1ULL;
         if (field_size < 64) {
@@ -433,26 +442,26 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
 
 /* Subword parallel search
 
-    The following provides facilities for subword parallel search for bitfields of any size.
-    To simplify, the first bitfield must be aligned within the word: it must occupy the lowest
-    bits of the word.
+ The following provides facilities for subword parallel search for bitfields of any size.
+ To simplify, the first bitfield must be aligned within the word: it must occupy the lowest
+ bits of the word.
 
-    In general the metods here return a vector with the most significant bit in each field
-    marking that a condition was met when comparing the corresponding pair of fields in two
-    vectors. Checking if any field meets a condition is as simple as comparing the return
-    vector against 0. Finding the first to meet a condition is also supported.
+ In general the metods here return a vector with the most significant bit in each field
+ marking that a condition was met when comparing the corresponding pair of fields in two
+ vectors. Checking if any field meets a condition is as simple as comparing the return
+ vector against 0. Finding the first to meet a condition is also supported.
 
-    Vectors are "split" into fields according to a MSB vector, wich indicates the most
-    significant bit of each field. The MSB must be passed in as an argument to most
-    bit field comparison functions. It can be generated by the field_sign_bit<width> template.
+ Vectors are "split" into fields according to a MSB vector, wich indicates the most
+ significant bit of each field. The MSB must be passed in as an argument to most
+ bit field comparison functions. It can be generated by the field_sign_bit<width> template.
 
-    The simplest condition to test is any_field_NE(A,B), where A and B are words.
-    This condition should be true if any bitfield in A is not equal to the corresponding
-    field in B.
+ The simplest condition to test is any_field_NE(A,B), where A and B are words.
+ This condition should be true if any bitfield in A is not equal to the corresponding
+ field in B.
 
-    This is almost as simple as a direct word compare, but needs to take into account that
-    we may want to have part of the words undefined.
-*/
+ This is almost as simple as a direct word compare, but needs to take into account that
+ we may want to have part of the words undefined.
+ */
 constexpr uint8_t num_fields_table[65] = {0, 64, 32, 21, 16, 12, 10, 9, // 0-7
                                           8, 7,  6,  5,  5,  4,  4,  4, // 8-15
                                           4, 3,  3,  3,  3,  3,  2,  2, // 16-23
@@ -542,16 +551,16 @@ constexpr uint64_t field_sign_bit(int width)
 
 /* Unsigned LT.
 
-    This can be determined by trial subtaction. However, some care must be exercised
-    since simply subtracting one vector from another will allow carries from one
-    bitfield to flow into the next one. To avoid this, we isolate bitfields by clamping
-    the MSBs to 1 in A and 0 in B before subtraction. After the subtraction the MSBs in
-    the result indicate borrows from the MSB. We then compute overflow (borrow OUT of MSB)
-    using boolean logic as described below.
+ This can be determined by trial subtaction. However, some care must be exercised
+ since simply subtracting one vector from another will allow carries from one
+ bitfield to flow into the next one. To avoid this, we isolate bitfields by clamping
+ the MSBs to 1 in A and 0 in B before subtraction. After the subtraction the MSBs in
+ the result indicate borrows from the MSB. We then compute overflow (borrow OUT of MSB)
+ using boolean logic as described below.
 
-    Unsigned LT is also used to find all zero fields or all non-zero fields, so it is
-    the backbone of all comparisons returning vectors.
-*/
+ Unsigned LT is also used to find all zero fields or all non-zero fields, so it is
+ the backbone of all comparisons returning vectors.
+ */
 
 // compute the overflows in unsigned trial subtraction A-B. The overflows
 // will be marked by 1 in the sign bit of each field in the result. Other
@@ -627,14 +636,14 @@ inline uint64_t find_all_fields_unsigned_GT(uint64_t MSBs, uint64_t A, uint64_t 
 }
 
 /*
-    Handling signed values
+ Handling signed values
 
-    Trial subtraction only works as is for unsigned. We simply transform signed into unsigned
-    by pusing all values up by 1<<(field_width-1). This makes all negative values positive and positive
-    values remain positive, although larger. Any overflow during the push can be ignored.
-    After that transformation Trial subtraction should correctly detect the LT condition.
+ Trial subtraction only works as is for unsigned. We simply transform signed into unsigned
+ by pusing all values up by 1<<(field_width-1). This makes all negative values positive and positive
+ values remain positive, although larger. Any overflow during the push can be ignored.
+ After that transformation Trial subtraction should correctly detect the LT condition.
 
-*/
+ */
 
 
 inline uint64_t find_all_fields_signed_LT(uint64_t MSBs, uint64_t A, uint64_t B)
@@ -861,9 +870,9 @@ inline int first_field_marked(int width, uint64_t vector)
     const struct find_field_desc& desc = find_field_table[width];
     int result = 0;
     switch (desc.levels) {
-        // the following case entries are intended to fall through
-        // (this is a variant of Duff's Device)
-        // TODO: disable compiler warnings for it
+            // the following case entries are intended to fall through
+            // (this is a variant of Duff's Device)
+            // TODO: disable compiler warnings for it
         case 6:
             result |= (vector & desc.m32) ? 32 : 0;
         case 5:
@@ -890,7 +899,7 @@ inline int first_field_marked(int width, uint64_t vector)
     // directly compute position of set bit using table
     const struct find_field_desc& desc = find_field_table[width];
     return ((vector & desc.m1) ? 1 : 0) | ((vector & desc.m2) ? 2 : 0) | ((vector & desc.m4) ? 4 : 0) |
-           ((vector & desc.m8) ? 8 : 0) | ((vector & desc.m16) ? 16 : 0) | ((vector & desc.m32) ? 32 : 0);
+    ((vector & desc.m8) ? 8 : 0) | ((vector & desc.m16) ? 16 : 0) | ((vector & desc.m32) ? 32 : 0);
 }
 #endif
 #if 0

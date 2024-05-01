@@ -1036,14 +1036,14 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::lower_bound_int_compressed(int64_t value) const noexcept
 {
-    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    static impl::CompressedDataFetcher<IntegerCompressor> encoder;
     encoder.ptr = &m_integer_compressor;
     return lower_bound(m_data, m_size, value, encoder);
 }
 
 size_t Array::upper_bound_int_compressed(int64_t value) const noexcept
 {
-    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    static impl::CompressedDataFetcher<IntegerCompressor> encoder;
     encoder.ptr = &m_integer_compressor;
     return upper_bound(m_data, m_size, value, encoder);
 }
