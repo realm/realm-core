@@ -2933,6 +2933,7 @@ DisableReplication::~DisableReplication()
 
 StringInterner* DB::get_string_interner(TableKey tk, ColKey::Idx col_idx)
 {
+    REALM_UNREACHABLE();
     std::lock_guard lock(m_string_interners_mutex);
     auto it = m_string_interners.find(tk);
     std::vector<StringInterner*>* interners;
@@ -2946,8 +2947,10 @@ StringInterner* DB::get_string_interner(TableKey tk, ColKey::Idx col_idx)
     while (col_idx.val >= interners->size()) {
         interners->push_back(nullptr);
     }
-    if ((*interners)[col_idx.val] == nullptr)
-        (*interners)[col_idx.val] = new StringInterner;
+    if ((*interners)[col_idx.val] == nullptr) {
+        //    ref_type interner_ref = m_interner_data.get(col_idx.val);
+        //    (*interners)[col_idx.val] = new StringInterner(m_alloc, interner_ref);
+    }
     return (*interners)[col_idx.val];
 }
 

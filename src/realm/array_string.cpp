@@ -538,6 +538,7 @@ void ArrayString::verify() const
 
 ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interner)
 {
+    REALM_ASSERT(interner);
     // we have to write out all, modified or not, to match the total cleanup
     Array interned(Allocator::get_default());
     auto sz = size();

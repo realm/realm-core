@@ -681,7 +681,7 @@ private:
     /// Memory mappings must have been updated to reflect any growth in filesize before
     /// calling advance_transact()
     void advance_transact(ref_type new_top_ref, util::InputStream*, bool writable);
-    void refresh_dirty_accessors();
+    void refresh_dirty_accessors(bool writable);
     void flush_accessors_for_commit();
 
     /// \brief The version of the format of the node structure (in file or in
