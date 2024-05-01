@@ -1628,14 +1628,16 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
             auto col_key = out.table->m_leaf_ndx2colkey[j - 1];
             auto col_type = col_key.get_type();
             // String columns are interned at this point
-            if (compress && col_type == col_type_String && !col_attr.test(col_attr_Collection)) {
+            if (out.compress && col_type == col_type_String && !col_key.is_collection()) {
+                ArrayRef leaf(m_alloc);
+                leaf.init_from_ref(ref);
                 auto header = leaf.get_header();
                 if (NodeHeader::get_hasrefs_from_header(header) ||
                     NodeHeader::get_wtype_from_header(header) == wtype_Multiply) {
                     // We're interning these strings
                     ArrayString as(m_alloc);
                     as.init_from_ref(leaf_rot.get_as_ref());
-                    written_cluster.set_as_ref(j, as.write(out, table.get_string_interner(col_key)));
+                    written_cluster.set_as_ref(j, as.write(out, out.table->get_string_interner(col_key)));
                     // in a transactional setting:
                     // Destroy all sub-arrays if present, in order to release memory in file
                     // This is contrary to the rest of the handling in this function, but needed
