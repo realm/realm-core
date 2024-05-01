@@ -4124,8 +4124,8 @@ TEST_TYPES(Parser_7642, std::true_type, std::false_type)
     }
 
     cars->create_object().set(col_make, "Tesla").set(col_int, 123);
-    cars->create_object().set(col_make, "Ford").set(col_int, 456);;
-    cars->create_object().set(col_make, "Audi").set(col_int, 789);;
+    cars->create_object().set(col_make, "Ford").set(col_int, 456);
+    cars->create_object().set(col_make, "Audi").set(col_int, 789);
 
     using Vec = std::vector<Mixed>;
     verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
