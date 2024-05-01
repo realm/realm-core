@@ -71,7 +71,7 @@ TEST(Decimal_Basics)
     test_double(0.1 / 1000 / 1000 / 1000 / 1000 / 1000 / 1000, "1.00000000000000E-19");
     test_double(0.01 * 1000 * 1000 * 1000 * 1000 * 1000 * 1000, "1.00000000000000E16");
     test_double(3.141592653589793238, "3.14159265358979"); // only 15 significant digits when converting from double
-    Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
+    Decimal128 pi = Decimal128("3.141592653589793238");    // 19 significant digits
     CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
     Decimal128::Bid128 bid;
     int exp;

@@ -173,7 +173,6 @@ public:
 
     SyncManager* sync_manager() override REQUIRES(!m_mutex);
     void request_log_out() override REQUIRES(!m_mutex);
-    void request_refresh_user(util::UniqueFunction<void(std::optional<app::AppError>)>&&) override REQUIRES(!m_mutex);
     void request_refresh_location(util::UniqueFunction<void(std::optional<app::AppError>)>&&) override
         REQUIRES(!m_mutex);
     void request_access_token(util::UniqueFunction<void(std::optional<app::AppError>)>&&) override REQUIRES(!m_mutex);

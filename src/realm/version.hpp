@@ -39,9 +39,18 @@ class StringData;
 
 class Version {
 public:
-    static int get_major() { return REALM_VERSION_MAJOR; }
-    static int get_minor() { return REALM_VERSION_MINOR; }
-    static int get_patch() { return REALM_VERSION_PATCH; }
+    static int get_major()
+    {
+        return REALM_VERSION_MAJOR;
+    }
+    static int get_minor()
+    {
+        return REALM_VERSION_MINOR;
+    }
+    static int get_patch()
+    {
+        return REALM_VERSION_PATCH;
+    }
     static StringData get_extra();
     static std::string get_version();
     static bool is_at_least(int major, int minor, int patch, StringData extra);

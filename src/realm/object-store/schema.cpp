@@ -118,8 +118,8 @@ Schema::const_iterator Schema::find(TableKey table_key) const noexcept
 namespace {
 
 struct CheckObjectPath {
-    const ObjectSchema& object;              // the schema to check
-    std::string path;                        // a printable path for error messaging
+    const ObjectSchema& object; // the schema to check
+    std::string path;           // a printable path for error messaging
 };
 
 // a non-recursive search that returns a property path to the first embedded object cycle detected
