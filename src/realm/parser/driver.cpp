@@ -1331,6 +1331,9 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     Mixed value;
 
     auto convert_if_needed = [&](Mixed value) -> Mixed {
+        if (value.is_null()) {
+            return value;
+        }
         switch (value.get_type()) {
             case type_Int:
                 if (hint == type_Decimal) {
@@ -1362,6 +1365,22 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 }
                 break;
             }
+            case type_Float: {
+                if (hint == type_Int) {
+                    float float_val = value.get_float();
+                    if (std::isinf(float_val)) {
+                        throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+                    }
+                    if (std::isnan(float_val)) {
+                        throw InvalidQueryError(util::format("NaN not supported for %1", get_data_type_name(hint)));
+                    }
+                    int64_t int_val = int64_t(float_val);
+                    if (float(int_val) == float_val) {
+                        return int_val;
+                    }
+                }
+                break;
+            }
             case type_String: {
                 StringData str = value.get_string();
                 switch (hint) {
@@ -1379,6 +1398,8 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 }
                 break;
             }
+            default:
+                break;
         }
 
         return value;
