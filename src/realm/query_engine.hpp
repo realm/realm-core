@@ -512,13 +512,6 @@ public:
             if (const int64_t* val = it->get_if<int64_t>()) {
                 m_needles.insert(*val);
             }
-            else if (const double* val = it->get_if<double>()) {
-                // JS encodes numbers as double
-                // only add this value if it represents an integer
-                if (*val == double(int64_t(*val))) {
-                    m_needles.insert(int64_t(*val));
-                }
-            }
         }
     }
 

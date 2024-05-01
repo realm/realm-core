@@ -1330,6 +1330,60 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     std::string explain_value_message = text;
     Mixed value;
 
+    auto convert_if_needed = [&](Mixed value) -> Mixed {
+        switch (value.get_type()) {
+            case type_Int:
+                if (hint == type_Decimal) {
+                    return Decimal128(value.get_int());
+                }
+                break;
+            case type_Double: {
+                auto double_val = value.get_double();
+                if (std::isinf(double_val) && (!Mixed::is_numeric(hint) || hint == type_Int)) {
+                    throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+                }
+
+                switch (hint) {
+                    case type_Float:
+                        return float(double_val);
+                    case type_Decimal:
+                        // If not argument, try decode again to get full precision
+                        return (type == Type::ARG) ? Decimal128(double_val) : Decimal128(text);
+                    case type_Int: {
+                        int64_t int_val = int64_t(double_val);
+                        // Only return an integer if it precisely represents val
+                        if (double(int_val) == double_val) {
+                            return int_val;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
+            }
+            case type_String: {
+                StringData str = value.get_string();
+                switch (hint) {
+                    case type_Int:
+                        return string_to<int64_t>(str);
+                    case type_Float:
+                        return string_to<float>(str);
+                    case type_Double:
+                        return string_to<double>(str);
+                    case type_Decimal:
+                        return string_to<Decimal128>(str);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            }
+        }
+
+        return value;
+    };
+
     if (type == Type::ARG) {
         size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
         if (m_comp_type && !drv->m_args.is_argument_list(arg_no)) {
@@ -1339,6 +1393,9 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
         if (drv->m_args.is_argument_list(arg_no)) {
             std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
+            for (auto& mixed : mixed_list) {
+                mixed = convert_if_needed(mixed);
+            }
             return copy_list_of_args(mixed_list);
         }
         if (drv->m_args.is_argument_null(arg_no)) {
@@ -1396,14 +1453,11 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
     }
 
+    value = convert_if_needed(value);
+
     switch (value.get_type()) {
         case type_Int: {
-            if (hint == type_Decimal) {
-                ret = std::make_unique<Value<Decimal128>>(Decimal128(value.get_int()));
-            }
-            else {
-                ret = std::make_unique<Value<int64_t>>(value.get_int());
-            }
+            ret = std::make_unique<Value<int64_t>>(value.get_int());
             break;
         }
         case type_Float: {
@@ -1414,60 +1468,17 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             ret = std::make_unique<Value<Decimal128>>(value.get_decimal());
             break;
         case type_Double: {
-            auto double_val = value.get_double();
-            if (std::isinf(double_val) && (!Mixed::is_numeric(hint) || hint == type_Int)) {
-                throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
-            }
-
-            switch (hint) {
-                case type_Float:
-                    ret = std::make_unique<Value<float>>(float(double_val));
-                    break;
-                case type_Decimal: {
-                    // If not argument, try decode again to get full precision
-                    Decimal128 dec = (type == Type::ARG) ? Decimal128(double_val) : Decimal128(text);
-                    ret = std::make_unique<Value<Decimal128>>(dec);
-                    break;
-                }
-                case type_Int: {
-                    int64_t int_val = int64_t(double_val);
-                    // Only return an integer if it precisely represents val
-                    if (double(int_val) == double_val) {
-                        ret = std::make_unique<Value<int64_t>>(int_val);
-                        break;
-                    }
-                    [[fallthrough]];
-                }
-                default:
-                    ret = std::make_unique<Value<double>>(double_val);
-                    break;
-            }
+            ret = std::make_unique<Value<double>>(value.get_double());
             break;
         }
         case type_String: {
             StringData str = value.get_string();
-            switch (hint) {
-                case type_Int:
-                    ret = std::make_unique<Value<int64_t>>(string_to<int64_t>(str));
-                    break;
-                case type_Float:
-                    ret = std::make_unique<Value<float>>(string_to<float>(str));
-                    break;
-                case type_Double:
-                    ret = std::make_unique<Value<double>>(string_to<double>(str));
-                    break;
-                case type_Decimal:
-                    ret = std::make_unique<Value<Decimal128>>(string_to<Decimal128>(str));
-                    break;
-                default:
-                    if (hint == type_TypeOfValue) {
-                        TypeOfValue type_of_value(std::string_view(str.data(), str.size()));
-                        ret = std::make_unique<Value<TypeOfValue>>(type_of_value);
-                    }
-                    else {
-                        ret = std::make_unique<ConstantStringValue>(str);
-                    }
-                    break;
+            if (hint == type_TypeOfValue) {
+                TypeOfValue type_of_value(std::string_view(str.data(), str.size()));
+                ret = std::make_unique<Value<TypeOfValue>>(type_of_value);
+            }
+            else {
+                ret = std::make_unique<ConstantStringValue>(str);
             }
             break;
         }
