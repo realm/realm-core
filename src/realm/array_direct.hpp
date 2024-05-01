@@ -208,7 +208,7 @@ public:
         // note: above shifts in zeroes below the bits we want
         return result;
     }
-    uint64_t get_with_unsafe_prefetch(unsigned num_bits)
+    uint64_t get_with_unsafe_prefetch(size_t num_bits)
     {
         auto first_word = m_word_ptr[0];
         uint64_t result = first_word >> m_in_word_offset;
@@ -318,14 +318,6 @@ public:
     }
 
     inline uint64_t get_last_unaligned_word() const
-    {
-        const auto in_word_position = field_position & 0x3F;
-        const auto first_word = first_word_ptr[0];
-        const uint64_t result = first_word >> in_word_position;
-        // note: above shifts in zeroes above the bitfield
-        return result;
-    }
-    void set_value(uint64_t value) const
     {
         const auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
@@ -461,42 +453,43 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     This is almost as simple as a direct word compare, but needs to take into account that
     we may want to have part of the words undefined.
 */
-constexpr int num_fields_table[65] = {-1, 64, 32, 21, 16, 12, 10, 9, // 0-7
-                                      8,  7,  6,  5,  5,  4,  4,  4, // 8-15
-                                      4,  3,  3,  3,  3,  3,  2,  2, // 16-23
-                                      2,  2,  2,  2,  2,  2,  2,  2, // 24-31
-                                      2,  1,  1,  1,  1,  1,  1,  1, // 32-39
-                                      1,  1,  1,  1,  1,  1,  1,  1, // 40-47
-                                      1,  1,  1,  1,  1,  1,  1,  1, // 48-55
-                                      1,  1,  1,  1,  1,  1,  1,  1, // 56-63
-                                      1};
+constexpr uint8_t num_fields_table[65] = {0, 64, 32, 21, 16, 12, 10, 9, // 0-7
+                                          8, 7,  6,  5,  5,  4,  4,  4, // 8-15
+                                          4, 3,  3,  3,  3,  3,  2,  2, // 16-23
+                                          2, 2,  2,  2,  2,  2,  2,  2, // 24-31
+                                          2, 1,  1,  1,  1,  1,  1,  1, // 32-39
+                                          1, 1,  1,  1,  1,  1,  1,  1, // 40-47
+                                          1, 1,  1,  1,  1,  1,  1,  1, // 48-55
+                                          1, 1,  1,  1,  1,  1,  1,  1, // 56-63
+                                          1};
 
-constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
-                                    64, 63, 60, 55, 60, 52, 56, 60, // 8-15
-                                    64, 51, 54, 57, 60, 63, 44, 46, // 16-23
-                                    48, 50, 52, 54, 56, 58, 60, 64, // 24-31
-                                    64, 33, 34, 35, 36, 37, 38, 39, // 32-39
-                                    40, 41, 42, 43, 44, 45, 46, 47, // 40-47
-                                    48, 49, 50, 51, 52, 53, 54, 55, // 48-55
-                                    56, 57, 58, 59, 60, 61, 62, 63, // 56-63
-                                    64};
+constexpr uint8_t num_bits_table[65] = {64, 64, 64, 63, 64, 60, 60, 63, // 0-7
+                                        64, 63, 60, 55, 60, 52, 56, 60, // 8-15
+                                        64, 51, 54, 57, 60, 63, 44, 46, // 16-23
+                                        48, 50, 52, 54, 56, 58, 60, 64, // 24-31
+                                        64, 33, 34, 35, 36, 37, 38, 39, // 32-39
+                                        40, 41, 42, 43, 44, 45, 46, 47, // 40-47
+                                        48, 49, 50, 51, 52, 53, 54, 55, // 48-55
+                                        56, 57, 58, 59, 60, 61, 62, 63, // 56-63
+                                        64};
 
-inline int num_fields_for_width(size_t width)
+inline uint8_t num_fields_for_width(uint8_t width)
 {
     REALM_ASSERT_DEBUG(width);
-    auto retval = num_fields_table[width];
+    const auto retval = num_fields_table[width];
 #ifdef REALM_DEBUG
-    REALM_ASSERT_DEBUG(retval == 64 / width);
+    REALM_ASSERT_DEBUG(width == 0 || retval == int(64 / width));
 #endif
     return retval;
 }
 
-inline int num_bits_for_width(size_t width)
+inline uint8_t num_bits_for_width(uint8_t width)
 {
+    REALM_ASSERT_DEBUG(width);
     return num_bits_table[width];
 }
 
-inline uint64_t cares_about(int width)
+inline uint64_t cares_about(uint8_t width)
 {
     return 0xFFFFFFFFFFFFFFFFULL >> (64 - num_bits_table[width]);
 }
@@ -510,7 +503,7 @@ bool inline any_field_NE(int width, uint64_t A, uint64_t B)
 
 // Populate all fields in a vector with a given value of a give width.
 // Bits outside of the given field are ignored.
-inline constexpr uint64_t populate(uint8_t width, uint64_t value)
+constexpr uint64_t populate(size_t width, uint64_t value)
 {
     value &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
     if (width < 8) {
@@ -536,13 +529,13 @@ inline constexpr uint64_t populate(uint8_t width, uint64_t value)
 }
 
 // provides a set bit in pos 0 of each field, remaining bits zero
-inline constexpr uint64_t field_bit0(int width)
+constexpr uint64_t field_bit0(int width)
 {
     return populate(width, 1);
 }
 
 // provides a set sign-bit in each field, remaining bits zero
-inline constexpr uint64_t field_sign_bit(int width)
+constexpr uint64_t field_sign_bit(int width)
 {
     return populate(width, 1ULL << (width - 1));
 }
@@ -921,9 +914,9 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
 {
     const auto field_count = num_fields_for_width(width);
     const auto bit_count_pr_iteration = num_bits_for_width(width);
-    const auto fast_scan_limit = 4 * bit_count_pr_iteration;
+    const size_t fast_scan_limit = 4 * bit_count_pr_iteration;
     // use signed to make it easier to ascertain correctness of loop condition below
-    signed total_bit_count_left = static_cast<signed>(end - start) * static_cast<signed>(width);
+    auto total_bit_count_left = (end - start) * width;
     REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
     unaligned_word_iter it(data, offset + start * width);
     uint64_t found_vector = 0;
@@ -980,7 +973,7 @@ inline int64_t default_fetcher(const char* data, size_t ndx)
 }
 
 template <typename T>
-struct EncodedFetcher {
+struct CompressedDataFetcher {
 
     int64_t operator()(const char*, size_t ndx) const
     {
@@ -1015,7 +1008,7 @@ struct EncodedFetcher {
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template <int width, typename F = decltype(default_fetcher<width>)>
+template <typename F>
 inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value,
                           F fetcher = default_fetcher) noexcept
 {
@@ -1093,7 +1086,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
@@ -1106,7 +1099,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
 }
 
 // See lower_bound()
-template <int width, typename F = decltype(default_fetcher<width>)>
+template <typename F>
 inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value,
                           F fetcher = default_fetcher) noexcept
 {
@@ -1157,27 +1150,27 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
 template <int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::lower_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
+    return impl::lower_bound(data, 0, size, value, impl::default_fetcher<width>);
 }
 
 template <typename T>
 inline size_t lower_bound(const char* data, size_t size, int64_t value,
-                          const impl::EncodedFetcher<T>& encoder) noexcept
+                          const impl::CompressedDataFetcher<T>& fetcher) noexcept
 {
-    return impl::lower_bound<0>(data, 0, size, value, encoder);
+    return impl::lower_bound(data, 0, size, value, fetcher);
 }
 
 template <int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::upper_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
+    return impl::upper_bound(data, 0, size, value, impl::default_fetcher<width>);
 }
 
 template <typename T>
 inline size_t upper_bound(const char* data, size_t size, int64_t value,
-                          const impl::EncodedFetcher<T>& encoder) noexcept
+                          const impl::CompressedDataFetcher<T>& fetcher) noexcept
 {
-    return impl::upper_bound<0>(data, 0, size, value, encoder);
+    return impl::upper_bound(data, 0, size, value, fetcher);
 }
 
 } // namespace realm
