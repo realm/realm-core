@@ -1599,6 +1599,14 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
         if (!is_download && snapshot_version > current_progress.snapshot_version)
             return [] {};
 
+        // If this is a non-streaming download progress update and this notifier was
+        // created for a later query version (i.e. we're currently downloading
+        // subscription set version zero, but subscription set version 1 existed
+        // when the notifier was registered), then we want to skip this callback.
+        if (is_download && current_progress.query_version < pending_query_version) {
+            return [] {};
+        }
+
         // The initial download size we get from the server is the uncompacted
         // size, and so the download may complete before we actually receive
         // that much data. When that happens, transferrable will drop and we
@@ -1613,10 +1621,6 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
         // bytes this NotifierPackage was waiting to upload.
         if (!is_download) {
             estimate = std::min(transfered / double(transferable), 1.0);
-        }
-        const auto query_version = current_progress.query_version;
-        if (is_download && pending_query_version > query_version) {
-            estimate = estimate / (pending_query_version - query_version + 1);
         }
     }
 

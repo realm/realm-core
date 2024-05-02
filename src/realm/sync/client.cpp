@@ -1966,7 +1966,7 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
     }
 
     m_progress_handler(p.downloaded, p.downloadable, p.uploaded, p.uploadable, p.snapshot, download_estimate,
-                       upload_estimate, m_flx_active_version);
+                       upload_estimate, m_flx_last_seen_version);
 }
 
 util::Future<std::string> SessionWrapper::send_test_command(std::string body)

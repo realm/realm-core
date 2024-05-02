@@ -68,6 +68,79 @@ struct TestSyncProgressNotifier : _impl::SyncProgressNotifier {
 };
 #endif
 
+struct ProgressEntry {
+    uint64_t transferred = 0;
+    uint64_t transferrable = 0;
+    double estimate = 0.0;
+
+    inline bool operator==(const ProgressEntry& other) const noexcept
+    {
+        return transferred == other.transferred && transferrable == other.transferrable && estimate == other.estimate;
+    }
+};
+
+static std::string estimate_to_string(double est)
+{
+    std::ostringstream ss;
+    ss << std::setprecision(4) << est;
+    return ss.str();
+}
+
+static std::ostream& operator<<(std::ostream& os, const ProgressEntry& value)
+{
+    return os << util::format("{ transferred: %1, transferrable: %2, estimate: %3 }", value.transferred,
+                              value.transferrable, estimate_to_string(value.estimate));
+}
+
+
+struct WaitableProgress : public util::AtomicRefCountBase {
+    WaitableProgress(const std::shared_ptr<util::Logger>& base_logger, std::string context)
+        : logger(std::move(context), base_logger)
+    {
+    }
+
+    std::function<SyncSession::ProgressNotifierCallback> make_cb()
+    {
+        auto self = util::bind_ptr(this);
+        return [self](uint64_t transferred, uint64_t transferrable, double estimate) {
+            self->logger.trace("Progress callback called xferred: %1, xferrable: %2, estimate: %3", transferred,
+                               transferrable, estimate_to_string(estimate));
+            std::lock_guard lk(self->mutex);
+            self->entries.push_back(ProgressEntry{transferred, transferrable, estimate});
+            self->cv.notify_one();
+        };
+    }
+
+    bool empty()
+    {
+        std::lock_guard lk(mutex);
+        return entries.empty();
+    }
+
+    std::vector<ProgressEntry> wait_for_full_sync()
+    {
+        std::unique_lock lk(mutex);
+        if (!cv.wait_for(lk, std::chrono::seconds(30), [&] {
+                return !entries.empty() && entries.back().transferred >= entries.back().transferrable &&
+                       entries.back().estimate >= 1.0;
+            })) {
+            CAPTURE(entries);
+            FAIL("Failed while waiting for progress to complete");
+            return {};
+        }
+
+        std::vector<ProgressEntry> ret;
+        std::swap(ret, entries);
+        return ret;
+    }
+
+    util::PrefixLogger logger;
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::vector<ProgressEntry> entries;
+};
+
+
 TEST_CASE("progress notification", "[sync][session][progress]") {
     using NotifierType = SyncSession::ProgressDirection;
     _impl::SyncProgressNotifier progress;
@@ -852,75 +925,53 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             CHECK(!callback_was_called);
         }
     }
+
+    SECTION("flx non-streaming notifiers") {
+        struct TestValues {
+            int64_t query_version;
+            double cur_estimate;
+            uint64_t transferred;
+            uint64_t transferrable;
+        };
+
+        // clang-format off
+        const auto input_values = {
+            TestValues{0, 0, 0, 0},
+            TestValues{0, 1, 200, 200},
+            TestValues{1, 0.2, 300, 600},
+            TestValues{1, 0.4, 400, 600},
+            TestValues{1, 0.8, 600, 700},
+            TestValues{1, 1, 700, 700},
+            TestValues{2, 0.3, 800, 1000},
+            TestValues{2, 0.6, 900, 1000},
+            TestValues{2, 1, 1000, 1000},
+        };
+        // clang-format on
+
+        const std::vector<ProgressEntry> expected_values = {
+            ProgressEntry{300, 600, 0.2},
+            ProgressEntry{400, 600, 0.4},
+            ProgressEntry{600, 600, 0.8},
+            ProgressEntry{700, 600, 1.0},
+        };
+
+        auto logger = util::Logger::get_default_logger();
+        auto progress_output = util::make_bind<WaitableProgress>(logger, "flx non-streaming download");
+        progress.register_callback(progress_output->make_cb(), NotifierType::download, false, 1);
+
+        uint64_t snapshot = 1;
+        for (const auto& input_val : input_values) {
+            progress.update(input_val.transferred, input_val.transferrable, 0, 0, ++snapshot, input_val.cur_estimate,
+                            0.0, input_val.query_version);
+        }
+
+        const auto output_values = progress_output->wait_for_full_sync();
+
+        REQUIRE_THAT(output_values, Catch::Matchers::Equals(expected_values));
+    }
 }
 
 #if REALM_ENABLE_AUTH_TESTS
-struct ProgressEntry {
-    uint64_t transferred = 0;
-    uint64_t transferrable = 0;
-    double estimate = 0.0;
-};
-
-static std::string estimate_to_string(double est)
-{
-    std::ostringstream ss;
-    ss << std::setprecision(4) << est;
-    return ss.str();
-}
-
-static std::ostream& operator<<(std::ostream& os, const ProgressEntry& value)
-{
-    return os << util::format("{ transferred: %1, transferrable: %2, estimate: %3 }", value.transferred,
-                              value.transferrable, estimate_to_string(value.estimate));
-}
-
-struct WaitableProgress : public util::AtomicRefCountBase {
-    WaitableProgress(const std::shared_ptr<util::Logger>& base_logger, std::string context)
-        : logger(std::move(context), base_logger)
-    {
-    }
-
-    std::function<SyncSession::ProgressNotifierCallback> make_cb()
-    {
-        auto self = util::bind_ptr(this);
-        return [self](uint64_t transferred, uint64_t transferrable, double estimate) {
-            self->logger.info("Progress callback called xferred: %1, xferrable: %2, estimate: %3", transferred,
-                              transferrable, estimate_to_string(estimate));
-            std::lock_guard lk(self->mutex);
-            self->entries.push_back(ProgressEntry{transferred, transferrable, estimate});
-            self->cv.notify_one();
-        };
-    }
-
-    bool empty()
-    {
-        std::lock_guard lk(mutex);
-        return entries.empty();
-    }
-
-    std::vector<ProgressEntry> wait_for_full_sync()
-    {
-        std::unique_lock lk(mutex);
-        if (!cv.wait_for(lk, std::chrono::seconds(30), [&] {
-                return !entries.empty() && entries.back().transferred >= entries.back().transferrable &&
-                       entries.back().estimate >= 1.0;
-            })) {
-            CAPTURE(entries);
-            FAIL("Failed while waiting for progress to complete");
-            return {};
-        }
-
-        std::vector<ProgressEntry> ret;
-        std::swap(ret, entries);
-        return ret;
-    }
-
-    util::PrefixLogger logger;
-    std::mutex mutex;
-    std::condition_variable cv;
-    std::vector<ProgressEntry> entries;
-};
-
 struct FuturizedAsyncOpen {
     FuturizedAsyncOpen(std::shared_ptr<AsyncOpenTask> task)
         : m_task(std::move(task))
@@ -1160,6 +1211,7 @@ TEMPLATE_TEST_CASE("progress notifications fire immediately when fully caught up
         validate_noop_entry(noop_upload_progress->wait_for_full_sync(), "noop_upload_progress");
     }
 }
+
 
 TEMPLATE_TEST_CASE("sync progress: upload progress", "[sync][baas][progress]", PBS, FLX)
 {
