@@ -340,20 +340,22 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
         auto dst_any = dst_list.get_any(left);
         if (src_any != dst_any)
             break;
-        if (is_collection(src_any) && !check_matching_list(src_list, dst_list, left, left, to_collection_type(src_any)))
+        if (is_collection(src_any) &&
+            !check_matching_list(src_list, dst_list, left, left, to_collection_type(src_any)))
             break;
         left += 1;
     }
 
     // find first not matching element from end
-    int right_src = (int)src_list.size()-1;
-    int right_dst = (int)dst_list.size()-1;
+    int right_src = (int)src_list.size() - 1;
+    int right_dst = (int)dst_list.size() - 1;
     while (right_src >= left && right_dst >= left) {
         auto src_any = src_list.get_any(right_src);
         auto dst_any = dst_list.get_any(right_dst);
         if (src_any != dst_any)
             break;
-        if (is_collection(src_any) && !check_matching_list(src_list, dst_list, right_src, right_dst, to_collection_type(src_any)))
+        if (is_collection(src_any) &&
+            !check_matching_list(src_list, dst_list, right_src, right_dst, to_collection_type(src_any)))
             break;
         right_src -= 1;
         right_dst -= 1;
@@ -385,7 +387,7 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
             InterRealmValueConverter::ConversionResult converted_src;
             bool update_out = false;
             cmp_src_to_dst(src_any, dst_any, &converted_src, &update_out);
-            if(update_out) {
+            if (update_out) {
                 // we do not support embedded objects
                 REALM_ASSERT(!converted_src.requires_new_embedded_object);
                 dst_list.set_any(left_dst, converted_src.converted_value);
@@ -416,12 +418,10 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
             InterRealmValueConverter::ConversionResult converted_src;
             bool update_out = false;
             cmp_src_to_dst(src_any, Mixed{}, &converted_src, &update_out);
-            if(update_out) {
+            if (update_out) {
                 // we do not support embedded objects
                 REALM_ASSERT(!converted_src.requires_new_embedded_object);
-                //dst_list.set_any(left, converted_src.converted_value);
                 dst_list.insert_any(i, converted_src.converted_value);
-
             }
             else {
                 dst_list.insert_any(i, src_any);
@@ -489,15 +489,13 @@ void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictio
             copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key.get_string(), coll_type);
         }
         else {
-            
+
             InterRealmValueConverter::ConversionResult converted_src;
             bool update_out = false;
             cmp_src_to_dst(any, Mixed{}, &converted_src, &update_out);
-            if(update_out) {
+            if (update_out) {
                 // we do not support embedded objects
                 REALM_ASSERT(!converted_src.requires_new_embedded_object);
-                //dst_list.set_any(left, converted_src.converted_value);
-                //dst_list.insert_any(i, converted_src.converted_value);
                 dst_dictionary.insert(key, converted_src.converted_value);
             }
             else
@@ -506,8 +504,8 @@ void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictio
     }
 }
 
-bool InterRealmValueConverter::check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src, size_t ndx_dst,
-                                                   CollectionType type) const
+bool InterRealmValueConverter::check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src,
+                                                   size_t ndx_dst, CollectionType type) const
 {
 
     if (type == CollectionType::List) {
@@ -580,8 +578,8 @@ bool InterRealmValueConverter::check_matching_dictionary(const Dictionary& src_d
     return true;
 }
 
-void InterRealmValueConverter::copy_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src, size_t ndx_dst,
-                                                  CollectionType type) const
+void InterRealmValueConverter::copy_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src,
+                                                  size_t ndx_dst, CollectionType type) const
 {
     if (type == CollectionType::List) {
         auto n_src_list = src_list.get_list(ndx_src);
