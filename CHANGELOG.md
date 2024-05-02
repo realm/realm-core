@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Accessing App::current_user() from within a notification produced by App:switch_user() (which includes notifications for a newly logged in user) would deadlock ([#7670](https://github.com/realm/realm-core/issues/7670), since v14.6.0).
 
 ### Breaking changes
 * None.
