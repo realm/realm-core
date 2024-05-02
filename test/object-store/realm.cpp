@@ -1509,16 +1509,22 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     std::mutex mutex;
 
     // Create the app session and get the logged in user identity
-    auto server_app_config = minimal_app_config("autoopen-realm", schema);
-    TestAppSession session(create_app(server_app_config), transport, DeleteApp{true}, realm::ReconnectMode::normal,
-                           socket_provider);
-    auto user = session.app()->current_user();
-    std::string identity = user->user_id();
-    REQUIRE(user->is_logged_in());
-    REQUIRE(!identity.empty());
-    // Reopen the App instance and retrieve the cached user
-    session.reopen(false);
-    user = session.app()->get_existing_logged_in_user(identity);
+    auto app_session = create_app(minimal_app_config("autoopen-realm", schema));
+    std::string identity;
+    TestAppSession::Config tas_config;
+    {
+        TestAppSession session(app_session, {transport, realm::ReconnectMode::normal, socket_provider, false},
+                               DeleteApp{false});
+        auto user = session.current_user();
+        REQUIRE(user);
+        REQUIRE(user->is_logged_in());
+        identity = user->user_id();
+        tas_config = session.config(); // get config with storage path and user creds populated
+    }
+    REQUIRE_FALSE(identity.empty());
+    tas_config.delete_storage = true;
+    TestAppSession session(app_session, tas_config);
+    auto user = session.app()->get_existing_logged_in_user(identity);
 
     SyncTestFile config(user, partition, schema);
     config.sync_config->cancel_waits_on_nonfatal_error = true;

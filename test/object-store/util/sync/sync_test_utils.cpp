@@ -224,10 +224,10 @@ std::string get_compile_time_admin_url()
 #endif // REALM_ENABLE_SYNC
 
 #if REALM_APP_SERVICES
-AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
+AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials(std::string_view prefix)
 {
     // emails with this prefix will pass through the baas app due to the register function
-    email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    email = util::format("%1%2@%3.com", prefix, random_string(10), random_string(10));
     password = random_string(10);
     static_cast<AppCredentials&>(*this) = AppCredentials::username_password(email, password);
 }
