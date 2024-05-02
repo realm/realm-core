@@ -4699,8 +4699,10 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
     CHECK(!app->current_user());
 
     int event_processed = 0;
-    auto token = app->subscribe([&event_processed](auto&) {
+    auto token = app->subscribe([&](auto&) {
         event_processed++;
+        // Read the current user to verify that doing so does not deadlock
+        app->current_user();
     });
 
     SECTION("current user is populated") {
