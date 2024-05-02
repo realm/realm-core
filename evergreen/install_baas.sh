@@ -402,12 +402,9 @@ if [[ -z "${BAAS_VERSION}" ]]; then
     exit 1
 fi
 
-BAAS_VERSION="BAAS-28604-remove-ff"
-
 # Clone the baas repo and check out the specified version
 if [[ ! -d "${BAAS_DIR}/.git" ]]; then
-#    git clone git@github.com:10gen/baas.git "${BAAS_DIR}"
-    git clone git@github.com:sean-brandenburg/baas.git "${BAAS_DIR}"
+    git clone git@github.com:10gen/baas.git "${BAAS_DIR}"
     pushd "${BAAS_DIR}" > /dev/null
 else
     pushd "${BAAS_DIR}" > /dev/null

@@ -948,17 +948,15 @@ void AdminAPISession::create_schema(const std::string& app_id, const AppCreateCo
 
 bool AdminAPISession::set_feature_flag(const std::string& app_id, const std::string& flag_name, bool enable) const
 {
-    auto features_endpoint =
-        AdminAPIEndpoint(util::format("%1/api/private/v1.0/features/%2", m_base_url, flag_name), m_access_token);
-    auto flag_response = features_endpoint.post_json(
-        nlohmann::json{{"app_ids", nlohmann::json::array({app_id})}, {"action", enable ? "enable" : "disable"}});
-    auto actual_modified = flag_response["actual_modified"];
-    // "actual_modified" should only be 1 since only 1 app_id was provided
-    return actual_modified.is_number_integer() && actual_modified.get<int>() == 1;
+    auto features = apps(APIFamily::Private)[app_id]["features"];
+    auto flag_response =
+        features.post_json(nlohmann::json{{"action", enable ? "enable" : "disable"}, {"feature_flags", {flag_name}}});
+    return flag_response.empty();
 }
 
-bool AdminAPISession::get_feature_flag(const std::string& app_id, const std::string& flag_name) const
+bool AdminAPISession::get_feature_flag(const std::string& /*app_id*/, const std::string& /*flag_name*/) const
 {
+    /** TODO: Fix once an updated baasaas solution is in place
     auto settings_json = get_app_settings(app_id);
     // Format: {..., "features": {"enabled": ["<feature1-name>", "<feature2-name>", ...], ...}, ...}
     if (auto features = settings_json.find("features");
@@ -972,6 +970,7 @@ bool AdminAPISession::get_feature_flag(const std::string& app_id, const std::str
             }
         }
     }
+    */
     return false;
 }
 

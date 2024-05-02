@@ -69,7 +69,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 14;
+    return 12;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
