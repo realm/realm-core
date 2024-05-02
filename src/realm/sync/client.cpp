@@ -980,11 +980,11 @@ void SessionImpl::process_pending_flx_bootstrap()
                     std::chrono::duration_cast<std::chrono::milliseconds>(duration).count(),
                     pending_batch.remaining_changesets);
     }
-    on_changesets_integrated(new_version.realm_version, progress, changesets_processed > 0);
 
     REALM_ASSERT_3(query_version, !=, -1);
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 
+    on_changesets_integrated(new_version.realm_version, progress, changesets_processed > 0);
     auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
                                   DownloadBatchState::LastInBatch, changesets_processed);
     // NoAction/EarlyReturn are both valid no-op actions to take here.
@@ -1958,14 +1958,15 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
             ss << std::fixed << std::setprecision(4) << d;
             return ss.str();
         };
-        m_sess->logger.debug("Progress handler called, downloaded = %1, downloadable = %2, estimate = %3, "
-                             "uploaded = %4, uploadable = %5, estimate = %6, snapshot version = %7",
-                             p.downloaded, p.downloadable, to_str(download_estimate), p.uploaded, p.uploadable,
-                             to_str(upload_estimate), p.snapshot);
+        m_sess->logger.debug(
+            "Progress handler called, downloaded = %1, downloadable = %2, estimate = %3, "
+            "uploaded = %4, uploadable = %5, estimate = %6, snapshot version = %7, query_version = %8",
+            p.downloaded, p.downloadable, to_str(download_estimate), p.uploaded, p.uploadable,
+            to_str(upload_estimate), p.snapshot, m_flx_active_version);
     }
 
     m_progress_handler(p.downloaded, p.downloadable, p.uploaded, p.uploadable, p.snapshot, download_estimate,
-                       upload_estimate);
+                       upload_estimate, m_flx_last_seen_version);
 }
 
 util::Future<std::string> SessionWrapper::send_test_command(std::string body)
