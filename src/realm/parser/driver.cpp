@@ -1330,14 +1330,11 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     std::string explain_value_message = text;
     Mixed value;
 
-    auto convert_if_needed = [&](Mixed value) -> Mixed {
-        if (value.is_null()) {
-            return value;
-        }
+    auto convert_if_needed = [&](Mixed& value) -> void {
         switch (value.get_type()) {
             case type_Int:
                 if (hint == type_Decimal) {
-                    return Decimal128(value.get_int());
+                    value = Decimal128(value.get_int());
                 }
                 break;
             case type_Double: {
@@ -1348,15 +1345,17 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 
                 switch (hint) {
                     case type_Float:
-                        return float(double_val);
+                        value = float(double_val);
+                        break;
                     case type_Decimal:
                         // If not argument, try decode again to get full precision
-                        return (type == Type::ARG) ? Decimal128(double_val) : Decimal128(text);
+                        value = (type == Type::ARG) ? Decimal128(double_val) : Decimal128(text);
+                        break;
                     case type_Int: {
                         int64_t int_val = int64_t(double_val);
                         // Only return an integer if it precisely represents val
                         if (double(int_val) == double_val) {
-                            return int_val;
+                            value = int_val;
                         }
                         break;
                     }
@@ -1369,14 +1368,15 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 if (hint == type_Int) {
                     float float_val = value.get_float();
                     if (std::isinf(float_val)) {
-                        throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+                        throw InvalidQueryError(
+                            util::format("Infinity not supported for %1", get_data_type_name(hint)));
                     }
                     if (std::isnan(float_val)) {
                         throw InvalidQueryError(util::format("NaN not supported for %1", get_data_type_name(hint)));
                     }
                     int64_t int_val = int64_t(float_val);
                     if (float(int_val) == float_val) {
-                        return int_val;
+                        value = int_val;
                     }
                 }
                 break;
@@ -1385,13 +1385,16 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 StringData str = value.get_string();
                 switch (hint) {
                     case type_Int:
-                        return string_to<int64_t>(str);
+                        value = string_to<int64_t>(str);
+                        break;
                     case type_Float:
-                        return string_to<float>(str);
+                        value = string_to<float>(str);
+                        break;
                     case type_Double:
-                        return string_to<double>(str);
+                        value = string_to<double>(str);
+                        break;
                     case type_Decimal:
-                        return string_to<Decimal128>(str);
+                        value = string_to<Decimal128>(str);
                         break;
                     default:
                         break;
@@ -1401,8 +1404,6 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             default:
                 break;
         }
-
-        return value;
     };
 
     if (type == Type::ARG) {
@@ -1415,7 +1416,9 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         if (drv->m_args.is_argument_list(arg_no)) {
             std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
             for (auto& mixed : mixed_list) {
-                mixed = convert_if_needed(mixed);
+                if (!mixed.is_null()) {
+                    convert_if_needed(mixed);
+                }
             }
             return copy_list_of_args(mixed_list);
         }
@@ -1474,7 +1477,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
     }
 
-    value = convert_if_needed(value);
+    convert_if_needed(value);
 
     switch (value.get_type()) {
         case type_Int: {
