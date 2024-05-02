@@ -257,9 +257,9 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
 
     static std::vector<realm::Mixed> expected_sorted()
     {
-        return {Mixed{util::none},    Mixed{int64_t(1)},        Mixed{double(2.2)},
-                Mixed{float(3.3)},    Mixed{Decimal128("300")}, Mixed{BinaryData("a", 1)},
-                Mixed{"hello world"}, Mixed{Timestamp(1, 1)},   Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
+        return {Mixed{util::none},         Mixed{int64_t(1)},        Mixed{double(2.2)},
+                Mixed{float(3.3)},         Mixed{Decimal128("300")}, Mixed{"hello world"},
+                Mixed{BinaryData("a", 1)}, Mixed{Timestamp(1, 1)},   Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
                 Mixed{realm::UUID()}};
     }
 
@@ -617,15 +617,15 @@ TEST_CASE("sectioned results", "[sectioned results]") {
 
         r->begin_transaction();
         table->clear();
-        auto col_typed_link = table->add_column(type_TypedLink, "typed_link_col");
+        auto col_mixed = table->add_column(type_Mixed, "typed_link_col");
         auto linked = table->create_object();
-        table->create_object(ObjKey{}, {{col_typed_link, linked.get_link()}});
+        table->create_object(ObjKey{}, {{col_mixed, linked.get_link()}});
         r->commit_transaction();
 
         // Should throw on `type_TypedLink` being a section key.
         sr = sorted.sectioned_results([&](Mixed value, SharedRealm realm) {
             auto obj = Object(realm, value.get_link());
-            return Mixed(obj.get_obj().get<ObjLink>(col_typed_link));
+            return obj.get_obj().get<Mixed>(col_mixed);
         });
         REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
                           "Links are not supported as section keys."); // Trigger calculation

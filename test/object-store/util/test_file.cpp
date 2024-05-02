@@ -20,8 +20,10 @@
 
 #include "util/test_utils.hpp"
 #include "util/sync/baas_admin_api.hpp"
+#include "util/sync/sync_test_utils.hpp"
 #include "../util/crypt_key.hpp"
 #include "../util/test_path.hpp"
+#include "util/sync/sync_test_utils.hpp"
 
 #include <realm/db.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -70,7 +72,6 @@ TestFile::TestFile()
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     encryption_key = test_util::crypt_key();
     int fd = mkstemp(path.data());
     if (fd < 0) {
@@ -92,7 +93,7 @@ TestFile::~TestFile()
 {
     if (!m_persist) {
         try {
-            util::Logger::get_default_logger()->detail("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
+            util::Logger::get_default_logger()->debug("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
             util::File::try_remove(path);
             util::try_remove_dir_recursive(m_temp_dir);
         }
@@ -130,15 +131,17 @@ static const std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token"
 static const std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
 static const std::string fake_device_id = "123400000000000000000000";
 
-static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
+SyncTestFile::SyncTestFile(TestSyncManager& tsm, std::string name, std::string user_name)
+    : SyncTestFile(tsm.fake_user(user_name), bson::Bson(name))
 {
-    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
 }
 
-SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
-    : SyncTestFile(get_fake_user(*app, user_name), bson::Bson(name))
+#if REALM_APP_SERVICES
+SyncTestFile::SyncTestFile(OfflineAppSession& oas, std::string name)
+    : SyncTestFile(oas.make_user(), bson::Bson(name))
 {
 }
+#endif // REALM_APP_SERVICES
 
 SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition, util::Optional<Schema> schema)
 {
@@ -179,13 +182,13 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
                      error.status, session->path());
         abort();
     };
-    schema_version = 1;
+    schema_version = 0;
     schema = _schema;
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
-SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, bson::Bson partition, Schema schema)
-    : SyncTestFile(app->current_user(), std::move(partition), std::move(schema))
+SyncTestFile::SyncTestFile(TestSyncManager& tsm, bson::Bson partition, Schema schema)
+    : SyncTestFile(tsm.fake_user("test"), std::move(partition), std::move(schema))
 {
 }
 
@@ -195,13 +198,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     , m_server(m_local_root_dir, util::none, ([&] {
                    using namespace std::literals::chrono_literals;
 
-#if TEST_ENABLE_LOGGING
                    m_logger = util::Logger::get_default_logger();
-
-#else
-                   // Logging is disabled, use a NullLogger to prevent printing anything
-                   m_logger.reset(new util::NullLogger());
-#endif
 
                    sync::Server::Config c;
                    c.logger = m_logger;
@@ -249,6 +246,11 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
+int SyncServer::port() const
+{
+    return static_cast<int>(m_server.listen_endpoint().port());
+}
+
 struct WaitForSessionState {
     std::condition_variable cv;
     std::mutex mutex;
@@ -260,7 +262,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
                                std::chrono::seconds timeout)
 {
     auto shared_state = std::make_shared<WaitForSessionState>();
-    auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
+    auto& session = *realm.sync_session();
     auto delay = TEST_TIMEOUT_EXTRA > 0 ? timeout + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : timeout;
     (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {
         auto shared_state = weak_state.lock();
@@ -277,7 +279,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
         return shared_state->complete == true;
     });
     if (!completed) {
-        throw std::runtime_error(util::format("wait_for_session() exceeded %1 ms", delay.count()));
+        throw std::runtime_error(util::format("wait_for_session() exceeded %1 s", delay.count()));
     }
     return shared_state->status;
 }
@@ -292,7 +294,8 @@ bool wait_for_download(Realm& realm, std::chrono::seconds timeout)
     return !wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout).is_ok();
 }
 
-void set_app_config_defaults(app::App::Config& app_config,
+#if REALM_APP_SERVICES
+void set_app_config_defaults(app::AppConfig& app_config,
                              const std::shared_ptr<app::GenericNetworkTransport>& transport)
 {
     if (!app_config.transport)
@@ -315,7 +318,9 @@ void set_app_config_defaults(app::App::Config& app_config,
         app_config.device_info.bundle_id = "Bundle Id";
     if (app_config.app_id.empty())
         app_config.app_id = "app_id";
+    app_config.metadata_mode = app::AppConfig::MetadataMode::InMemory;
 }
+#endif // REALM_APP_SERVICES
 
 // MARK: - TestAppSession
 
@@ -337,33 +342,31 @@ TestAppSession::TestAppSession(AppSession session,
 {
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
-    auto app_config = get_config(m_transport, *m_app_session);
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    app_config = get_config(m_transport, *m_app_session);
     set_app_config_defaults(app_config, m_transport);
+    app_config.base_file_path = m_base_file_path;
+    app_config.metadata_mode = realm::app::AppConfig::MetadataMode::NoEncryption;
 
     util::try_make_dir(m_base_file_path);
-    SyncClientConfig sc_config;
-    sc_config.base_file_path = m_base_file_path;
-    sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
-    sc_config.reconnect_mode = reconnect_mode;
-    sc_config.socket_provider = custom_socket_provider;
+    app_config.sync_client_config.reconnect_mode = reconnect_mode;
+    app_config.sync_client_config.socket_provider = custom_socket_provider;
     // With multiplexing enabled, the linger time controls how long a
     // connection is kept open for reuse. In tests, we want to shut
     // down sync clients immediately.
-    sc_config.timeouts.connection_linger_time = 0;
+    app_config.sync_client_config.timeouts.connection_linger_time = 0;
 
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
 
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
-    create_user_and_log_in(m_app);
+    user_creds = create_user_and_log_in(m_app);
 }
 
 TestAppSession::~TestAppSession()
 {
     if (util::File::exists(m_base_file_path)) {
         try {
-            m_app->sync_manager()->reset_for_testing();
+            m_app->sync_manager()->tear_down_for_testing();
             util::try_remove_dir_recursive(m_base_file_path);
         }
         catch (const std::exception& ex) {
@@ -376,7 +379,53 @@ TestAppSession::~TestAppSession()
     }
 }
 
-std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, const std::string& object_type,
+void TestAppSession::close(bool tear_down)
+{
+    try {
+        if (tear_down) {
+            // If tearing down, make sure there's an app to work with
+            if (!m_app) {
+                reopen(false);
+            }
+            REALM_ASSERT(m_app);
+            // Clean up the app data
+            m_app->sync_manager()->tear_down_for_testing();
+        }
+        else if (m_app) {
+            // Otherwise, make sure all the session are closed
+            m_app->sync_manager()->close_all_sessions();
+        }
+        m_app.reset();
+
+        // If tearing down, clean up the test file directory
+        if (tear_down && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+            util::try_remove_dir_recursive(m_base_file_path);
+            m_base_file_path.clear();
+        }
+    }
+    catch (const std::exception& ex) {
+        std::cerr << "Error tearing down TestAppSession: " << ex.what() << "\n";
+    }
+    // Ensure all cached apps are cleared
+    app::App::clear_cached_apps();
+}
+
+void TestAppSession::reopen(bool log_in)
+{
+    REALM_ASSERT(!m_base_file_path.empty());
+    if (m_app) {
+        close(false);
+    }
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+
+    // initialize sync client
+    m_app->sync_manager()->get_sync_client();
+    if (log_in) {
+        log_in_user(m_app, user_creds);
+    }
+}
+
+std::vector<bson::BsonDocument> TestAppSession::get_documents(app::User& user, const std::string& object_type,
                                                               size_t expected_count) const
 {
     app::MongoClient remote_client = user.mongo_client("BackingDB");
@@ -404,46 +453,35 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
         std::chrono::minutes(5));
 
     std::vector<bson::BsonDocument> documents;
-    collection.find({}, {},
-                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
-                        REQUIRE(result);
-                        REQUIRE(!error);
-                        REQUIRE(result->size() == expected_count);
-                        documents.reserve(result->size());
-                        for (auto&& bson : *result) {
-                            REQUIRE(bson.type() == bson::Bson::Type::Document);
-                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
-                        }
-                    });
+    collection.find({}, {}, [&](util::Optional<bson::BsonArray>&& result, util::Optional<app::AppError> error) {
+        REQUIRE(result);
+        REQUIRE(!error);
+        REQUIRE(result->size() == expected_count);
+        documents.reserve(result->size());
+        for (auto&& bson : *result) {
+            REQUIRE(bson.type() == bson::Bson::Type::Document);
+            documents.push_back(std::move(static_cast<const bson::BsonDocument&>(bson)));
+        }
+    });
     return documents;
 }
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
 
+TestSyncManager::Config::Config() {}
+
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
-    : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))
+    : m_sync_manager(SyncManager::create(SyncClientConfig()))
     , m_sync_server(sync_server_config)
+    , m_base_file_path(config.base_path.empty() ? util::make_temp_dir() : config.base_path)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
-    app::App::Config app_config = config.app_config;
-    set_app_config_defaults(app_config, transport);
-    util::Logger::set_default_level_threshold(config.log_level);
-
-    SyncClientConfig sc_config;
-    m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
     util::try_make_dir(m_base_file_path);
-    sc_config.base_file_path = m_base_file_path;
-    sc_config.metadata_mode = config.metadata_mode;
 
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
-    if (config.override_sync_route) {
-        m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
-    }
-
+    m_sync_manager->set_sync_route(m_sync_server.base_url() + "/realm-sync", true);
     if (config.start_sync_client) {
-        // initialize sync client
-        m_app->sync_manager()->get_sync_client();
+        m_sync_manager->get_sync_client();
     }
 }
 
@@ -452,22 +490,81 @@ TestSyncManager::~TestSyncManager()
     if (m_should_teardown_test_directory) {
         if (!m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
             try {
-                m_app->sync_manager()->reset_for_testing();
+                m_sync_manager->tear_down_for_testing();
                 util::try_remove_dir_recursive(m_base_file_path);
             }
             catch (const std::exception& ex) {
                 std::cerr << ex.what() << "\n";
             }
+#if REALM_APP_SERVICES
             app::App::clear_cached_apps();
+#endif // REALM_APP_SERVICES
         }
     }
 }
 
-std::shared_ptr<realm::SyncUser> TestSyncManager::fake_user(const std::string& name)
+std::shared_ptr<TestUser> TestSyncManager::fake_user(const std::string& name)
 {
-    return get_fake_user(*m_app, name);
+    auto user = std::make_shared<TestUser>(name, m_sync_manager);
+    user->m_access_token = fake_access_token;
+    user->m_refresh_token = fake_refresh_token;
+    return user;
 }
 
+#if REALM_APP_SERVICES
+OfflineAppSession::Config::Config(std::shared_ptr<realm::app::GenericNetworkTransport> t)
+    : transport(t)
+{
+}
+
+OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
+    : m_transport(std::move(config.transport))
+    , m_delete_storage(config.delete_storage)
+{
+    REALM_ASSERT(m_transport);
+    set_app_config_defaults(m_app_config, m_transport);
+
+    if (config.storage_path) {
+        m_base_file_path = *config.storage_path;
+        util::try_make_dir(m_base_file_path);
+    }
+    else {
+        m_base_file_path = util::make_temp_dir();
+    }
+
+    m_app_config.base_file_path = m_base_file_path;
+    m_app_config.metadata_mode = config.metadata_mode;
+    if (config.base_url) {
+        m_app_config.base_url = *config.base_url;
+    }
+    if (config.app_id) {
+        m_app_config.app_id = *config.app_id;
+    }
+    m_app_config.sync_client_config.socket_provider = config.socket_provider;
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, m_app_config);
+}
+
+OfflineAppSession::~OfflineAppSession()
+{
+    if (util::File::exists(m_base_file_path) && m_delete_storage) {
+        try {
+            m_app->sync_manager()->tear_down_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+        }
+        catch (const std::exception& ex) {
+            std::cerr << ex.what() << "\n";
+        }
+        app::App::clear_cached_apps();
+    }
+}
+
+std::shared_ptr<realm::app::User> OfflineAppSession::make_user() const
+{
+    create_user_and_log_in(app());
+    return app()->current_user();
+}
+
+#endif // REALM_APP_SERVICES
 #endif // REALM_ENABLE_SYNC
 
 #if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)

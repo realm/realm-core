@@ -22,6 +22,7 @@
 #include <vector>
 #include <unordered_set>
 #include <realm/cluster.hpp>
+#include <realm/path.hpp>
 #include <realm/mixed.hpp>
 #include <realm/util/bind_ptr.hpp>
 
@@ -34,51 +35,6 @@ class Group;
 class KeyValues;
 
 enum class DescriptorType { Sort, Distinct, Limit, Filter };
-
-// A key wrapper to be used for sorting,
-// In addition to column key, it supports index into collection.
-// TODO: Implement sorting by indexed elements of an array. They should be similar to dictionary keys.
-class ExtendedColumnKey {
-public:
-    ExtendedColumnKey(ColKey col)
-        : m_colkey(col)
-    {
-    }
-    ExtendedColumnKey(ColKey col, Mixed index)
-        : m_colkey(col)
-        , m_index(index)
-    {
-        m_index.use_buffer(m_buffer);
-    }
-    ExtendedColumnKey(const ExtendedColumnKey& other)
-        : m_colkey(other.m_colkey)
-        , m_index(other.m_index)
-    {
-        m_index.use_buffer(m_buffer);
-    }
-    ExtendedColumnKey& operator=(const ExtendedColumnKey& rhs)
-    {
-        m_colkey = rhs.m_colkey;
-        m_index = rhs.m_index;
-        m_index.use_buffer(m_buffer);
-        return *this;
-    }
-
-    ColKey get_col_key() const
-    {
-        return m_colkey;
-    }
-    ConstTableRef get_target_table(const Table* table) const;
-    std::string get_description(const Table* table) const;
-    bool is_collection() const;
-    ObjKey get_link_target(const Obj& obj) const;
-    Mixed get_value(const Obj& obj) const;
-
-private:
-    ColKey m_colkey;
-    Mixed m_index;
-    std::string m_buffer;
-};
 
 struct LinkPathPart {
     // Constructor for forward links
@@ -122,16 +78,15 @@ public:
     public:
         Sorter(std::vector<std::vector<ExtendedColumnKey>> const& columns, std::vector<bool> const& ascending,
                Table const& root_table, const IndexPairs& indexes);
-        Sorter()
-        {
-        }
+        Sorter() {}
 
         bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
 
         bool has_links() const
         {
-            return std::any_of(m_columns.begin(), m_columns.end(),
-                               [](auto&& col) { return !col.translated_keys.empty(); });
+            return std::any_of(m_columns.begin(), m_columns.end(), [](auto&& col) {
+                return !col.translated_keys.empty();
+            });
         }
 
         bool any_is_null(IndexPair i) const
@@ -389,10 +344,11 @@ public:
     std::string get_description(ConstTableRef target_table) const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;
+
 private:
     std::vector<std::unique_ptr<BaseDescriptor>> m_descriptors;
     std::vector<TableKey> m_dependencies;
 };
-}
+} // namespace realm
 
 #endif /* REALM_SORT_DESCRIPTOR_HPP */

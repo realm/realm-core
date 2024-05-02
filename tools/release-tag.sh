@@ -11,7 +11,7 @@ if [ $# != 1 ]; then
 fi
 
 project_dir=$(git rev-parse --show-toplevel)
-realm_version=$(grep ^VERSION "${project_dir}/dependencies.list" | cut -f 2 -d=)
+realm_version=$(sed -rn 's/^VERSION: (.*)/\1/p' < "${project_dir}/dependencies.yml")
 tag=v${realm_version}
 git tag -m \""$1"\" "${tag}"
 git push origin "${tag}"

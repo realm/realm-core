@@ -87,7 +87,8 @@ private:
     std::pair<T, std::string_view> peek_token_impl() const
     {
         // We currently only support numeric, string, and boolean values in header lines.
-        static_assert(std::is_integral_v<T> || is_any_v<T, std::string_view, std::string>);
+        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T> ||
+                      is_any_v<T, std::string_view, std::string>);
         if (at_end()) {
             throw ProtocolCodecException("reached end of header line prematurely");
         }
@@ -120,6 +121,30 @@ private:
             }
 
             return {(cur_arg != 0), m_sv.substr(parse_res.ptr - m_sv.data())};
+        }
+        else if constexpr (std::is_floating_point_v<T>) {
+            // Currently all double are in the middle of the string delimited by a space.
+            auto delim_at = m_sv.find(' ');
+            if (delim_at == std::string_view::npos)
+                throw ProtocolCodecException("reached end of header line prematurely for double value parsing");
+
+            // FIXME use std::from_chars one day when it's availiable in every std lib
+            T val = {};
+            try {
+                std::string str(m_sv.substr(0, delim_at));
+                if constexpr (std::is_same_v<T, float>)
+                    val = std::stof(str);
+                else if constexpr (std::is_same_v<T, double>)
+                    val = std::stod(str);
+                else if constexpr (std::is_same_v<T, long double>)
+                    val = std::stold(str);
+            }
+            catch (const std::exception& err) {
+                throw ProtocolCodecException(
+                    util::format("error parsing floating-point number in header line: %1", err.what()));
+            }
+
+            return {val, m_sv.substr(delim_at)};
         }
     }
 
@@ -255,7 +280,7 @@ public:
                 auto json_raw = msg.read_sized_data<std::string_view>(message_size);
                 try {
                     auto json = nlohmann::json::parse(json_raw);
-                    logger.trace("Error message encoded as json: %1", json_raw);
+                    logger.trace(util::LogCategory::session, "Error message encoded as json: %1", json_raw);
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.is_fatal = sync::IsFatal{!json["tryAgain"]};
                     info.message = json["message"];
@@ -282,6 +307,16 @@ public:
                         }
 
                         info.migration_query_string.emplace(query_string->get<std::string_view>());
+                    }
+
+                    if (info.raw_error_code == static_cast<int>(sync::ProtocolError::schema_version_changed)) {
+                        auto schema_version = json.find("previousSchemaVersion");
+                        if (schema_version == json.end() || !schema_version->is_number_unsigned()) {
+                            return report_error(
+                                "Missing/invalid previous schema version in schema migration error response");
+                        }
+
+                        info.previous_schema_version.emplace(schema_version->get<uint64_t>());
                     }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
@@ -366,10 +401,23 @@ public:
         }
     }
 
+    struct DownloadMessage {
+        SyncProgress progress;
+        std::optional<int64_t> query_version;
+        std::optional<bool> last_in_batch;
+        union {
+            uint64_t downloadable_bytes = 0;
+            double progress_estimate;
+        };
+        ReceivedChangesets changesets;
+    };
+
 private:
     template <typename Connection>
     void parse_download_message(Connection& connection, HeaderLineParser& msg)
     {
+        bool is_flx = connection.is_flx_sync_connection();
+
         util::Logger& logger = connection.logger;
         auto report_error = [&](ErrorCodes::Error code, const auto fmt, auto&&... args) {
             auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
@@ -378,18 +426,32 @@ private:
 
         auto msg_with_header = msg.remaining();
         auto session_ident = msg.read_next<session_ident_type>();
-        SyncProgress progress;
+
+        DownloadMessage message;
+        auto&& progress = message.progress;
         progress.download.server_version = msg.read_next<version_type>();
         progress.download.last_integrated_client_version = msg.read_next<version_type>();
         progress.latest_server_version.version = msg.read_next<version_type>();
         progress.latest_server_version.salt = msg.read_next<salt_type>();
         progress.upload.client_version = msg.read_next<version_type>();
         progress.upload.last_integrated_server_version = msg.read_next<version_type>();
-        auto query_version = connection.is_flx_sync_connection() ? msg.read_next<int64_t>() : 0;
 
-        // If this is a PBS connection, then every download message is its own complete batch.
-        auto last_in_batch = connection.is_flx_sync_connection() ? msg.read_next<bool>() : true;
-        auto downloadable_bytes = msg.read_next<int64_t>();
+        if (is_flx) {
+            message.query_version = msg.read_next<int64_t>();
+            if (message.query_version < 0)
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version",
+                                    message.query_version);
+
+            message.last_in_batch = msg.read_next<bool>();
+
+            message.progress_estimate = msg.read_next<double>();
+            if (message.progress_estimate < 0 || message.progress_estimate > 1)
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad progress value: %1",
+                                    message.progress_estimate);
+        }
+        else
+            message.downloadable_bytes = msg.read_next<int64_t>();
+
         auto is_body_compressed = msg.read_next<bool>();
         auto uncompressed_body_size = msg.read_next<size_t>();
         auto compressed_body_size = msg.read_next<size_t>('\n');
@@ -414,11 +476,10 @@ private:
             msg = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
         }
 
-        logger.debug("Download message compression: session_ident=%1, is_body_compressed=%2, "
+        logger.debug(util::LogCategory::changeset,
+                     "Download message compression: session_ident=%1, is_body_compressed=%2, "
                      "compressed_body_size=%3, uncompressed_body_size=%4",
                      session_ident, is_body_compressed, compressed_body_size, uncompressed_body_size);
-
-        ReceivedChangesets received_changesets;
 
         // Loop through the body and find the changesets.
         while (!msg.at_end()) {
@@ -439,19 +500,20 @@ private:
                                     "Server version in downloaded changeset cannot be zero");
             }
             auto changeset_data = msg.read_sized_data<BinaryData>(changeset_size);
-            logger.debug("Received: DOWNLOAD CHANGESET(session_ident=%1, server_version=%2, "
+            logger.debug(util::LogCategory::changeset,
+                         "Received: DOWNLOAD CHANGESET(session_ident=%1, server_version=%2, "
                          "client_version=%3, origin_timestamp=%4, origin_file_ident=%5, "
                          "original_changeset_size=%6, changeset_size=%7)",
                          session_ident, cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
                          cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
                          cur_changeset.original_changeset_size, changeset_size); // Throws
-            if (logger.would_log(util::Logger::Level::trace)) {
+            if (logger.would_log(util::LogCategory::changeset, util::Logger::Level::trace)) {
                 if (changeset_data.size() < 1056) {
-                    logger.trace("Changeset: %1",
+                    logger.trace(util::LogCategory::changeset, "Changeset: %1",
                                  clamped_hex_dump(changeset_data)); // Throws
                 }
                 else {
-                    logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
+                    logger.trace(util::LogCategory::changeset, "Changeset(comp): %1 %2", changeset_data.size(),
                                  compressed_hex_dump(changeset_data)); // Throws
                 }
 #if REALM_DEBUG
@@ -460,18 +522,15 @@ private:
                 sync::parse_changeset(in, log);
                 std::stringstream ss;
                 log.print(ss);
-                logger.trace("Changeset (parsed):\n%1", ss.str());
+                logger.trace(util::LogCategory::changeset, "Changeset (parsed):\n%1", ss.str());
 #endif
             }
 
             cur_changeset.data = changeset_data;
-            received_changesets.push_back(std::move(cur_changeset)); // Throws
+            message.changesets.push_back(std::move(cur_changeset)); // Throws
         }
 
-        auto batch_state =
-            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
-        connection.receive_download_message(session_ident, progress, downloadable_bytes, query_version, batch_state,
-                                            received_changesets); // Throws
+        connection.receive_download_message(session_ident, message); // Throws
     }
 
     static sync::ProtocolErrorInfo::Action string_to_action(const std::string& action_string)
@@ -490,6 +549,7 @@ private:
             {"RefreshUser", action::RefreshUser},
             {"RefreshLocation", action::RefreshLocation},
             {"LogOutUser", action::LogOutUser},
+            {"MigrateSchema", action::MigrateSchema},
         };
 
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {
@@ -711,7 +771,8 @@ public:
                     msg = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
                 }
 
-                logger.debug("Upload message compression: is_body_compressed = %1, "
+                logger.debug(util::LogCategory::changeset,
+                             "Upload message compression: is_body_compressed = %1, "
                              "compressed_body_size=%2, uncompressed_body_size=%3, "
                              "progress_client_version=%4, progress_server_version=%5, "
                              "locked_server_version=%6",
@@ -744,13 +805,14 @@ public:
                     upload_changeset.changeset = msg.read_sized_data<BinaryData>(changeset_size);
 
                     if (logger.would_log(util::Logger::Level::trace)) {
-                        logger.trace("Received: UPLOAD CHANGESET(client_version=%1, server_version=%2, "
+                        logger.trace(util::LogCategory::changeset,
+                                     "Received: UPLOAD CHANGESET(client_version=%1, server_version=%2, "
                                      "origin_timestamp=%3, origin_file_ident=%4, changeset_size=%5)",
                                      upload_changeset.upload_cursor.client_version,
                                      upload_changeset.upload_cursor.last_integrated_server_version,
                                      upload_changeset.origin_timestamp, upload_changeset.origin_file_ident,
                                      changeset_size); // Throws
-                        logger.trace("Changeset: %1",
+                        logger.trace(util::LogCategory::changeset, "Changeset: %1",
                                      clamped_hex_dump(upload_changeset.changeset)); // Throws
                     }
                     upload_changesets.push_back(std::move(upload_changeset)); // Throws

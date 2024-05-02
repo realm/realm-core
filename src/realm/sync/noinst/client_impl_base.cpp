@@ -8,6 +8,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/basic_system_errors.hpp>
@@ -136,9 +137,8 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
     return true;
 }
 
-
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{config.logger ? std::move(config.logger) : util::Logger::get_default_logger()}
+    : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::session, std::move(config.logger))}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -188,10 +188,11 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
-    logger.debug("Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3",
-                 m_reconnect_backoff_info.max_resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_backoff_multiplier);
+    logger.debug(
+        "Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3, jitter: 1/%4",
+        m_reconnect_backoff_info.max_resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_backoff_multiplier, m_reconnect_backoff_info.delay_jitter_divisor);
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
@@ -206,10 +207,8 @@ ClientImpl::ClientImpl(ClientConfig config)
     REALM_ASSERT_EX(m_socket_provider, "Must provide socket provider in sync Client config");
 
     if (m_one_connection_per_session) {
-        // FIXME: Re-enable this warning when the load balancer is able to handle
-        // multiplexing.
-        //        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
-        //            "never do this in production");
+        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
+                    "never do this in production");
     }
 
     if (config.disable_upload_activation_delay) {
@@ -397,7 +396,7 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
-void ClientImpl::Connection::finish_session_deactivation(Session* sess)
+void Connection::finish_session_deactivation(Session* sess)
 {
     REALM_ASSERT(sess->m_state == Session::Deactivated);
     auto ident = sess->m_ident;
@@ -526,6 +525,11 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
         case WebSocketError::websocket_connection_failed: {
             SessionErrorInfo error_info(
                 {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)}, IsFatal{false});
+            // If the connection fails/times out and the server has not been contacted yet, refresh the location
+            // to make sure the websocket URL is correct
+            if (!m_server_endpoint.is_verified) {
+                error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+            }
             involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::connect_operation_failed);
             break;
         }
@@ -580,8 +584,19 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_fatal_error: {
-            involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{true}),
-                                   ConnectionTerminationReason::http_response_says_fatal_error);
+            // Error is fatal if the sync_route has already been verified - if the sync_route has not
+            // been verified, then use a non-fatal error and try to perform a location update.
+            SessionErrorInfo error_info(
+                {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)},
+                IsFatal{m_server_endpoint.is_verified});
+            ConnectionTerminationReason reason = ConnectionTerminationReason::http_response_says_fatal_error;
+            // If the connection fails/times out and the server has not been contacted yet, refresh the location
+            // to make sure the websocket URL is correct
+            if (!m_server_endpoint.is_verified) {
+                error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+                reason = ConnectionTerminationReason::connect_operation_failed;
+            }
+            involuntary_disconnect(std::move(error_info), reason);
             break;
         }
         case WebSocketError::websocket_forbidden: {
@@ -807,10 +822,14 @@ void Connection::handle_connect_wait(Status status)
 
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
     logger.info("Connect timeout"); // Throws
-    involuntary_disconnect(
-        SessionErrorInfo{Status{ErrorCodes::SyncConnectTimeout, "Sync connection was not fully established in time"},
-                         IsFatal{false}},
-        ConnectionTerminationReason::sync_connect_timeout); // Throws
+    SessionErrorInfo error_info({ErrorCodes::SyncConnectTimeout, "Sync connection was not fully established in time"},
+                                IsFatal{false});
+    // If the connection fails/times out and the server has not been contacted yet, refresh the location
+    // to make sure the websocket URL is correct
+    if (!m_server_endpoint.is_verified) {
+        error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+    }
+    involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
 
@@ -820,6 +839,7 @@ void Connection::handle_connection_established()
     m_connect_timer.reset();
 
     m_state = ConnectionState::connected;
+    m_server_endpoint.is_verified = true; // sync route is valid since connection is successful
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
@@ -1352,19 +1372,14 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
         close_due_to_protocol_error(std::move(status)); // Throws
 }
 
-void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
-                                          std::uint_fast64_t downloadable_bytes, int64_t query_version,
-                                          DownloadBatchState batch_state,
-                                          const ReceivedChangesets& received_changesets)
+void Connection::receive_download_message(session_ident_type session_ident, const DownloadMessage& message)
 {
     Session* sess = find_and_validate_session(session_ident, "DOWNLOAD");
     if (REALM_UNLIKELY(!sess)) {
         return;
     }
 
-    if (auto status = sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
-                                                     received_changesets);
-        !status.is_ok()) {
+    if (auto status = sess->receive_download_message(message); !status.is_ok()) {
         close_due_to_protocol_error(std::move(status));
     }
 }
@@ -1426,11 +1441,12 @@ void Connection::receive_server_log_message(session_ident_type session_ident, ut
 
     if (session_ident != 0) {
         if (auto sess = get_session(session_ident)) {
-            sess->logger.log(level, "%1 log: %2", prefix, message);
+            sess->logger.log(LogCategory::session, level, "%1 log: %2", prefix, message);
             return;
         }
 
-        logger.log(level, "%1 log for unknown session %2: %3", prefix, session_ident, message);
+        logger.log(util::LogCategory::session, level, "%1 log for unknown session %2: %3", prefix, session_ident,
+                   message);
         return;
     }
 
@@ -1443,7 +1459,8 @@ void Connection::receive_appservices_request_id(std::string_view coid)
     // Only set once per connection
     if (!coid.empty() && m_appservices_coid.empty()) {
         m_appservices_coid = coid;
-        logger.info("Connected to app services with request id: \"%1\"", m_appservices_coid);
+        logger.log(util::LogCategory::session, util::LogCategory::Level::info,
+                   "Connected to app services with request id: \"%1\"", m_appservices_coid);
     }
 }
 
@@ -1597,13 +1614,16 @@ void Session::on_integration_failure(const IntegrationException& error)
     }
 }
 
-void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
+void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress,
+                                       bool changesets_integrated)
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT_3(progress.download.server_version, >=, m_download_progress.server_version);
-    m_download_progress = progress.download;
     bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
+
+    m_download_progress = progress.download;
     m_progress = progress;
+
     if (upload_progressed) {
         if (progress.upload.client_version > m_last_version_selected_for_upload) {
             if (progress.upload.client_version > m_upload_progress.client_version)
@@ -1611,11 +1631,18 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
             m_last_version_selected_for_upload = progress.upload.client_version;
         }
 
+        notify_upload_progress();
         check_for_upload_completion();
     }
 
-    do_recognize_sync_version(client_version); // Allows upload process to resume
-    check_for_download_completion();           // Throws
+    bool resume_upload = do_recognize_sync_version(client_version); // Allows upload process to resume
+
+    // notify also when final DOWNLOAD received with no changesets
+    bool download_progressed = changesets_integrated || (!upload_progressed && resume_upload);
+    if (download_progressed)
+        notify_download_progress();
+
+    check_for_download_completion(); // Throws
 
     // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
     if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
@@ -1670,8 +1697,9 @@ void Session::activate()
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_download_progress = m_progress.download;
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
+    init_progress_handler();
 
-    logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
+    logger.debug("last_version_available  = %1", m_last_version_available);                    // Throws
     logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
     logger.debug("progress_download_client_version = %1",
                  m_progress.download.last_integrated_client_version);                                      // Throws
@@ -1680,6 +1708,9 @@ void Session::activate()
 
     reset_protocol_state();
     m_state = Active;
+
+    call_debug_hook(SyncClientHookEvent::SessionActivating, m_progress, m_last_sent_flx_query_version,
+                    DownloadBatchState::SteadyState, 0);
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -1873,6 +1904,9 @@ void Session::send_bind_message()
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
         bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
+        auto schema_version = get_schema_version();
+        // Send 0 if schema is not versioned.
+        bind_json_data["schemaVersion"] = schema_version != uint64_t(-1) ? schema_version : 0;
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
@@ -2030,18 +2064,19 @@ void Session::send_upload_message()
     ClientProtocol::UploadMessageBuilder upload_message_builder = protocol.make_upload_message_builder(); // Throws
 
     for (const UploadChangeset& uc : uploadable_changesets) {
-        logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
+        logger.debug(util::LogCategory::changeset,
+                     "Fetching changeset for upload (client_version=%1, server_version=%2, "
                      "changeset_size=%3, origin_timestamp=%4, origin_file_ident=%5)",
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
                      uc.origin_timestamp, uc.origin_file_ident); // Throws
         if (logger.would_log(util::Logger::Level::trace)) {
             BinaryData changeset_data = uc.changeset.get_first_chunk();
             if (changeset_data.size() < 1024) {
-                logger.trace("Changeset: %1",
+                logger.trace(util::LogCategory::changeset, "Changeset: %1",
                              _impl::clamped_hex_dump(changeset_data)); // Throws
             }
             else {
-                logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
+                logger.trace(util::LogCategory::changeset, "Changeset(comp): %1 %2", changeset_data.size(),
                              protocol.compressed_hex_dump(changeset_data));
             }
 
@@ -2052,10 +2087,10 @@ void Session::send_upload_message()
                 parse_changeset(in, log);
                 std::stringstream ss;
                 log.print(ss);
-                logger.trace("Changeset (parsed):\n%1", ss.str());
+                logger.trace(util::LogCategory::changeset, "Changeset (parsed):\n%1", ss.str());
             }
             catch (const BadChangesetError& err) {
-                logger.error("Unable to parse changeset: %1", err.what());
+                logger.error(util::LogCategory::changeset, "Unable to parse changeset: %1", err.what());
             }
 #endif
         }
@@ -2079,7 +2114,7 @@ void Session::send_upload_message()
                 compact_changesets(&changeset, 1);
                 encode_changeset(changeset, encode_buffer);
 
-                logger.debug("Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
+                logger.debug(util::LogCategory::changeset, "Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
                              encode_buffer.size()); // Throws
             }
 
@@ -2243,6 +2278,7 @@ bool Session::client_reset_if_needed()
 
     m_upload_progress = m_progress.upload;
     m_download_progress = m_progress.download;
+    init_progress_handler();
     // In recovery mode, there may be new changesets to upload and nothing left to download.
     // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
     // For both, we want to allow uploads again without needing external changes to download first.
@@ -2320,29 +2356,47 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     return Status::OK();       // Success
 }
 
-Status Session::receive_download_message(const SyncProgress& progress, std::uint_fast64_t downloadable_bytes,
-                                         DownloadBatchState batch_state, int64_t query_version,
-                                         const ReceivedChangesets& received_changesets)
+Status Session::receive_download_message(const DownloadMessage& message)
 {
-    REALM_ASSERT_EX(query_version >= 0, query_version);
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state != Active)
         return Status::OK();
 
-    if (is_steady_state_download_message(batch_state, query_version)) {
-        batch_state = DownloadBatchState::SteadyState;
-    }
+    bool is_flx = m_conn.is_flx_sync_connection();
+    int64_t query_version = is_flx ? *message.query_version : 0;
 
-    logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
-                 "latest_server_version=%3, latest_server_version_salt=%4, "
-                 "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
-                 "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
-                 progress.download.server_version, progress.download.last_integrated_client_version,
-                 progress.latest_server_version.version, progress.latest_server_version.salt,
-                 progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
+    if (!is_flx || query_version > 0)
+        enable_progress_notifications();
+
+    // If this is a PBS connection, then every download message is its own complete batch.
+    bool last_in_batch = is_flx ? *message.last_in_batch : true;
+    auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    if (is_steady_state_download_message(batch_state, query_version))
+        batch_state = DownloadBatchState::SteadyState;
+
+    auto&& progress = message.progress;
+    if (is_flx) {
+        logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
+                     "latest_server_version=%3, latest_server_version_salt=%4, "
+                     "upload_client_version=%5, upload_server_version=%6, progress_estimate=%7, "
+                     "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
+                     progress.download.server_version, progress.download.last_integrated_client_version,
+                     progress.latest_server_version.version, progress.latest_server_version.salt,
+                     progress.upload.client_version, progress.upload.last_integrated_server_version,
+                     message.progress_estimate, last_in_batch, query_version, message.changesets.size()); // Throws
+    }
+    else {
+        logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
+                     "latest_server_version=%3, latest_server_version_salt=%4, "
+                     "upload_client_version=%5, upload_server_version=%6, "
+                     "downloadable_bytes=%7, num_changesets=%8, ...)",
+                     progress.download.server_version, progress.download.last_integrated_client_version,
+                     progress.latest_server_version.version, progress.latest_server_version.salt,
+                     progress.upload.client_version, progress.upload.last_integrated_server_version,
+                     message.downloadable_bytes, message.changesets.size()); // Throws
+    }
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
     // changeset over and over again.
@@ -2362,7 +2416,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    for (const RemoteChangeset& changeset : received_changesets) {
+    for (const RemoteChangeset& changeset : message.changesets) {
         // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
         // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
@@ -2400,21 +2454,25 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
-                                       batch_state, received_changesets.size());
+                                       batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
+    if (is_flx)
+        update_download_estimate(message.progress_estimate);
+
+    if (process_flx_bootstrap_message(progress, batch_state, query_version, message.changesets)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
 
-    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
+    uint64_t downloadable_bytes = is_flx ? 0 : message.downloadable_bytes;
+    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                  batch_state, received_changesets.size());
+                                  batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2542,6 +2600,19 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         return Status::OK();
     }
 
+    if (protocol_error == ProtocolError::schema_version_changed) {
+        // Enable upload immediately if the session is still active.
+        if (m_state == Active) {
+            auto wt = get_db()->start_write();
+            _impl::sync_schema_migration::track_sync_schema_migration(*wt, *info.previous_schema_version);
+            wt->commit();
+            // Notify SyncSession a schema migration is required.
+            on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info});
+        }
+        // Keep the session active to upload any unsynced changes.
+        return Status::OK();
+    }
+
     m_error_message_received = true;
     suspend(SessionErrorInfo{info, std::move(status)});
     return Status::OK();
@@ -2636,7 +2707,7 @@ void Session::clear_resumption_delay_state()
     }
 }
 
-Status ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress) noexcept
+Status Session::check_received_sync_progress(const SyncProgress& progress) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;

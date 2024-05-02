@@ -276,7 +276,7 @@ void do_clean_dir(const std::string& path, const std::string& guard_string)
         }
     }
 }
-}
+} // namespace
 
 void TestDirGuard::clean_dir(const std::string& path)
 {

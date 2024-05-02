@@ -18,6 +18,8 @@
 
 #include "util/unit_test_transport.hpp"
 
+#include "util/test_utils.hpp"
+
 #include <realm/object-store/util/uuid.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
@@ -28,11 +30,7 @@
 using namespace realm;
 using namespace realm::app;
 
-std::string UnitTestTransport::access_token =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoi"
-    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2Rk"
-    "Y2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+static const std::string access_token = encode_fake_jwt("fake access token");
 const std::string UnitTestTransport::api_key = "lVRPQVYBJSIbGos2ZZn0mGaIq1SIOsGaZ5lrcp8bxlR5jg4OGuGwQq1GkektNQ3i";
 const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
 const std::string UnitTestTransport::api_key_name = "some_api_key_name";
@@ -74,7 +72,9 @@ void UnitTestTransport::handle_profile(const Request& request,
 
     std::string user_id = util::uuid_string();
     std::string response;
-    if (m_provider_type == IdentityProviderAnonymous) {
+    // "anon-user" is the value of the IdentityProviderAnonymous constant
+    // which is not available here in non REALM_APP_SERVICES configurations
+    if (m_provider_type == "anon-user") {
         response = nlohmann::json({{"user_id", user_id},
                                    {"identities", {{{"id", identity_0_id}, {"provider_type", m_provider_type}}}},
                                    {"data", m_user_profile}})
@@ -117,10 +117,16 @@ void UnitTestTransport::handle_location(const Request& request,
     CHECK(request.method == HttpMethod::get);
     CHECK(request.timeout_ms == m_request_timeout);
 
-    std::string response = nlohmann::json({{"deployment_model", "this"},
-                                           {"hostname", "field"},
-                                           {"ws_hostname", "shouldn't"},
-                                           {"location", "matter"}})
+    if (m_base_url) {
+        CHECK(request.url.find(*m_base_url) != std::string::npos);
+        m_location_called = true;
+    }
+
+    // The actual values don't matter
+    std::string response = nlohmann::json({{"deployment_model", "DOESN'T"},
+                                           {"hostname", "https://some.fake.url"},
+                                           {"ws_hostname", "wss://ws.some.fake.url"},
+                                           {"location", "MATTER"}})
                                .dump();
 
     completion(Response{200, 0, {}, response});

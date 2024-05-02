@@ -123,6 +123,11 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::revert_to_pbs:
             return "Server rolled back after flexible sync migration - reverting client to partition based "
                    "sync";
+        case ProtocolError::bad_schema_version:
+            return "Client tried to open a session with an invalid schema version (BIND)";
+        case ProtocolError::schema_version_changed:
+            return "Client opened a session with a new valid schema version - migrating client to use new schema "
+                   "version (BIND)";
     }
     return nullptr;
 }
@@ -214,6 +219,10 @@ Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
                 [[fallthrough]];
             case ProtocolError::revert_to_pbs:
                 return ErrorCodes::WrongSyncType;
+            case ProtocolError::bad_schema_version:
+                [[fallthrough]];
+            case ProtocolError::schema_version_changed:
+                return ErrorCodes::SyncSchemaMigrationError;
 
             case ProtocolError::limits_exceeded:
                 [[fallthrough]];

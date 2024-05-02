@@ -27,6 +27,7 @@ ArrayMixed::ArrayMixed(Allocator& a)
     , m_ints(a)
     , m_int_pairs(a)
     , m_strings(a)
+    , m_refs(a)
 {
     m_composite.set_parent(this, payload_idx_type);
 }
@@ -45,6 +46,7 @@ void ArrayMixed::init_from_mem(MemRef mem) noexcept
     m_ints.detach();
     m_int_pairs.detach();
     m_strings.detach();
+    m_refs.detach();
 }
 
 void ArrayMixed::add(Mixed value)
@@ -59,28 +61,57 @@ void ArrayMixed::add(Mixed value)
 
 void ArrayMixed::set(size_t ndx, Mixed value)
 {
+    auto old_type = get_type(ndx);
+    // If we replace a collections ref value with one of the
+    // same type, then it is just an update of of the
+    // ref stored in the parent. If the new type is a different
+    // type then it means that we are overwriting a collection
+    // with some other value and hence the collection must be
+    // destroyed as well as the possible key.
+    bool destroy_collection = !value.is_type(old_type);
+
     if (value.is_null()) {
         set_null(ndx);
-        return;
     }
-    erase_linked_payload(ndx);
-    m_composite.set(ndx, store(value));
+    else {
+        erase_linked_payload(ndx, destroy_collection);
+        m_composite.set(ndx, store(value));
+    }
+
+    if (destroy_collection && Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            if (ndx < keys.size())
+                keys.set(ndx, 0);
+        }
+    }
 }
 
 void ArrayMixed::insert(size_t ndx, Mixed value)
 {
     if (value.is_null()) {
         m_composite.insert(ndx, 0);
-        return;
     }
-    m_composite.insert(ndx, store(value));
+    else {
+        m_composite.insert(ndx, store(value));
+    }
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            keys.insert(ndx, 0);
+        }
+    }
 }
 
 void ArrayMixed::set_null(size_t ndx)
 {
     auto val = m_composite.get(ndx);
     if (val) {
-        erase_linked_payload(ndx);
+        erase_linked_payload(ndx, true);
         m_composite.set(ndx, 0);
     }
 }
@@ -163,6 +194,10 @@ Mixed ArrayMixed::get(size_t ndx) const
                 return Mixed(UUID(bytes));
             }
             default:
+                if (size_t((val & s_payload_idx_mask) >> s_payload_idx_shift) == payload_idx_ref) {
+                    ensure_ref_array();
+                    return Mixed(m_refs.get(payload_ndx), CollectionType(int(type)));
+                }
                 break;
         }
     }
@@ -176,23 +211,31 @@ void ArrayMixed::clear()
     m_ints.destroy();
     m_int_pairs.destroy();
     m_strings.destroy();
+    m_refs.destroy_deep();
     Array::set(payload_idx_int, 0);
     Array::set(payload_idx_pair, 0);
     Array::set(payload_idx_str, 0);
+    Array::set(payload_idx_ref, 0);
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array::destroy(ref, m_composite.get_alloc());
+            Array::set(payload_idx_key, 0);
+        }
+    }
 }
 
 void ArrayMixed::erase(size_t ndx)
 {
-    erase_linked_payload(ndx);
+    erase_linked_payload(ndx, true);
     m_composite.erase(ndx);
-}
-
-void ArrayMixed::truncate_and_destroy_children(size_t ndx)
-{
-    for (size_t i = size(); i > ndx; i--) {
-        erase_linked_payload(i - 1);
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            keys.erase(ndx);
+        }
     }
-    m_composite.truncate(ndx);
 }
 
 void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
@@ -203,8 +246,20 @@ void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
         auto val = get(i++);
         dst.add(val);
     }
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            dst.ensure_keys();
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            for (size_t j = 0, i = ndx; i < sz; i++, j++) {
+                dst.set_key(j, keys.get(i));
+            }
+            keys.truncate(ndx);
+        }
+    }
     while (i > ndx) {
-        erase_linked_payload(--i);
+        erase_linked_payload(--i, false);
     }
     m_composite.truncate(ndx);
 }
@@ -225,6 +280,49 @@ size_t ArrayMixed::find_first(Mixed value, size_t begin, size_t end) const noexc
     return realm::npos;
 }
 
+bool ArrayMixed::ensure_keys()
+{
+    if (Array::size() < payload_idx_key + 1 || Array::get(payload_idx_key) == 0) {
+        Array keys(Array::get_alloc());
+        keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+        keys.create(type_Normal, false, size(), 0);
+        keys.update_parent();
+
+        return false;
+    }
+    return true;
+}
+
+size_t ArrayMixed::find_key(int64_t key) const noexcept
+{
+    if (ref_type ref = get_as_ref(payload_idx_key)) {
+        Array keys(Array::get_alloc());
+        keys.init_from_ref(ref);
+        return keys.find_first(key);
+    }
+    return realm::not_found;
+}
+
+void ArrayMixed::set_key(size_t ndx, int64_t key)
+{
+    Array keys(Array::get_alloc());
+    ensure_array_accessor(keys, payload_idx_key);
+    while (keys.size() <= ndx) {
+        keys.add(0);
+    }
+    keys.set(ndx, key);
+}
+
+int64_t ArrayMixed::get_key(size_t ndx) const
+{
+    Array keys(Array::get_alloc());
+    if (ref_type ref = get_as_ref(payload_idx_key)) {
+        keys.init_from_ref(ref);
+        return (ndx < keys.size()) ? keys.get(ndx) : 0;
+    }
+    return 0;
+}
+
 void ArrayMixed::verify() const
 {
     // TODO: Implement
@@ -239,7 +337,7 @@ void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const
             arr.init_from_ref(ref);
         }
         else {
-            arr.create(type_Normal);
+            arr.create(ndx_in_parent == payload_idx_ref ? type_HasRefs : type_Normal);
             arr.update_parent();
         }
     }
@@ -270,6 +368,14 @@ void ArrayMixed::ensure_string_array() const
     }
 }
 
+void ArrayMixed::ensure_ref_array() const
+{
+    while (Array::size() < payload_idx_ref + 1) {
+        const_cast<ArrayMixed*>(this)->Array::add(0);
+    }
+    ensure_array_accessor(m_refs, payload_idx_ref);
+}
+
 void ArrayMixed::replace_index(size_t old_ndx, size_t new_ndx, size_t payload_arr_index)
 {
     if (old_ndx != new_ndx) {
@@ -285,7 +391,7 @@ void ArrayMixed::replace_index(size_t old_ndx, size_t new_ndx, size_t payload_ar
     }
 }
 
-void ArrayMixed::erase_linked_payload(size_t ndx)
+void ArrayMixed::erase_linked_payload(size_t ndx, bool free_linked_arrays)
 {
     auto val = m_composite.get(ndx);
     auto payload_arr_index = size_t((val & s_payload_idx_mask) >> s_payload_idx_shift);
@@ -328,6 +434,19 @@ void ArrayMixed::erase_linked_payload(size_t ndx)
                     replace_index(last_ndx >> 1, erase_ndx >> 1, payload_arr_index);
                 }
                 m_int_pairs.truncate(last_ndx);
+                break;
+            }
+            case payload_idx_ref: {
+                ensure_ref_array();
+                last_ndx = m_refs.size() - 1;
+                auto old_ref = m_refs.get(erase_ndx);
+                if (erase_ndx != last_ndx) {
+                    m_refs.set(erase_ndx, m_refs.get(last_ndx));
+                    replace_index(last_ndx, erase_ndx, payload_arr_index);
+                }
+                m_refs.erase(last_ndx);
+                if (old_ref && free_linked_arrays)
+                    Array::destroy_deep(old_ref, m_composite.get_alloc());
                 break;
             }
             default:
@@ -440,7 +559,11 @@ int64_t ArrayMixed::store(const Mixed& value)
             break;
         }
         default:
-            val = 0;
+            REALM_ASSERT(type == type_List || type == type_Dictionary);
+            ensure_ref_array();
+            size_t ndx = m_refs.size();
+            m_refs.add(value.get_ref());
+            val = int64_t(ndx << s_data_shift) | (payload_idx_ref << s_payload_idx_shift);
             break;
     }
     return val + int(type) + 1;

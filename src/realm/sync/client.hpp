@@ -23,12 +23,6 @@ class Client {
 public:
     using port_type = sync::port_type;
 
-    static constexpr milliseconds_type default_connect_timeout = sync::default_connect_timeout;
-    static constexpr milliseconds_type default_connection_linger_time = sync::default_connection_linger_time;
-    static constexpr milliseconds_type default_ping_keepalive_period = sync::default_ping_keepalive_period;
-    static constexpr milliseconds_type default_pong_keepalive_timeout = sync::default_pong_keepalive_timeout;
-    static constexpr milliseconds_type default_fast_reconnect_limit = sync::default_fast_reconnect_limit;
-
     using Config = ClientConfig;
 
     /// \throw util::EventLoop::Implementation::NotAvailable if no event loop
@@ -38,13 +32,6 @@ public:
     Client(Client&&) noexcept;
     ~Client() noexcept;
 
-    /// Run the internal event-loop of the client. At most one thread may
-    /// execute run() at any given time. The call will not return until somebody
-    /// calls stop().
-    void run() noexcept;
-
-    /// See run().
-    ///
     /// Thread-safe.
     void shutdown() noexcept;
 
@@ -100,6 +87,9 @@ public:
     /// by any thread, and by multiple threads concurrently.
     bool wait_for_session_terminations_or_client_stopped();
 
+    /// Async version of wait_for_session_terminations_or_client_stopped().
+    util::Future<void> notify_session_terminated();
+
     /// Returns false if the specified URL is invalid.
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                               port_type& port, std::string& path) const;
@@ -108,9 +98,6 @@ private:
     std::unique_ptr<ClientImpl> m_impl;
     friend class Session;
 };
-
-
-class BadServerUrl; // Exception
 
 
 /// \brief Client-side representation of a Realm file synchronization session.
@@ -174,7 +161,8 @@ public:
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                  std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                 std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version);
+                                 std::uint_fast64_t snapshot_version, double download_estimate,
+                                 double upload_estimate);
     using WaitOperCompletionHandler = util::UniqueFunction<void(Status)>;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
@@ -204,6 +192,11 @@ public:
         /// On the MongoDB Realm-based Sync server, virtual paths are not coupled
         /// to file system paths, and thus, these restrictions do not apply.
         std::string realm_identifier = "";
+
+        // If the client has successfully contacted the server, then this will be
+        // set to true, otherwise it is false and the sync sessions will attempt
+        // to update the location info if the connection fails.
+        bool server_verified = false;
 
         /// The user id of the logged in user for this sync session. This will be used
         /// along with the server_address/server_port/protocol_envelope to determine
@@ -353,6 +346,11 @@ public:
         ///
         /// Note: Currently only used in FLX sync.
         SessionReason session_reason = SessionReason::Sync;
+
+        /// Schema version
+        ///
+        /// Note: Currently set only for FLX sync.
+        uint64_t schema_version = -1; // = ObjectStore::NotVersioned
     };
 
     /// \brief Start a new session for the specified client-side Realm.
@@ -566,7 +564,7 @@ public:
     ///
     /// \param signed_user_token A cryptographically signed token describing the
     /// identity and access rights of the current user. See ProtocolEnvelope.
-    void refresh(const std::string& signed_user_token);
+    void refresh(std::string_view signed_user_token);
 
     /// \brief Inform the synchronization agent about changes of local origin.
     ///
@@ -717,14 +715,6 @@ private:
 std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
 
 // Implementation
-
-class BadServerUrl : public Exception {
-public:
-    BadServerUrl(std::string_view url)
-        : Exception(ErrorCodes::BadServerUrl, util::format("Unable to parse server URL '%1'", url))
-    {
-    }
-};
 
 inline Session::Session(Session&& sess) noexcept
     : m_impl{sess.m_impl}

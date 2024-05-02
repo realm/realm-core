@@ -16,6 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#ifndef REALM_TEST_UTIL_TRANSPORT_HPP
+#define REALM_TEST_UTIL_TRANSPORT_HPP
+
 #include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include <external/json/json.hpp>
@@ -33,14 +36,23 @@ public:
     {
     }
 
-    static std::string access_token;
-
     static const std::string api_key;
     static const std::string api_key_id;
     static const std::string api_key_name;
     static const std::string auth_route;
     static const std::string identity_0_id;
     static const std::string identity_1_id;
+
+    void set_base_url(const std::string_view base_url)
+    {
+        m_base_url = std::string(base_url);
+        m_location_called = false;
+    }
+
+    bool get_location_called() const
+    {
+        return m_location_called;
+    }
 
     void set_provider_type(const std::string& provider_type)
     {
@@ -63,6 +75,8 @@ public:
 private:
     std::string m_provider_type;
     uint64_t m_request_timeout = 60000;
+    realm::util::Optional<std::string> m_base_url = realm::util::none;
+    bool m_location_called = false;
     nlohmann::json m_user_profile = nlohmann::json::object();
     nlohmann::json m_options;
 
@@ -81,3 +95,5 @@ private:
     void handle_token_refresh(const realm::app::Request& request,
                               realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion);
 };
+
+#endif // REALM_TEST_UTIL_TRANSPORT_HPP

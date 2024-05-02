@@ -139,6 +139,8 @@ struct RealmConfig {
         return schema_mode == SchemaMode::ReadOnly;
     }
 
+    bool needs_file_format_upgrade() const;
+
     // If false, always return a new Realm instance, and don't return
     // that Realm instance for other requests for a cached Realm. Useful
     // for dynamic Realms and for tests that need multiple instances on
@@ -183,6 +185,13 @@ struct RealmConfig {
     // everything can be done deterministically on one thread, and
     // speeds up tests that don't need notifications.
     bool automatic_change_notifications = true;
+
+    // For internal use and should not be exposed by SDKs.
+    //
+    // If the file is invalid or can't be decrypted with the given encryption
+    // key, clear it and reinitialize it as a new file. This is used for the
+    // sync metadata realm which is automatically deleted if it can't be used.
+    bool clear_on_invalid_file = false;
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {
@@ -368,7 +377,7 @@ public:
      * will be thrown instead.
      *
      * If the destination file does not exist, the action performed depends on
-     * the type of the source and destimation files. If the destination
+     * the type of the source and destination files. If the destination
      * configuration is a non-sync local Realm configuration, a compacted copy
      * of the current Transaction's data (which includes uncommitted changes if
      * applicable!) is written in streaming form, with no history.
@@ -557,6 +566,7 @@ private:
     void set_schema(Schema const& reference, Schema schema);
     bool reset_file(Schema& schema, std::vector<SchemaChange>& changes_required);
     bool schema_change_needs_write_transaction(Schema& schema, std::vector<SchemaChange>& changes, uint64_t version);
+    void verify_schema_version_not_decreasing(uint64_t version);
     Schema get_full_schema();
 
     // Ensure that m_schema and m_schema_version match that of the current

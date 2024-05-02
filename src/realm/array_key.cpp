@@ -87,15 +87,6 @@ void ArrayKeyBase<1>::verify() const
 
     ConstTableRef target_table = origin_table->get_opposite_table(link_col_key);
 
-    auto verify_link = [origin_table, link_col_key](const Obj& target_obj, ObjKey origin_key) {
-        auto cnt = target_obj.get_backlink_count(*origin_table, link_col_key);
-        for (size_t i = 0; i < cnt; i++) {
-            if (target_obj.get_backlink(*origin_table, link_col_key, i) == origin_key)
-                return;
-        }
-        REALM_ASSERT(false);
-    };
-
     // Verify that forward link has a corresponding backlink
     for (size_t i = 0; i < size(); ++i) {
         if (ObjKey target_key = get(i)) {
@@ -104,7 +95,7 @@ void ArrayKeyBase<1>::verify() const
             auto target_obj = target_key.is_unresolved() ? target_table->try_get_tombstone(target_key)
                                                          : target_table->try_get_object(target_key);
             REALM_ASSERT(target_obj);
-            verify_link(target_obj, origin_key);
+            target_obj.verify_backlink(*origin_table, link_col_key, origin_key);
         }
     }
 #endif

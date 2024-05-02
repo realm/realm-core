@@ -304,8 +304,6 @@ const char* get_data_type_name(DataType type) noexcept
             return "mixed";
         case type_Link:
             return "link";
-        case type_LinkList:
-            return "linklist";
         case type_TypedLink:
             return "typedLink";
         default:
@@ -335,21 +333,17 @@ std::ostream& operator<<(std::ostream& o, Table::Type table_type)
 }
 } // namespace realm
 
-void LinkChain::add(ColKey ck)
+bool LinkChain::add(ColKey ck)
 {
     // Link column can be a single Link, LinkList, or BackLink.
     REALM_ASSERT(m_current_table->valid_column(ck));
     ColumnType type = ck.get_type();
-    if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+    if (type == col_type_Link || type == col_type_BackLink) {
         m_current_table = m_current_table->get_opposite_table(ck);
+        m_link_cols.push_back(ck);
+        return true;
     }
-    else {
-        // Only last column in link chain is allowed to be non-link
-        throw LogicError(ErrorCodes::TypeMismatch,
-                         util::format("Property '%1.%2' is not an object reference",
-                                      m_current_table->get_class_name(), m_current_table->get_column_name(ck)));
-    }
-    m_link_cols.push_back(ck);
+    return false;
 }
 
 // -- Table ---------------------------------------------------------------------------------
@@ -394,147 +388,75 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     m_cookie = cookie_created;
 }
 
-ColKey Table::add_column(DataType type, StringData name, bool nullable)
+ColKey Table::add_column(DataType type, StringData name, bool nullable, std::optional<CollectionType> collection_type,
+                         DataType key_type)
 {
     REALM_ASSERT(!is_link_type(ColumnType(type)));
+    if (type == type_TypedLink) {
+        throw IllegalOperation("TypedLink properties not yet supported");
+    }
 
-    Table* invalid_link = nullptr;
     ColumnAttrMask attr;
+    if (collection_type) {
+        switch (*collection_type) {
+            case CollectionType::List:
+                attr.set(col_attr_List);
+                break;
+            case CollectionType::Set:
+                attr.set(col_attr_Set);
+                break;
+            case CollectionType::Dictionary:
+                attr.set(col_attr_Dictionary);
+                break;
+        }
+    }
     if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
 
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
+    Table* invalid_link = nullptr;
+    return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
 
-ColKey Table::add_column(Table& target, StringData name)
+ColKey Table::add_column(Table& target, StringData name, std::optional<CollectionType> collection_type,
+                         DataType key_type)
 {
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Incoming links from an asymmetric table are not allowed.
+    // Links to an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Ephemeral objects not supported");
     }
 
     m_has_any_embedded_objects.reset();
 
+    DataType data_type = type_Link;
     ColumnAttrMask attr;
-    attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(col_type_Link, attr);
-
-    auto retval = do_insert_column(col_key, type_Link, name, &target); // Throws
-    return retval;
-}
-
-ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
-{
-    Table* invalid_link = nullptr;
-    ColumnAttrMask attr;
-    attr.set(col_attr_List);
-    if (nullable || type == type_Mixed)
-        attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
-}
-
-ColKey Table::add_column_set(DataType type, StringData name, bool nullable)
-{
-    Table* invalid_link = nullptr;
-    ColumnAttrMask attr;
-    attr.set(col_attr_Set);
-    if (nullable || type == type_Mixed)
-        attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
-}
-
-ColKey Table::add_column_list(Table& target, StringData name)
-{
-    // Both origin and target must be group-level tables, and in the same group.
-    Group* origin_group = get_parent_group();
-    Group* target_group = target.get_parent_group();
-    REALM_ASSERT_RELEASE(origin_group && target_group);
-    REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Incoming links from an asymmetric table are not allowed.
-    if (target.is_asymmetric()) {
-        throw IllegalOperation("List of ephemeral objects not supported");
-    }
-
-    m_has_any_embedded_objects.reset();
-
-    ColumnAttrMask attr;
-    attr.set(col_attr_List);
-    ColKey col_key = generate_col_key(col_type_LinkList, attr);
-
-    return do_insert_column(col_key, type_LinkList, name, &target); // Throws
-}
-
-ColKey Table::add_column_set(Table& target, StringData name)
-{
-    // Both origin and target must be group-level tables, and in the same group.
-    Group* origin_group = get_parent_group();
-    Group* target_group = target.get_parent_group();
-    REALM_ASSERT_RELEASE(origin_group && target_group);
-    REALM_ASSERT_RELEASE(origin_group == target_group);
-    if (target.is_embedded())
-        throw IllegalOperation("Set of embedded objects not supported");
-    // Incoming links from an asymmetric table are not allowed.
-    if (target.is_asymmetric()) {
-        throw IllegalOperation("Set of ephemeral objects not supported");
-    }
-
-    ColumnAttrMask attr;
-    attr.set(col_attr_Set);
-    ColKey col_key = generate_col_key(col_type_Link, attr);
-    return do_insert_column(col_key, type_Link, name, &target); // Throws
-}
-
-ColKey Table::add_column_link(DataType type, StringData name, Table& target)
-{
-    REALM_ASSERT(is_link_type(ColumnType(type)));
-
-    if (type == type_LinkList) {
-        return add_column_list(target, name);
+    if (collection_type) {
+        switch (*collection_type) {
+            case CollectionType::List:
+                attr.set(col_attr_List);
+                break;
+            case CollectionType::Set:
+                if (target.is_embedded())
+                    throw IllegalOperation("Set of embedded objects not supported");
+                attr.set(col_attr_Set);
+                break;
+            case CollectionType::Dictionary:
+                attr.set(col_attr_Dictionary);
+                attr.set(col_attr_Nullable);
+                break;
+        }
     }
     else {
-        REALM_ASSERT(type == type_Link);
-        return add_column(target, name);
-    }
-}
-
-ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullable, DataType key_type)
-{
-    Table* invalid_link = nullptr;
-    ColumnAttrMask attr;
-    REALM_ASSERT(key_type != type_Mixed);
-    attr.set(col_attr_Dictionary);
-    if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
-}
-
-ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key_type)
-{
-    // Both origin and target must be group-level tables, and in the same group.
-    Group* origin_group = get_parent_group();
-    Group* target_group = target.get_parent_group();
-    REALM_ASSERT_RELEASE(origin_group && target_group);
-    REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Incoming links from an asymmetric table are not allowed.
-    if (target.is_asymmetric()) {
-        throw IllegalOperation("Dictionary of ephemeral objects not supported");
     }
+    ColKey col_key = generate_col_key(ColumnType(data_type), attr);
 
-    ColumnAttrMask attr;
-    attr.set(col_attr_Dictionary);
-    attr.set(col_attr_Nullable);
-
-    ColKey col_key = generate_col_key(ColumnType(col_type_Link), attr);
-    return do_insert_column(col_key, type_Link, name, &target, key_type); // Throws
+    return do_insert_column(col_key, data_type, name, &target, key_type); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -577,6 +499,25 @@ void Table::nullify_links(CascadeState& cascade_state)
     }
 }
 
+CollectionType Table::get_collection_type(ColKey col_key) const
+{
+    if (col_key.is_list()) {
+        return CollectionType::List;
+    }
+    if (col_key.is_set()) {
+        return CollectionType::Set;
+    }
+    REALM_ASSERT(col_key.is_dictionary());
+    return CollectionType::Dictionary;
+}
+
+void Table::remove_columns()
+{
+    for (size_t i = get_column_count(); i > 0; --i) {
+        ColKey col_key = spec_ndx2colkey(i - 1);
+        remove_column(col_key);
+    }
+}
 
 void Table::remove_column(ColKey col_key)
 {
@@ -737,71 +678,89 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
     return col_key;
 }
 
+template <typename Type>
+static void do_bulk_insert_index(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
+{
+    using LeafType = typename ColumnTypeTraits<Type>::cluster_leaf_type;
+    LeafType leaf(alloc);
+
+    auto f = [&col_key, &index, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        index->insert_bulk(cluster->get_key_array(), cluster->get_offset(), cluster->node_size(), leaf);
+        return IteratorControl::AdvanceToNext;
+    };
+
+    table->traverse_clusters(f);
+}
+
+
+static void do_bulk_insert_index_list(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
+{
+    ArrayInteger leaf(alloc);
+
+    auto f = [&col_key, &index, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        index->insert_bulk_list(cluster->get_key_array(), cluster->get_offset(), cluster->node_size(), leaf);
+        return IteratorControl::AdvanceToNext;
+    };
+
+    table->traverse_clusters(f);
+}
 
 void Table::populate_search_index(ColKey col_key)
 {
     auto col_ndx = col_key.get_index().val;
-    StringIndex* index = m_index_accessors[col_ndx].get();
+    SearchIndex* index = m_index_accessors[col_ndx].get();
+    DataType type = get_column_type(col_key);
 
-    // Insert ref to index
-    for (auto o : *this) {
-        ObjKey key = o.get_key();
-        DataType type = get_column_type(col_key);
-
-        if (type == type_Int) {
-            if (is_nullable(col_key)) {
-                Optional<int64_t> value = o.get<Optional<int64_t>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                int64_t value = o.get<int64_t>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_Bool) {
-            if (is_nullable(col_key)) {
-                Optional<bool> value = o.get<Optional<bool>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                bool value = o.get<bool>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_String) {
-            StringData value = o.get<StringData>(col_key);
-            index->insert(key, value); // Throws
-        }
-        else if (type == type_Timestamp) {
-            Timestamp value = o.get<Timestamp>(col_key);
-            index->insert(key, value); // Throws
-        }
-        else if (type == type_ObjectId) {
-            if (is_nullable(col_key)) {
-                Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                ObjectId value = o.get<ObjectId>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_UUID) {
-            if (is_nullable(col_key)) {
-                Optional<UUID> value = o.get<Optional<UUID>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                UUID value = o.get<UUID>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_Mixed) {
-            index->insert(key, o.get<Mixed>(col_key));
+    if (type == type_Int) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<int64_t>>(this, index, col_key, get_alloc());
         }
         else {
-            REALM_ASSERT_RELEASE(false && "Data type does not support search index");
+            do_bulk_insert_index<int64_t>(this, index, col_key, get_alloc());
         }
+    }
+    else if (type == type_Bool) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<bool>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<bool>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_String) {
+        if (col_key.is_list()) {
+            do_bulk_insert_index_list(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<StringData>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_Timestamp) {
+        do_bulk_insert_index<Timestamp>(this, index, col_key, get_alloc());
+    }
+    else if (type == type_ObjectId) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<ObjectId>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<ObjectId>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_UUID) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<UUID>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<UUID>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_Mixed) {
+        do_bulk_insert_index<Mixed>(this, index, col_key, get_alloc());
+    }
+    else {
+        REALM_ASSERT_RELEASE(false && "Data type does not support search index");
     }
 }
 
@@ -839,6 +798,8 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
         if (auto&& index = m_index_accessors[column_ndx]) {
             // There is an index for this column
             auto col_key = m_leaf_ndx2colkey[column_ndx];
+            if (col_key.is_collection())
+                continue;
             auto type = col_key.get_type();
             auto attr = col_key.get_attrs();
             bool nullable = attr.test(col_attr_Nullable);
@@ -918,7 +879,8 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection() ||
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) ||
+        (col_key.is_collection() && !(col_key.is_list() && col_key.get_type() == col_type_String)) ||
         (type == IndexType::Fulltext && col_key.get_type() != col_type_String)) {
         // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
         // it should probably be a type mismatch exception instead.
@@ -933,10 +895,10 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     // Create the index
     m_index_accessors[column_ndx] =
         std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
-    StringIndex* index = m_index_accessors[column_ndx].get();
-
+    SearchIndex* index = m_index_accessors[column_ndx].get();
     // Insert ref to index
     index->set_parent(&m_index_refs, column_ndx);
+
     m_index_refs.set(column_ndx, index->get_ref()); // Throws
 
     populate_search_index(col_key);
@@ -1042,7 +1004,6 @@ size_t Table::get_num_unique_values(ColKey col_key) const
 
 void Table::erase_root_column(ColKey col_key)
 {
-    check_column(col_key);
     ColumnType col_type = col_key.get_type();
     if (is_link_type(col_type)) {
         auto target_table = get_opposite_table(col_key);
@@ -1129,9 +1090,9 @@ void Table::do_erase_root_column(ColKey col_key)
     bump_storage_version();
 }
 
-Query Table::where(const DictionaryLinkValues& dictionary_of_links) const
+Query Table::where(const Dictionary& dict) const
 {
-    return Query(m_own_ref, dictionary_of_links);
+    return Query(m_own_ref, dict.clone_as_obj_list());
 }
 
 void Table::set_table_type(Type table_type, bool handle_backlinks)
@@ -1309,695 +1270,14 @@ Table::~Table() noexcept
 
 IndexType Table::search_index_type(ColKey col_key) const noexcept
 {
-    if (auto index = m_index_accessors[col_key.get_index().val].get()) {
-        return index->is_fulltext_index() ? IndexType::Fulltext : IndexType::General;
+    if (m_index_accessors[col_key.get_index().val].get()) {
+        auto attr = m_spec.get_column_attr(m_leaf_ndx2spec_ndx[col_key.get_index().val]);
+        bool fulltext = attr.test(col_attr_FullText_Indexed);
+        return fulltext ? IndexType::Fulltext : IndexType::General;
     }
     return IndexType::None;
 }
 
-void Table::migrate_column_info()
-{
-    bool changes = false;
-    TableKey tk = (get_name() == "pk") ? TableKey(0) : get_key();
-    changes |= m_spec.convert_column_attributes();
-    changes |= m_spec.convert_column_keys(tk);
-
-    if (changes) {
-        build_column_mapping();
-    }
-}
-
-bool Table::verify_column_keys()
-{
-    size_t nb_public_columns = m_spec.get_public_column_count();
-    size_t nb_columns = m_spec.get_column_count();
-    bool modified = false;
-
-    auto check = [&]() {
-        for (size_t spec_ndx = nb_public_columns; spec_ndx < nb_columns; spec_ndx++) {
-            if (m_spec.get_column_type(spec_ndx) == col_type_BackLink) {
-                auto col_key = m_spec.get_key(spec_ndx);
-                // This function checks for a specific error in the m_keys array where the
-                // backlink column keys are wrong. It can be detected by trying to find the
-                // corresponding origin table. If the error exists some of the results will
-                // give null TableKeys back.
-                if (!get_opposite_table_key(col_key))
-                    return false;
-                auto t = get_opposite_table(col_key);
-                auto c = get_opposite_column(col_key);
-                if (!t->valid_column(c))
-                    return false;
-                if (t->get_opposite_column(c) != col_key) {
-                    t->set_opposite_column(c, get_key(), col_key);
-                }
-            }
-        }
-        return true;
-    };
-
-    if (!check()) {
-        m_spec.fix_column_keys(get_key());
-        build_column_mapping();
-        refresh_index_accessors();
-        REALM_ASSERT_RELEASE(check());
-        modified = true;
-    }
-    return modified;
-}
-
-// Delete the indexes stored in the columns array and create corresponding
-// entries in m_index_accessors array. This also has the effect that the columns
-// array after this step does not have extra entries for certain columns
-void Table::migrate_indexes(ColKey pk_col_key)
-{
-    if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
-        Array col_refs(m_alloc);
-        col_refs.set_parent(&m_top, top_position_for_columns);
-        col_refs.init_from_ref(top_ref);
-        auto col_count = m_spec.get_column_count();
-        size_t col_ndx = 0;
-
-        // If col_refs.size() equals col_count, there are no indexes to migrate
-        while (col_ndx < col_count && col_refs.size() > col_count) {
-            if (m_spec.get_column_attr(col_ndx).test(col_attr_Indexed) && !m_index_refs.get(col_ndx)) {
-                // Simply delete entry. This will have the effect that we will not have to take
-                // extra entries into account
-                auto old_index_ref = to_ref(col_refs.get(col_ndx + 1));
-                col_refs.erase(col_ndx + 1);
-                if (old_index_ref) {
-                    // It should not be possible for old_index_ref to be 0, but we have seen some error
-                    // reports on freeing a null ref, so just to be sure ...
-                    Array::destroy_deep(old_index_ref, m_alloc);
-                }
-
-                // Primary key columns does not need an index
-                if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
-                    // Otherwise create new index. Will be updated when objects are created
-                    m_index_accessors[col_ndx] = std::make_unique<StringIndex>(
-                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx), IndexType::General),
-                        get_alloc()); // Throws
-                    auto index = m_index_accessors[col_ndx].get();
-                    index->set_parent(&m_index_refs, col_ndx);
-                    m_index_refs.set(col_ndx, index->get_ref());
-                }
-            }
-            col_ndx++;
-        };
-    }
-}
-
-// Move information held in the subspec area into the structures managed by Table
-// This is information about origin/target tables in relation to links
-// This information is now held in "opposite" arrays directly in Table structure
-// At the same time the backlink columns are destroyed
-// If there is no subspec, this stage is done
-void Table::migrate_subspec()
-{
-    if (!m_spec.has_subspec())
-        return;
-
-    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
-    Array col_refs(m_alloc);
-    col_refs.set_parent(&m_top, top_position_for_columns);
-    col_refs.init_from_ref(top_ref);
-    Group* group = get_parent_group();
-
-    for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
-        ColumnType col_type = m_spec.get_column_type(col_ndx);
-
-        if (is_link_type(col_type)) {
-            auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
-            auto target_table = group->get_table(target_key);
-            Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
-            // The target table spec may already be migrated.
-            // If it has, the new functions should be used.
-            ColKey backlink_col_key = target_spec.has_subspec()
-                                          ? target_spec.find_backlink_column(m_key, col_ndx)
-                                          : target_table->find_opposite_column(m_spec.get_key(col_ndx));
-            REALM_ASSERT(backlink_col_key.get_type() == col_type_BackLink);
-            if (m_opposite_table.get(col_ndx) != target_key.value) {
-                m_opposite_table.set(col_ndx, target_key.value);
-            }
-            if (m_opposite_column.get(col_ndx) != backlink_col_key.value) {
-                m_opposite_column.set(col_ndx, backlink_col_key.value);
-            }
-        }
-        else if (col_type == col_type_BackLink) {
-            auto origin_key = m_spec.get_opposite_link_table_key(col_ndx);
-            size_t origin_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
-            auto origin_table = group->get_table(origin_key);
-            Spec& origin_spec = _impl::TableFriend::get_spec(*origin_table);
-            ColKey origin_col_key = origin_spec.get_key(origin_col_ndx);
-            REALM_ASSERT(is_link_type(origin_col_key.get_type()));
-            if (m_opposite_table.get(col_ndx) != origin_key.value) {
-                m_opposite_table.set(col_ndx, origin_key.value);
-            }
-            if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
-                m_opposite_column.set(col_ndx, origin_col_key.value);
-            }
-        }
-    };
-    m_spec.destroy_subspec();
-}
-
-namespace {
-
-class LegacyStringColumn : public BPlusTree<StringData> {
-public:
-    LegacyStringColumn(Allocator& alloc, Spec* spec, size_t col_ndx, bool nullable)
-        : BPlusTree(alloc)
-        , m_spec(spec)
-        , m_col_ndx(col_ndx)
-        , m_nullable(nullable)
-    {
-    }
-
-    std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
-    {
-        auto leaf = std::make_unique<LeafNode>(this);
-        leaf->ArrayString::set_spec(m_spec, m_col_ndx);
-        leaf->set_nullability(m_nullable);
-        leaf->init_from_ref(ref);
-        return leaf;
-    }
-
-    StringData get_legacy(size_t n) const
-    {
-        if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
-            return m_leaf_cache.get_legacy(n - m_cached_leaf_begin);
-        }
-        else {
-            StringData value;
-
-            auto func = [&value](BPlusTreeNode* node, size_t ndx) {
-                auto leaf = static_cast<LeafNode*>(node);
-                value = leaf->get_legacy(ndx);
-            };
-
-            m_root->bptree_access(n, func);
-
-            return value;
-        }
-    }
-
-private:
-    Spec* m_spec;
-    size_t m_col_ndx;
-    bool m_nullable;
-};
-
-// We need an accessor that can read old Timestamp columns.
-// The new BPlusTree<Timestamp> uses a different layout
-class LegacyTS : private Array {
-public:
-    explicit LegacyTS(Allocator& allocator)
-        : Array(allocator)
-        , m_seconds(allocator)
-        , m_nanoseconds(allocator)
-    {
-        m_seconds.set_parent(this, 0);
-        m_nanoseconds.set_parent(this, 1);
-    }
-
-    using Array::set_parent;
-
-    void init_from_parent()
-    {
-        Array::init_from_parent();
-        m_seconds.init_from_parent();
-        m_nanoseconds.init_from_parent();
-    }
-
-    size_t size() const
-    {
-        return m_seconds.size();
-    }
-
-    Timestamp get(size_t ndx) const
-    {
-        util::Optional<int64_t> seconds = m_seconds.get(ndx);
-        return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
-    }
-
-private:
-    BPlusTree<util::Optional<Int>> m_seconds;
-    BPlusTree<Int> m_nanoseconds;
-};
-
-// Function that can retrieve a single value from the old columns
-Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusTreeBase* accessor)
-{
-    switch (col_type) {
-        case col_type_Int:
-            if (nullable) {
-                auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
-                return Mixed{val};
-            }
-            else {
-                return Mixed{static_cast<BPlusTree<Int>*>(accessor)->get(ndx)};
-            }
-        case col_type_Bool:
-            if (nullable) {
-                auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
-                return val ? Mixed{bool(*val)} : Mixed{};
-            }
-            else {
-                return Mixed{bool(static_cast<BPlusTree<Int>*>(accessor)->get(ndx))};
-            }
-        case col_type_Float:
-            return Mixed{static_cast<BPlusTree<float>*>(accessor)->get(ndx)};
-        case col_type_Double:
-            return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
-        case col_type_String: {
-            auto str = static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx);
-            // This is a workaround for a bug where the length could be -1
-            // Seen when upgrading very old file.
-            if (str.size() == size_t(-1)) {
-                return Mixed("");
-            }
-            return Mixed{str};
-        }
-        case col_type_Binary:
-            return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
-        default:
-            REALM_UNREACHABLE();
-    }
-}
-
-template <class T>
-void copy_list(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
-{
-    if (sub_table_ref) {
-        // Actual list is in the columns array position 0
-        Array cols(alloc);
-        cols.init_from_ref(sub_table_ref);
-        ref_type list_ref = cols.get_as_ref(0);
-        BPlusTree<T> from_list(alloc);
-        from_list.init_from_ref(list_ref);
-        size_t list_size = from_list.size();
-        auto l = obj.get_list<T>(col);
-        for (size_t j = 0; j < list_size; j++) {
-            l.add(from_list.get(j));
-        }
-    }
-}
-
-template <>
-void copy_list<util::Optional<Bool>>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
-{
-    if (sub_table_ref) {
-        // Actual list is in the columns array position 0
-        Array cols(alloc);
-        cols.init_from_ref(sub_table_ref);
-        BPlusTree<util::Optional<Int>> from_list(alloc);
-        from_list.set_parent(&cols, 0);
-        from_list.init_from_parent();
-        size_t list_size = from_list.size();
-        auto l = obj.get_list<util::Optional<Bool>>(col);
-        for (size_t j = 0; j < list_size; j++) {
-            util::Optional<Bool> val;
-            auto int_val = from_list.get(j);
-            if (int_val) {
-                val = (*int_val != 0);
-            }
-            l.add(val);
-        }
-    }
-}
-
-template <>
-void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
-{
-    if (sub_table_ref) {
-        // Actual list is in the columns array position 0
-        bool nullable = col.get_attrs().test(col_attr_Nullable);
-        Array cols(alloc);
-        cols.init_from_ref(sub_table_ref);
-        LegacyStringColumn from_list(alloc, nullptr, 0, nullable); // List of strings cannot be enumerated
-        from_list.set_parent(&cols, 0);
-        from_list.init_from_parent();
-        size_t list_size = from_list.size();
-        auto l = obj.get_list<String>(col);
-        for (size_t j = 0; j < list_size; j++) {
-            l.add(from_list.get_legacy(j));
-        }
-    }
-}
-
-template <>
-void copy_list<Timestamp>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
-{
-    if (sub_table_ref) {
-        // Actual list is in the columns array position 0
-        Array cols(alloc);
-        cols.init_from_ref(sub_table_ref);
-        LegacyTS from_list(alloc);
-        from_list.set_parent(&cols, 0);
-        from_list.init_from_parent();
-        size_t list_size = from_list.size();
-        auto l = obj.get_list<Timestamp>(col);
-        for (size_t j = 0; j < list_size; j++) {
-            l.add(from_list.get(j));
-        }
-    }
-}
-
-} // namespace
-
-void Table::create_columns()
-{
-    size_t cnt;
-    auto get_column_cnt = [&cnt](const Cluster* cluster) {
-        cnt = cluster->nb_columns();
-        return IteratorControl::Stop;
-    };
-    traverse_clusters(get_column_cnt);
-
-    size_t column_count = m_spec.get_column_count();
-    if (cnt != column_count) {
-        for (size_t col_ndx = 0; col_ndx < column_count; col_ndx++) {
-            m_clusters.insert_column(m_spec.get_key(col_ndx));
-        }
-    }
-}
-
-bool Table::migrate_objects()
-{
-    size_t nb_public_columns = m_spec.get_public_column_count();
-    size_t nb_columns = m_spec.get_column_count();
-    if (!nb_columns) {
-        // No columns - this means no objects
-        return true;
-    }
-
-    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
-    if (!top_ref) {
-        // Has already been done
-        return true;
-    }
-    Array col_refs(m_alloc);
-    col_refs.set_parent(&m_top, top_position_for_columns);
-    col_refs.init_from_ref(top_ref);
-
-    /************************ Create column accessors ************************/
-
-    std::map<ColKey, std::unique_ptr<BPlusTreeBase>> column_accessors;
-    std::map<ColKey, std::unique_ptr<LegacyTS>> ts_accessors;
-    std::map<ColKey, std::unique_ptr<BPlusTree<int64_t>>> list_accessors;
-    std::vector<size_t> cols_to_destroy;
-    bool has_link_columns = false;
-
-    // helper function to determine the number of objects in the table
-    size_t number_of_objects = (nb_columns == 0) ? 0 : size_t(-1);
-    auto update_size = [&number_of_objects](size_t s) {
-        if (number_of_objects == size_t(-1)) {
-            number_of_objects = s;
-        }
-        else {
-            REALM_ASSERT(s == number_of_objects);
-        }
-    };
-
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        if (col_ndx < nb_public_columns && m_spec.get_column_name(col_ndx) == "!ROW_INDEX") {
-            // If this column has been added, we can break here
-            break;
-        }
-
-        ColKey col_key = m_spec.get_key(col_ndx);
-        ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
-        ColumnType col_type = m_spec.get_column_type(col_ndx);
-        bool nullable = attr.test(col_attr_Nullable);
-        std::unique_ptr<BPlusTreeBase> acc;
-        std::unique_ptr<LegacyTS> ts_acc;
-        std::unique_ptr<BPlusTree<int64_t>> list_acc;
-
-        if (!(col_ndx < col_refs.size())) {
-            throw RuntimeError(ErrorCodes::BrokenInvariant,
-                               util::format("Objects in '%1' corrupted by previous upgrade attempt", get_name()));
-        }
-
-        if (!col_refs.get(col_ndx)) {
-            // This column has been migrated
-            continue;
-        }
-
-        if (attr.test(col_attr_List) && col_type != col_type_LinkList) {
-            list_acc = std::make_unique<BPlusTree<int64_t>>(m_alloc);
-        }
-        else {
-            switch (col_type) {
-                case col_type_Int:
-                case col_type_Bool:
-                    if (nullable) {
-                        acc = std::make_unique<BPlusTree<util::Optional<Int>>>(m_alloc);
-                    }
-                    else {
-                        acc = std::make_unique<BPlusTree<Int>>(m_alloc);
-                    }
-                    break;
-                case col_type_Float:
-                    acc = std::make_unique<BPlusTree<float>>(m_alloc);
-                    break;
-                case col_type_Double:
-                    acc = std::make_unique<BPlusTree<double>>(m_alloc);
-                    break;
-                case col_type_String:
-                    acc = std::make_unique<LegacyStringColumn>(m_alloc, &m_spec, col_ndx, nullable);
-                    break;
-                case col_type_Binary:
-                    acc = std::make_unique<BPlusTree<Binary>>(m_alloc);
-                    break;
-                case col_type_Timestamp: {
-                    ts_acc = std::make_unique<LegacyTS>(m_alloc);
-                    break;
-                }
-                case col_type_Link:
-                case col_type_LinkList: {
-                    BPlusTree<int64_t> arr(m_alloc);
-                    arr.set_parent(&col_refs, col_ndx);
-                    arr.init_from_parent();
-                    update_size(arr.size());
-                    has_link_columns = true;
-                    break;
-                }
-                case col_type_BackLink: {
-                    BPlusTree<int64_t> arr(m_alloc);
-                    arr.set_parent(&col_refs, col_ndx);
-                    arr.init_from_parent();
-                    update_size(arr.size());
-                    cols_to_destroy.push_back(col_ndx);
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-
-        if (acc) {
-            acc->set_parent(&col_refs, col_ndx);
-            acc->init_from_parent();
-            update_size(acc->size());
-            column_accessors.emplace(col_key, std::move(acc));
-            cols_to_destroy.push_back(col_ndx);
-        }
-        if (ts_acc) {
-            ts_acc->set_parent(&col_refs, col_ndx);
-            ts_acc->init_from_parent();
-            update_size(ts_acc->size());
-            ts_accessors.emplace(col_key, std::move(ts_acc));
-            cols_to_destroy.push_back(col_ndx);
-        }
-        if (list_acc) {
-            list_acc->set_parent(&col_refs, col_ndx);
-            list_acc->init_from_parent();
-            update_size(list_acc->size());
-            list_accessors.emplace(col_key, std::move(list_acc));
-            cols_to_destroy.push_back(col_ndx);
-        }
-    }
-
-    REALM_ASSERT(number_of_objects != size_t(-1));
-
-    if (m_clusters.size() == number_of_objects) {
-        // We have migrated all objects
-        return !has_link_columns;
-    }
-
-    // !OID column must not be present. Such columns are only present in syncked
-    // realms, which we cannot upgrade.
-    REALM_ASSERT(nb_public_columns == 0 || m_spec.get_column_name(0) != "!OID");
-
-    /*************************** Create objects ******************************/
-
-    for (size_t row_ndx = 0; row_ndx < number_of_objects; row_ndx++) {
-        // Build a vector of values obtained from the old columns
-        FieldValues init_values;
-        for (auto& it : column_accessors) {
-            auto col_key = it.first;
-            auto col_type = col_key.get_type();
-            auto nullable = col_key.get_attrs().test(col_attr_Nullable);
-            auto val = get_val_from_column(row_ndx, col_type, nullable, it.second.get());
-            init_values.insert(col_key, val);
-        }
-        for (auto& it : ts_accessors) {
-            init_values.insert(it.first, Mixed(it.second->get(row_ndx)));
-        }
-
-        // Create object with the initial values
-        Obj obj = m_clusters.insert(ObjKey(row_ndx), init_values);
-
-        // Then update possible list types
-        for (auto& it : list_accessors) {
-            switch (it.first.get_type()) {
-                case col_type_Int: {
-                    if (it.first.get_attrs().test(col_attr_Nullable)) {
-                        copy_list<util::Optional<int64_t>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    }
-                    else {
-                        copy_list<int64_t>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    }
-                    break;
-                }
-                case col_type_Bool:
-                    if (it.first.get_attrs().test(col_attr_Nullable)) {
-                        copy_list<util::Optional<Bool>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    }
-                    else {
-                        copy_list<Bool>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    }
-                    break;
-                case col_type_Float:
-                    copy_list<float>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    break;
-                case col_type_Double:
-                    copy_list<double>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    break;
-                case col_type_String:
-                    copy_list<String>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    break;
-                case col_type_Binary:
-                    copy_list<Binary>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    break;
-                case col_type_Timestamp: {
-                    copy_list<Timestamp>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-    }
-
-    // Destroy values in the old columns that has been copied.
-    // This frees up space in the file
-    for (auto ndx : cols_to_destroy) {
-        Array::destroy_deep(to_ref(col_refs.get(ndx)), m_alloc);
-        col_refs.set(ndx, 0);
-    }
-
-    // We need to be sure that the stored 'next sequence number' is bigger than
-    // the biggest ObjKey currently used.
-    this->set_sequence_number(uint64_t(number_of_objects));
-
-#if 0
-    if (fastrand(100) < 20) {
-        throw std::runtime_error("Upgrade interrupted"); // Can be used for testing
-    }
-#endif
-    return !has_link_columns;
-}
-
-void Table::migrate_links()
-{
-    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
-    if (!top_ref) {
-        // All objects migrated
-        return;
-    }
-
-    Array col_refs(m_alloc);
-    col_refs.set_parent(&m_top, top_position_for_columns);
-    col_refs.init_from_ref(top_ref);
-
-    // Cache column accessors and other information
-    size_t nb_columns = m_spec.get_public_column_count();
-    std::vector<std::unique_ptr<BPlusTree<Int>>> link_column_accessors(nb_columns);
-    std::vector<ColKey> col_keys(nb_columns);
-    std::vector<ColumnType> col_types(nb_columns);
-    std::vector<Table*> target_tables(nb_columns);
-    std::vector<ColKey> opposite_orig_row_ndx_col(nb_columns);
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        ColumnType col_type = m_spec.get_column_type(col_ndx);
-
-        if (is_link_type(col_type)) {
-            link_column_accessors[col_ndx] = std::make_unique<BPlusTree<int64_t>>(m_alloc);
-            link_column_accessors[col_ndx]->set_parent(&col_refs, col_ndx);
-            link_column_accessors[col_ndx]->init_from_parent();
-            col_keys[col_ndx] = m_spec.get_key(col_ndx);
-            col_types[col_ndx] = col_type;
-            target_tables[col_ndx] = get_opposite_table(col_keys[col_ndx]).unchecked_ptr();
-            opposite_orig_row_ndx_col[col_ndx] = target_tables[col_ndx]->get_column_key("!ROW_INDEX");
-        }
-    }
-
-    auto orig_row_ndx_col_key = get_column_key("!ROW_INDEX");
-    for (auto obj : *this) {
-        for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-            if (col_keys[col_ndx]) {
-                // If no !ROW_INDEX column is found, the original row index number is
-                // equal to the ObjKey value
-                size_t orig_row_ndx =
-                    size_t(orig_row_ndx_col_key ? obj.get<Int>(orig_row_ndx_col_key) : obj.get_key().value);
-                // Get original link value
-                int64_t link_val = link_column_accessors[col_ndx]->get(orig_row_ndx);
-
-                Table* target_table = target_tables[col_ndx];
-                ColKey search_col = opposite_orig_row_ndx_col[col_ndx];
-                auto get_target_key = [target_table, search_col](int64_t orig_link_val) -> ObjKey {
-                    if (search_col)
-                        return target_table->find_first_int(search_col, orig_link_val);
-                    else
-                        return ObjKey(orig_link_val);
-                };
-
-                if (link_val) {
-                    if (col_types[col_ndx] == col_type_Link) {
-                        obj.set(col_keys[col_ndx], get_target_key(link_val - 1));
-                    }
-                    else {
-                        auto ll = obj.get_linklist(col_keys[col_ndx]);
-                        BPlusTree<Int> links(m_alloc);
-                        links.init_from_ref(ref_type(link_val));
-                        size_t nb_links = links.size();
-                        for (size_t j = 0; j < nb_links; j++) {
-                            ll.add(get_target_key(links.get(j)));
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-void Table::finalize_migration(ColKey pk_col_key)
-{
-    if (ref_type ref = m_top.get_as_ref(top_position_for_columns)) {
-        Array::destroy_deep(ref, m_alloc);
-        m_top.set(top_position_for_columns, 0);
-    }
-
-    if (auto orig_row_ndx_col = get_column_key("!ROW_INDEX")) {
-        remove_column(orig_row_ndx_col);
-    }
-
-    if (auto oid_col = get_column_key("!OID")) {
-        remove_column(oid_col);
-    }
-
-    REALM_ASSERT_RELEASE(!pk_col_key || valid_column(pk_col_key));
-    do_set_primary_key_column(pk_col_key);
-}
 
 void Table::migrate_sets_and_dictionaries()
 {
@@ -2019,6 +1299,57 @@ void Table::migrate_sets_and_dictionaries()
                     dict.migrate();
                 }
             }
+        }
+    }
+}
+
+void Table::migrate_set_orderings()
+{
+    std::vector<ColKey> to_migrate;
+    for (auto col : get_column_keys()) {
+        if (col.is_set() && (col.get_type() == col_type_Mixed || col.get_type() == col_type_String ||
+                             col.get_type() == col_type_Binary)) {
+            to_migrate.push_back(col);
+        }
+    }
+    if (to_migrate.size()) {
+        for (auto obj : *this) {
+            for (auto col : to_migrate) {
+                if (col.get_type() == col_type_Mixed) {
+                    auto set = obj.get_set<Mixed>(col);
+                    set.migration_resort();
+                }
+                else if (col.get_type() == col_type_Binary) {
+                    auto set = obj.get_set<BinaryData>(col);
+                    set.migration_resort();
+                }
+                else {
+                    REALM_ASSERT_3(col.get_type(), ==, col_type_String);
+                    auto set = obj.get_set<String>(col);
+                    set.migration_resort();
+                }
+            }
+        }
+    }
+}
+
+void Table::migrate_col_keys()
+{
+    if (m_spec.migrate_column_keys()) {
+        build_column_mapping();
+    }
+
+    // Fix also m_opposite_column col_keys
+    ColumnType col_type_LinkList(13);
+    auto sz = m_opposite_column.size();
+
+    for (size_t n = 0; n < sz; n++) {
+        ColKey col_key(m_opposite_column.get(n));
+        if (col_key.get_type() == col_type_LinkList) {
+            auto attrs = col_key.get_attrs();
+            REALM_ASSERT(attrs.test(col_attr_List));
+            ColKey new_key(col_key.get_index(), col_type_Link, attrs, col_key.get_tag());
+            m_opposite_column.set(n, new_key.value);
         }
     }
 }
@@ -2365,6 +1696,19 @@ std::optional<Mixed> Table::max(ColKey col_key, ObjKey* return_ndx) const
     return AggregateHelper<Table>::max(*this, *this, col_key, return_ndx);
 }
 
+
+SearchIndex* Table::get_search_index(ColKey col) const noexcept
+{
+    check_column(col);
+    return m_index_accessors[col.get_index().val].get();
+}
+
+StringIndex* Table::get_string_index(ColKey col) const noexcept
+{
+    check_column(col);
+    return dynamic_cast<StringIndex*>(m_index_accessors[col.get_index().val].get());
+}
+
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const
 {
@@ -2375,7 +1719,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     }
     // You cannot call GetIndexData on ObjKey
     if constexpr (!std::is_same_v<T, ObjKey>) {
-        if (StringIndex* index = get_search_index(col_key)) {
+        if (SearchIndex* index = get_search_index(col_key)) {
             return index->find_first(value);
         }
         if (col_key == m_primary_key_col) {
@@ -2646,12 +1990,10 @@ void Table::update_from_parent() noexcept
     m_alloc.bump_storage_version();
 }
 
-void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const
+void Table::schema_to_json(std::ostream& out) const
 {
     out << "{";
     auto name = get_name();
-    if (renames.count(name))
-        name = renames.at(name);
     out << "\"name\":\"" << name << "\"";
     if (this->m_primary_key_col) {
         out << ",";
@@ -2665,15 +2007,11 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         auto col_key = col_keys[i];
         name = get_column_name(col_key);
         auto type = col_key.get_type();
-        if (renames.count(name))
-            name = renames.at(name);
         out << "{";
         out << "\"name\":\"" << name << "\"";
         if (this->is_link_type(type)) {
             out << ",\"type\":\"object\"";
             name = this->get_opposite_table(col_key)->get_name();
-            if (renames.count(name))
-                name = renames.at(name);
             out << ",\"objectType\":\"" << name << "\"";
         }
         else {
@@ -2707,27 +2045,6 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
     }
     out << "]}";
 }
-
-void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                    JSONOutputMode output_mode) const
-{
-    // Represent table as list of objects
-    out << "[";
-    bool first = true;
-
-    for (auto& obj : *this) {
-        if (first) {
-            first = false;
-        }
-        else {
-            out << ",";
-        }
-        obj.to_json(out, link_depth, renames, output_mode);
-    }
-
-    out << "]";
-}
-
 
 bool Table::operator==(const Table& t) const
 {
@@ -3830,7 +3147,6 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_Link:
             case type_TypedLink:
-            case type_LinkList:
                 // Can't have lists of these types
             case type_Mixed:
                 // These types are no longer supported at all
@@ -3888,8 +3204,6 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_TypedLink:
             case type_Link:
                 // Always nullable, so can't convert
-            case type_LinkList:
-                // Never nullable, so can't convert
             case type_Mixed:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();

@@ -32,20 +32,14 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][sessio
     if (!EventLoop::has_implementation())
         return;
 
-    const std::string dummy_device_id = "123400000000000000000000";
-
-    // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager::Config config;
-    config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
-    TestSyncManager init_sync_manager(config, {false});
-    auto& server = init_sync_manager.sync_server();
-    auto sync_manager = init_sync_manager.app()->sync_manager();
+    TestSyncManager tsm({}, {false});
+    auto& server = tsm.sync_server();
+    auto sync_manager = tsm.sync_manager();
     std::atomic<bool> handler_called(false);
 
     SECTION("works properly when called after the session is bound") {
         server.start();
-        auto user = sync_manager->get_user("user-async-wait-download-1", ENCODE_FAKE_JWT("not_a_real_token"),
-                                           ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
+        auto user = tsm.fake_user();
         auto session = sync_session(user, "/async-wait-download-1", [](auto, auto) {});
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
@@ -61,9 +55,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][sessio
 
     SECTION("works properly when called on a logged-out session") {
         server.start();
-        const auto user_id = "user-async-wait-download-3";
-        auto user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
-                                           ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
+        auto user = tsm.fake_user();
         auto session = sync_session(user, "/user-async-wait-download-3", [](auto, auto) {});
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
@@ -80,8 +72,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][sessio
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
-                                      ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
         });
@@ -92,8 +83,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][sessio
     }
 
     SECTION("aborts properly when queued and the session errors out") {
-        auto user = sync_manager->get_user("user-async-wait-download-4", ENCODE_FAKE_JWT("not_a_real_token"),
-                                           ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
+        auto user = tsm.fake_user();
         std::atomic<int> error_count(0);
         std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-download-4", [&](auto, auto) {
             ++error_count;
@@ -120,22 +110,14 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session]
     if (!EventLoop::has_implementation())
         return;
 
-    const std::string dummy_device_id = "123400000000000000000000";
-
-    // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager::Config config;
-    config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
-    config.should_teardown_test_directory = false;
-    SyncServer::Config server_config = {false};
-    TestSyncManager init_sync_manager(config, server_config);
-    auto& server = init_sync_manager.sync_server();
-    auto sync_manager = init_sync_manager.app()->sync_manager();
+    TestSyncManager tsm({}, {false});
+    auto& server = tsm.sync_server();
+    auto sync_manager = tsm.sync_manager();
     std::atomic<bool> handler_called(false);
 
     SECTION("works properly when called after the session is bound") {
         server.start();
-        auto user = sync_manager->get_user("user-async-wait-upload-1", ENCODE_FAKE_JWT("not_a_real_token"),
-                                           ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
+        auto user = tsm.fake_user();
         auto session = sync_session(user, "/async-wait-upload-1", [](auto, auto) {});
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
@@ -151,9 +133,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session]
 
     SECTION("works properly when called on a logged-out session") {
         server.start();
-        const auto user_id = "user-async-wait-upload-3";
-        auto user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
-                                           ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
+        auto user = tsm.fake_user();
         auto session = sync_session(user, "/user-async-wait-upload-3", [](auto, auto) {});
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
@@ -170,8 +150,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session]
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
-                                      ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
         });

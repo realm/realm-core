@@ -77,6 +77,11 @@ private:
 };
 } // namespace
 
+bool RealmConfig::needs_file_format_upgrade() const
+{
+    return DB::needs_file_format_upgrade(path, encryption_key);
+}
+
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
              Private)
     : m_config(std::move(config))
@@ -293,8 +298,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
 
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
-            if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version, false);
+            verify_schema_version_not_decreasing(version);
             return true;
 
         case SchemaMode::Immutable:
@@ -324,8 +328,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
         }
 
         case SchemaMode::Manual:
-            if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version, false);
+            verify_schema_version_not_decreasing(version);
             if (version == m_schema_version) {
                 ObjectStore::verify_no_changes_required(changes);
                 REALM_UNREACHABLE(); // changes is non-empty so above line always throws
@@ -333,6 +336,17 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             return true;
     }
     REALM_COMPILER_HINT_UNREACHABLE();
+}
+
+// Schema version is not allowed to decrease for local and pbs realms.
+void Realm::verify_schema_version_not_decreasing(uint64_t version)
+{
+#if REALM_ENABLE_SYNC
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested)
+        return;
+#endif
+    if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
+        throw InvalidSchemaVersionException(m_schema_version, version, false);
 }
 
 Schema Realm::get_full_schema()
@@ -751,7 +765,7 @@ void Realm::run_writes_on_proper_thread()
 
 void Realm::call_completion_callbacks()
 {
-    if (m_is_running_async_commit_completions) {
+    if (m_is_running_async_commit_completions || m_async_commit_q.empty()) {
         return;
     }
 

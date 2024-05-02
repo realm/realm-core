@@ -34,7 +34,8 @@ void create_fifo(std::string_view path); // throws
 bool try_create_fifo(std::string_view path, bool has_more_fallbacks = true);
 
 // Ensure that a path representing a directory ends with `/`
-inline std::string normalize_dir(const std::string& path) {
+inline std::string normalize_dir(const std::string& path)
+{
     return (!path.empty() && path.back() != '/') ? path + '/' : path;
 }
 

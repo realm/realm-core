@@ -69,6 +69,7 @@ inline std::string format_utc_time(std::time_t time, const char* format)
 
 } // namespace realm::util
 
+#if __cplusplus < 202002L
 // This is a C++17 version of https://en.cppreference.com/w/cpp/chrono/duration/operator_ltlt to make
 // logging and comparing durations easier - especially in tests.
 //
@@ -112,4 +113,5 @@ std::ostream& operator<<(std::basic_ostream<CharT, Traits>& os, const std::chron
 }
 
 } // namespace std::chrono
+#endif // __cplusplus < 202002L
 #endif // REALM_UTIL_TIME_HPP

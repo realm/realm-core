@@ -53,8 +53,7 @@ using namespace realm::util;
 
 namespace {
 
-struct EndOfFile {
-};
+struct EndOfFile {};
 
 enum INS {
     ADD_TABLE,
@@ -199,9 +198,6 @@ std::string create_column_name(DataType t)
             break;
         case type_TypedLink:
             str = "typed_link_";
-            break;
-        case type_LinkList:
-            str = "link_list_";
             break;
         case type_UUID:
             str = "uuid_";
@@ -432,7 +428,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, std:
                 TableKey table_key_2 = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t1 = wt->get_table(table_key_1);
                 TableRef t2 = wt->get_table(table_key_2);
-                std::string name = create_column_name(type_LinkList);
+                std::string name = create_column_name(type_Link);
                 if (log) {
                     *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
                          << "\", *wt->get_table(" << table_key_2 << "));";
@@ -533,37 +529,40 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, std:
                             obj.set<double>(col, value);
                         }
                         else if (type == type_Link) {
-                            TableRef target = t->get_link_target(col);
-                            if (target->size() > 0) {
-                                ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
-                                if (log) {
-                                    *log << "obj.set<Key>(" << col << ", " << target_key << ");\n";
-                                }
-                                obj.set(col, target_key);
-                            }
-                        }
-                        else if (type == type_LinkList) {
-                            TableRef target = t->get_link_target(col);
-                            if (target->size() > 0) {
-                                LnkLst links = obj.get_linklist(col);
-                                ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
-                                // either add or set, 50/50 probability
-                                if (links.size() > 0 && get_next(s) > 128) {
-                                    size_t linklist_row = get_next(s) % links.size();
-                                    if (log) {
-                                        *log << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", "
-                                             << target_key << ");\n";
+                            if (col.is_list()) {
+                                TableRef target = t->get_link_target(col);
+                                if (target->size() > 0) {
+                                    LnkLst links = obj.get_linklist(col);
+                                    ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
+                                    // either add or set, 50/50 probability
+                                    if (links.size() > 0 && get_next(s) > 128) {
+                                        size_t linklist_row = get_next(s) % links.size();
+                                        if (log) {
+                                            *log << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", "
+                                                 << target_key << ");\n";
+                                        }
+                                        links.set(linklist_row, target_key);
                                     }
-                                    links.set(linklist_row, target_key);
-                                }
-                                else {
-                                    if (log) {
-                                        *log << "obj.get_linklist(" << col << ")->add(" << target_key << ");\n";
+                                    else {
+                                        if (log) {
+                                            *log << "obj.get_linklist(" << col << ")->add(" << target_key << ");\n";
+                                        }
+                                        links.add(target_key);
                                     }
-                                    links.add(target_key);
                                 }
                             }
+                            else {
+                                TableRef target = t->get_link_target(col);
+                                if (target->size() > 0) {
+                                    ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
+                                    if (log) {
+                                        *log << "obj.set<Key>(" << col << ", " << target_key << ");\n";
+                                    }
+                                    obj.set(col, target_key);
+                                }
+                            }
                         }
+
                         else if (type == type_Timestamp) {
                             std::pair<int64_t, int32_t> values = get_timestamp_values(s);
                             Timestamp value{values.first, values.second};

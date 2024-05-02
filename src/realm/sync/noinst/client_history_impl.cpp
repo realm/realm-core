@@ -38,7 +38,7 @@
 
 namespace realm::sync {
 
-void ClientHistory::set_client_reset_adjustments(
+void ClientHistory::set_history_adjustments(
     util::Logger& logger, version_type current_version, SaltedFileIdent client_file_ident,
     SaltedVersion server_version, const std::vector<_impl::client_reset::RecoveredChange>& recovered_changesets)
 {
@@ -53,7 +53,7 @@ void ClientHistory::set_client_reset_adjustments(
     size_t uploadable_bytes = 0;
     if (recovered_changesets.empty()) {
         // Either we had nothing to upload or we're discarding the unsynced changes
-        logger.debug("Client reset adjustments: discarding %1 history entries", sync_history_size());
+        logger.debug("History adjustments: discarding %1 history entries", sync_history_size());
         do_trim_sync_history(sync_history_size()); // Throws
     }
     else {
@@ -66,9 +66,9 @@ void ClientHistory::set_client_reset_adjustments(
         do_trim_sync_history(discard_count);
 
         if (logger.would_log(util::Logger::Level::debug)) {
-            logger.debug("Client reset adjustments: trimming %1 history entries and updating %2 of %3 remaining "
-                         "history entries:",
-                         discard_count, recovered_changesets.size(), sync_history_size());
+            logger.debug("History adjustments: trimming %1 history entries and updating the remaining history "
+                         "entries (%2)",
+                         discard_count, sync_history_size());
             for (size_t i = 0, size = m_arrays->changesets.size(); i < size; ++i) {
                 logger.debug("- %1: ident(%2) changeset_size(%3) remote_version(%4)", i,
                              m_arrays->origin_file_idents.get(i), m_arrays->changesets.get(i).size(),
@@ -83,13 +83,18 @@ void ClientHistory::set_client_reset_adjustments(
             auto i = size_t(version - m_sync_history_base_version);
             util::compression::allocate_and_compress_nonportable(arena, changeset, compressed);
             m_arrays->changesets.set(i, BinaryData{compressed.data(), compressed.size()}); // Throws
-            m_arrays->remote_versions.set(i, server_version.version);
             m_arrays->reciprocal_transforms.set(i, BinaryData());
-            logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version,
-                         compressed.size(), server_version.version);
+        }
+        // Server version is updated for *every* entry in the sync history to ensure that server versions don't
+        // decrease.
+        for (size_t i = 0, size = m_arrays->remote_versions.size(); i < size; ++i) {
+            m_arrays->remote_versions.set(i, server_version.version);
+            version_type version = m_sync_history_base_version + i;
+            logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version + 1,
+                         m_arrays->changesets.get(i).size(), server_version.version);
         }
     }
-    logger.debug("New uploadable bytes after client reset adjustment: %1", uploadable_bytes);
+    logger.debug("New uploadable bytes after history adjustment: %1", uploadable_bytes);
 
     // Client progress versions are set to 0 to signal to the server that we've
     // reset our versioning. If we send the actual values, the server would
@@ -227,7 +232,7 @@ void ClientHistory::compress_stored_changesets()
     using gf = _impl::GroupFriend;
     Allocator& alloc = gf::get_alloc(*m_group);
     auto ref = gf::get_history_ref(*m_group);
-    Arrays arrays{alloc, *m_group, ref};
+    Arrays arrays{alloc, m_group, ref};
 
     util::AppendBuffer<char> compressed_buffer;
     util::AppendBuffer<char> decompressed_buffer;
@@ -362,7 +367,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
     ref_type ref = gf::get_history_ref(*rt);
     REALM_ASSERT(ref);
 
-    Arrays arrays(alloc, *rt, ref);
+    Arrays arrays(alloc, rt.get(), ref);
     const auto sync_history_size = arrays.changesets.size();
     const auto sync_history_base_version = rt->get_version() - sync_history_size;
 
@@ -529,7 +534,8 @@ void ClientHistory::integrate_server_changesets(
             new_version = transact->commit_and_continue_as_read(); // Throws
         }
 
-        logger.debug("Integrated %1 changesets out of %2", changesets_transformed_count, num_changesets);
+        logger.debug(util::LogCategory::changeset, "Integrated %1 changesets out of %2", changesets_transformed_count,
+                     num_changesets);
     }
 
     REALM_ASSERT(new_version.version > 0);
@@ -583,7 +589,7 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
             InstructionApplier applier{*transact};
             {
                 TempShortCircuitReplication tscr{m_replication};
-                applier.apply(*transformed_changeset, &logger); // Throws
+                applier.apply(*transformed_changeset); // Throws
             }
             downloaded_bytes += transformed_changeset->original_changeset_size;
 
@@ -1233,8 +1239,7 @@ void ClientHistory::update_from_ref_and_version(ref_type ref, version_type versi
         m_arrays->init_from_ref(ref);
     }
     else {
-        REALM_ASSERT_RELEASE(m_group);
-        m_arrays.emplace(m_db->get_alloc(), *m_group, ref);
+        m_arrays.emplace(m_db->get_alloc(), m_group, ref);
     }
 
     m_ct_history_base_version = version - ct_history_size();
@@ -1389,12 +1394,13 @@ ClientHistory::Arrays::Arrays(DB& db, Group& group)
     dg.release();
 }
 
-ClientHistory::Arrays::Arrays(Allocator& alloc, Group& parent, ref_type ref)
+ClientHistory::Arrays::Arrays(Allocator& alloc, Group* parent, ref_type ref)
     : Arrays(alloc)
 {
     using gf = _impl::GroupFriend;
     root.init_from_ref(ref);
-    gf::set_history_parent(parent, root);
+    if (parent)
+        gf::set_history_parent(*parent, root);
 
     ct_history.set_parent(&root, s_ct_history_iip);
     changesets.set_parent(&root, s_changesets_iip);

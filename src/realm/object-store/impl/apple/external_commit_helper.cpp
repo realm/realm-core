@@ -170,7 +170,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const Realm
     m_shutdown_read_fd = shutdown_pipe[0];
     m_shutdown_write_fd = shutdown_pipe[1];
 
-    m_thread = std::thread([=] {
+    m_thread = std::thread([this] {
         try {
             listen();
         }

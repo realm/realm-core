@@ -46,6 +46,12 @@ using namespace realm;
 using namespace realm::util;
 namespace cf = realm::collection_fixtures;
 
+// Dummy implementation to satisfy StringifyingContext
+inline std::ostream& operator<<(std::ostream& out, const realm::object_store::Collection&)
+{
+    return out;
+}
+
 struct StringifyingContext {
     template <typename T>
     std::string box(T value)
@@ -103,13 +109,6 @@ struct StringMaker<Results> {
         return str;
     }
 };
-template <>
-struct StringMaker<util::None> {
-    static std::string convert(util::None)
-    {
-        return "[none]";
-    }
-};
 } // namespace Catch
 
 TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
@@ -125,7 +124,6 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
     using Boxed = typename TestType::Boxed;
 
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Array | TestType::property_type}}},
@@ -816,24 +814,32 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         if (!util::EventLoop::has_implementation())
             return;
 
-        SyncServer server;
-        SyncTestFile sync_config(server, "shared");
-        sync_config.schema = config.schema;
+        TestSyncManager init_sync_manager({}, {false});
+        auto& server = init_sync_manager.sync_server();
+        SyncTestFile sync_config(init_sync_manager, "shared");
+        sync_config.schema = Schema{
+            {"object",
+             {{"value", PropertyType::Array | TestType::property_type},
+              {"_id", PropertyType::Int, Property::IsPrimary{true}}}},
+        };
         sync_config.schema_version = 0;
+        server.start();
 
         {
             auto r = Realm::get_shared_realm(sync_config);
             r->begin_transaction();
 
             CppContext ctx(r);
-            auto obj = Object::create(ctx, r, *r->schema().find("object"), std::any(AnyDict{}));
+            auto obj = Object::create(ctx, r, *r->schema().find("object"), std::any(AnyDict{{"_id", INT64_C(5)}}));
             auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
             list.add(static_cast<T>(values[0]));
 
             r->commit_transaction();
             wait_for_upload(*r);
+            wait_for_download(*r);
         }
 
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
         util::File::remove(sync_config.path);
 
         {
@@ -855,7 +861,6 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
 TEST_CASE("list of mixed links", "[primitives]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable}}},
@@ -988,4 +993,62 @@ TEST_CASE("list of mixed links", "[primitives]") {
             REQUIRE(local_changes.deletions.count() == 0);
         }
     }
+}
+
+TEST_CASE("list of strings - with index", "[primitives]") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object",
+         {{"strings", PropertyType::Array | PropertyType::String, Property::IsPrimary{false},
+           Property::IsIndexed{true}}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    ColKey col = table->get_column_key("strings");
+    Results has_banana(r, table->query("strings = 'Banana'"));
+    Results has_pear(r, table->query("strings = 'Pear'"));
+
+    auto write = [&](auto&& fn) {
+        r->begin_transaction();
+        fn();
+        r->commit_transaction();
+    };
+
+    r->begin_transaction();
+    Obj obj = table->create_object();
+    List list(r, obj, col);
+    r->commit_transaction();
+
+    write([&] {
+        list.add(StringData("Banana"));
+        list.add(StringData("Apple"));
+        list.add(StringData("Orange"));
+    });
+
+    CHECK(has_banana.size() == 1);
+    CHECK(has_pear.size() == 0);
+
+    write([&] {
+        list.set(0, StringData("Pear")); // Add Pear - remove banana
+        list.add(StringData("Pear"));    // Already there
+        list.add(StringData("Grape"));   // Add
+    });
+    CHECK(has_banana.size() == 0);
+    CHECK(has_pear.size() == 1);
+
+    write([&] {
+        list.set(1, StringData("Orange")); // Already Orange - remove Apple
+        list.set(3, StringData("Banana")); // Add Banana - keep Pear
+    });
+    CHECK(has_banana.size() == 1);
+    CHECK(has_pear.size() == 1);
+
+    write([&] {
+        list.set(2, StringData("Banana")); // No change in index
+    });
+    CHECK(has_banana.size() == 1);
+    CHECK(has_pear.size() == 1);
 }

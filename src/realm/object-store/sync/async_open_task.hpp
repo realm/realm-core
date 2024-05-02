@@ -52,13 +52,15 @@ public:
     //
     // If multiple AsyncOpenTasks all attempt to download the same Realm and one of them is canceled,
     // the other tasks will receive a "Cancelled" exception.
-    void start(AsyncOpenCallback async_open_complete) REQUIRES(!m_mutex);
+    void start(AsyncOpenCallback callback) REQUIRES(!m_mutex);
 
     // Cancels the download and stops the session. No further functions should be called on this class.
     void cancel() REQUIRES(!m_mutex);
 
-    uint64_t register_download_progress_notifier(
-        std::function<void(uint64_t transferred_bytes, uint64_t transferrable_bytes)>&& callback) REQUIRES(!m_mutex);
+    using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes,
+                                          double progress_estimate);
+    uint64_t register_download_progress_notifier(std::function<ProgressNotifierCallback>&& callback)
+        REQUIRES(!m_mutex);
     void unregister_download_progress_notifier(uint64_t token) REQUIRES(!m_mutex);
 
 private:
@@ -68,12 +70,16 @@ private:
         REQUIRES(!m_mutex);
     void attach_to_subscription_initializer(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, bool)
         REQUIRES(!m_mutex);
+    void migrate_schema_or_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
+        REQUIRES(!m_mutex);
+    void wait_for_bootstrap_or_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
+        REQUIRES(!m_mutex);
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator GUARDED_BY(m_mutex);
     std::shared_ptr<SyncSession> m_session GUARDED_BY(m_mutex);
     std::vector<uint64_t> m_registered_callbacks GUARDED_BY(m_mutex);
-    mutable util::CheckedMutex m_mutex;
-    bool m_db_first_open{true};
+    util::CheckedMutex m_mutex;
+    const bool m_db_first_open;
 };
 
 } // namespace realm

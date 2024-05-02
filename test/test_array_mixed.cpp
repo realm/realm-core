@@ -102,7 +102,7 @@ TEST(ArrayMixed_Basics)
     arr.erase(5); // Erase string
     CHECK_EQUAL(arr.get(5).get_binary(), BinaryData(bin.data(), bin.size()));
 
-    arr.insert(2, Mixed());    // null
+    arr.insert(2, Mixed());             // null
     arr.insert(2, int64_t(4500000000)); // Requires more than 32 bit
 
     CHECK_EQUAL(arr.get(2).get_int(), 4500000000);
@@ -219,7 +219,7 @@ TEST(Mixed_Compare)
     CHECK_EQUAL(Mixed(2.2f), Mixed(Decimal128(2.2f)));
 
     std::string str("Hello");
-    CHECK(Mixed(str) == Mixed(BinaryData(str)));
+    CHECK(Mixed(str) != Mixed(BinaryData(str)));
     CHECK_NOT(Mixed::types_are_comparable(Mixed(), Mixed()));
     CHECK(Mixed() == Mixed());
     CHECK(Mixed(0.f) < Mixed(1));
@@ -227,10 +227,32 @@ TEST(Mixed_Compare)
     CHECK(Mixed(0.f) < Mixed("a"));
     CHECK(Mixed(10.0) < Mixed(BinaryData("b")));
     CHECK(Mixed("a") < Mixed(BinaryData("b")));
-    CHECK(Mixed(BinaryData("b")) < Mixed("c"));
+    CHECK(Mixed("c") < Mixed(BinaryData("b")));
     CHECK(Mixed("a") < Mixed(Timestamp(1, 2)));
     CHECK(Mixed(Decimal128("25")) < Mixed(Timestamp(1, 2)));
     CHECK(Mixed(Timestamp(2, 3)) < Mixed(ObjectId(Timestamp(1, 2), 0, 0))); // Not value comparable
+}
+
+TEST(Mixed_string_binary_compare)
+{
+    const auto a = Mixed("a");
+    const auto b = Mixed("B");
+    const auto c = Mixed(BinaryData("C", 1));
+
+    CHECK_GREATER(a.compare(b), 0);
+    CHECK_LESS(b.compare(c), 0);
+    CHECK_GREATER(c.compare(a), 0);
+
+    std::vector<std::array<Mixed, 3>> perms = {
+        {a, b, c}, {a, c, b}, {b, a, c}, // vars[2] is the expected ordering
+        {b, c, a}, {c, a, b}, {c, b, a},
+    };
+    for (auto& arr : perms) {
+        std::sort(arr.begin(), arr.end());
+        CHECK_EQUAL(arr[0], perms[2][0]);
+        CHECK_EQUAL(arr[1], perms[2][1]);
+        CHECK_EQUAL(arr[2], perms[2][2]);
+    }
 }
 
 // This test takes ~10 minutes in a Release build so it's disabled by default

@@ -36,12 +36,18 @@
 
 namespace realm {
 class Mixed;
+class List;
 class Class;
 class SectionedResults;
 
 namespace _impl {
 class ResultsNotifierBase;
 }
+
+namespace object_store {
+class Dictionary;
+class Set;
+} // namespace object_store
 
 class Results {
 public:
@@ -118,6 +124,9 @@ public:
 
     // Get an element in a list
     Mixed get_any(size_t index) REQUIRES(!m_mutex);
+
+    List get_list(size_t index) REQUIRES(!m_mutex);
+    object_store::Dictionary get_dictionary(size_t index) REQUIRES(!m_mutex);
 
     // Get the key/value pair at an index of the results.
     // This method is only valid when applied to a results based on a
@@ -402,10 +411,23 @@ auto Results::dispatch(Fn&& fn) const
 }
 
 template <typename Context>
-auto Results::get(Context& ctx, size_t row_ndx)
+auto Results::get(Context& ctx, size_t ndx)
 {
     return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+        using U = std::decay_t<decltype(*t)>;
+        if constexpr (std::is_same_v<U, Mixed>) {
+            Mixed value = this->get<Mixed>(ndx);
+            if (value.is_type(type_Dictionary)) {
+                return ctx.box(get_dictionary(ndx));
+            }
+            if (value.is_type(type_List)) {
+                return ctx.box(get_list(ndx));
+            }
+            return ctx.box(value);
+        }
+        else {
+            return ctx.box(this->get<U>(ndx));
+        }
     });
 }
 

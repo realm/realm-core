@@ -14,10 +14,10 @@ public:
     using Precision = TimestampFormatter::Precision;
     using Config = TimestampFormatter::Config;
 
-    explicit TimestampStderrLogger(Config = {}, Level = get_default_level_threshold());
+    explicit TimestampStderrLogger(Config = {}, Level = LogCategory::realm.get_default_level_threshold());
 
 protected:
-    void do_log(Logger::Level, const std::string& message) final;
+    void do_log(const LogCategory& category, Logger::Level, const std::string& message) final;
 
 private:
     TimestampFormatter m_formatter;

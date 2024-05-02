@@ -190,7 +190,7 @@ void S2RegionCoverer::AddCandidate(Candidate* candidate) {
                        + candidate->num_children) << max_children_shift())
                      + num_terminals);
     pq_->push(make_pair(priority, candidate));
-      s2_logger()->detail("Push: %1 (%2) ", candidate->cell.id(), priority);
+      s2_logger()->trace("Push: %1 (%2) ", candidate->cell.id(), priority);
   }
 }
 
@@ -255,7 +255,7 @@ void S2RegionCoverer::GetCoveringInternal(S2Region const& region) {
          (!interior_covering_ || result_->size() < (size_t)max_cells_)) {
     Candidate* candidate = pq_->top().second;
     pq_->pop();
-    s2_logger()->detail("Pop: %1", candidate->cell.id());
+    s2_logger()->trace("Pop: %1", candidate->cell.id());
     if (candidate->cell.level() < min_level_ ||
         candidate->num_children == 1 ||
         (int)result_->size() + (int)(interior_covering_ ? 0 : (int)pq_->size()) +
@@ -272,7 +272,7 @@ void S2RegionCoverer::GetCoveringInternal(S2Region const& region) {
       AddCandidate(candidate);
     }
   }
-  s2_logger()->detail("Created %1 cells, %2 candidates created, %3 left", result_->size(),
+  s2_logger()->trace("Created %1 cells, %2 candidates created, %3 left", result_->size(),
                       candidates_created_counter_, pq_->size());
   while (!pq_->empty()) {
     DeleteCandidate(pq_->top().second, true);

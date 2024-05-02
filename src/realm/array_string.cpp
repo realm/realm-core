@@ -25,7 +25,7 @@ using namespace realm;
 ArrayString::ArrayString(Allocator& a)
     : m_alloc(a)
 {
-    m_arr = new (&m_storage.m_string_short) ArrayStringShort(a, true);
+    m_arr = new (&m_storage) ArrayStringShort(a, true);
 }
 
 void ArrayString::create()
@@ -45,12 +45,12 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
         // Small strings
         bool is_small = Array::get_wtype_from_header(header) == Array::wtype_Multiply;
         if (is_small) {
-            auto arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, m_nullable);
+            auto arr = new (&m_storage) ArrayStringShort(m_alloc, m_nullable);
             arr->init_from_mem(mem);
             m_type = Type::small_strings;
         }
         else {
-            auto arr = new (&m_storage.m_enum) Array(m_alloc);
+            auto arr = new (&m_storage) Array(m_alloc);
             arr->init_from_mem(mem);
             m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
             ArrayParent* p;
@@ -65,12 +65,12 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
     else {
         bool is_big = Array::get_context_flag_from_header(header);
         if (!is_big) {
-            auto arr = new (&m_storage.m_string_long) ArraySmallBlobs(m_alloc);
+            auto arr = new (&m_storage) ArraySmallBlobs(m_alloc);
             arr->init_from_mem(mem);
             m_type = Type::medium_strings;
         }
         else {
-            auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, m_nullable);
+            auto arr = new (&m_storage) ArrayBigBlobs(m_alloc, m_nullable);
             arr->init_from_mem(mem);
             m_type = Type::big_strings;
         }
@@ -97,7 +97,7 @@ void ArrayString::detach() noexcept
     m_arr->detach();
     // Make sure the object is in a state like right after construction
     // Next call must be to create()
-    m_arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
+    m_arr = new (&m_storage) ArrayStringShort(m_alloc, true);
     m_type = Type::small_strings;
 }
 
@@ -358,7 +358,7 @@ size_t lower_bound_string(const T* arr, U value)
     }
     return i;
 }
-}
+} // namespace
 
 size_t ArrayString::lower_bound(StringData value)
 {
@@ -400,7 +400,7 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         auto ndx_in_parent = string_medium->get_ndx_in_parent();
         string_medium->destroy();
 
-        auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
+        auto arr = new (&m_storage) ArrayBigBlobs(m_alloc, true);
         arr->init_from_mem(big_blobs.get_mem());
         arr->set_parent(parent, ndx_in_parent);
         arr->update_parent();
@@ -427,7 +427,7 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         auto ndx_in_parent = string_short->get_ndx_in_parent();
         string_short->destroy();
 
-        auto arr = new (&m_storage.m_string_long) ArraySmallBlobs(m_alloc);
+        auto arr = new (&m_storage) ArraySmallBlobs(m_alloc);
         arr->init_from_mem(string_long.get_mem());
         arr->set_parent(parent, ndx_in_parent);
         arr->update_parent();
@@ -448,7 +448,7 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         auto ndx_in_parent = string_short->get_ndx_in_parent();
         string_short->destroy();
 
-        auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
+        auto arr = new (&m_storage) ArrayBigBlobs(m_alloc, true);
         arr->init_from_mem(big_blobs.get_mem());
         arr->set_parent(parent, ndx_in_parent);
         arr->update_parent();

@@ -130,7 +130,7 @@ void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, DetachOr
     results.submit_single(ident, lead_text, timer);
 }
 
-} // anonymous namepsace
+} // namespace
 
 
 int main()

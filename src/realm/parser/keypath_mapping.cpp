@@ -35,14 +35,14 @@ std::size_t TableAndColHash::operator()(const std::pair<TableKey, std::string>& 
 }
 
 
-bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::string alias)
+bool KeyPathMapping::add_mapping(ConstTableRef table, const std::string& name, std::string alias)
 {
     auto table_key = table->get_key();
     auto it_and_success = m_mapping.insert({{table_key, name}, alias});
     return it_and_success.second;
 }
 
-bool KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
+bool KeyPathMapping::remove_mapping(ConstTableRef table, const std::string& name)
 {
     auto table_key = table->get_key();
     return m_mapping.erase({table_key, name}) > 0;
@@ -65,7 +65,7 @@ util::Optional<std::string> KeyPathMapping::get_mapping(TableKey table_key, cons
     return ret;
 }
 
-bool KeyPathMapping::add_table_mapping(ConstTableRef table, std::string alias)
+bool KeyPathMapping::add_table_mapping(ConstTableRef table, const std::string& alias)
 {
     std::string real_table_name = table->get_name();
     if (alias == real_table_name) {
@@ -75,7 +75,7 @@ bool KeyPathMapping::add_table_mapping(ConstTableRef table, std::string alias)
     return it_and_success.second;
 }
 
-bool KeyPathMapping::remove_table_mapping(std::string alias_to_remove)
+bool KeyPathMapping::remove_table_mapping(const std::string& alias_to_remove)
 {
     return m_table_mappings.erase(alias_to_remove) > 0;
 }
@@ -85,7 +85,7 @@ bool KeyPathMapping::has_table_mapping(const std::string& alias) const
     return m_table_mappings.count(alias) > 0;
 }
 
-util::Optional<std::string> KeyPathMapping::get_table_mapping(const std::string alias) const
+util::Optional<std::string> KeyPathMapping::get_table_mapping(const std::string& alias) const
 {
     if (auto it = m_table_mappings.find(alias); it != m_table_mappings.end()) {
         return it->second;
@@ -95,10 +95,10 @@ util::Optional<std::string> KeyPathMapping::get_table_mapping(const std::string 
 
 constexpr static size_t max_substitutions_allowed = 50;
 
-std::string KeyPathMapping::translate_table_name(const std::string& identifier)
+std::string KeyPathMapping::translate_table_name(std::string_view identifier)
 {
     size_t substitutions = 0;
-    std::string alias = identifier;
+    std::string alias{identifier};
     while (auto mapped = get_table_mapping(alias)) {
         if (substitutions > max_substitutions_allowed) {
             throw MappingError(
@@ -115,11 +115,11 @@ std::string KeyPathMapping::translate_table_name(const std::string& identifier)
     return alias;
 }
 
-std::string KeyPathMapping::translate(ConstTableRef table, const std::string& identifier)
+std::string KeyPathMapping::translate(ConstTableRef table, std::string_view identifier)
 {
     size_t substitutions = 0;
     auto tk = table->get_key();
-    std::string alias = identifier;
+    std::string alias{identifier};
     while (auto mapped = get_mapping(tk, alias)) {
         if (substitutions > max_substitutions_allowed) {
             throw MappingError(
@@ -132,10 +132,10 @@ std::string KeyPathMapping::translate(ConstTableRef table, const std::string& id
     return alias;
 }
 
-std::string KeyPathMapping::translate(const LinkChain& link_chain, const std::string& identifier)
+std::string KeyPathMapping::translate(const LinkChain& link_chain, std::string_view identifier)
 {
     auto table = link_chain.get_current_table();
-    return translate(table, identifier);
+    return translate(table, std::string{identifier});
 }
 
 } // namespace query_parser

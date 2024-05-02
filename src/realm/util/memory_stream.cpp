@@ -110,12 +110,12 @@ auto MemoryInputStreambuf::do_seekoff(off_type offset, std::ios_base::seekdir di
     }
     goto bad;
 
-  good:
+good:
     if (offset >= (m_begin - anchor) && offset <= (m_end - anchor)) {
         m_curr = anchor + std::ptrdiff_t(offset);
         return pos_type(off_type(m_curr - m_begin));
     }
 
-  bad:
+bad:
     return pos_type(off_type(-1)); // Error
 }

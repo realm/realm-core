@@ -19,19 +19,19 @@
 #include <realm/util/base64.hpp>
 
 #include <limits>
-#include <vector>
 
 #if defined(_MSC_VER)
-#  define REALM_RESTRICT __restrict
+#define REALM_RESTRICT __restrict
 #elif defined(__GNUC__) || defined(__clang__)
-#  define REALM_RESTRICT __restrict__
+#define REALM_RESTRICT __restrict__
 #else
-#  define REALM_RESTRICT
+#define REALM_RESTRICT
 #endif
 
 
 namespace {
 
+// clang-format off
 static const char g_base64_encoding_chars[] = {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
     'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
@@ -62,6 +62,7 @@ static const unsigned char g_base64_chars[] = {
     66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
     66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66
 };
+// clang-format on
 
 inline unsigned int index_of_base64_byte(unsigned char c)
 {
@@ -71,21 +72,19 @@ inline unsigned int index_of_base64_byte(unsigned char c)
 } // unnamed namespace
 
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
-size_t base64_encode(const char *in_buffer, size_t in_buffer_size, char* out_buffer, size_t out_buffer_size) noexcept
+size_t base64_encode(Span<const char> in_buffer, Span<char> out_buffer) noexcept
 {
-    REALM_ASSERT_EX(in_buffer_size < std::numeric_limits<size_t>::max() - 2, in_buffer_size);
-    REALM_ASSERT_EX(in_buffer_size < 3 * (std::numeric_limits<size_t>::max() / 4) - 2, in_buffer_size);
-    size_t encoded_size = 4 * ((in_buffer_size + 2) / 3);
-    REALM_ASSERT_EX(out_buffer_size >= encoded_size, out_buffer_size, encoded_size);
-    static_cast<void>(out_buffer_size);
+    REALM_ASSERT_EX(in_buffer.size() < std::numeric_limits<size_t>::max() - 2, in_buffer.size());
+    REALM_ASSERT_EX(in_buffer.size() < 3 * (std::numeric_limits<size_t>::max() / 4) - 2, in_buffer.size());
+    size_t encoded_size = 4 * ((in_buffer.size() + 2) / 3);
+    REALM_ASSERT_EX(out_buffer.size() >= encoded_size, out_buffer.size(), encoded_size);
 
-    for (size_t i = 0, j = 0; i < in_buffer_size;) {
-        uint32_t octet_a = i < in_buffer_size ? static_cast<unsigned char>(in_buffer[i++]) : 0;
-        uint32_t octet_b = i < in_buffer_size ? static_cast<unsigned char>(in_buffer[i++]) : 0;
-        uint32_t octet_c = i < in_buffer_size ? static_cast<unsigned char>(in_buffer[i++]) : 0;
+    for (size_t i = 0, j = 0; i < in_buffer.size();) {
+        uint32_t octet_a = i < in_buffer.size() ? static_cast<unsigned char>(in_buffer[i++]) : 0;
+        uint32_t octet_b = i < in_buffer.size() ? static_cast<unsigned char>(in_buffer[i++]) : 0;
+        uint32_t octet_c = i < in_buffer.size() ? static_cast<unsigned char>(in_buffer[i++]) : 0;
 
         uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
 
@@ -96,7 +95,7 @@ size_t base64_encode(const char *in_buffer, size_t in_buffer_size, char* out_buf
     }
 
     // The last zero, one or two characters must be set to '=';
-    switch(in_buffer_size % 3) {
+    switch (in_buffer.size() % 3) {
         case 0:
             break;
         case 1:
@@ -114,26 +113,24 @@ size_t base64_encode(const char *in_buffer, size_t in_buffer_size, char* out_buf
 }
 
 
-Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_buffer_len) noexcept
+std::optional<size_t> base64_decode(Span<const char> input, Span<char> out_buffer) noexcept
 {
     REALM_ASSERT_EX(input.size() < std::numeric_limits<size_t>::max() / 3, input.size());
     size_t required_buffer_len = (input.size() * 3 + 3) / 4;
-    REALM_ASSERT_EX(out_buffer_len >= required_buffer_len, out_buffer_len, required_buffer_len);
-    static_cast<void>(out_buffer_len);
+    REALM_ASSERT_EX(out_buffer.size() >= required_buffer_len, out_buffer.size(), required_buffer_len);
     static_cast<void>(required_buffer_len);
 
     // Guard against overlap (so that "restrict" works in the following)
-    REALM_ASSERT(input.data() + input.size() <= out_buffer
-                 || input.data() >= out_buffer + out_buffer_len);
+    REALM_ASSERT(input.data() + input.size() <= out_buffer.data() || input.data() > &out_buffer.back());
 
 
     const char* REALM_RESTRICT p = input.data();
-          char* REALM_RESTRICT o = out_buffer;
+    char* REALM_RESTRICT o = out_buffer.data();
 
     enum b64_byte_type {
-        equals     = 64,  // used as padding at the end
+        equals = 64, // used as padding at the end
         whitespace = 65,
-        invalid    = 66,
+        invalid = 66,
     };
 
     size_t bytes_written = 0;
@@ -144,9 +141,13 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
         // classify the base64 character
         unsigned int x = index_of_base64_byte(static_cast<unsigned char>(p[i]));
         switch (x) {
-            case equals:     ++num_trailing_equals; continue;
-            case whitespace: continue; // ignore whitespace
-            case invalid:    return none;
+            case equals:
+                ++num_trailing_equals;
+                continue;
+            case whitespace:
+                continue; // ignore whitespace
+            case invalid:
+                return none;
         }
 
         if (num_trailing_equals > 0)
@@ -158,8 +159,8 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
 
         if (buffer_size == 4) {
             *o++ = (buffer >> 16) & 0xff;
-            *o++ = (buffer >>  8) & 0xff;
-            *o++ = (buffer >>  0) & 0xff;
+            *o++ = (buffer >> 8) & 0xff;
+            *o++ = (buffer >> 0) & 0xff;
             buffer = 0;
             buffer_size = 0;
             bytes_written += 3;
@@ -171,7 +172,7 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
     if (num_trailing_equals == 0 && extra > 1) {
         num_trailing_equals = 4 - extra;
     }
-    
+
     // trailing bytes
     if (num_trailing_equals == 0) {
         if (buffer_size != 0)
@@ -179,11 +180,11 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
     }
     else if (num_trailing_equals == 1) {
         *o++ = (buffer >> 10) & 0xff;
-        *o++ = (buffer >>  2) & 0xff;
+        *o++ = (buffer >> 2) & 0xff;
         bytes_written += 2;
     }
     else if (num_trailing_equals == 2) {
-        *o++ = (buffer >>  4) & 0xff;
+        *o++ = (buffer >> 4) & 0xff;
         bytes_written += 1;
     }
     else {
@@ -193,17 +194,16 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
     return bytes_written;
 }
 
-Optional<std::vector<char>> base64_decode_to_vector(StringData encoded)
+std::optional<std::vector<char>> base64_decode_to_vector(Span<const char> encoded)
 {
     size_t max_size = base64_decoded_size(encoded.size());
     std::vector<char> decoded(max_size); // Throws
-    Optional<size_t> actual_size = base64_decode(encoded, decoded.data(), decoded.size());
+    auto actual_size = base64_decode(encoded, decoded);
     if (!actual_size)
-        return none;
+        return std::nullopt;
 
     decoded.resize(*actual_size); // Throws
     return decoded;
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util.

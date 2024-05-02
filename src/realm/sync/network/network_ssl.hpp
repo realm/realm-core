@@ -194,10 +194,6 @@ private:
 /// until its completion handler starts executing.
 class Stream {
 public:
-#if REALM_HAVE_SECURE_TRANSPORT
-    struct MockSSLError;
-#endif
-
     using port_type = network::Endpoint::port_type;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
@@ -385,11 +381,6 @@ public:
     /// Returns a reference to the underlying socket.
     Socket& lowest_layer() noexcept;
 
-#if REALM_HAVE_SECURE_TRANSPORT
-    /// Mock the error value returned by ssl_perform() - currently only used by Apple Secure Transport
-    void set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error = nullptr);
-#endif
-
 private:
     using Want = Service::Want;
     using StreamOps = Service::BasicStreamOps<Stream>;
@@ -503,7 +494,6 @@ private:
 #elif REALM_HAVE_SECURE_TRANSPORT
     util::CFPtr<SSLContextRef> m_ssl;
     VerifyMode m_verify_mode = VerifyMode::none;
-    std::unique_ptr<MockSSLError> m_mock_ssl_perform_error;
 
     enum class BlockingOperation {
         read,
@@ -540,6 +530,47 @@ private:
     friend class network::ReadAheadBuffer;
 #if REALM_HAVE_SECURE_TRANSPORT
     friend struct MockSSLError; // for access to Service::Want
+#endif
+
+#if REALM_HAVE_SECURE_TRANSPORT
+public:
+    // Structure for mocking the error returned by Oper called by ssl_perform()
+    // By default, this is a one-shot error that will be cleared after it is read,
+    // unless clear_after_access is set to false.
+    struct MockSSLError {
+        using Operation = Stream::BlockingOperation;
+
+        explicit MockSSLError(Operation op, int ssl_error, int bytes_processed, bool clear_after_access = true)
+            : operation{op}
+            , ssl_error{ssl_error}
+            , sys_error{0}
+            , bytes_processed{bytes_processed}
+            , clear_after_access{clear_after_access}
+        {
+        }
+
+        explicit MockSSLError(Operation op, int ssl_error, int sys_error, int bytes_processed,
+                              bool clear_after_access = true)
+            : operation{op}
+            , ssl_error{ssl_error}
+            , sys_error{sys_error}
+            , bytes_processed{bytes_processed}
+            , clear_after_access{clear_after_access}
+        {
+        }
+
+        Operation operation;
+        int ssl_error;
+        int sys_error;
+        int bytes_processed;
+        bool clear_after_access;
+    };
+
+    /// Mock the error value returned by ssl_perform() - currently only used by Apple Secure Transport
+    void set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error = nullptr); ///
+
+private:
+    std::unique_ptr<MockSSLError> m_mock_ssl_perform_error;
 #endif
 };
 
@@ -1273,44 +1304,8 @@ inline int Stream::do_ssl_shutdown() noexcept
 
 inline void Stream::set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error)
 {
-    if (!error)
-        m_mock_ssl_perform_error.reset();
-    else
-        m_mock_ssl_perform_error = std::move(error);
+    m_mock_ssl_perform_error = std::move(error);
 }
-
-// Structure for mocking the error returned by Oper called by ssl_perform()
-// By default, this is a one-shot error that will be cleared after it is read,
-// unless clear_after_access is set to false.
-struct Stream::MockSSLError {
-    using Operation = Stream::BlockingOperation;
-
-    explicit MockSSLError(Operation op, int ssl_error, int bytes_processed, bool clear_after_access = true)
-        : operation{op}
-        , ssl_error{ssl_error}
-        , sys_error{0}
-        , bytes_processed{bytes_processed}
-        , clear_after_access{clear_after_access}
-    {
-    }
-
-    explicit MockSSLError(Operation op, int ssl_error, int sys_error, int bytes_processed,
-                          bool clear_after_access = true)
-        : operation{op}
-        , ssl_error{ssl_error}
-        , sys_error{sys_error}
-        , bytes_processed{bytes_processed}
-        , clear_after_access{clear_after_access}
-    {
-    }
-
-    Operation operation;
-    int ssl_error;
-    int sys_error;
-    int bytes_processed;
-    bool clear_after_access;
-};
-
 
 // Provides a homogeneous, and mostly quirks-free interface across the SecureTransport
 // operations (handshake, read, write, shutdown).

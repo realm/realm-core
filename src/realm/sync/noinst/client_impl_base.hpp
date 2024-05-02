@@ -42,6 +42,7 @@ struct ServerEndpoint {
     network::Endpoint::port_type port;
     std::string user_id;
     SyncServerMode server_mode = SyncServerMode::PBS;
+    bool is_verified = false;
 
 private:
     auto to_tuple() const
@@ -230,6 +231,8 @@ public:
 
     void cancel_reconnect_delay();
     bool wait_for_session_terminations_or_client_stopped();
+    // Async version of wait_for_session_terminations_or_client_stopped().
+    util::Future<void> notify_session_terminated();
     void voluntary_disconnect_all_connections();
 
 private:
@@ -262,17 +265,9 @@ private:
     // the next, which is important because it carries information about a
     // possible reconnect delay applying to the new connection object (server
     // hammering protection).
-    //
-    // Note: Due to a particular load balancing scheme that is currently in use,
-    // every session is forced to open a seperate connection (via abuse of
-    // `m_one_connection_per_session`, which is only intended for testing
-    // purposes). This disables part of the hammering protection scheme built in
-    // to the client.
     struct ServerSlot {
-        explicit ServerSlot(ReconnectInfo reconnect_info)
-            : reconnect_info(std::move(reconnect_info))
-        {
-        }
+        explicit ServerSlot(ReconnectInfo reconnect_info);
+        ~ServerSlot();
 
         ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
         std::unique_ptr<ClientImpl::Connection> connection;
@@ -296,9 +291,8 @@ private:
 
     std::mutex m_mutex;
 
-    bool m_stopped = false;                       // Protected by `m_mutex`
-    bool m_sessions_terminated = false;           // Protected by `m_mutex`
-    bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
+    bool m_stopped = false;             // Protected by `m_mutex`
+    bool m_sessions_terminated = false; // Protected by `m_mutex`
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
@@ -395,7 +389,6 @@ enum class ClientImpl::ConnectionTerminationReason {
     missing_protocol_feature,
 };
 
-
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
 
@@ -406,6 +399,7 @@ public:
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
     using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImpl::ReconnectInfo;
+    using DownloadMessage = ClientProtocol::DownloadMessage;
 
     std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
@@ -569,8 +563,8 @@ private:
     void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
                                      session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
-    void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                                  int64_t query_version, DownloadBatchState batch_state, const ReceivedChangesets&);
+    void receive_download_message(session_ident_type, const DownloadMessage& message);
+
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
     void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
@@ -698,7 +692,7 @@ private:
     OutputBuffer m_output_buffer;
 
     const connection_ident_type m_ident;
-    const ServerEndpoint m_server_endpoint;
+    ServerEndpoint m_server_endpoint;
     std::string m_appservices_coid;
 
     /// DEPRECATED - These will be removed in a future release
@@ -717,6 +711,7 @@ private:
 class ClientImpl::Session {
 public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
+    using DownloadMessage = ClientProtocol::DownloadMessage;
 
     std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
@@ -853,7 +848,8 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(version_type client_version, const SyncProgress& progress);
+    void on_changesets_integrated(version_type client_version, const SyncProgress& progress,
+                                  bool changesets_integrated);
 
     void on_integration_failure(const IntegrationException& e);
 
@@ -907,6 +903,9 @@ private:
     // Get the reason a synchronization session is used for (regular sync or client reset)
     // - Client reset state means the session is going to be used to download a fresh realm.
     SessionReason get_session_reason() noexcept;
+
+    /// Returns the schema version the synchronization session connects with to the server.
+    uint64_t get_schema_version() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///
@@ -1178,9 +1177,7 @@ private:
     void send_json_error_message();
     void send_test_command_message();
     Status receive_ident_message(SaltedFileIdent);
-    Status receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                                    DownloadBatchState last_in_batch, int64_t query_version,
-                                    const ReceivedChangesets&);
+    Status receive_download_message(const DownloadMessage& message);
     Status receive_mark_message(request_ident_type);
     Status receive_unbound_message();
     Status receive_error_message(const ProtocolErrorInfo& info);
@@ -1201,6 +1198,12 @@ private:
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
+
+    void init_progress_handler();
+    void enable_progress_notifications();
+    void notify_upload_progress();
+    void update_download_estimate(double download_estimate);
+    void notify_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes = {});
 
     friend class Connection;
 };
@@ -1243,6 +1246,13 @@ inline ConnectionState ClientImpl::Connection::get_state() const noexcept
 {
     return m_state;
 }
+
+inline ClientImpl::ServerSlot::ServerSlot(ReconnectInfo reconnect_info)
+    : reconnect_info(std::move(reconnect_info))
+{
+}
+
+inline ClientImpl::ServerSlot::~ServerSlot() = default;
 
 inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
 {
@@ -1423,7 +1433,8 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
 }
 
 inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), conn.logger_ptr)} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::session, make_logger_prefix(ident),
+                                                      conn.logger_ptr)} // Throws
     , logger{*logger_ptr}
     , m_conn{conn}
     , m_ident{ident}

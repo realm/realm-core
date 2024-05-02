@@ -103,7 +103,10 @@ export class CppFunc {
 }
 
 export class CppMemInit {
-  constructor(public readonly name: string, public val: string) {}
+  constructor(
+    public readonly name: string,
+    public val: string,
+  ) {}
 
   init() {
     return `${this.name}(${this.val})`;
@@ -125,7 +128,11 @@ export interface CppCtorProps extends CppFuncProps {
 
 export class CppCtor extends CppMethod {
   public mem_inits: CppMemInit[] = [];
-  constructor(public readonly name: string, public args: CppVar[], public _props: CppCtorProps = {}) {
+  constructor(
+    public readonly name: string,
+    public args: CppVar[],
+    public _props: CppCtorProps = {},
+  ) {
     super(name, "", args, _props);
     if (_props.mem_inits) this.mem_inits = _props.mem_inits;
   }

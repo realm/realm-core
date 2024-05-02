@@ -2052,7 +2052,11 @@ TEST_CASE("migration: SoftResetFile", "[migration]") {
         ObjectStore::table_for_object_type(realm->read_group(), "object")->create_object();
         realm->commit_transaction();
     }
-    auto realm = Realm::get_shared_realm(config);
+    SharedRealm realm;
+    if (!config.needs_file_format_upgrade()) {
+        realm = Realm::get_shared_realm(config);
+    }
+    REQUIRE(realm);
     auto ino = get_fileid();
 
     SECTION("file is reset when schema version increases") {
@@ -2155,7 +2159,6 @@ TEST_CASE("migration: Additive", "[migration]") {
     };
 
     TestFile config;
-    config.cache = false;
     config.schema = schema;
     config.schema_mode = GENERATE(SchemaMode::AdditiveDiscovered, SchemaMode::AdditiveExplicit);
     auto realm = Realm::get_shared_realm(config);
@@ -2276,7 +2279,7 @@ TEST_CASE("migration: Additive", "[migration]") {
         REQUIRE_NOTHROW(realm->update_schema(schema, 1));
         REQUIRE(realm->schema_version() == 1);
         REQUIRE_NOTHROW(realm->update_schema(schema, 0));
-        REQUIRE(realm->schema_version() == 1);
+        REQUIRE(realm->schema_version() == 0);
     }
 
     SECTION("migration function is not used") {

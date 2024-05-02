@@ -39,7 +39,7 @@ private:
 struct InterRealmValueConverter {
     InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table, ColKey dst_col,
                              EmbeddedObjectConverter* ec);
-    void track_new_embedded(const Obj& src, const Obj& dst);
+    void track_new_embedded(const Obj& src, const Obj& dst) const;
     struct ConversionResult {
         Mixed converted_value;
         bool requires_new_embedded_object = false;
@@ -49,13 +49,24 @@ struct InterRealmValueConverter {
     // convert `src` to the destination Realm and compare that value with `dst`
     // If `converted_src_out` is provided, it will be set to the converted src value
     int cmp_src_to_dst(Mixed src, Mixed dst, ConversionResult* converted_src_out = nullptr,
-                       bool* did_update_out = nullptr);
+                       bool* did_update_out = nullptr) const;
     void copy_value(const Obj& src_obj, Obj& dst_obj, bool* update_out);
 
 private:
-    void copy_list(const Obj& src_obj, Obj& dst_obj, bool* update_out);
-    void copy_set(const Obj& src_obj, Obj& dst_obj, bool* update_out);
-    void copy_dictionary(const Obj& src_obj, Obj& dst_obj, bool* update_out);
+    void copy_list(const LstBase& src_obj, LstBase& dst_obj, bool* update_out) const;
+    void copy_set(const SetBase& src_obj, SetBase& dst_obj, bool* update_out) const;
+    void copy_dictionary(const Dictionary& src_obj, Dictionary& dst_obj, bool* update_out) const;
+    // collection in mixed.
+    void handle_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list) const;
+    void handle_dictionary_in_mixed(Dictionary& src_dict, Dictionary& dst_dict) const;
+    void copy_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx, CollectionType type) const;
+    void copy_dictionary_in_mixed(const Dictionary& src_list, Dictionary& dst_list, StringData ndx,
+                                  CollectionType type) const;
+    bool check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx, CollectionType type) const;
+    bool check_matching_dictionary(const Dictionary& src_list, const Dictionary& dst_list, StringData key,
+                                   CollectionType type) const;
+    bool is_collection(Mixed) const;
+    CollectionType to_collection_type(Mixed) const;
 
     TableRef m_dst_link_table;
     ConstTableRef m_src_table;

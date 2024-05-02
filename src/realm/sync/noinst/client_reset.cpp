@@ -73,7 +73,8 @@ static inline bool should_skip_table(const Transaction& group, TableKey key)
 void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger,
                     bool allow_schema_additions)
 {
-    logger.debug("transfer_group, src size = %1, dst size = %2, allow_schema_additions = %3", group_src.size(),
+    logger.debug(util::LogCategory::reset,
+                 "transfer_group, src size = %1, dst size = %2, allow_schema_additions = %3", group_src.size(),
                  group_dst.size(), allow_schema_additions);
 
     // Turn off the sync history tracking during state transfer since it will be thrown
@@ -88,10 +89,10 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         if (should_skip_table(group_dst, table_key))
             continue;
         StringData table_name = group_dst.get_table_name(table_key);
-        logger.debug("key = %1, table_name = %2", table_key.value, table_name);
+        logger.debug(util::LogCategory::reset, "key = %1, table_name = %2", table_key.value, table_name);
         ConstTableRef table_src = group_src.get_table(table_name);
         if (!table_src) {
-            logger.debug("Table '%1' will be removed", table_name);
+            logger.debug(util::LogCategory::reset, "Table '%1' will be removed", table_name);
             tables_to_remove.insert(table_name);
             continue;
         }
@@ -133,7 +134,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                              pk_col_name_dst, table_name));
         }
         // The table survives.
-        logger.debug("Table '%1' will remain", table_name);
+        logger.debug(util::LogCategory::reset, "Table '%1' will remain", table_name);
     }
 
     // If there have been any tables marked for removal stop.
@@ -204,7 +205,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         REALM_ASSERT_EX(allow_schema_additions || num_tables_src == num_tables_dst, num_tables_src, num_tables_dst);
         num_tables = num_tables_src;
     }
-    logger.debug("The number of tables is %1", num_tables);
+    logger.debug(util::LogCategory::reset, "The number of tables is %1", num_tables);
 
     // Remove columns in dst if they are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
@@ -250,7 +251,8 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                 DataType col_type = table_src->get_column_type(col_key);
                 bool nullable = col_key.is_nullable();
                 auto search_index_type = table_src->search_index_type(col_key);
-                logger.trace("Create column, table = %1, column name = %2, "
+                logger.trace(util::LogCategory::reset,
+                             "Create column, table = %1, column name = %2, "
                              " type = %3, nullable = %4, search_index = %5",
                              table_name, col_name, col_key.get_type(), nullable, search_index_type);
                 ColKey col_key_dst;
@@ -294,7 +296,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                 // column preexists in dest, make sure the types match
                 if (col_key.get_type() != col_key_dst.get_type()) {
                     throw ClientResetFailed(util::format(
-                        "Incompatable column type change detected during client reset for '%1.%2' (%3 vs %4)",
+                        "Incompatible column type change detected during client reset for '%1.%2' (%3 vs %4)",
                         table_name, col_name, col_key.get_type(), col_key_dst.get_type()));
                 }
                 ColumnAttrMask src_col_attrs = col_key.get_attrs();
@@ -324,7 +326,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         if (table_src->is_embedded())
             continue;
         StringData table_name = table_src->get_name();
-        logger.debug("Removing objects in '%1'", table_name);
+        logger.debug(util::LogCategory::reset, "Removing objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
 
         auto pk_col = table_dst->get_primary_key_column();
@@ -337,7 +339,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
             }
         }
         for (auto& pair : objects_to_remove) {
-            logger.debug("  removing '%1'", pair.first);
+            logger.debug(util::LogCategory::reset, "  removing '%1'", pair.first);
             table_dst->remove_object(pair.second);
         }
     }
@@ -353,14 +355,15 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         TableRef table_dst = group_dst.get_table(table_name);
         auto pk_col = table_src->get_primary_key_column();
         REALM_ASSERT(pk_col);
-        logger.debug("Creating missing objects for table '%1', number of rows = %2, "
+        logger.debug(util::LogCategory::reset,
+                     "Creating missing objects for table '%1', number of rows = %2, "
                      "primary_key_col = %3, primary_key_type = %4",
                      table_name, table_src->size(), pk_col.get_index().val, pk_col.get_type());
         for (const Obj& src : *table_src) {
             bool created = false;
             table_dst->create_object_with_primary_key(src.get_primary_key(), &created);
             if (created) {
-                logger.debug("   created %1", src.get_primary_key());
+                logger.debug(util::LogCategory::reset, "   created %1", src.get_primary_key());
             }
         }
     }
@@ -383,7 +386,8 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                         allow_schema_additions, table_src->get_column_count(), table_dst->get_column_count());
         auto pk_col = table_src->get_primary_key_column();
         REALM_ASSERT(pk_col);
-        logger.debug("Updating values for table '%1', number of rows = %2, "
+        logger.debug(util::LogCategory::reset,
+                     "Updating values for table '%1', number of rows = %2, "
                      "number of columns = %3, primary_key_col = %4, "
                      "primary_key_type = %5",
                      table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
@@ -400,7 +404,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
             bool updated = false;
             converter.copy(src, dst, &updated);
             if (updated) {
-                logger.debug("  updating %1", src_pk);
+                logger.debug(util::LogCategory::reset, "  updating %1", src_pk);
             }
         }
         embedded_tracker.process_pending();
@@ -506,7 +510,8 @@ static ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode m
                                              util::Logger& logger)
 {
     if (auto previous_reset = has_pending_reset(wt)) {
-        logger.info("A previous reset was detected of type: '%1' at: %2", previous_reset->type, previous_reset->time);
+        logger.info(util::LogCategory::reset, "A previous reset was detected of type: '%1' at: %2",
+                    previous_reset->type, previous_reset->time);
         switch (previous_reset->type) {
             case ClientResyncMode::Manual:
                 REALM_UNREACHABLE();
@@ -522,7 +527,8 @@ static ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode m
                                                              previous_reset->type, previous_reset->time, mode));
                     case ClientResyncMode::RecoverOrDiscard:
                         mode = ClientResyncMode::DiscardLocal;
-                        logger.info("A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
+                        logger.info(util::LogCategory::reset,
+                                    "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
                                     previous_reset->type, previous_reset->time, mode);
                         remove_pending_client_resets(wt);
                         break;
@@ -546,7 +552,8 @@ static ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode m
                 "Client reset mode is set to 'Recover' but the server does not allow recovery for this client");
         }
         else if (mode == ClientResyncMode::RecoverOrDiscard) {
-            logger.info("Client reset in 'RecoverOrDiscard' is choosing 'DiscardLocal' because the server does not "
+            logger.info(util::LogCategory::reset,
+                        "Client reset in 'RecoverOrDiscard' is choosing 'DiscardLocal' because the server does not "
                         "permit recovery for this client");
             mode = ClientResyncMode::DiscardLocal;
         }
@@ -565,7 +572,8 @@ bool perform_client_reset_diff(DB& db_local, DB& db_remote, sync::SaltedFileIden
     bool recover_local_changes =
         actual_mode == ClientResyncMode::Recover || actual_mode == ClientResyncMode::RecoverOrDiscard;
 
-    logger.info("Client reset: path_local = %1, "
+    logger.info(util::LogCategory::reset,
+                "Client reset: path_local = %1, "
                 "client_file_ident = (ident: %2, salt: %3), "
                 "remote_path = %4, requested_mode = %5, recovery_is_allowed = %6, "
                 "actual_mode = %7, will_recover = %8",
@@ -608,8 +616,8 @@ bool perform_client_reset_diff(DB& db_local, DB& db_remote, sync::SaltedFileIden
 
     // now that the state of the fresh and local Realms are identical,
     // reset the local sync history and steal the fresh Realm's ident
-    history_local.set_client_reset_adjustments(logger, wt_local->get_version(), client_file_ident,
-                                               fresh_server_version, recovered);
+    history_local.set_history_adjustments(logger, wt_local->get_version(), client_file_ident, fresh_server_version,
+                                          recovered);
 
     int64_t subscription_version = 0;
     if (sub_store) {
@@ -625,7 +633,8 @@ bool perform_client_reset_diff(DB& db_local, DB& db_remote, sync::SaltedFileIden
     on_flx_version_complete(subscription_version);
 
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
-    logger.info("perform_client_reset_diff is done: old_version = (version: %1, index: %2), "
+    logger.info(util::LogCategory::reset,
+                "perform_client_reset_diff is done: old_version = (version: %1, index: %2), "
                 "new_version = (version: %3, index: %4)",
                 old_version_local.version, old_version_local.index, new_version_local.version,
                 new_version_local.index);

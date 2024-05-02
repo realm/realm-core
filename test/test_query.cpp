@@ -500,6 +500,59 @@ TEST(Query_NextGen_StringConditions)
     cnt = table2->column<String>(col_str3).like(realm::null(), false).count();
     CHECK_EQUAL(cnt, 1);
 
+    auto check_results = [&](Query q, std::vector<StringData>&& matches) {
+        TableView view = q.find_all();
+        std::sort(matches.begin(), matches.end());
+        std::vector<StringData> actual;
+        for (size_t i = 0; i < view.size(); ++i) {
+            actual.push_back(view.get_object(i).get<StringData>(col_str3));
+        }
+        std::sort(actual.begin(), actual.end());
+        if (!CHECK_EQUAL(actual, matches)) {
+            util::format(std::cout, "failed query '%1'\n", q.get_description());
+        }
+        TableView parsed_results = table2->query(q.get_description()).find_all();
+        std::vector<StringData> parsed_matches;
+        for (size_t i = 0; i < parsed_results.size(); ++i) {
+            parsed_matches.push_back(parsed_results.get_object(i).get<StringData>(col_str3));
+        }
+        std::sort(parsed_matches.begin(), parsed_matches.end());
+        if (!CHECK_EQUAL(parsed_matches, matches)) {
+            util::format(std::cout, "failed parsed query '%1'\n", q.get_description());
+        }
+    };
+
+    // greater
+    check_results((table2->column<String>(col_str3) > StringData("")), {"foo", "bar", "!"});
+    check_results((table2->column<String>(col_str3) > StringData("b")), {"foo", "bar"});
+    check_results((table2->column<String>(col_str3) > StringData("bar")), {"foo"});
+    check_results((table2->column<String>(col_str3) > StringData("barrr")), {"foo"});
+    check_results((table2->column<String>(col_str3) > StringData("bb")), {"foo"});
+    check_results((table2->column<String>(col_str3) > StringData("z")), {});
+
+    // less
+    check_results((table2->column<String>(col_str3) < StringData("")), {StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("b")), {"", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("bar")), {"", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("barrr")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("z")), {"foo", "bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("f")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("fp")), {"foo", "bar", "", "!", StringData()});
+
+    // greater equal
+    check_results((table2->column<String>(col_str3) >= StringData("")), {"foo", "bar", "!", ""});
+    check_results((table2->column<String>(col_str3) >= StringData("b")), {"foo", "bar"});
+    check_results((table2->column<String>(col_str3) >= StringData("bar")), {"foo", "bar"});
+    check_results((table2->column<String>(col_str3) >= StringData("barrrr")), {"foo"});
+    check_results((table2->column<String>(col_str3) >= StringData("z")), {});
+
+    // less equal
+    check_results((table2->column<String>(col_str3) <= StringData("")), {StringData(), ""});
+    check_results((table2->column<String>(col_str3) <= StringData("b")), {"", "!", StringData()});
+    check_results((table2->column<String>(col_str3) <= StringData("bar")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) <= StringData("barrrr")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) <= StringData("z")), {"foo", "bar", "", "!", StringData()});
+
     TableRef table3 = group.add_table(StringData("table3"));
     auto col_link1 = table3->add_column(*table2, "link1");
 
@@ -658,9 +711,8 @@ TEST(Query_NextGenSyntaxMonkey)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 +
-                            random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
-                                                        (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        const size_t rows = 1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
+                                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         auto col_int0 = table.add_column(type_Int, "first");
         auto col_int1 = table.add_column(type_Int, "second");
@@ -3268,8 +3320,8 @@ TEST(Query_Float3_where)
     t.create_object().set_all(float(1.1), double(2.1), 1);
     t.create_object().set_all(float(1.2), double(2.2), 2);
     t.create_object().set_all(float(1.3), double(2.3), 3);
-    t.create_object().set_all(float(1.4), double(2.4), 4); // match
-    t.create_object().set_all(float(1.5), double(2.5), 5); // match
+    t.create_object().set_all(float(1.4), double(2.4), 4);                     // match
+    t.create_object().set_all(float(1.5), double(2.5), 5);                     // match
     t.create_object(ObjKey(0xc001ede1b0)).set_all(float(1.6), double(2.6), 6); // match
     t.create_object().set_all(float(1.7), double(2.7), 7);
     t.create_object().set_all(float(1.8), double(2.8), 8);
@@ -4104,21 +4156,21 @@ TEST(Query_EmptyDescriptors)
 
     std::vector<size_t> results = {4, 3, 2, 3}; // original order
 
-    {   // Sorting with an empty sort descriptor is a no-op
+    { // Sorting with an empty sort descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Distinct with an empty descriptor is a no-op
+    { // Distinct with an empty descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor());
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty sort, empty distinct is still a no-op
+    { // Empty sort, empty distinct is still a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.distinct(DistinctDescriptor());
@@ -4126,7 +4178,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Arbitrary compounded empty sort and distinct is still a no-op
+    { // Arbitrary compounded empty sort and distinct is still a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.sort(SortDescriptor());
@@ -4139,7 +4191,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty distinct compounded on a valid distinct is a no-op
+    { // Empty distinct compounded on a valid distinct is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor());
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -4149,7 +4201,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty sort compounded on a valid sort is a no-op
+    { // Empty sort compounded on a valid sort is a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.sort(SortDescriptor({{t1_int_col}}));
@@ -4573,7 +4625,7 @@ TEST(Query_DistinctAndSort)
     // 5 | 2        "A"      4           | 2       |
 
     using ResultList = std::vector<std::pair<size_t, ObjKey>>; // value, key
-    {   // distinct with no sort keeps original order
+    {                                                          // distinct with no sort keeps original order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.distinct(t1_int_col);
@@ -4583,7 +4635,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a sorted view retains sorted order
+    { // distinct on a sorted view retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}));
@@ -4594,7 +4646,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a view sorted descending retains sorted order
+    { // distinct on a view sorted descending retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[2]}};
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {false /* descending */, false /* descending */}));
@@ -4605,7 +4657,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a sorted view (different from table order) retains sorted order
+    { // distinct on a sorted view (different from table order) retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[0]}};
         tv.sort(t1_int_col, false /* descending */);
@@ -4616,7 +4668,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct across links on an unsorted view retains original order
+    { // distinct across links on an unsorted view retains original order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.distinct(DistinctDescriptor({{t1_link_col, t2_int_col}}));
@@ -4626,7 +4678,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a view sorted across links retains sorted order
+    { // distinct on a view sorted across links retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.sort(SortDescriptor({{t1_link_col, t2_int_col}}));
@@ -4637,7 +4689,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct across links and sort across links
+    { // distinct across links and sort across links
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor({{t1_link_col, t2_int_col}}));
@@ -4689,7 +4741,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
     // 3 | 300        "A"      |
     // 4 | 400        "A"      |
 
-    {   // sort descending then distinct
+    { // sort descending then distinct
         TableView tv = t1->where().find_all();
         ResultList results = {{"A", k4}};
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
@@ -4726,7 +4778,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // distinct then sort descending
+    { // distinct then sort descending
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k0}};
         tv.distinct(DistinctDescriptor({{t1_str_col}}));
@@ -4740,7 +4792,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // sort descending then multicolumn distinct
+    { // sort descending then multicolumn distinct
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
@@ -4754,7 +4806,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // multicolumn distinct then sort descending
+    { // multicolumn distinct then sort descending
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.distinct(DistinctDescriptor({{t1_str_col}, {t1_int_col}}));
@@ -4770,7 +4822,8 @@ TEST(Query_SortDistinctOrderThroughHandover)
     }
 }
 
-TEST(Query_CompoundDescriptors) {
+TEST(Query_CompoundDescriptors)
+{
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
@@ -4810,7 +4863,7 @@ TEST(Query_CompoundDescriptors) {
     // 4 | 2        "A"     |
     // 5 | 2        "A"     |
 
-    {   // sorting twice should the same as a single sort with both criteria
+    { // sorting twice should the same as a single sort with both criteria
         // but reversed: sort(a).sort(b) == sort(b, a)
         ResultList results = {{2, k3}, {1, k2}, {2, k4}, {2, k5}, {1, k0}, {1, k1}};
         TableView tv = t1->where().find_all();
@@ -4836,7 +4889,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 
-    {   // two distincts are not the same as a single distinct with both criteria
+    { // two distincts are not the same as a single distinct with both criteria
         ResultList results = {{1, k0}, {2, k3}};
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -4862,7 +4915,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 
-    {   // check results of sort-distinct-sort-distinct
+    { // check results of sort-distinct-sort-distinct
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {true, true}));
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -5483,6 +5536,25 @@ TEST(Query_AllocatorBug_SourceOlderThanDest)
     cnt = (bar->link(col_link).column<Lst<double>>(col_double).min() == 1).count();
 }
 
+TEST(Query_LinkToDictionary)
+{
+    Group g;
+    auto target = g.add_table("target");
+    auto dict_col = target->add_column_dictionary(type_String, "string", true);
+    auto source = g.add_table("source");
+    auto link_col = source->add_column(*target, "link");
+
+    for (int i = 0; i < 200; ++i) {
+        auto target_obj = target->create_object();
+        target_obj.get_dictionary(dict_col).insert("key", "value");
+        source->create_object().set_all(target_obj.get_key());
+    }
+
+    // Will crash if this uses the wrong allocator
+    auto q = source->link(link_col).column<Dictionary>(dict_col) == StringData();
+    CHECK_EQUAL(q.count(), 0);
+}
+
 TEST(Query_StringNodeEqualBaseBug)
 {
     Group g;
@@ -5565,8 +5637,8 @@ TEST_IF(Query_OptimalNode, false)
 NONCONCURRENT_TEST(Query_IntPerformance)
 {
     Table table;
-    auto col_1 = table.add_column(type_Int, "1");
-    auto col_2 = table.add_column(type_Int, "2");
+    auto col_1 = table.add_column(type_Int, "a");
+    auto col_2 = table.add_column(type_Int, "b");
 
     for (int i = 0; i < 1000; i++) {
         table.create_object().set(col_1, i).set(col_2, i == 500 ? 500 : 2);
@@ -5574,6 +5646,7 @@ NONCONCURRENT_TEST(Query_IntPerformance)
 
     Query q1 = table.where().equal(col_2, 2);
     Query q2 = table.where().not_equal(col_1, 500);
+    Query q3 = table.query("a == b");
 
     auto t1 = steady_clock::now();
 
@@ -5595,20 +5668,29 @@ NONCONCURRENT_TEST(Query_IntPerformance)
     auto t3 = steady_clock::now();
 
     for (size_t t = 0; t < nb_reps; t++) {
+        TableView tv = q3.find_all();
+        CHECK_EQUAL(tv.size(), 2);
+    }
+
+    auto t4 = steady_clock::now();
+
+    for (size_t t = 0; t < nb_reps; t++) {
         auto sum = q2.sum(col_2);
         CHECK_EQUAL(sum, 1998);
     }
 
     CALLGRIND_STOP_INSTRUMENTATION;
 
-    auto t4 = steady_clock::now();
+    auto t5 = steady_clock::now();
 
     std::cout << nb_reps << " repetitions in Query_IntPerformance" << std::endl;
     std::cout << "    time equal: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/rep"
               << std::endl;
     std::cout << "    time not_equal: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_reps << " ns/rep"
               << std::endl;
-    std::cout << "    time sum: " << duration_cast<nanoseconds>(t4 - t3).count() / nb_reps << " ns/rep" << std::endl;
+    std::cout << "    time a == b: " << duration_cast<nanoseconds>(t4 - t3).count() / nb_reps << " ns/rep"
+              << std::endl;
+    std::cout << "    time sum: " << duration_cast<nanoseconds>(t5 - t4).count() / nb_reps << " ns/rep" << std::endl;
 }
 
 TEST(Query_NotWithEmptyGroup)

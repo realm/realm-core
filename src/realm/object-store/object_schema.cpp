@@ -99,8 +99,6 @@ PropertyType ObjectSchema::from_core_type(ColumnType type)
         case col_type_Link:
         case col_type_TypedLink:
             return PropertyType::Object;
-        case col_type_LinkList:
-            return PropertyType::Object | PropertyType::Array;
         default:
             REALM_UNREACHABLE();
     }

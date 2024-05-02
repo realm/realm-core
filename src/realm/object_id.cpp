@@ -52,8 +52,9 @@ static_assert(sizeof(ObjectId) == 12, "changing the size of an ObjectId is a fil
 
 bool ObjectId::is_valid_str(StringData str) noexcept
 {
-    return str.size() == 24 &&
-           std::all_of(str.data(), str.data() + str.size(), [](unsigned char c) { return std::isxdigit(c); });
+    return str.size() == 24 && std::all_of(str.data(), str.data() + str.size(), [](unsigned char c) {
+               return std::isxdigit(c);
+           });
 }
 
 ObjectId::ObjectId(StringData init) noexcept
@@ -111,12 +112,16 @@ Timestamp ObjectId::get_timestamp() const
 
 std::string ObjectId::to_string() const
 {
+    constexpr size_t buffer_size = 2 * sizeof(ObjectIdBytes);
+    char buffer[buffer_size];
     std::string ret;
+    char* p = buffer;
     for (size_t i = 0; i < m_bytes.size(); i++) {
-        ret += hex_digits[m_bytes[i] >> 4];
-        ret += hex_digits[m_bytes[i] & 0xf];
+        auto c = m_bytes[i];
+        *p++ = hex_digits[c >> 4];
+        *p++ = hex_digits[c & 0xf];
     }
-    return ret;
+    return {buffer, buffer_size};
 }
 
 ObjectId::ObjectIdBytes ObjectId::to_bytes() const

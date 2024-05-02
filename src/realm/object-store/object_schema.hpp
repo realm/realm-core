@@ -88,6 +88,7 @@ public:
 
     static PropertyType from_core_type(ColumnType type);
     static PropertyType from_core_type(ColKey col);
+    static PropertyType from_core_type(CollectionType type);
 
 private:
     void set_primary_key_property() noexcept;

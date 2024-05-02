@@ -35,13 +35,13 @@
 #include <sys/stat.h>
 #endif
 
-#include <realm/utilities.hpp>
-#include <realm/util/assert.hpp>
 #include <realm/exceptions.hpp>
+#include <realm/util/assert.hpp>
 #include <realm/util/features.h>
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/sensitive_buffer.hpp>
+#include <realm/utilities.hpp>
 
 #if defined(_MSVC_LANG) // compiling with MSVC
 #include <filesystem>
@@ -116,6 +116,12 @@ std::string make_temp_file(const char* prefix);
 
 size_t page_size();
 
+struct OnlyForTestingPageSizeChange {
+    OnlyForTestingPageSizeChange(size_t new_page_size);
+    ~OnlyForTestingPageSizeChange();
+};
+
+using EncryptionKeyType = SensitiveBuffer<std::array<uint8_t, 64>>;
 
 /// This class provides a RAII abstraction over the concept of a file
 /// descriptor (or file handle).
@@ -140,7 +146,7 @@ size_t page_size();
 /// \endcode
 class File {
 public:
-    using EncryptionKeyType = SensitiveBuffer<std::array<uint8_t, 64>>;
+    using EncryptionKeyType = util::EncryptionKeyType;
 
     enum Mode {
         mode_Read,   ///< access_ReadOnly,  create_Never             (fopen: rb)
@@ -520,7 +526,7 @@ public:
     static void move(const std::string& old_path, const std::string& new_path);
 
     /// Copy the file at the specified origin path to the specified target path.
-    static void copy(const std::string& origin_path, const std::string& target_path);
+    static bool copy(const std::string& origin_path, const std::string& target_path, bool overwrite_existing = true);
 
     /// Compare the two files at the specified paths for equality. Returns true
     /// if, and only if they are equal.
@@ -712,7 +718,6 @@ private:
 #endif
     };
 };
-
 
 /// This class provides a RAII abstraction over the concept of a
 /// memory mapped file.

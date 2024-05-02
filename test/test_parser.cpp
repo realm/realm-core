@@ -514,6 +514,8 @@ TEST(Parser_empty_input)
 
 TEST(Parser_ConstrainedQuery)
 {
+    // We no longer throw when serializing a constrained query,
+    // but the description cannot be used to build a new query
     Group g;
     std::string table_name = "table";
     TableRef t = g.add_table(table_name);
@@ -534,13 +536,13 @@ TEST(Parser_ConstrainedQuery)
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
-    CHECK_THROW(q.get_description(), SerializationError);
+    CHECK_THROW(t->query(q.get_description()), query_parser::SyntaxError);
 
     Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
-    CHECK_THROW(q2.get_description(), SerializationError);
+    CHECK_THROW(t->query(q2.get_description()), query_parser::SyntaxError);
 }
 
 TEST(Parser_basic_serialisation)
@@ -723,7 +725,37 @@ TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableInde
         verify_query(test_context, t, out.str(), 1);
         verify_query_sub(test_context, t, util::format("values == $%1", i), args, 1);
     }
+    size_t sz = t->size();
     verify_query(test_context, t, "values == null", nullable ? 1 : 0);
+    verify_query(test_context, t, "values == ANY {-1, 0, 1}", 3);
+    verify_query(test_context, t, "values == ANY {0, 1}", 2);
+    verify_query(test_context, t, "values == ANY {1}", 1);
+    verify_query(test_context, t, "values == ANY {}", 0);
+
+    verify_query(test_context, t, "values == NONE {-1, 0, 1}", sz - 3);
+    verify_query(test_context, t, "values == NONE {-1, 0}", sz - 2);
+    verify_query(test_context, t, "values == NONE {-1}", sz - 1);
+    verify_query(test_context, t, "values == NONE {}", sz);
+
+    verify_query(test_context, t, "values == ALL {-1, 0, 1}", 0);
+    verify_query(test_context, t, "values == ALL {-1, 0}", 0);
+    verify_query(test_context, t, "values == ALL {-1}", 1);
+    verify_query(test_context, t, "values == ALL {}", sz);
+
+    verify_query(test_context, t, "values != NONE {-1, 0, 1}", 0);
+    verify_query(test_context, t, "values != NONE {-1, 0}", 0);
+    verify_query(test_context, t, "values != NONE {-1}", 1);
+    verify_query(test_context, t, "values != NONE {}", sz);
+
+    verify_query(test_context, t, "values != ANY {-1, 0, 1}", sz);
+    verify_query(test_context, t, "values != ANY {0, 1}", sz);
+    verify_query(test_context, t, "values != ANY {1}", sz - 1);
+    verify_query(test_context, t, "values != ANY {}", 0);
+
+    verify_query(test_context, t, "values != ALL {-1, 0, 1}", sz - 3);
+    verify_query(test_context, t, "values != ALL {-1, 0}", sz - 2);
+    verify_query(test_context, t, "values != ALL {-1}", sz - 1);
+    verify_query(test_context, t, "values != ALL {}", sz);
 }
 
 TEST(Parser_LinksToSameTable)
@@ -821,9 +853,9 @@ TEST(Parser_LinksToDifferentTable)
     verify_query(test_context, t, "items = obj('Items', 'coffee')", 0); // nobody buys coffee
     verify_query(test_context, t, "items = obj('Items', 'milk')", 2);   // but milk
     verify_query(test_context, t, "items = O0", 2);                     // how many people bought milk?
-    verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
-    verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
-    verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
+    verify_query(test_context, t, "items.@count > 2", 3);               // how many people bought more than two items?
+    verify_query(test_context, t, "items.price > 3.0", 3);              // how many people buy items over $3.0?
+    verify_query(test_context, t, "items.name ==[c] 'milk'", 2);        // how many people buy milk?
     // how many people bought items with an active sale?
     verify_query(test_context, t, "items.discount.active == true", 3);
     // how many people bought an item marked down by more than $2.0?
@@ -1095,14 +1127,14 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, items, "nullable\\tdata == NIL", 2);
     verify_query(test_context, items, "nullable\\tdata != NIL", 3);
 
-    verify_query(test_context, items, "nullable\\tdata CONTAINS 'f'", 2);
-    verify_query(test_context, items, "nullable\\tdata BEGINSWITH 'f'", 1);
-    verify_query(test_context, items, "nullable\\tdata ENDSWITH 'e'", 2);
-    verify_query(test_context, items, "nullable\\tdata LIKE 'f*'", 1);
-    verify_query(test_context, items, "nullable\\tdata CONTAINS[c] 'F'", 2);
-    verify_query(test_context, items, "nullable\\tdata BEGINSWITH[c] 'F'", 1);
-    verify_query(test_context, items, "nullable\\tdata ENDSWITH[c] 'E'", 2);
-    verify_query(test_context, items, "nullable\\tdata LIKE[c] 'F*'", 1);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS bin('f')", 2);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH bin('f')", 1);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH bin('e')", 2);
+    verify_query(test_context, items, "nullable\\tdata LIKE bin('f*')", 1);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS[c] bin('F')", 2);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH[c] bin('F')", 1);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH[c] bin('E')", 2);
+    verify_query(test_context, items, "nullable\\tdata LIKE[c] bin('F*')", 1);
 
     verify_query(test_context, items, "nullable\\tdata CONTAINS NULL", 5);
     verify_query(test_context, items, "nullable\\tdata BEGINSWITH NULL", 5);
@@ -1135,14 +1167,14 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.nullable\\tdata !=[c] NULL", 3);
     verify_query(test_context, people, "NULL ==[c] fav_item.data", 0);
 
-    verify_query(test_context, people, "fav_item.data CONTAINS 'f'", 2);
-    verify_query(test_context, people, "fav_item.data BEGINSWITH 'f'", 1);
-    verify_query(test_context, people, "fav_item.data ENDSWITH 'e'", 2);
-    verify_query(test_context, people, "fav_item.data LIKE 'f*'", 1);
-    verify_query(test_context, people, "fav_item.data CONTAINS[c] 'F'", 2);
-    verify_query(test_context, people, "fav_item.data BEGINSWITH[c] 'F'", 1);
-    verify_query(test_context, people, "fav_item.data ENDSWITH[c] 'E'", 2);
-    verify_query(test_context, people, "fav_item.data LIKE[c] 'F*'", 1);
+    verify_query(test_context, people, "fav_item.data CONTAINS bin('f')", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH bin('f')", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH bin('e')", 2);
+    verify_query(test_context, people, "fav_item.data LIKE bin('f*')", 1);
+    verify_query(test_context, people, "fav_item.data CONTAINS[c] bin('F')", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH[c] bin('F')", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH[c] bin('E')", 2);
+    verify_query(test_context, people, "fav_item.data LIKE[c] bin('F*')", 1);
 
     // two column
     verify_query(test_context, people, "fav_item.data == fav_item.nullable\\tdata", 3);
@@ -1150,7 +1182,8 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.nullable\\tdata == fav_item.nullable\\tdata", 5);
 
     verify_query(test_context, items,
-                 "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'",
+                 "data contains NULL && data contains bin('fo') && !(data contains bin('asdfasdfasdf')) && data "
+                 "contains bin('rk')",
                  1);
 }
 
@@ -1263,6 +1296,7 @@ TEST(Parser_TwoColumnAggregates)
     ColKey item_price_col = items->add_column(type_Double, "price");
     ColKey item_price_float_col = items->add_column(type_Float, "price_float");
     ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
+    ColKey item_price_mixed_col = items->add_column(type_Mixed, "price_mixed");
     ColKey item_discount_col = items->add_column(*discounts, "discount");
     ColKey item_creation_date = items->add_column(type_Timestamp, "creation_date");
     using item_t = std::pair<std::string, double>;
@@ -1275,6 +1309,7 @@ TEST(Parser_TwoColumnAggregates)
         obj.set(item_price_col, item_info[i].second);
         obj.set(item_price_float_col, float(item_info[i].second));
         obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
+        obj.set(item_price_mixed_col, Mixed(item_info[i].second));
         obj.set(item_creation_date, Timestamp(static_cast<int64_t>(item_info[i].second * 10), 0));
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
@@ -1287,6 +1322,7 @@ TEST(Parser_TwoColumnAggregates)
     ColKey items_col = t->add_column_list(*items, "items");
     ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
     ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
+    ColKey account_mixed_col = t->add_column(type_Mixed, "account_balance_mixed");
     ColKey account_creation_date_col = t->add_column(type_Timestamp, "account_creation_date");
 
     Obj person0 = t->create_object();
@@ -1297,16 +1333,19 @@ TEST(Parser_TwoColumnAggregates)
     person0.set(account_col, double(10.0));
     person0.set(account_float_col, float(10.0));
     person0.set(account_decimal_col, Decimal128(10.0));
+    person0.set(account_mixed_col, Mixed(10.0));
     person0.set(account_creation_date_col, Timestamp(30, 0));
     person1.set(id_col, int64_t(1));
     person1.set(account_col, double(20.0));
     person1.set(account_float_col, float(20.0));
     person1.set(account_decimal_col, Decimal128(20.0));
+    person1.set(account_mixed_col, Mixed(20.0));
     person1.set(account_creation_date_col, Timestamp(50, 0));
     person2.set(id_col, int64_t(2));
     person2.set(account_col, double(30.0));
     person2.set(account_float_col, float(30.0));
     person2.set(account_decimal_col, Decimal128(30.0));
+    person2.set(account_mixed_col, Mixed(30.0));
     person2.set(account_creation_date_col, Timestamp(70, 0));
 
     LnkLst list_0 = person0.get_linklist(items_col);
@@ -1364,6 +1403,15 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, t, "items.@min.price_decimal > account_balance_decimal", 0);
     verify_query(test_context, t, "items.@max.price_decimal > account_balance_decimal", 0);
     verify_query(test_context, t, "items.@avg.price_decimal > account_balance_decimal", 0);
+    // Mixed vs Mixed
+    verify_query(test_context, t, "items.@sum.price_mixed == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price_mixed == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price_mixed == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price_mixed == 6.375", 1); // person0
+    verify_query(test_context, t, "items.@sum.price_mixed > account_balance_mixed", 2);
+    verify_query(test_context, t, "items.@min.price_mixed > account_balance_mixed", 0);
+    verify_query(test_context, t, "items.@max.price_mixed > account_balance_mixed", 0);
+    verify_query(test_context, t, "items.@avg.price_mixed > account_balance_mixed", 0);
     // Timestamp vs Timestamp
     verify_query(test_context, t, "items.@min.creation_date == T40:0", 1); // person0
     verify_query(test_context, t, "items.@max.creation_date == T95:0", 2); // person0, person2
@@ -1470,7 +1518,7 @@ TEST(Parser_substitution)
 
     std::any args[] = {Int(2), Double(2.25), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
                        bd0,    Float(2.33),  obj_keys[0],  Int(3),        Int(4),     Bool(false)};
-    size_t num_args = 12;
+    size_t num_args = 13;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
     verify_query_sub(test_context, t, "name CONTAINS[c] $2", args, num_args, 2);
@@ -1559,7 +1607,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $5", args, num_args, 0));
-    verify_query_sub(test_context, t, "name == $6", args, num_args, 0);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $6", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $7", args, num_args, 0));
     // bool
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $0", args, num_args, 0));
@@ -1580,10 +1628,11 @@ TEST(Parser_substitution)
     // binary
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $1", args, num_args, 0));
-    verify_query_sub(test_context, t, "binary == $2", args, num_args, 1);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $2", args, num_args, 0));
     verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $5", args, num_args, 0));
+    verify_query_sub(test_context, t, "binary == $6", args, num_args, 1);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $7", args, num_args, 0));
 }
 
@@ -2160,12 +2209,10 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t2, "list.integers.@avg == 1", 2);
     verify_query(test_context, t2, "list.integers.@sum == 1", 2);
     verify_query(test_context, t2, "list.integers.@min == 1", 2);
-    // aggregate operators across multiple lists
-    // we haven't supported aggregates across multiple lists previously
-    // but the implementation works and applies the aggregate to the primitive list
-    // this may be surprising, but it is one way to interpret the expression
-    verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
-    verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
+
+    verify_query(test_context, t2, "ALL list.integers == 1", 3);  // first 2 rows have both a {1} list
+                                                                  // row 2 has only an empty list which matches ALL
+    verify_query(test_context, t2, "NONE list.integers == 1", 2); // row 0 has only one list and it macthes 1
 
     std::any args[] = {Int(1)};
     size_t num_args = 1;
@@ -2222,14 +2269,16 @@ TEST(Parser_list_of_primitive_ints)
     CHECK_EQUAL(message, "Cannot convert 'string' to a number");
 }
 
-TEST(Parser_list_of_primitive_strings)
+TEST_TYPES(Parser_list_of_primitive_strings, std::true_type, std::false_type)
 {
     Group g;
     TableRef t = g.add_table("table");
 
     constexpr bool nullable = true;
     auto col_str_list = t->add_column_list(type_String, "strings", nullable);
-    CHECK_THROW_ANY(t->add_search_index(col_str_list));
+    if constexpr (TEST_TYPE::value) {
+        t->add_search_index(col_str_list);
+    }
 
     auto get_string = [](size_t i) -> std::string {
         return util::format("string_%1", i);
@@ -2373,7 +2422,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
-    CHECK_EQUAL(message, "Property 'table.values' is not an object reference");
+    CHECK_EQUAL(message, "Property 'table.values' has no property 'len'");
 }
 
 TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>, Nullable<Bool>, Prop<Float>,
@@ -2391,7 +2440,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
-    std::vector<type> values = gen.values_from_int<type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<type> values = gen.values_from_int<type>({2, 9, 4, 0, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     t->create_object();             // empty list
     auto obj3 = t->create_object(); // {1}
@@ -2402,10 +2451,12 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     obj4.get_list<type>(col).add(value_1);
     auto obj5 = t->create_object(); // {null} or {0}
     obj5.get_list<type>(col).add(TEST_TYPE::default_value());
-
     for (auto it = t->begin(); it != t->end(); ++it) {
         it->set<ObjKey>(col_link, it->get_key()); // self links
     }
+    auto value_first = gen.convert_for_test<underlying_type>(2);
+    auto value_4 = gen.convert_for_test<underlying_type>(7);
+    auto value_last = gen.convert_for_test<underlying_type>(22);
 
     // repeat the same tests but over links, the tests are only the same because the links are self cycles
     std::vector<std::string> column_prefix = {"", "link.", "link.link."};
@@ -2418,8 +2469,8 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
         verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
         verify_query(test_context, t, util::format("%1values == NULL", path), (is_nullable ? 1 : 0)); // obj5
 
-        std::any args[] = {value_1};
-        size_t num_args = 1;
+        std::any args[] = {value_1, value_first, value_4, value_last};
+        size_t num_args = 4;
         size_t num_matching_value_1 = 3;                       // obj1, obj3, obj4
         size_t num_not_matching_value_1 = 2;                   // obj1, obj5
         size_t num_all_matching_value_1 = 3;                   // obj2, obj3, obj4
@@ -2434,6 +2485,11 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
             num_none_matching_value_1 = is_nullable ? 2 : 1;
             num_none_not_matching_value_1 = is_nullable ? 3 : 4;
         }
+        verify_query_sub(test_context, t, util::format("%1values[first] == $1", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[4] == $2", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[last] == $3", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[*] == $0", path), args, num_args,
+                         num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args,
                          num_not_matching_value_1);
@@ -2459,7 +2515,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     }
     else {
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
-        CHECK_EQUAL(message, "Property 'table.values' is not an object reference");
+        CHECK_EQUAL(message, "Property 'table.values' has no property 'length'");
     }
 }
 
@@ -3625,8 +3681,8 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
         if (i == 0) {
             list.add(items_keys[0]);
             list.add(items_keys[1]);
-            list.add(items_keys[2]);
             list.add(items_keys[3]);
+            list.add(items_keys[2]);
         }
         else if (i == 1) {
             for (size_t j = 0; j < 10; ++j) {
@@ -3645,6 +3701,10 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
         items->add_search_index(item_name_col);
         t->add_search_index(id_col);
     }
+
+    verify_query(test_context, t, "items[FIRST].name == 'milk'", 2);
+    verify_query(test_context, t, "items[LAST].name == 'cereal'", 1);
+    verify_query(test_context, t, "items[1].name == 'oranges'", 1);
 
     // any is implied over list properties
     verify_query(test_context, t, "items.price == 5.5", 2);
@@ -3894,8 +3954,9 @@ TEST(Parser_OperatorIN)
                                      ObjKey{},
                                      ObjLink{t->get_key(), people_keys[0]}};
     std::vector<Mixed> empty_list = {};
-    util::Any args[] = {realm::null(), int_list, strings_list, mixed_list, empty_list};
-    size_t num_args = 5;
+    util::Any args[] = {realm::null(),          int_list, strings_list, mixed_list, empty_list, String("customer_id"),
+                        String("fav_item.name")};
+    size_t num_args = 7;
     verify_query_sub(test_context, t, "customer_id IN $1", args, num_args, 3);
     verify_query_sub(test_context, t, "fav_item.name IN $2", args, num_args, 2);
     verify_query_sub(test_context, t, "fav_item.name IN $3", args, num_args, 0);
@@ -3913,7 +3974,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NULL IN items.price", 0);                // null
     verify_query(test_context, t, "'dairy' IN fav_item.allergens.name", 2); // through link prefix
     verify_query(test_context, items, "20 IN @links.Person.items.account_balance", 1); // backlinks
-    verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
+    verify_query(test_context, t, "fav_item.price IN items.price", 2);                 // single property in list
 
     // list property compared to a constant list
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ANY items.price", 2);
@@ -4030,6 +4091,97 @@ TEST(Parser_OperatorIN)
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found '5.5'"));
     CHECK_THROW_EX(verify_query(test_context, t, "5.5 in fav_item.price", 1), query_parser::InvalidQueryArgError,
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
+}
+
+TEST(Parser_OrOfIn)
+{
+    Group g;
+
+    TableRef persons = g.add_table("class_Person");
+    constexpr bool nullable = true;
+    auto col_name = persons->add_column(type_String, "name", nullable);
+    persons->create_object().set(col_name, "Ani");
+    persons->create_object().set(col_name, "Teddy");
+    persons->create_object().set(col_name, "Poly");
+    persons->create_object().set(col_name, ""); // empty string
+    persons->create_object();                   // null value
+
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'}", 3);
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null}", 4);
+    verify_query(test_context, persons,
+                 "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null} OR name IN {''}", 5);
+}
+
+TEST_TYPES(Parser_7642, std::true_type, std::false_type)
+{
+    Group g;
+    auto cars = g.add_table("class_Car");
+    auto col_make = cars->add_column(type_String, "make");
+    auto col_int = cars->add_column(type_Int, "value");
+    if (TEST_TYPE::value) {
+        cars->add_search_index(col_make);
+        cars->add_search_index(col_int);
+    }
+
+    cars->create_object().set(col_make, "Tesla").set(col_int, 123);
+    cars->create_object().set(col_make, "Ford").set(col_int, 456);
+    cars->create_object().set(col_make, "Audi").set(col_int, 789);
+    cars->create_object().set(col_make, "Chevy").set(col_int, 1000);
+
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
+    // do not compare to floats, and do not compare to floats/doubles that are not an exact integer
+    float nan_f = std::numeric_limits<float>::quiet_NaN();
+    float inf_f = std::numeric_limits<float>::infinity();
+    Vec args = Vec{456, 789.0f, 123.0, 789.10, 1000.1f};
+    verify_query(test_context, cars, "value IN $0", {args}, 3);
+    args.push_back(inf_f);
+    args.push_back(nan_f);
+    verify_query_sub(test_context, cars, "value == $0", args, 1);
+    verify_query_sub(test_context, cars, "value == $1", args, 1);
+    verify_query_sub(test_context, cars, "value == $2", args, 1);
+    verify_query_sub(test_context, cars, "value == $3", args, 0);
+    verify_query_sub(test_context, cars, "value == $4", args, 0);
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $5", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $6", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "NaN not supported for int"));
+}
+
+TEST(Parser_KeyPathSubstitution)
+{
+    Group g;
+    TableRef persons = g.add_table_with_primary_key("class_Person", type_String, "name");
+    TableRef animals = g.add_table_with_primary_key("class_Animal", type_String, "name");
+    persons->add_column(*animals, "Pet");
+    animals->add_column(type_Int, "Legs");
+
+    auto wanda = animals->create_object_with_primary_key("Wanda").set("Legs", 0);
+    auto kaa = animals->create_object_with_primary_key("Kaa").set("Legs", 0);
+    auto zazu = animals->create_object_with_primary_key("Zazu").set("Legs", 2);
+    auto pluto = animals->create_object_with_primary_key("Pluto").set("Legs", 4);
+
+    persons->create_object_with_primary_key("Adam").set("Pet", wanda.get_key());
+    persons->create_object_with_primary_key("Brian").set("Pet", kaa.get_key());
+    persons->create_object_with_primary_key("Charlie").set("Pet", zazu.get_key());
+    persons->create_object_with_primary_key("David").set("Pet", pluto.get_key());
+    persons->create_object_with_primary_key("Eric");
+
+    std::any args[] = {String("Pet"), String("Pet.Legs"), 25, realm::null(), String("Pet.Weight")};
+
+    size_t num_args = 5;
+    verify_query_sub(test_context, persons, "$K0 != null", args, num_args, 4);
+    verify_query_sub(test_context, persons, "$K0 == null", args, num_args, 1);
+    verify_query_sub(test_context, persons, "$K1 = 0", args, num_args, 2);
+    verify_query_sub(test_context, persons, "$K1 > 0", args, num_args, 2);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K2 = 0", args, num_args, 2),
+                query_parser::InvalidQueryArgError);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K3 = 0", args, num_args, 2),
+                query_parser::InvalidQueryArgError);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K4 = 0", args, num_args, 2),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K5 = 0", args, num_args, 2),
+                query_parser::InvalidQueryArgError);
 }
 
 TEST(Parser_ListVsList)
@@ -4591,10 +4743,11 @@ TEST(Parser_Decimal128)
     verify_query(test_context, table, "dec >= -infinity", table->size() - num_nans);
 
     // argument substitution checks
-    std::any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}};
-    size_t num_args = 3;
+    std::any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}, 123.0};
+    size_t num_args = 4;
     verify_query_sub(test_context, table, "dec == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "dec == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "dec == $3", args, num_args, 1);
     verify_query_sub(test_context, table, "dec == $2", args, num_args, 0);
     verify_query_sub(test_context, table, "nullable_dec == $2", args, num_args, 1);
 
@@ -4663,21 +4816,31 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed != 50", 99);
     verify_query(test_context, table, "mixed == null", 1);
     verify_query(test_context, table, "mixed != null", 99);
-    verify_query(test_context, table, "mixed beginswith 'String2'", 3); // 20, 24, 28
-    verify_query(test_context, table, "mixed beginswith B64\"U3RyaW5nMg==\"",
-                 3); // 20, 24, 28, this string literal is base64 for 'String2'
-    verify_query(test_context, table, "mixed contains \"trin\"", 25);
-    verify_query(test_context, table, "mixed like \"Strin*\"", 25);
-    verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
+    verify_query(test_context, table, "mixed beginswith 'String2'", 2);      // 20, 24, 28
+    verify_query(test_context, table, "mixed beginswith bin('String2')", 1); // 28
+    // the following string literal is base64 for 'String2'
+    verify_query(test_context, table, "mixed beginswith B64\"U3RyaW5nMg==\"", 2);      // 20, 24
+    verify_query(test_context, table, "mixed beginswith bin(B64\"U3RyaW5nMg==\")", 1); // 28
+    verify_query(test_context, table, "mixed contains \"trin\"", 24);
+    verify_query(test_context, table, "mixed contains bin(\"trin\")", 1);
+    verify_query(test_context, table, "mixed like \"Strin*\"", 24);
+    verify_query(test_context, table, "mixed like bin(\"Strin*\")", 1); // 28
+    verify_query(test_context, table, "mixed endswith \"4\"", 5);       // 4, 24, 44, 64, 84
+    verify_query(test_context, table, "mixed endswith bin(\"4\")", 0);
+    verify_query(test_context, table, "mixed endswith bin(\"Binary\")", 1);
+    verify_query(test_context, table, "mixed.@size > 7", 22);
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
-    char bin[1] = {0x34};
-    std::any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key()),
+    std::string str_value = "4";
+    std::any args[] = {BinaryData(str_value),
+                       ObjLink(table->get_key(), table->begin()->get_key()),
                        ObjLink(origin->get_key(), origin->begin()->get_key()),
                        ObjLink(TableKey(), ObjKey()), // null link
-                       realm::null{}};
-    size_t num_args = 5;
-    verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
+                       realm::null{},
+                       StringData(str_value)};
+    size_t num_args = 6;
+    verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 0);
+    verify_query_sub(test_context, table, "mixed endswith $5", args, num_args, 5); // 4, 24, 44, 64, 84
     verify_query_sub(test_context, origin, "link == $1", args, num_args, 1);
     verify_query_sub(test_context, origin, "link == $3", args, num_args, 1);
     verify_query_sub(test_context, origin, "link == $4", args, num_args, 1);
@@ -4688,16 +4851,24 @@ TEST(Parser_Mixed)
     verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
     verify_query_sub(test_context, origin, "mixed == $1", args, num_args, 1);
 
-    verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
-    verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
-    verify_query(test_context, table, "mixed !=[c] \"string2binary\"", 99);
+    verify_query(test_context, table, "mixed == \"String2Binary\"", 0);
+    verify_query(test_context, table, "mixed == \"String4\"", 1);
+    verify_query(test_context, table, "mixed == bin(\"String2Binary\")", 1);
+    verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 0);
+    verify_query(test_context, table, "mixed ==[c] \"string4\"", 1);
+    verify_query(test_context, table, "mixed ==[c] binary(\"string2binary\")", 1);
+    verify_query(test_context, table, "mixed !=[c] \"string2binary\"", 100);
+    verify_query(test_context, table, "mixed !=[c] \"string4\"", 99);
+    verify_query(test_context, table, "mixed !=[c] bin(\"string2binary\")", 99);
     verify_query(test_context, table, "mixed == \"String48\"", 1);
     verify_query(test_context, table, "mixed == 3.0", 3);
     verify_query(test_context, table, "mixed == NULL", 1);
     verify_query(test_context, origin, "links.mixed > 50", 5);
     verify_query(test_context, origin, "links.mixed beginswith[c] \"string\"", 10);
+    verify_query(test_context, origin, "links.mixed beginswith[c] bin(\"string\")", 1);
     verify_query(test_context, origin, "link.mixed > 50", 2);
     verify_query(test_context, origin, "link.mixed beginswith[c] \"string\"", 5);
+    verify_query(test_context, origin, "link.mixed beginswith[c] bin(\"string\")", 0);
     verify_query(test_context, origin, "link == NULL", 1);
     verify_query(test_context, origin, "link.mixed == NULL", 1);
     verify_query(test_context, origin, "links.mixed == NULL", 1);
@@ -4740,6 +4911,8 @@ TEST(Parser_TypeOfValue)
     }
     std::string bin_data("String2Binary");
     table->get_object(15).set(col_any, Mixed());
+    table->get_object(17).set_collection(col_any, CollectionType::Dictionary);
+    table->get_object(19).set<Mixed>(col_any, table->begin()->get_link());
     table->get_object(75).set(col_any, Mixed(75.));
     table->get_object(28).set(col_any, Mixed(BinaryData(bin_data)));
     nb_strings--;
@@ -4765,7 +4938,10 @@ TEST(Parser_TypeOfValue)
             ++it;
         }
     }
-    size_t nb_ints = 71;
+
+    size_t nb_ints = 69;
+    size_t nb_numerics = nb_ints + 3;
+
     verify_query(test_context, table, "mixed.@type == 'string'", nb_strings);
     verify_query(test_context, table, "mixed.@type == 'double'", 2);
     verify_query(test_context, table, "mixed.@type == 'float'", 0);
@@ -4789,16 +4965,22 @@ TEST(Parser_TypeOfValue)
     verify_query(test_context, table, "mixed.@type == 'char'", nb_ints);
     verify_query(test_context, table, "mixed.@type == 'timestamp'", 0);
     verify_query(test_context, table, "mixed.@type == 'datetimeoffset'", 0);
-    verify_query(test_context, table, "mixed.@type == 'object'", 0);
+    verify_query(test_context, table, "mixed.@type == 'objectlink'", 1);
+    verify_query(test_context, table, "mixed.@type == 'object'", 1);
+
+    std::any args[] = {StringData("object")};
+    size_t num_args = 1;
+    verify_query_sub(test_context, table, "mixed.@type == $0", args, num_args, 1);
 
     verify_query(test_context, table,
                  "mixed.@type == 'binary' || mixed.@type == 'DECIMAL' || mixed.@type == 'Double'", 4);
     verify_query(test_context, table, "mixed.@type == 'null'", 1);
-    verify_query(test_context, table, "mixed.@type == 'numeric'", table->size() - nb_strings - 2);
-    verify_query(
-        test_context, table,
-        "mixed.@type == 'numeric' || mixed.@type == 'string' || mixed.@type == 'binary' || mixed.@type == 'null'",
-        table->size());
+    verify_query(test_context, table, "mixed.@type == 'numeric'", nb_numerics);
+    verify_query(test_context, table,
+                 "mixed.@type == 'numeric' || mixed.@type == 'string' || mixed.@type == 'objectlink' || mixed.@type "
+                 "== 'binary' || mixed.@type == "
+                 "'object' || mixed.@type == 'null'",
+                 table->size());
     verify_query(test_context, table, "mixed.@type == mixed.@type", table->size());
     verify_query(test_context, origin, "link.mixed.@type == 'numeric' || link.mixed.@type == 'string'",
                  origin->size());
@@ -4806,9 +4988,9 @@ TEST(Parser_TypeOfValue)
                  origin->size());
     verify_query(test_context, origin, "ANY links.mixed.@type IN ANY {'numeric', 'string'}", origin->size());
 
-    verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
+    verify_query(test_context, table, "mixed.@type == int.@type", nb_ints);
     verify_query(test_context, origin, "link.@type == link.mixed.@type", 0);
-    verify_query(test_context, origin, "links.@type == links.mixed.@type", 0);
+    verify_query(test_context, origin, "links.@type == links.mixed.@type", 1); // Object 19
 
     verify_query(test_context, table, "mixed > 50", int_over_50);
     verify_query(test_context, table, "mixed > 50 && mixed.@type == 'double'", 1);
@@ -4862,10 +5044,11 @@ TEST(Parser_TypeOfValue)
     CHECK_THROW_EX(verify_query(test_context, table, "int.@type == 'int'", 1), query_parser::InvalidQueryError,
                    std::string(e.what()).find("Comparison between two constants is not supported") !=
                        std::string::npos);
-    CHECK_THROW_EX(verify_query(test_context, origin, "link.@type == 'object'", 1), query_parser::InvalidQueryError,
-                   CHECK(std::string(e.what()).find(
-                             "Comparison between two constants is not supported ('\"object\"' and '\"object\"')") !=
-                         std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, origin, "link.@type == 'objectlink'", 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find(
+                  "Comparison between two constants is not supported ('\"objectlink\"' and '\"objectlink\"')") !=
+              std::string::npos));
     CHECK_THROW_EX(verify_query(test_context, table, "mixed.@type =[c] 'string'", 1), query_parser::InvalidQueryError,
                    CHECK_EQUAL(std::string(e.what()), "Unsupported comparison operator '=[c]' against type '@type', "
                                                       "right side must be a string or binary type"));
@@ -4906,6 +5089,9 @@ TEST(Parser_Dictionary)
         if ((i % 5) == 0) {
             dict.insert("Foo", 5);
         }
+        if (i == 78) {
+            dict.insert("Value", Mixed()); // Insert NULL
+        }
         dict.insert("Bar", i);
         if (incr) {
             expected++;
@@ -4932,23 +5118,30 @@ TEST(Parser_Dictionary)
     size_t num_args = 1;
 
     verify_query(test_context, foo, "dict.@values > 50", 50);
+    verify_query(test_context, foo, "dict[*] > 50", 50);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query(test_context, foo, "dict.Value > 50", expected);
     verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
-    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
-    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 20);
+    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 22);
+    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 19);
     verify_query(test_context, foo, "ANY dict.@keys == {'Bar'}", 100);
     verify_query(test_context, foo, "dict.@keys == {'Bar', 'Foo'}", 3);
-    verify_query(test_context, foo, "dict['Value'] == {}", 0);
+    verify_query(test_context, foo, "dict['Value'] == NULL", 23);
+    verify_query(test_context, foo, "dict['Value'] == {}", 0); // Tricky - what does this even mean?
     verify_query(test_context, foo, "dict['Value'] == {0, 100}", 3);
     verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
-    verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
+    verify_query(test_context, foo, "ALL dict.@type == 'int'", 99);   // One dictionary has a NULL
     verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
     verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
+    // Dictionaries are not ordered
+    CHECK_THROW_ANY(verify_query(test_context, foo, "dict[FIRST] > 50", expected));
+    CHECK_THROW_ANY(verify_query(test_context, foo, "dict[LAST] > 50", expected));
 
     verify_query(test_context, origin, "link.dict['Value'] > 50", 3);
+    verify_query(test_context, origin, "link.dict.Value > 50", 3);
     verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
     verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
@@ -4969,9 +5162,6 @@ TEST(Parser_Dictionary)
 
     dict.insert("Value", 4.5);
     std::string message;
-
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
-    CHECK_EQUAL(message, "Property 'foo.dict' is not an object reference");
 
     // aggregates still work with mixed types
     verify_query(test_context, foo, "dict.@max == 100", 2);
@@ -5023,8 +5213,13 @@ TEST(Parser_DictionaryObjects)
     q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
     CHECK_EQUAL(q.count(), 1);
 
+
+    std::any args[] = {StringData("pluto")};
+    size_t num_args = 1;
+
     verify_query(test_context, persons, "pets.@values.age > 4", 2);
     verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 2);
+    verify_query_sub(test_context, persons, "pets.@values == obj('dog', $0)", args, num_args, 2);
     verify_query(test_context, persons, "pets.@values != obj('dog', 'pluto')", 2);
     verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro') }", 2);
     verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'astro'), NULL }", 2);
@@ -5061,6 +5256,288 @@ TEST(Parser_DictionarySorting)
     CHECK_EQUAL(results.get_object(1).get_key(), lady.get_key());
     CHECK_EQUAL(results.get_object(2).get_key(), pluto.get_key());
     CHECK_EQUAL(results.get_object(3).get_key(), astro.get_key());
+}
+
+TEST(Parser_NestedDictionaryList)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column_dictionary(type_Mixed, "properties");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    auto dict_paul = paul.get_dictionary(col);
+    dict_paul.insert_collection("tickets", CollectionType::List);
+    auto list1 = dict_paul.get_list("tickets");
+    list1->add(0);
+    list1->add(1);
+    list1->add(4);
+
+    Obj john = persons->create_object_with_primary_key("John");
+    auto dict_john = john.get_dictionary(col);
+    dict_john.insert_collection("tickets", CollectionType::List);
+    auto list2 = dict_john.get_list("tickets");
+    list2->add(2);
+    list2->add(3);
+    list2->add(4);
+
+    auto q = persons->column<Dictionary>(col).path({"tickets", 0}) == 0;
+    CHECK_EQUAL(q.count(), 1);
+
+    verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
+    verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
+}
+
+TEST(Parser_NestedListDictionary)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column_list(type_Mixed, "properties");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    auto list_paul = paul.get_list<Mixed>(col);
+    list_paul.insert_collection(0, CollectionType::Dictionary);
+    auto dict1 = list_paul.get_dictionary(0);
+    dict1->insert("one", 1);
+    dict1->insert("two", 2);
+    dict1->insert("foo", 5);
+    dict1->insert("three", 3);
+
+    Obj john = persons->create_object_with_primary_key("John");
+    auto list_john = john.get_list<Mixed>(col);
+    list_john.insert_collection(0, CollectionType::Dictionary);
+    auto dict2 = list_john.get_dictionary(0);
+    dict2->insert("two", 2);
+    dict2->insert("bar", 5);
+    dict2->insert("four", 4);
+
+    auto q = persons->column<Lst<Mixed>>(col).path({0, "one"}) == 1;
+    CHECK_EQUAL(q.count(), 1);
+
+    verify_query(test_context, persons, "properties[0].one == 1", 1);
+    verify_query(test_context, persons, "properties[*].one == 1", 1);
+    verify_query(test_context, persons, "properties[first].two == 2", 2);
+    verify_query(test_context, persons, "properties[0][*] == 5", 2);
+}
+
+TEST(Parser_NestedMixedDictionaryList)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    // Be aware - this is not a dictionary property
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_self = persons->add_column(*persons, "self");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    paul.set(col_self, paul.get_key());
+    paul.set_collection(col, CollectionType::Dictionary);
+    auto dict_paul = paul.get_dictionary(col);
+    {
+        dict_paul.insert_collection("instruments", CollectionType::List);
+        auto list = dict_paul.get_list("instruments");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        list->insert_collection(2, CollectionType::Dictionary);
+        auto bass = list->get_dictionary(0);
+        bass->insert("brand", "høfner");
+        bass->insert("strings", 4);
+        bass->insert("electric", true);
+        auto guitar = list->get_dictionary(1);
+        guitar->insert("brand", "gibson");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+        guitar = list->get_dictionary(2);
+        guitar->insert("brand", "martin");
+        guitar->insert("strings", 12);
+        guitar->insert("electric", false);
+    }
+    {
+        dict_paul.insert_collection("pets", CollectionType::List);
+        auto list = dict_paul.get_list("pets");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto bird = list->get_dictionary(0);
+        bird->insert("name", "pipper");
+        bird->insert("legs", 2);
+        bird->insert("age", 4);
+        auto dog = list->get_dictionary(1);
+        dog->insert("name", "fido");
+        dog->insert("legs", 4);
+        dog->insert("age", 8);
+    }
+
+    Obj john = persons->create_object_with_primary_key("John");
+    john.set(col_self, john.get_key());
+    john.set_collection(col, CollectionType::Dictionary);
+    auto dict_john = john.get_dictionary(col);
+    dict_john.insert_collection("tickets", CollectionType::List); // Value here is NULL
+    {
+        dict_john.insert_collection("instruments", CollectionType::List);
+        auto list = dict_john.get_list("instruments");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto guitar = list->get_dictionary(0);
+        guitar->insert("brand", "fender");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+        guitar = list->get_dictionary(1);
+        guitar->insert("brand", "gibson");
+        guitar->insert("color", "red");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+    }
+    {
+        dict_john.insert_collection("pets", CollectionType::List);
+        auto list = dict_john.get_list("pets");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto cat = list->get_dictionary(0);
+        cat->insert("name", "Lady");
+        cat->insert("legs", 4);
+        cat->insert("age", 6);
+        auto snake = list->get_dictionary(1);
+        snake->insert("name", "carl");
+        snake->insert("legs", 0);
+        snake->insert("age", 20);
+    }
+
+    Obj george = persons->create_object_with_primary_key("George");
+    george.set(col_self, george.get_key());
+    george.set_collection(col, CollectionType::List);
+    auto list_george = george.get_list<Mixed>(col);
+    list_george.add(1);
+    list_george.add(2);
+    list_george.add(3);
+
+    Obj ringo = persons->create_object_with_primary_key("Ringo");
+    ringo.set(col_self, ringo.get_key());
+    ringo.set_collection(col, CollectionType::Dictionary);
+    auto dict_ringo = ringo.get_dictionary(col);
+    dict_ringo.insert("Foo", "Bar");
+
+    auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
+    CHECK_EQUAL(q.count(), 1);
+
+    verify_query(test_context, persons, "properties.instruments[0].strings == 6", 1);
+    verify_query(test_context, persons, "properties.instruments[0].strings > 5", 1);
+    verify_query(test_context, persons, "properties.instruments[*].strings == 6", 2);
+    verify_query(test_context, persons, "properties.instruments[LAST].strings == 6", 1);
+    verify_query(test_context, persons, "properties.instruments[*].@keys  == 'color'", 1);
+    verify_query(test_context, persons, "properties.instruments[*].brand  BEGINSWITH 'gi'", 2);
+    verify_query(test_context, persons, "properties[*][0].legs  == 2", 1); // Pipper the bird
+    verify_query(test_context, persons, "properties[*][0].legs  == 4", 1); // Lady the cat
+    verify_query(test_context, persons, "properties[*][*].legs  == 0", 1); // carl the snake
+    verify_query(test_context, persons, "properties[*][*][*] > 10", 2);    // carl the snake and martin the guitar
+    verify_query(test_context, persons, "properties[*] == {3, 2, 1}", 0);
+    verify_query(test_context, persons, "properties[*] == {1, 2, 3}", 1);
+    verify_query(test_context, persons, "ANY properties[*] == 2", 1);
+    verify_query(test_context, persons, "NONE properties[*] == 2", 3);
+    verify_query(test_context, persons, "properties.@keys == 'instruments'", 2);
+    verify_query(test_context, persons, "properties.@keys == 'pets'", 2);
+    verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
+    verify_query(test_context, persons, "properties.@size == 3", 2);
+    verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
+    verify_query(test_context, persons, "properties.@type == 'object'", 3);
+    verify_query(test_context, persons, "properties.@type == 'array'", 1);
+    verify_query(test_context, persons, "properties.@type == 'collection'", 4);
+    verify_query(test_context, persons, "properties.Foo == 'Bar'", 1);
+}
+
+TEST(Parser_NestedDictionaryDeep)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_self = persons->add_column(*persons, "self");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    Obj john = persons->create_object_with_primary_key("John");
+    paul.set(col_self, paul.get_key());
+    paul.set_collection(col, CollectionType::Dictionary);
+    auto dict1 = paul.get_dictionary(col);
+    dict1.insert("one", 1);
+    dict1.insert_collection("two", CollectionType::List);
+    dict1.insert_collection("three", CollectionType::List);
+
+    auto list1 = dict1.get_list("two");
+    list1->add(5);
+    list1->add(6);
+
+    auto list2 = dict1.get_list("three");
+    list2->add(5);
+    list2->insert_collection(1, CollectionType::Dictionary);
+    auto dict2 = list2->get_dictionary(1);
+    dict2->insert("Hello", 5);
+    dict2->insert("friend", john);
+    bool thrown = false;
+    try {
+        for (int i = 0; i < 100; i++) {
+            dict2->insert_collection("deeper", CollectionType::Dictionary);
+            dict2 = dict2->get_dictionary("deeper");
+        }
+    }
+    catch (const Exception& e) {
+        CHECK(e.code() == ErrorCodes::LimitExceeded);
+        thrown = true;
+    }
+    CHECK(thrown);
+
+    /*
+    "properties": {
+      "one": 1,
+      "two": [
+        5,
+        6
+      ]
+      "three": [
+        5,
+        {
+          "Hello": 5
+        }
+      ],
+    }
+    */
+
+    verify_query(test_context, persons, "self.properties == 1", 0);
+    verify_query(test_context, persons, "properties[0] == 1", 0);
+    verify_query(test_context, persons, "properties['one'] == 1", 1);
+    verify_query(test_context, persons, "properties.two[1].Hello == 5", 0);
+    verify_query(test_context, persons, "properties.three[0].Hello == 5", 0);
+    verify_query(test_context, persons, "properties.three[1].Hello == 5", 1);
+    verify_query(test_context, persons, "properties.three[1].friend.name == 'John'", 1);
+}
+
+TEST(Parser_NestedDictionaryMultipleLinks)
+{
+    // Check that we will follow every link before descending down by path
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_friends = persons->add_column_list(*persons, "friends");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    Obj john = persons->create_object_with_primary_key("John");
+    Obj george = persons->create_object_with_primary_key("George");
+    Obj ringo = persons->create_object_with_primary_key("Ringo");
+    Obj eric = persons->create_object_with_primary_key("Eric");
+
+    paul.set_collection(col, CollectionType::Dictionary);
+    john.set_collection(col, CollectionType::Dictionary);
+    george.set_collection(col, CollectionType::Dictionary);
+    ringo.set_collection(col, CollectionType::Dictionary);
+    paul.get_dictionary(col).insert("plays", "bass");
+    john.get_dictionary(col).insert("plays", "guitar");
+    george.get_dictionary(col).insert("plays", "guitar");
+    ringo.get_dictionary(col).insert("plays", "drums");
+
+    paul.get_linklist(col_friends).add(john.get_key());
+    auto erics_friends = eric.get_linklist(col_friends);
+    erics_friends.add(paul.get_key());
+    erics_friends.add(john.get_key());
+    erics_friends.add(george.get_key());
+    erics_friends.add(ringo.get_key());
+
+    verify_query(test_context, persons, "friends.properties.plays == 'bass'", 1);
+    verify_query(test_context, persons, "friends.properties.plays == 'guitar'", 2);
 }
 
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
@@ -5175,6 +5652,8 @@ TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128
         verify_query(test_context, table, "set.@min == value", 1); // 3
         verify_query(test_context, table, "set.@avg == value", 1); // 3
         verify_query(test_context, table, "set.@sum == value", 1); // 3
+        // Sets not indexable
+        CHECK_THROW_ANY(verify_query(test_context, table, "set[1] == 3", 2));
     }
     else {
         CHECK_THROW_ANY(verify_query(test_context, table, "set.@min > 100", 1));
@@ -5410,6 +5889,72 @@ TEST(Parser_SetLinks)
 
     verify_query(test_context, origin, "link.set.val == 3", 1);
     verify_query(test_context, origin, "link.set.val == 5", 2);
+}
+
+TEST(Parser_CollectionLinks)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict = persons->add_column_dictionary(*persons, "relations");
+    auto col_list = persons->add_column_list(*persons, "children");
+    auto col_int = persons->add_column_list(type_Int, "scores");
+    persons->add_column(*persons, "spouse");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
+    Obj charlie = persons->create_object_with_primary_key("charlie");
+
+    Obj david = persons->create_object_with_primary_key("david");
+    persons->create_object_with_primary_key("elisabeth");
+    persons->create_object_with_primary_key("felix");
+
+    Obj gary = persons->create_object_with_primary_key("gary");
+    Obj hutch = persons->create_object_with_primary_key("hutch");
+
+    auto dict = adam.get_dictionary(col_dict);
+    dict.insert("partner", bernie);
+    dict.insert("colleague", charlie);
+
+    dict = bernie.get_dictionary(col_dict);
+    dict.insert("partner", charlie);
+    dict.insert("colleague", charlie);
+    auto scores = bernie.get_list<Int>(col_int);
+    scores.add(1);
+    scores.add(2);
+    scores.add(3);
+
+    dict = charlie.get_dictionary(col_dict);
+    dict.insert("partner", adam);
+    dict.insert("colleague", bernie);
+    dict.insert("uncle", gary);
+    scores = charlie.get_list<Int>(col_int);
+    scores.add(3);
+    scores.add(4);
+    scores.add(5);
+
+    auto list = adam.get_linklist(col_list);
+    list.add(david);
+
+    list = david.get_linklist(col_list);
+    list.add(gary);
+    list.add(hutch);
+
+    list = bernie.get_linklist(col_list);
+    list.add(gary);
+    list.add(david);
+
+    verify_query(test_context, persons, "relations.partner.name == 'bernie'", 1);
+    verify_query(test_context, persons, "relations[SIZE] == 3", 1);
+    verify_query(test_context, persons, "relations.partner.relations.partner.name == 'bernie'", 1);
+    verify_query(test_context, persons, "relations.colleague.name == 'charlie'", 2);
+    verify_query(test_context, persons, "relations.colleague.scores[FIRST] == 1", 1);
+    verify_query(test_context, persons, "relations.colleague.scores[LAST] > 2", 3);
+
+    verify_query(test_context, persons, "children[FIRST].name == 'david'", 1);
+    verify_query(test_context, persons, "children[*].name == 'david'", 2);
+    verify_query(test_context, persons, "children[SIZE] == 2", 2);
+    verify_query(test_context, persons, "children[FIRST].children[LAST].name == 'hutch'", 1);
+    CHECK_THROW_ANY(verify_query(test_context, persons, "spouse[5].name == 'elisabeth'", 0));
 }
 
 namespace {
@@ -5899,16 +6444,118 @@ TEST(Parser_issue6831)
 {
     Group g;
     auto plant = g.add_table_with_primary_key("Plant", type_ObjectId, "id");
-    plant->add_column(type_String, "Name");
+    plant->add_column(type_String, "Family");
     auto inventory = g.add_table_with_primary_key("Inventory", type_String, "id");
     inventory->add_column_dictionary(*plant, "Plants");
 
+    auto potato = plant->create_object_with_primary_key(ObjectId::gen());
+    potato.set("Family", "Solanaceae");
     auto petunia = plant->create_object_with_primary_key(ObjectId::gen());
-    petunia.set("Name", "Petunia");
+    petunia.set("Family", "Solanaceae");
+    auto rose = plant->create_object_with_primary_key(ObjectId::gen());
+    rose.set("Family", "Rosaceae");
     auto obj = inventory->create_object_with_primary_key("Inv");
     auto dict = obj.get_dictionary("Plants");
+    dict.insert("Potato", potato);
     dict.insert("Petunia", petunia);
+    dict.insert("Rose", rose);
     auto q = inventory->query("Plants.@keys == 'Petunia'");
+    CHECK_EQUAL(q.count(), 1);
+    q = inventory->query("Plants.Rose.Family == 'Rosaceae'");
+    CHECK_EQUAL(q.count(), 1);
+}
+
+TEST(Parser_issue7393)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("Table", type_String, "id");
+    auto col_value = table->add_column(type_Mixed, "value");
+    auto obj = table->create_object_with_primary_key("EMBEDDED");
+    obj.set_json(col_value, R"([
+        [4, 5, 6],
+        {
+            "key1": 7,
+            "key2": 8,
+            "key3": [9]
+        }
+    ])");
+    auto q = table->query("value[*][*] == {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("value[0][*] == {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("value[1][*] == {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 0);
+}
+
+TEST(Parser_Wildcard)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_String, "id");
+    auto origin = g.add_table_with_primary_key("origin", type_String, "id");
+    auto col_any = table->add_column(type_Mixed, "value");
+    auto col_dict = table->add_column_dictionary(type_Mixed, "dict");
+    auto col_list = table->add_column_list(type_Int, "list");
+    auto col_list_any = table->add_column_list(type_Mixed, "list_any");
+    auto col_link = origin->add_column_list(*table, "link");
+
+    auto obj1 = table->create_object_with_primary_key("obj1");
+    obj1.set_json(col_any, R"([[3, 2, 1], [4, 5, 6]])");
+    obj1.set_json(col_dict, R"({"key1": 1, "key2": 2, "key3": [4, 5, 6]})");
+    obj1.set_json(col_list_any, R"([4, 5, 6])");
+    auto list = obj1.get_list<Int>(col_list);
+    list.add(4);
+    list.add(5);
+    list.add(6);
+    auto obj2 = table->create_object_with_primary_key("obj2");
+    obj2.set_json(col_any, R"([[9, 8, 7], [1, 2, 5]])");
+    obj2.set_json(col_dict, R"({"key1": 3, "key3": 4, "key4": [3, 2, 1]})");
+    obj2.set_json(col_list_any, R"([1, 2, [8, 9, 10]])");
+    list = obj2.get_list<Int>(col_list);
+    list.add(1);
+    list.add(2);
+    list.add(3);
+    auto obj3 = table->create_object_with_primary_key("obj3");
+    obj3.set_json(col_any, R"([[9, 8, 7], [1, 2, 3]])");
+    obj3.set_json(col_dict, R"({"key1": 3, "key2": [8, 10], "key3": [3, 2, 1]})");
+
+    auto obj = origin->create_object_with_primary_key("top");
+    auto ll = obj.get_linklist(col_link);
+    ll.add(obj1.get_key());
+    ll.add(obj2.get_key());
+
+    auto q = table->query("value[*][*] = {1, 2, 3, 4, 5, 6}");
+    CHECK_EQUAL(q.count(), 0);
+    q = table->query("value[*][*] = {3, 2, 1}");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("{3, 2, 1} = value[*][*]");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("ANY value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 3);
+    q = table->query("ALL value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("NONE value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 3);
+    q = origin->query("link.dict.key1 = {1, 3}");
+    CHECK_EQUAL(q.count(), 0);
+    q = origin->query("link.dict.key1 = {1}");
+    CHECK_EQUAL(q.count(), 1);
+
+    q = origin->query("link[0].list = {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list = {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list_any = {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list_any[0] = 4");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list_any[2][1] = 9");
+    CHECK_EQUAL(q.count(), 1);
+
+    q = origin->query("link.dict.@keys = {'key1', 'key2', 'key3'}"); // Order matters
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("ALL link.dict.@keys = {'key4', 'key3', 'key1'}"); // Order does not matter
     CHECK_EQUAL(q.count(), 1);
 }
 

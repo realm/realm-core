@@ -36,7 +36,6 @@
 #include <external/mpark/variant.hpp>
 
 namespace realm {
-app::Response do_http_request(const app::Request& request);
 
 class AdminAPIEndpoint {
 public:
@@ -83,6 +82,7 @@ public:
     void delete_app(const std::string& app_id) const;
     void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
     void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
+    void create_schema(const std::string& app_id, const AppCreateConfig& config, bool use_draft = true) const;
 
     struct Service {
         std::string id;
@@ -97,6 +97,7 @@ public:
         util::Optional<nlohmann::json> partition;
         util::Optional<nlohmann::json> queryable_field_names;
         util::Optional<nlohmann::json> permissions;
+        util::Optional<nlohmann::json> asymmetric_tables;
         std::string state;
         bool recovery_is_disabled = false;
         std::string_view sync_service_name()
@@ -122,6 +123,10 @@ public:
                               ServiceConfig sync_config) const;
     ServiceConfig set_disable_recovery_to(const std::string& app_id, const std::string& service_id,
                                           ServiceConfig sync_config, bool disable) const;
+    struct SchemaVersionInfo {
+        int64_t version_major;
+    };
+    std::vector<SchemaVersionInfo> get_schema_versions(const std::string& app_id) const;
     bool is_sync_enabled(const std::string& app_id) const;
     bool is_sync_terminated(const std::string& app_id) const;
     bool is_initial_sync_complete(const std::string& app_id) const;
@@ -254,38 +259,16 @@ struct AppSession {
 };
 AppSession create_app(const AppCreateConfig& config);
 
-class SynchronousTestTransport : public app::GenericNetworkTransport {
-public:
-    void send_request_to_server(const app::Request& request,
-                                util::UniqueFunction<void(const app::Response&)>&& completion) override
-    {
-        {
-            std::lock_guard barrier(m_mutex);
-        }
-        completion(do_http_request(request));
-    }
-
-    void block()
-    {
-        m_mutex.lock();
-    }
-    void unblock()
-    {
-        m_mutex.unlock();
-    }
-
-private:
-    std::mutex m_mutex;
-};
-
 // This will create a new test app in the baas server - base_url and admin_url
 // are automatically set
 AppSession get_runtime_app_session();
 
 std::string get_mongodb_server();
+std::string get_base_url();
+std::string get_admin_url();
 
 template <typename Factory>
-inline app::App::Config get_config(Factory factory, const AppSession& app_session)
+inline app::AppConfig get_config(Factory factory, const AppSession& app_session)
 {
     return {app_session.client_app_id,
             factory,

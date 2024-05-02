@@ -51,11 +51,10 @@ std::string changeset_compressed_to_binary(const std::string& changeset_compress
 
     // Decode from BASE64
     const size_t encoded_size = changeset_compressed.size() - (p - start);
-    size_t buffer_size = util::base64_decoded_size(encoded_size);
     std::string decode_buffer;
-    decode_buffer.resize(buffer_size);
+    decode_buffer.resize(util::base64_decoded_size(encoded_size));
     StringData window(p, encoded_size);
-    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer);
     if (!decoded_size || *decoded_size > encoded_size) {
         throw std::runtime_error("Invalid base64 value");
     }

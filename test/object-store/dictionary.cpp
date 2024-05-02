@@ -33,6 +33,8 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
+#include <numeric>
+
 using namespace realm;
 using namespace realm::util;
 
@@ -60,6 +62,141 @@ struct StringMaker<object_store::Dictionary> {
 
 namespace cf = realm::collection_fixtures;
 
+TEST_CASE("nested dictionary in mixed", "[dictionary]") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{{"any_collection", {{"any", PropertyType::Mixed | PropertyType::Nullable}}}};
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table_any = r->read_group().get_table("class_any_collection");
+    r->begin_transaction();
+
+    Obj any_obj = table_any->create_object();
+    ColKey col_any = table_any->get_column_key("any");
+    any_obj.set_collection(col_any, CollectionType::Dictionary);
+    object_store::Dictionary dict_mixed(r, any_obj, col_any);
+    r->commit_transaction();
+
+    CollectionChangeSet change_dictionary;
+    auto token_dict = dict_mixed.add_notification_callback([&](CollectionChangeSet c) {
+        change_dictionary = c;
+    });
+
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
+
+    write([&] {
+        dict_mixed.insert_collection("list", CollectionType::List);
+        dict_mixed.insert_collection("dictionary", CollectionType::Dictionary);
+    });
+
+    REQUIRE(change_dictionary.insertions.count() == 2);
+
+    auto list = dict_mixed.get_list("list");
+
+    SECTION("notification on nested list") {
+        CollectionChangeSet change;
+
+        auto require_change = [&] {
+            auto token = list.add_notification_callback([&](CollectionChangeSet c) {
+                change = c;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        SECTION("adding values") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+            REQUIRE_INDICES(change_dictionary.modifications, 1);
+        }
+
+        SECTION("adding list before") {
+            // for keys in dictionary insertion in front of the previous key should not matter.
+            CollectionChangeSet change_list_after_insert;
+            write([&] {
+                dict_mixed.insert_collection("A", CollectionType::List);
+            });
+
+            auto new_list = dict_mixed.get_list("A");
+            auto token_new_list = new_list.add_notification_callback([&](CollectionChangeSet c) {
+                change_list_after_insert = c;
+            });
+            write([&] {
+                new_list.add(Mixed{42});
+            });
+
+            REQUIRE_INDICES(change_list_after_insert.insertions, 0);
+        }
+        SECTION("erase from containing dictionary") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+            write([&] {
+                dict_mixed.insert("list", 42);
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE_INDICES(change_dictionary.modifications, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+        SECTION("erase containing dictionary") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+            write([&] {
+                any_obj.set(col_any, Mixed(42));
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+        SECTION("erase containing object") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+            write([&] {
+                any_obj.remove();
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+    }
+    SECTION("dictionary as Results") {
+        auto results = dict_mixed.get_values();
+
+        auto val = results.get<Mixed>(0);
+        REQUIRE(val.is_type(type_Dictionary));
+        auto dict = results.get_dictionary(0);
+        REQUIRE(dict.is_valid());
+
+        val = results.get<Mixed>(1);
+        REQUIRE(val.is_type(type_List));
+        auto list = results.get_list(1);
+        REQUIRE(list.is_valid());
+
+        CppContext ctx(r);
+        CHECK(util::any_cast<object_store::Dictionary&&>(results.get(ctx, 0)).is_valid());
+        CHECK(util::any_cast<List&&>(results.get(ctx, 1)).is_valid());
+    }
+}
+
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
                    cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
                    cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
@@ -71,7 +208,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     using W = typename TestType::Wrapped;
 
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
@@ -662,9 +798,11 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             r->commit_transaction();
 
             advance_and_notify(*r);
-            REQUIRE(key_change.insertions.size() == 0);
-            REQUIRE(key_change.deletions[0].get_string() == keys[1]);
-            REQUIRE(key_change.modifications[0].get_string() == keys[0]);
+            CHECK(key_change.insertions.size() == 0);
+            REQUIRE(key_change.deletions.size() == 1);
+            REQUIRE(key_change.modifications.size() == 1);
+            CHECK(key_change.deletions[0].get_string() == keys[1]);
+            CHECK(key_change.modifications[0].get_string() == keys[0]);
 
             r->begin_transaction();
             dict.insert(keys[1], T(values[1]));
@@ -688,6 +826,10 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         }
 
         SECTION("clear list") {
+            DictionaryChangeSet key_change;
+            auto token = dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c) {
+                key_change = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -697,6 +839,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(change.deletions.count() == values.size());
             REQUIRE(rchange.deletions.count() == values.size());
             REQUIRE(srchange.deletions.count() == values.size());
+            REQUIRE(key_change.collection_was_cleared);
         }
 
         SECTION("delete containing row") {
@@ -881,11 +1024,12 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
 TEST_CASE("embedded dictionary", "[dictionary]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"origin", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
-        {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}}};
+    config.schema =
+        Schema{{"origin",
+                {{"_id", PropertyType::Int, Property::IsPrimary{true}},
+                 {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+               {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}}};
 
     auto r = Realm::get_shared_realm(config);
 
@@ -893,13 +1037,14 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
     auto target = r->read_group().get_table("class_target");
 
     r->begin_transaction();
-    Obj obj = origin->create_object();
+    Obj obj = origin->create_object_with_primary_key(1);
     ColKey col_links = origin->get_column_key("links");
     ColKey col_value = target->get_column_key("value");
 
     object_store::Dictionary dict(r, obj, col_links);
     for (int i = 0; i < 10; ++i)
         dict.insert_embedded(util::to_string(i));
+    dict.insert("null", ObjKey());
 
     r->commit_transaction();
 
@@ -919,9 +1064,25 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
 
         SECTION("creates new object for dictionary") {
             dict.insert(ctx, "foo", std::any(AnyDict{{"value", INT64_C(20)}}));
-            REQUIRE(dict.size() == 11);
+            REQUIRE(dict.size() == 12);
             REQUIRE(target->size() == initial_target_size + 1);
             REQUIRE(dict.get_object("foo").get<Int>(col_value) == 20);
+        }
+
+        SECTION("overwrite null value") {
+            dict.insert(ctx, "null", std::any(AnyDict{{"value", INT64_C(17)}}), CreatePolicy::UpdateModified);
+            REQUIRE(dict.size() == 11);
+            REQUIRE(target->size() == initial_target_size + 1);
+            REQUIRE(dict.get_object("null").get<Int>(col_value) == 17);
+        }
+
+        SECTION("mutates the existing object for update mode Modified") {
+            auto old_object = dict.get<Obj>("0");
+            dict.insert(ctx, "0", std::any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
+            REQUIRE(dict.size() == 11);
+            REQUIRE(target->size() == initial_target_size);
+            REQUIRE(dict.get_object("0").get<Int>(col_value) == 20);
+            REQUIRE(old_object.is_valid());
         }
 
         r->cancel_transaction();
@@ -938,7 +1099,6 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
     using T = typename TestType::Type;
     using W = typename TestType::Wrapped;
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
@@ -969,8 +1129,10 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
         Obj target_obj = target->create_object().set(col_target_value, T(values[i]));
         dict.insert(keys[i], target_obj);
     }
+
     r->commit_transaction();
     r->begin_transaction();
+
     SECTION("min()") {
         if constexpr (!TestType::can_minmax) {
             REQUIRE_EXCEPTION(
@@ -1048,7 +1210,6 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
 
 TEST_CASE("dictionary with mixed links", "[dictionary]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable}}},
@@ -1201,13 +1362,145 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
                               Any{AnyDict{{"intDictionary", AnyDict{{"0", Any(AnyDict{{"intCol", INT64_C(0)}})},
                                                                     {"1", Any(AnyDict{{"intCol", INT64_C(1)}})},
                                                                     {"2", Any(AnyDict{{"intCol", INT64_C(2)}})}}}}});
+    auto obj1 = Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                               Any{AnyDict{{"intDictionary", AnyDict{{"null", Any()}}}}});
     r->commit_transaction();
 
     r->begin_transaction();
-    // Before fix, we would crash here
-    r->read_group().get_table("class_IntObject")->clear();
+    SECTION("clear dictionary") {
+        // Before fix, we would crash here
+        r->read_group().get_table("class_IntObject")->clear();
+        // r->read_group().to_json(std::cout);
+    }
+
+    SECTION("overwrite null value") {
+        obj1.set_property_value(ctx, "intDictionary", Any(AnyDict{{"null", Any(AnyDict{{"intCol", INT64_C(3)}})}}),
+                                CreatePolicy::UpdateModified);
+        auto dict =
+            util::any_cast<object_store::Dictionary&&>(obj1.get_property_value<std::any>(ctx, "intDictionary"));
+        REQUIRE(dict.get_object("null").get<Int>("intCol") == 3);
+    }
     r->commit_transaction();
-    // r->read_group().to_json(std::cout);
+}
+
+TEST_CASE("nested collection set by Object::create", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"any", PropertyType::Mixed | PropertyType::Nullable},
+         }},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    Any value{AnyDict{{"_id", INT64_C(5)},
+                      {"any", AnyDict{{"0", Any(AnyDict{{"zero", INT64_C(0)}})},
+                                      {"1", Any(AnyVector{std::string("one"), INT64_C(1)})},
+                                      {"2", Any(AnyDict{{"two", INT64_C(2)}, {"three", INT64_C(3)}})}}}}};
+    r->begin_transaction();
+    auto obj = Object::create(ctx, r, *r->schema().find("DictionaryObject"), value);
+    r->commit_transaction();
+
+    auto dict = util::any_cast<object_store::Dictionary&&>(obj.get_property_value<std::any>(ctx, "any"));
+
+    auto dict0 = util::any_cast<object_store::Dictionary&&>(dict.get(ctx, "0"));
+    auto list1 = util::any_cast<List&&>(dict.get(ctx, "1"));
+    auto dict2 = dict.get_dictionary("2");
+    CHECK(dict0.get_any("zero") == Mixed(0));
+    CHECK(list1.get_any(0) == Mixed("one"));
+    CHECK(list1.get_any(1) == Mixed(1));
+    CHECK(dict2.get_any("two") == Mixed(2));
+    CHECK(dict2.get_any("three") == Mixed(3));
+
+    SECTION("modify list only") {
+        Any new_value{
+            AnyDict{{"_id", INT64_C(5)}, {"any", AnyDict{{"1", Any(AnyVector{std::string("seven"), INT64_C(7)})}}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        CHECK(list1.get_any(0) == Mixed("seven"));
+        CHECK(list1.get_any(1) == Mixed(7));
+    }
+
+    SECTION("update with less data") {
+        Any new_value{
+            AnyDict{{"_id", INT64_C(5)}, {"any", AnyDict{{"1", Any(AnyVector{std::string("seven"), INT64_C(7)})}}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateAll);
+        r->commit_transaction();
+        CHECK(dict.size() == 1);
+        list1 = dict.get_list("1");
+        CHECK(list1.get_any(0) == Mixed("seven"));
+        CHECK(list1.get_any(1) == Mixed(7));
+    }
+
+    SECTION("replace list with dictionary") {
+        Any new_value{AnyDict{{"_id", INT64_C(5)}, {"any", AnyDict{{"1", Any(AnyDict{{"seven", INT64_C(7)}})}}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        auto dict1 = dict.get_dictionary("1");
+        CHECK(dict1.get_any("seven") == Mixed(7));
+    }
+
+    SECTION("replace dictionary with list on top level") {
+        value = Any{AnyDict{
+            {"_id", INT64_C(5)},
+            {"any", AnyVector{Any(AnyDict{{"zero", INT64_C(0)}}), Any(AnyVector{std::string("one"), INT64_C(1)}),
+                              Any(AnyDict{{"two", INT64_C(2)}, {"three", INT64_C(3)}})}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        auto list = util::any_cast<List&&>(obj.get_property_value<std::any>(ctx, "any"));
+        dict0 = util::any_cast<object_store::Dictionary&&>(list.get(ctx, 0));
+        CHECK(dict0.get_any("zero") == Mixed(0));
+
+        SECTION("modify dictionary only") {
+            Any new_value{
+                AnyDict{{"_id", INT64_C(5)}, {"any", AnyVector{Any(AnyDict{{std::string("seven"), INT64_C(7)}})}}}};
+
+            r->begin_transaction();
+            Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+            CHECK(dict0.get_any("seven") == Mixed(7));
+        }
+
+        SECTION("replace dictionary with list") {
+            Any new_value{
+                AnyDict{{"_id", INT64_C(5)}, {"any", AnyVector{Any(AnyVector{std::string("seven"), INT64_C(7)})}}}};
+
+            r->begin_transaction();
+            Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+            auto list0 = util::any_cast<List&&>(list.get(ctx, 0));
+            CHECK(list0.get_any(0) == Mixed("seven"));
+            CHECK(list0.get_any(1) == Mixed(7));
+        }
+
+        SECTION("assign dictionary directly to nested list") {
+            r->begin_transaction();
+            list.set(ctx, 1, Any(AnyDict{{std::string("ten"), INT64_C(10)}}));
+            r->commit_transaction();
+            auto dict0 = list.get_dictionary(1);
+            CHECK(dict0.get_any("ten") == Mixed(10));
+        }
+
+        SECTION("assign list directly to nested list") {
+            r->begin_transaction();
+            list.set(ctx, 0, Any(AnyVector{std::string("ten"), INT64_C(10)}));
+            r->commit_transaction();
+            auto list0 = list.get_list(0);
+            CHECK(list0.get_any(0) == Mixed("ten"));
+            CHECK(list0.get_any(1) == Mixed(10));
+        }
+    }
 }
 
 TEST_CASE("dictionary assign", "[dictionary]") {
@@ -1584,7 +1877,6 @@ TEST_CASE("dictionary sort by keyPath value", "[dictionary]") {
 
 TEST_CASE("dictionary sort by linked object value", "[dictionary]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",

@@ -111,7 +111,8 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     auto uncompressed_body_size = msg.read_next<size_t>();
     auto compressed_body_size = msg.read_next<size_t>('\n');
 
-    logger.trace("decoding download message. "
+    logger.trace(util::LogCategory::changeset,
+                 "decoding download message. "
                  "{download: {server: %1, client: %2} upload: {server: %3, client: %4}, latest: %5}",
                  ret.progress.download.server_version, ret.progress.download.last_integrated_client_version,
                  ret.progress.upload.last_integrated_server_version, ret.progress.upload.client_version,
@@ -147,7 +148,8 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
         auto changeset_data = body.read_sized_data<BinaryData>(changeset_size);
         auto changeset_stream = realm::util::SimpleInputStream(changeset_data);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
-        logger.trace("found download changeset: serverVersion: %1, clientVersion: %2, origin: %3 %4",
+        logger.trace(util::LogCategory::changeset,
+                     "found download changeset: serverVersion: %1, clientVersion: %2, origin: %3 %4",
                      cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
                      cur_changeset.origin_file_ident, parsed_changeset);
         cur_changeset.data = changeset_data;
@@ -197,9 +199,9 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
 
         auto changeset_buffer = body.read_sized_data<BinaryData>(changeset_size);
 
-        logger.trace("found upload changeset: %1 %2 %3 %4 %5", cur_changeset.last_integrated_remote_version,
-                     cur_changeset.version, cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
-                     changeset_size);
+        logger.trace(util::LogCategory::changeset, "found upload changeset: %1 %2 %3 %4 %5",
+                     cur_changeset.last_integrated_remote_version, cur_changeset.version,
+                     cur_changeset.origin_timestamp, cur_changeset.origin_file_ident, changeset_size);
         realm::util::SimpleInputStream changeset_stream(changeset_buffer);
         try {
             realm::sync::parse_changeset(changeset_stream, cur_changeset);
@@ -208,7 +210,7 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
             logger.error("error decoding changeset after instructions %1", cur_changeset);
             throw;
         }
-        logger.trace("Decoded changeset: %1", cur_changeset);
+        logger.trace(util::LogCategory::changeset, "Decoded changeset: %1", cur_changeset);
         ret.changesets.push_back(std::move(cur_changeset));
     }
 
@@ -310,7 +312,7 @@ int main(int argc, const char** argv)
                                  });
                                  auto transaction = local_db->start_write();
                                  realm::sync::InstructionApplier applier(*transaction);
-                                 applier.apply(changeset, logger.get());
+                                 applier.apply(changeset);
                                  auto generated_version = transaction->commit();
                                  logger->debug("integrated local changesets as version %1", generated_version);
                                  history.set_local_origin_timestamp_source(realm::sync::generate_changeset_timestamp);

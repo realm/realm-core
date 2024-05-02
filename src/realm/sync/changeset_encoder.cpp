@@ -101,6 +101,10 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
         }
         case Type::Erased:
             [[fallthrough]];
+        case Type::Set:
+            [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
         case Type::ObjectValue:
@@ -117,7 +121,7 @@ void ChangesetEncoder::append_value(Instruction::Payload::Type type)
     append_value(int64_t(type));
 }
 
-void ChangesetEncoder::append_value(Instruction::AddColumn::CollectionType type)
+void ChangesetEncoder::append_value(Instruction::CollectionType type)
 {
     append_value(uint8_t(type));
 }
@@ -163,8 +167,8 @@ void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk)
 
 void ChangesetEncoder::append_value(const Instruction::Path& path)
 {
-    append_value(uint32_t(path.m_path.size()));
-    for (auto& element : path.m_path) {
+    append_value(uint32_t(path.size()));
+    for (auto& element : path) {
         // Integer path elements are encoded as their integer values.
         // String path elements are encoded as [-1, intern_string_id].
         if (auto index = mpark::get_if<uint32_t>(&element)) {
@@ -186,7 +190,7 @@ void ChangesetEncoder::operator()(const Instruction::AddInteger& instr)
 
 void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
 {
-    bool is_dictionary = (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary);
+    bool is_dictionary = (instr.collection_type == Instruction::CollectionType::Dictionary);
     // Mixed columns are always nullable.
     REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable || is_dictionary);
     append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.collection_type);
@@ -221,8 +225,7 @@ void ChangesetEncoder::operator()(const Instruction::ArrayErase& instr)
 
 void ChangesetEncoder::operator()(const Instruction::Clear& instr)
 {
-    uint32_t prior_size = 0; // Ignored
-    append_path_instr(Instruction::Type::Clear, instr, prior_size);
+    append_path_instr(Instruction::Type::Clear, instr, instr.collection_type);
 }
 
 void ChangesetEncoder::operator()(const Instruction::SetInsert& instr)

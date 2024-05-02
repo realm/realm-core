@@ -77,7 +77,7 @@ public:
             : m_owner(owner)
         {
         }
-        const StringIndex* create_search_index()
+        const SearchIndex* create_search_index()
         {
             m_owner->m_table.add_search_index(m_owner->m_col_key);
             return m_owner->m_table.get_search_index(m_owner->m_col_key);
@@ -314,7 +314,7 @@ TEST_TYPES(StringIndex_BuildIndex, string_column, nullable_string_column, enum_c
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     const ObjKey r1 = ndx.find_first(s1);
     const ObjKey r2 = ndx.find_first(s2);
@@ -345,7 +345,7 @@ TEST_TYPES(StringIndex_DeleteAll, string_column, nullable_string_column, enum_co
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     // Delete all entries
     // (reverse order to avoid ref updates)
@@ -391,7 +391,7 @@ TEST_TYPES(StringIndex_Delete, string_column, nullable_string_column, enum_colum
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     // Delete first item (in index)
     col.erase(1);
@@ -430,7 +430,7 @@ TEST_TYPES(StringIndex_ClearEmpty, string_column, nullable_string_column, enum_c
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     // Clear to remove all entries
     col.clear();
@@ -451,7 +451,7 @@ TEST_TYPES(StringIndex_Clear, string_column, nullable_string_column, enum_column
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     // Clear to remove all entries
     col.clear();
@@ -576,7 +576,7 @@ TEST_TYPES(StringIndex_Distinct, string_column, nullable_string_column, enum_col
     col.add(s4);
 
     // Create a new index on column
-    const StringIndex* ndx = col.create_search_index();
+    const SearchIndex* ndx = col.create_search_index();
     CHECK(ndx->has_duplicate_values());
 }
 
@@ -597,7 +597,7 @@ TEST_TYPES(StringIndex_FindAllNoCopy, string_column, nullable_string_column, enu
     col.add(s4);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     InternalFindResult ref_2;
     FindRes res1 = ndx.find_all_no_copy(StringData("not there"), ref_2);
@@ -634,7 +634,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
     // Create a new index on column
     col.create_search_index();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
     InternalFindResult results;
 
     for (auto i : ints) {
@@ -675,7 +675,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
     col.add_null();
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
     InternalFindResult results;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
@@ -711,7 +711,7 @@ TEST_TYPES(StringIndex_FindAllNoCopyCommonPrefixStrings, string_column, nullable
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     auto test_prefix_find = [&](std::string prefix) {
         std::string prefix_b = prefix + "b";
@@ -779,7 +779,7 @@ TEST(StringIndex_Count_Int)
         col.add(i);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     for (auto i : ints) {
         size_t count = ndx.count(i);
@@ -821,7 +821,7 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
     col.add(2);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     ObjKey f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(col.key(1), f);
@@ -917,7 +917,7 @@ TEST_TYPES_IF(StringIndex_EmbeddedZeroesCombinations, TEST_DURATION > 1, string_
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     constexpr unsigned int seed = 42;
     const size_t MAX_LENGTH = 16; // Test medium
@@ -955,7 +955,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, string_column, nullable_string_column, en
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col2 = test_resources.get_column();
-    const StringIndex& ndx2 = *col2.create_search_index();
+    const SearchIndex& ndx2 = *col2.create_search_index();
 
     // FIXME: re-enable once embedded nuls work
     col2.add(StringData("\0", 1));
@@ -976,7 +976,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, string_column, nullable_string_column, en
     int64_t v = 1ULL << 41;
     column<Int> test_resources_1;
     auto col = test_resources_1.get_column();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
     col.add(1ULL << 40);
     auto f = ndx.find_first(v);
     CHECK_EQUAL(f, null_key);
@@ -990,7 +990,7 @@ TEST_TYPES(StringIndex_Null, nullable_string_column, nullable_enum_column)
     col.add("");
     col.add(realm::null());
 
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     auto r1 = ndx.find_first(realm::null());
     CHECK_EQUAL(r1, col.key(1));
@@ -1165,7 +1165,7 @@ TEST_TYPES(StringIndex_Duplicate_Values, string_column, nullable_string_column, 
     col.add(s4);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     CHECK(!ndx.has_duplicate_values());
 
@@ -1234,7 +1234,7 @@ TEST_TYPES(StringIndex_MaxBytes, string_column, nullable_string_column, enum_col
     StringData over_max(std_over_max);
     StringData under_max(std_under_max);
 
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     CHECK_EQUAL(col.size(), 0);
 
@@ -1271,7 +1271,7 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     col.add("test_index_string1");
     col.add("test_index_string2");
@@ -1285,7 +1285,9 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     StringData base_b(std_base_b);
     StringData base_c(std_base_c);
     col.add(base_b);
+    ndx.verify();
     col.add(base_c);
+    ndx.verify();
 
     CHECK_EQUAL(col.find_first(base_b), 2);
     CHECK_EQUAL(col.find_first(base_c), 3);
@@ -1300,7 +1302,9 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     StringData base2_b(std_base2_b);
     StringData base2_c(std_base2_c);
     col.add(base2_b);
+    ndx.verify();
     col.add(base2_c);
+    ndx.verify();
 
     CHECK_EQUAL(col.find_first(base2_b), 4);
     CHECK_EQUAL(col.find_first(base2_c), 5);
@@ -1515,12 +1519,33 @@ TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
 
-    const char* strings[] = {
-        "john", "John", "jOhn", "JOhn", "joHn", "JoHn", "jOHn", "JOHn", "johN", "JohN", "jOhN", "JOhN", "joHN", "JoHN", "jOHN", "JOHN", "john" /* yes, an extra to test the "bucket" case as well */,
-        "hans", "Hansapark", "george", "billion dollar startup",
-        "abcde", "abcdE", "Abcde", "AbcdE",
-        "common", "common"
-    };
+    const char* strings[] = {"john",
+                             "John",
+                             "jOhn",
+                             "JOhn",
+                             "joHn",
+                             "JoHn",
+                             "jOHn",
+                             "JOHn",
+                             "johN",
+                             "JohN",
+                             "jOhN",
+                             "JOhN",
+                             "joHN",
+                             "JoHN",
+                             "jOHN",
+                             "JOHN",
+                             "john" /* yes, an extra to test the "bucket" case as well */,
+                             "hans",
+                             "Hansapark",
+                             "george",
+                             "billion dollar startup",
+                             "abcde",
+                             "abcdE",
+                             "Abcde",
+                             "AbcdE",
+                             "common",
+                             "common"};
 
     for (const char* string : strings) {
         col.add(string);
@@ -1532,7 +1557,7 @@ TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_
     }
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     std::vector<ObjKey> results;
     {
@@ -1554,7 +1579,6 @@ TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_
         for (size_t i = 0; i < results.size(); ++i) {
             auto upper_result = case_map(col.get(results[i]), true);
             CHECK_EQUAL(upper_result, upper_needle);
-
         }
         check_result_order(results, test_context);
         results.clear();
@@ -1617,7 +1641,7 @@ TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
     }
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     ref_type results_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn results(Allocator::get_default(), results_ref);
@@ -1661,7 +1685,7 @@ TEST_TYPES(StringIndex_45, string_column, nullable_string_column, enum_column, n
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
     std::string a4 = std::string(4, 'a');
     std::string A5 = std::string(5, 'A');
 
@@ -1677,7 +1701,8 @@ TEST_TYPES(StringIndex_45, string_column, nullable_string_column, enum_column, n
 
 namespace {
 
-std::string create_random_a_string(size_t max_len) {
+std::string create_random_a_string(size_t max_len)
+{
     std::string s;
     size_t len = size_t(fastrand(max_len));
     for (size_t p = 0; p < len; p++) {
@@ -1686,7 +1711,7 @@ std::string create_random_a_string(size_t max_len) {
     return s;
 }
 
-}
+} // namespace
 
 
 // Excluded when run with valgrind because it takes a long time
@@ -1708,7 +1733,7 @@ TEST_TYPES_IF(StringIndex_Insensitive_Fuzz, TEST_DURATION > 1, string_column, nu
             col.add(str);
         }
 
-        const StringIndex& ndx = *col.create_search_index();
+        const SearchIndex& ndx = *col.create_search_index();
 
         for (size_t t = 0; t < 1000; t++) {
             std::string needle = create_random_a_string(max_str_len);
@@ -1743,7 +1768,7 @@ TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, string_column, nullable_stri
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     std::string long1 = std::string(StringIndex::s_max_offset + 10, 'a');
     std::string long2 = long1 + "b";
@@ -1779,7 +1804,7 @@ TEST_TYPES(StringIndex_Insensitive_Numbers, string_column, nullable_string_colum
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     constexpr const char* number_string_16 = "1111111111111111";
     constexpr const char* number_string_17 = "11111111111111111";
@@ -1799,7 +1824,7 @@ TEST_TYPES(StringIndex_Rover, string_column, nullable_string_column, enum_column
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
 
-    const StringIndex& ndx = *col.create_search_index();
+    const SearchIndex& ndx = *col.create_search_index();
 
     col.add("ROVER");
     col.add("Rover");
@@ -1830,6 +1855,25 @@ TEST(StringIndex_MixedNonEmptyTable)
     auto col = table->add_column(type_Mixed, "any");
     table->create_object().set(col, Mixed("abcdefgh"));
     table->add_search_index(col);
+}
+
+TEST(StringIndex_MixedWithNestedCollections)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    auto col = table->add_column(type_Mixed, "value");
+    table->add_search_index(col);
+    table->create_object().set(col, Mixed("apple"));
+    auto obj = table->create_object();
+    obj.set(col, Mixed("banana"));
+
+    auto q = table->query("value = 'banana'");
+
+    CHECK_EQUAL(q.count(), 1);
+    obj.set_collection(col, CollectionType::Dictionary);
+    CHECK_EQUAL(q.count(), 0);
+    obj.set(col, Mixed("banana"));
+    CHECK_EQUAL(q.count(), 1);
 }
 
 TEST(StringIndex_MixedEqualBitPattern)
@@ -1900,4 +1944,132 @@ TEST(Unicode_Casemap)
         CHECK_EQUAL(*out, inp);
     }
 }
+
+static std::string random_string(std::string::size_type length)
+{
+    static auto& chrs = "0123456789"
+                        "abcdefghijklmnopqrstuvwxyz"
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+
+    std::string s;
+
+    s.reserve(length);
+
+    while (length--)
+        s += chrs[pick(rg)];
+
+    return s;
+}
+
+TEST(StringIndex_ListOfRandomStrings)
+{
+    using namespace std::chrono;
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto db = DB::create(path);
+    auto wt = db->start_write();
+
+    auto t = wt->add_table_with_primary_key("foo", type_Int, "_id");
+    ColKey col_codes = t->add_column_list(type_String, "codes");
+    std::string some_string;
+
+    for (size_t i = 0; i < 10000; i++) {
+        auto obj = t->create_object_with_primary_key(int64_t(i));
+        auto list = obj.get_list<String>(col_codes);
+        for (size_t j = 0; j < 3; j++) {
+            std::string str(random_string(14));
+            if (i == 5000 && j == 0) {
+                some_string = str;
+            }
+            list.add(StringData(str));
+        }
+    }
+
+    std::vector<Mixed> arguments{Mixed(some_string)};
+    auto q = wt->get_table("foo")->query("codes = $0", arguments);
+    // auto t1 = steady_clock::now();
+    auto tv = q.find_all();
+    // auto t2 = steady_clock::now();
+    // std::cout << "time without index: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    CHECK_EQUAL(tv.size(), 1);
+    t->add_search_index(col_codes);
+
+    // t1 = steady_clock::now();
+    tv = q.find_all();
+    // t2 = steady_clock::now();
+    // std::cout << "time with index: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    CHECK_EQUAL(tv.size(), 1);
+    t->add_search_index(col_codes);
+
+    // std::cout << tv.get_object(0).get<Int>("_id") << std::endl;
+}
+
+TEST_TYPES(StringIndex_ListOfStrings, std::true_type, std::false_type)
+{
+    constexpr bool add_index = TEST_TYPE::value;
+    Group g;
+
+    auto t = g.add_table("foo");
+    ColKey col = t->add_column_list(type_String, "names", true);
+    if constexpr (add_index) {
+        t->add_search_index(col);
+    }
+
+    auto obj1 = t->create_object();
+    auto obj2 = t->create_object();
+    auto obj3 = t->create_object();
+
+    for (Obj* obj : {&obj2, &obj3}) {
+        auto list = obj->get_list<String>(col);
+        list.add("Johnny");
+        list.add("John");
+    }
+
+    auto list = obj1.get_list<String>(col);
+    list.add("Johnny");
+    list.add("John");
+    list.add("Ivan");
+    list.add("Ivan");
+    list.add(StringData());
+
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 3);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 3);
+    CHECK_EQUAL(t->query(R"(names = NULL)").count(), 1);
+
+    list.set(0, "Paul");
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 3);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Paul")").count(), 1);
+
+    list.remove(1);
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Paul")").count(), 1);
+    CHECK_EQUAL(t->query(R"(names = "Ivan")").count(), 1);
+
+    list.clear();
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Paul")").count(), 0);
+
+    list = obj2.get_list<String>(col);
+    list.insert(0, "Adam");
+    list.insert(0, "Adam");
+    obj2.remove();
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 1);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 1);
+
+    std::string long1 = std::string(StringIndex::s_max_offset, 'a');
+    std::string long2 = long1 + "b";
+
+    list = obj1.get_list<String>(col);
+    list.add(long1);
+    if (add_index) {
+        CHECK_THROW_ANY(list.add(long2));
+    }
+}
+
 #endif // TEST_INDEX_STRING

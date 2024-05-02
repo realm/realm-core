@@ -8,11 +8,114 @@
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t
+#include <set>
 
 namespace realm {
 
 template <class L>
 struct CollectionIterator;
+
+// Used in Cluster when removing owning object
+class DummyParent : public CollectionParent {
+public:
+    DummyParent(TableRef t, ref_type ref)
+        : m_obj(t, MemRef(), ObjKey(), 0)
+        , m_ref(ref)
+    {
+    }
+    FullPath get_path() const noexcept final
+    {
+        return {};
+    }
+    Path get_short_path() const noexcept final
+    {
+        return {};
+    }
+    StablePath get_stable_path() const noexcept final
+    {
+        return {};
+    }
+    ColKey get_col_key() const noexcept final
+    {
+        return {};
+    }
+    void add_index(Path&, const Index&) const noexcept final {}
+    size_t find_index(const Index&) const noexcept final
+    {
+        return realm::npos;
+    }
+
+    TableRef get_table() const noexcept final
+    {
+        return m_obj.get_table();
+    }
+    const Obj& get_object() const noexcept final
+    {
+        return m_obj;
+    }
+    uint32_t parent_version() const noexcept final
+    {
+        return 0;
+    }
+    void update_content_version() const noexcept final {}
+
+protected:
+    Obj m_obj;
+    ref_type m_ref;
+    UpdateStatus update_if_needed() const final
+    {
+        return UpdateStatus::Updated;
+    }
+    ref_type get_collection_ref(Index, CollectionType) const final
+    {
+        return m_ref;
+    }
+    void set_collection_ref(Index, ref_type, CollectionType) {}
+};
+
+class Collection {
+public:
+    virtual ~Collection();
+    /// The size of the collection.
+    virtual size_t size() const = 0;
+    /// Get element at @a ndx as a `Mixed`.
+    virtual Mixed get_any(size_t ndx) const = 0;
+    /// True if `size()` returns 0.
+    bool is_empty() const
+    {
+        return size() == 0;
+    }
+    virtual void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const {}
+    /// Get collection type (set, list, dictionary)
+    virtual CollectionType get_collection_type() const noexcept = 0;
+
+    virtual void insert_collection(const PathElement&, CollectionType)
+    {
+        throw IllegalOperation("insert_collection is not legal on this collection type");
+    }
+    virtual void set_collection(const PathElement&, CollectionType)
+    {
+        throw IllegalOperation("set_collection is not legal on this collection type");
+    }
+    // Returns the path to the collection. Uniquely identifies the collection within the Group.
+    virtual FullPath get_path() const = 0;
+    // Returns the path from the owning object. Starting with the column key. Identifies
+    // the collection within the object
+    virtual Path get_short_path() const = 0;
+    // Return a path based on keys instead of indices
+    virtual StablePath get_stable_path() const = 0;
+
+    struct QueryCtrlBlock {
+        Path path;
+        std::vector<std::vector<Mixed>> matches;
+        bool path_only_unary_keys = false; // Not from list
+        Allocator* alloc = nullptr;
+        Group* group = nullptr;
+    };
+    static void get_any(QueryCtrlBlock&, Mixed, size_t);
+};
+
+using CollectionPtr = std::shared_ptr<Collection>;
 
 /// Base class for all collection accessors.
 ///
@@ -21,18 +124,10 @@ struct CollectionIterator;
 /// object consistent with the persisted state, mindful of the fact that the
 /// state may have changed as a consequence of modifications from other instances
 /// referencing the same persisted state.
-class CollectionBase {
+class CollectionBase : public Collection {
 public:
-    virtual ~CollectionBase() {}
-
-    /// The size of the collection.
-    virtual size_t size() const = 0;
-
     /// True if the element at @a ndx is NULL.
     virtual bool is_null(size_t ndx) const = 0;
-
-    /// Get element at @a ndx as a `Mixed`.
-    virtual Mixed get_any(size_t ndx) const = 0;
 
     /// Clear the collection.
     virtual void clear() = 0;
@@ -55,7 +150,7 @@ public:
 
     /// Produce a clone of the collection accessor referring to the same
     /// underlying memory.
-    virtual std::unique_ptr<CollectionBase> clone_collection() const = 0;
+    virtual CollectionBasePtr clone_collection() const = 0;
 
     /// Modifies a vector of indices so that they refer to values sorted
     /// according to the specified sort order.
@@ -70,26 +165,31 @@ public:
     // Return index of the first occurrence of 'value'
     virtual size_t find_any(Mixed value) const = 0;
 
-    /// True if `size()` returns 0.
-    virtual bool is_empty() const final
-    {
-        return size() == 0;
-    }
-
     /// Get the object that owns this collection.
     virtual const Obj& get_obj() const noexcept = 0;
 
     /// Get the column key for this collection.
     virtual ColKey get_col_key() const noexcept = 0;
 
+    virtual PathElement get_path_element(size_t ndx) const
+    {
+        return PathElement(ndx);
+    }
+
+    // Clone this collection if it contains objects, and return nullptr otherwise
+    virtual LinkCollectionPtr clone_as_obj_list() const
+    {
+        return nullptr;
+    }
+
     /// Return true if the collection has changed since the last call to
     /// `has_changed()`. Note that this function is not idempotent and updates
     /// the internal state of the accessor if it has changed.
-    virtual bool has_changed() const = 0;
+    virtual bool has_changed() const noexcept = 0;
 
     /// Returns true if the accessor is in the attached state. By default, this
     /// checks if the owning object is still valid.
-    virtual bool is_attached() const
+    virtual bool is_attached() const noexcept
     {
         return get_obj().is_valid();
     }
@@ -103,13 +203,13 @@ public:
     }
 
     /// Get the table of the object that owns this collection.
-    virtual ConstTableRef get_table() const noexcept final
+    ConstTableRef get_table() const noexcept
     {
         return get_obj().get_table();
     }
 
     /// If this is a collection of links, get the target table.
-    virtual TableRef get_target_table() const final
+    TableRef get_target_table() const
     {
         return get_obj().get_target_table(get_col_key());
     }
@@ -118,6 +218,19 @@ public:
     {
         return ndx;
     }
+
+    virtual DictionaryPtr get_dictionary(const PathElement&) const
+    {
+        throw IllegalOperation("get_dictionary for this collection is not allowed");
+    }
+    virtual ListMixedPtr get_list(const PathElement&) const
+    {
+        throw IllegalOperation("get_list for this collection is not allowed");
+    }
+
+    virtual void set_owner(const Obj& obj, ColKey) = 0;
+    virtual void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) = 0;
+
 
     StringData get_property_name() const
     {
@@ -148,29 +261,28 @@ protected:
     CollectionBase& operator=(const CollectionBase&) noexcept = default;
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
-    void validate_index(const char* msg, size_t index, size_t size) const;
+    void validate_index(const char* msg, size_t index, size_t size) const
+    {
+        if (index >= size) {
+            out_of_bounds(msg, index, size);
+        }
+    }
+    void out_of_bounds(const char* msg, size_t index, size_t size) const;
+    static UpdateStatus do_init_from_parent(BPlusTreeBase* tree, ref_type ref, bool allow_create);
 };
 
-inline std::string_view collection_type_name(ColKey col, bool uppercase = false)
+inline std::string_view collection_type_name(CollectionType col_type, bool uppercase = false)
 {
-    if (col.is_list())
-        return uppercase ? "List" : "list";
-    if (col.is_set())
-        return uppercase ? "Set" : "set";
-    if (col.is_dictionary())
-        return uppercase ? "Dictionary" : "dictionary";
+    switch (col_type) {
+        case CollectionType::List:
+            return uppercase ? "List" : "list";
+        case CollectionType::Set:
+            return uppercase ? "Set" : "set";
+        case CollectionType::Dictionary:
+            return uppercase ? "Dictionary" : "dictionary";
+    }
     return "";
 }
-
-inline void CollectionBase::validate_index(const char* msg, size_t index, size_t size) const
-{
-    if (index >= size) {
-        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_col_key()),
-                                       get_table()->get_class_name(), get_property_name()),
-                          index, size);
-    }
-}
-
 
 template <class T>
 inline void check_column_type(ColKey col)
@@ -200,9 +312,7 @@ template <>
 inline void check_column_type<ObjKey>(ColKey col)
 {
     if (col) {
-        bool is_link_list = (col.get_type() == col_type_LinkList);
-        bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
-        if (!(is_link_list || is_link_set))
+        if (!((col.is_list() || col.is_set()) && col.get_type() == col_type_Link))
             throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list or set");
     }
 }
@@ -347,17 +457,63 @@ class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
+    FullPath get_path() const override
+    {
+        auto path = m_parent->get_path();
+        m_parent->add_index(path.path_from_top, m_index);
+        return path;
+    }
+
+    Path get_short_path() const override
+    {
+        Path ret = m_parent->get_short_path();
+        m_parent->add_index(ret, m_index);
+        return ret;
+    }
+
+    StablePath get_stable_path() const override
+    {
+        auto ret = m_parent->get_stable_path();
+        ret.push_back(m_index);
+        return ret;
+    }
+
     // Overriding members of CollectionBase:
-    ColKey get_col_key() const noexcept final
+    ColKey get_col_key() const noexcept override
     {
         return m_col_key;
     }
 
     const Obj& get_obj() const noexcept final
     {
-        return m_obj;
+        return m_obj_mem;
     }
 
+    // The tricky thing here is that we should return true, even if the
+    // collection has not yet been created.
+    bool is_attached() const noexcept final
+    {
+        if (m_parent) {
+            try {
+                // Update the parent. Will throw if parent is not existing.
+                switch (m_parent->update_if_needed()) {
+                    case UpdateStatus::Updated:
+                        // Make sure to update next time around
+                        m_content_version = 0;
+                        [[fallthrough]];
+                    case UpdateStatus::NoChange:
+                        // Check if it would be legal to try and get a ref from parent
+                        // Will return true even if the current ref is 0.
+                        return m_parent->check_collection_ref(m_index, Interface::s_collection_type);
+                    case UpdateStatus::Detached:
+                        break;
+                }
+            }
+            catch (...) {
+            }
+        }
+        return false;
+    }
 
     /// Returns true if the accessor has changed since the last time
     /// `has_changed()` was called.
@@ -366,71 +522,149 @@ public:
     ///
     /// Note: This involves a call to `update_if_needed()`.
     ///
-    /// Note: This function does not return true for an accessor that became
-    /// detached since the last call, even though it may look to the caller as
-    /// if the size of the collection suddenly became zero.
-    bool has_changed() const final
+    /// Note: This function returns false for an accessor that became
+    /// detached since the last call
+    bool has_changed() const noexcept final
     {
-        // `has_changed()` sneakily modifies internal state.
-        update_if_needed();
-        if (m_last_content_version != m_content_version) {
-            m_last_content_version = m_content_version;
-            return true;
+        try {
+            // `has_changed()` sneakily modifies internal state.
+            update_if_needed();
+            if (m_last_content_version != m_content_version) {
+                m_last_content_version = m_content_version;
+                return true;
+            }
+        }
+        catch (...) {
         }
         return false;
     }
+
+    CollectionType get_collection_type() const noexcept override
+    {
+        return Interface::s_collection_type;
+    }
+
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        m_obj_mem = obj;
+        m_parent = &m_obj_mem;
+        m_index = obj.build_index(ck);
+        if (obj) {
+            m_alloc = &obj.get_alloc();
+        }
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_obj_mem = parent->get_object();
+        m_col_parent = std::move(parent);
+        m_parent = m_col_parent.get();
+        m_index = index;
+        if (m_obj_mem) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+        // Force update on next access
+        m_content_version = 0;
+    }
+
+    CollectionParent* get_owner() const noexcept
+    {
+        return m_parent;
+    }
+
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
     using Interface::get_owner_key;
     using Interface::get_table;
     using Interface::get_target_table;
 
 protected:
-    Obj m_obj;
+    ObjCollectionParent m_obj_mem;
+    std::shared_ptr<CollectionParent> m_col_parent;
+    CollectionParent::Index m_index;
     ColKey m_col_key;
-    bool m_nullable = false;
-
     mutable uint_fast64_t m_content_version = 0;
-
     // Content version used by `has_changed()`.
     mutable uint_fast64_t m_last_content_version = 0;
+    mutable uint32_t m_parent_version = 0;
+    bool m_nullable = false;
 
     CollectionBaseImpl() = default;
-    CollectionBaseImpl(const CollectionBaseImpl& other) = default;
-    CollectionBaseImpl(CollectionBaseImpl&& other) = default;
+    CollectionBaseImpl(const CollectionBaseImpl& other)
+        : Interface(static_cast<const Interface&>(other))
+        , m_obj_mem(other.m_obj_mem)
+        , m_col_parent(other.m_col_parent)
+        , m_index(other.m_index)
+        , m_col_key(other.m_col_key)
+        , m_nullable(other.m_nullable)
+        , m_parent(m_col_parent ? m_col_parent.get() : &m_obj_mem)
+        , m_alloc(other.m_alloc)
+    {
+    }
 
     CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
-        : m_obj(obj)
+        : m_obj_mem(obj)
+        , m_index(obj.build_index(col_key))
         , m_col_key(col_key)
+        , m_nullable(col_key.is_nullable())
+        , m_parent(&m_obj_mem)
+    {
+        if (obj) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+    }
+
+    CollectionBaseImpl(ColKey col_key) noexcept
+        : m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
     {
     }
 
-    CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
-    CollectionBaseImpl& operator=(CollectionBaseImpl&& other) = default;
-
-    /// Refresh the associated `Obj` (if needed), and update the internal
-    /// content version number. This is meant to be called from a derived class
-    /// before accessing its data.
-    ///
-    /// If the `Obj` changed since the last call, or the content version was
-    /// bumped, this returns `UpdateStatus::Updated`. In response, the caller
-    /// must invoke `init_from_parent()` or similar on its internal state
-    /// accessors to refresh its view of the data.
-    ///
-    /// If the owning object (or parent container) was deleted, this returns
-    /// `UpdateStatus::Detached`, and the caller is allowed to enter a
-    /// degenerate state.
-    ///
-    /// If no change has happened to the data, this function returns
-    /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
-    virtual UpdateStatus update_if_needed() const
+    CollectionBaseImpl(CollectionParent& parent, CollectionParent::Index index) noexcept
+        : m_obj_mem(parent.get_object())
+        , m_index(index)
+        , m_col_key(parent.get_col_key())
+        , m_parent(&parent)
+        , m_alloc(&m_obj_mem.get_alloc())
     {
-        UpdateStatus status = m_obj.update_if_needed_with_status();
+    }
+
+    CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
+    {
+        Interface::operator=(static_cast<const Interface&>(other));
+        if (this != &other) {
+            m_obj_mem = other.m_obj_mem;
+            m_col_parent = other.m_col_parent;
+            m_parent = m_col_parent ? m_col_parent.get() : &m_obj_mem;
+            m_alloc = other.m_alloc;
+            m_index = other.m_index;
+            m_col_key = other.m_col_key;
+            m_nullable = other.m_nullable;
+        }
+
+        return *this;
+    }
+
+    ref_type get_collection_ref() const
+    {
+        return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
+    }
+
+    void set_collection_ref(ref_type ref)
+    {
+        m_parent->set_collection_ref(m_index, ref, Interface::s_collection_type);
+    }
+
+    UpdateStatus get_update_status() const
+    {
+        UpdateStatus status = m_parent ? m_parent->update_if_needed() : UpdateStatus::Detached;
 
         if (status != UpdateStatus::Detached) {
-            auto content_version = m_obj.get_alloc().get_content_version();
-            if (content_version != m_content_version) {
+            auto content_version = m_alloc->get_content_version();
+            auto parent_version = m_parent->parent_version();
+            if (content_version != m_content_version || m_parent_version != parent_version) {
                 m_content_version = content_version;
+                m_parent_version = parent_version;
                 status = UpdateStatus::Updated;
             }
         }
@@ -438,31 +672,81 @@ protected:
         return status;
     }
 
-    /// Refresh the associated `Obj` (if needed) and ensure that the
-    /// collection is created. Must be used in places where you
-    /// modify a potentially detached collection.
-    ///
-    /// The caller must react to the `UpdateStatus` in the same way as with
-    /// `update_if_needed()`, i.e., eventually end up calling
-    /// `init_from_parent()` or similar.
-    ///
-    /// Throws if the owning object no longer exists. Note: This means that this
-    /// method will never return `UpdateStatus::Detached`.
-    virtual UpdateStatus ensure_created()
+    /// Refresh the parent object (if needed) and compare version numbers.
+    /// Return true if the collection should initialize from parent
+    /// Throws if the owning object no longer exists.
+    bool should_update() const
     {
-        bool changed = m_obj.update_if_needed(); // Throws if the object does not exist.
-        auto content_version = m_obj.get_alloc().get_content_version();
-
-        if (changed || content_version != m_content_version) {
-            m_content_version = content_version;
-            return UpdateStatus::Updated;
+        check_parent();
+        auto status = get_update_status();
+        if (status == UpdateStatus::Detached) {
+            throw StaleAccessor("Parent no longer exists");
         }
-        return UpdateStatus::NoChange;
+        return status == UpdateStatus::Updated;
     }
 
-    void bump_content_version()
+    void bump_content_version() noexcept
     {
-        m_content_version = m_obj.bump_content_version();
+        REALM_ASSERT(m_alloc);
+        m_content_version = m_alloc->bump_content_version();
+        m_parent->update_content_version();
+    }
+
+    void update_content_version() const noexcept
+    {
+        REALM_ASSERT(m_alloc);
+        m_content_version = m_alloc->get_content_version();
+    }
+
+    void bump_both_versions()
+    {
+        REALM_ASSERT(m_alloc);
+        m_alloc->bump_content_version();
+        m_alloc->bump_storage_version();
+        m_parent->update_content_version();
+    }
+
+    Replication* get_replication() const
+    {
+        check_parent();
+        return m_parent->get_table()->get_repl();
+    }
+
+    Table* get_table_unchecked() const
+    {
+        check_parent();
+        auto t = m_parent->get_table();
+        REALM_ASSERT(t);
+        return t.unchecked_ptr();
+    }
+
+    Allocator& get_alloc() const
+    {
+        check_alloc();
+        return *m_alloc;
+    }
+
+    void set_alloc(Allocator& alloc)
+    {
+        m_alloc = &alloc;
+    }
+
+    void set_backlink(ColKey col_key, ObjLink new_link) const
+    {
+        check_parent();
+        m_parent->get_object().set_backlink(col_key, new_link);
+    }
+    // Used when replacing a link, return true if CascadeState contains objects to remove
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->get_object().replace_backlink(col_key, old_link, new_link, state);
+    }
+    // Used when removing a backlink, return true if CascadeState contains objects to remove
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->get_object().remove_backlink(col_key, old_link, state);
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes
@@ -479,19 +763,46 @@ protected:
     ref_type get_child_ref(size_t child_ndx) const noexcept final
     {
         static_cast<void>(child_ndx);
-        try {
-            return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-        }
-        catch (const KeyNotFound&) {
-            return ref_type(0);
-        }
+        return get_collection_ref();
     }
 
     void update_child_ref(size_t child_ndx, ref_type new_ref) final
     {
         static_cast<void>(child_ndx);
-        m_obj.set_int(m_col_key, from_ref(new_ref));
+        set_collection_ref(new_ref);
     }
+
+private:
+    CollectionParent* m_parent = nullptr;
+    Allocator* m_alloc = nullptr;
+
+    void check_parent() const
+    {
+        if (!m_parent) {
+            throw StaleAccessor("Collection has no owner");
+        }
+    }
+    void check_alloc() const
+    {
+        if (!m_alloc) {
+            throw StaleAccessor("Allocator not set");
+        }
+    }
+    /// Refresh the associated `Obj` (if needed), and update the internal
+    /// content version number. This is meant to be called from a derived class
+    /// before accessing its data.
+    ///
+    /// If the `Obj` changed since the last call, or the content version was
+    /// bumped, this returns `UpdateStatus::Updated`. In response, the caller
+    /// must invoke `init_from_parent()` or similar on its internal state
+    /// accessors to refresh its view of the data.
+    ///
+    /// If the owning object (or parent container) was deleted, an exception will
+    /// be thrown and the caller should enter a degenerate state.
+    ///
+    /// If no change has happened to the data, this function returns
+    /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
+    virtual UpdateStatus update_if_needed() const = 0;
 };
 
 namespace _impl {
@@ -509,24 +820,12 @@ void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>* tree);
 
 /// Clear the context flag on the tree if there are no more unresolved links.
 void check_for_last_unresolved(BPlusTree<ObjKey>* tree);
-
-/// Proxy class needed because the ObjList interface clobbers method names from
-/// CollectionBase.
-struct ObjListProxy : ObjList {
-    virtual TableRef proxy_get_target_table() const = 0;
-
-    TableRef get_target_table() const final
-    {
-        return proxy_get_target_table();
-    }
-};
-
 } // namespace _impl
 
 /// Base class for collections of objects, where unresolved links (tombstones)
 /// can occur.
 template <class Interface>
-class ObjCollectionBase : public Interface, public _impl::ObjListProxy {
+class ObjCollectionBase : public Interface, public ObjList {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
@@ -562,7 +861,15 @@ public:
         return m_unresolved.size() != 0;
     }
 
-    using Interface::get_target_table;
+    LinkCollectionPtr clone_as_obj_list() const final
+    {
+        return clone_obj_list();
+    }
+
+    TableRef get_target_table() const final
+    {
+        return Interface::get_target_table();
+    }
 
 protected:
     ObjCollectionBase() = default;
@@ -579,7 +886,7 @@ protected:
     /// `BPlusTree<T>`.
     virtual BPlusTree<ObjKey>* get_mutable_tree() const = 0;
 
-    /// Implements update_if_needed() in a way that ensures the consistency of
+    /// Implements `update_if_needed()` in a way that ensures the consistency of
     /// the unresolved list. Derived classes should call this instead of calling
     /// `update_if_needed()` on their inner accessor.
     UpdateStatus update_if_needed() const
@@ -650,10 +957,6 @@ private:
     // Sorted set of indices containing unresolved links.
     mutable std::vector<size_t> m_unresolved;
 
-    TableRef proxy_get_target_table() const final
-    {
-        return Interface::get_target_table();
-    }
     bool matches(const ObjList& other) const final
     {
         return get_owning_obj().get_key() == other.get_owning_obj().get_key() &&
@@ -681,6 +984,7 @@ struct CollectionIterator {
     using pointer = const value_type*;
     using reference = const value_type&;
 
+    CollectionIterator() noexcept = default;
     CollectionIterator(const L* l, size_t ndx) noexcept
         : m_list(l)
         , m_ndx(ndx)
@@ -776,7 +1080,7 @@ struct CollectionIterator {
 
 private:
     mutable value_type m_val;
-    const L* m_list;
+    const L* m_list = nullptr;
     size_t m_ndx = size_t(-1);
 };
 
@@ -789,6 +1093,25 @@ inline CollectionIterator<CollectionBase> CollectionBase::end() const
 {
     return CollectionIterator<CollectionBase>(this, size());
 }
+template <class T>
+class IteratorAdapter {
+public:
+    IteratorAdapter(T* keys)
+        : m_list(keys)
+    {
+    }
+    CollectionIterator<T> begin() const
+    {
+        return CollectionIterator<T>(m_list, 0);
+    }
+    CollectionIterator<T> end() const
+    {
+        return CollectionIterator<T>(m_list, m_list->size());
+    }
+
+private:
+    T* m_list;
+};
 
 namespace _impl {
 size_t get_collection_size_from_ref(ref_type, Allocator& alloc);

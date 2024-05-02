@@ -804,10 +804,10 @@ vector<S2Point>* SimplifyLoopAsPolyline(S2Loop const* loop, S1Angle tolerance) {
   if (indices.size() <= 2) return NULL;
   // Add them all except the last: it is the same as the first.
   vector<S2Point>* simplified_line = new vector<S2Point>(indices.size() - 1);
-    s2_logger()->detail("Now simplified to: ");
+    s2_logger()->trace("Now simplified to: ");
   for (size_t i = 0; i + 1 < indices.size(); ++i) {
     (*simplified_line)[i] = line.vertex(indices[i]);
-      s2_logger()->detail("%1", S2LatLng(line.vertex(indices[i])));
+      s2_logger()->trace("%1", S2LatLng(line.vertex(indices[i])));
   }
   return simplified_line;
 }

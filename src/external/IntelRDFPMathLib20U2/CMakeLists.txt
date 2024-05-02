@@ -7,6 +7,7 @@ LIBRARY/src/bid128_add.c
 LIBRARY/src/bid128_fma.c
 LIBRARY/src/bid128_string.c
 LIBRARY/src/bid128_2_str_tables.c
+LIBRARY/src/bid32_to_bid128.c
 LIBRARY/src/bid64_to_bid128.c
 LIBRARY/src/bid128_to_int64.c
 LIBRARY/src/bid128_quantize.c
@@ -31,4 +32,6 @@ if(HAVE-Wunused-but-set-variable)
     target_compile_options(Bid PRIVATE -Wno-unused-but-set-variable)
 endif()
 
-set_target_properties(Bid PROPERTIES CXX_VISIBILITY_PRESET hidden)
+set_target_properties(Bid PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    COMPILE_WARNING_AS_ERROR Off)

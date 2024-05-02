@@ -35,6 +35,13 @@ public:
     // expected result.
     enum class RoundTo { Digits7 = 0, Digits15 = 1 };
 
+    struct Bid32 {
+        Bid32(uint32_t x)
+            : u(x)
+        {
+        }
+        uint32_t u;
+    };
     struct Bid64 {
         Bid64(uint64_t x)
             : w(x)
@@ -55,6 +62,7 @@ public:
     {
     }
     Decimal128(Bid128 coefficient, int exponent, bool sign) noexcept;
+    explicit Decimal128(Bid32) noexcept;
     explicit Decimal128(Bid64) noexcept;
     explicit Decimal128(StringData) noexcept;
     explicit Decimal128(Bid128 val) noexcept
@@ -111,7 +119,8 @@ public:
     }
 
     std::string to_string() const noexcept;
-    Bid64 to_bid64() const;
+    std::optional<Bid32> to_bid32() const noexcept;
+    std::optional<Bid64> to_bid64() const noexcept;
     const Bid128* raw() const noexcept
     {
         return &m_value;
@@ -127,6 +136,9 @@ private:
     static constexpr int DECIMAL_EXPONENT_BIAS_128 = 6176;
     static constexpr int DECIMAL_COEFF_HIGH_BITS = 49;
     static constexpr int DECIMAL_EXP_BITS = 14;
+    static constexpr uint32_t DECIMAL_NULL_32 = 0x7c0000aa;
+    static constexpr uint64_t DECIMAL_NULL_64 = 0x7c000000000000aa;
+    static constexpr Bid128 DECIMAL_NULL_128 = {0xaa, 0x7c00000000000000};
     static constexpr uint64_t MASK_COEFF = (1ull << DECIMAL_COEFF_HIGH_BITS) - 1;
     static constexpr uint64_t MASK_EXP = ((1ull << DECIMAL_EXP_BITS) - 1) << DECIMAL_COEFF_HIGH_BITS;
     static constexpr uint64_t MASK_SIGN = 1ull << (DECIMAL_COEFF_HIGH_BITS + DECIMAL_EXP_BITS);
@@ -142,6 +154,8 @@ private:
         return m_value.w[0];
     }
 };
+
+bool operator==(Decimal128::Bid32 lhs, Decimal128::Bid32 rhs) noexcept;
 
 inline std::ostream& operator<<(std::ostream& ostr, const Decimal128& id)
 {

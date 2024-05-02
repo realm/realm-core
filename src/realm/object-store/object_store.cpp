@@ -27,6 +27,7 @@
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/instruction_replication.hpp>
@@ -101,6 +102,21 @@ DataType to_core_type(PropertyType type)
     }
 }
 
+std::optional<CollectionType> process_collection(const Property& property)
+{
+    // check if the final type is itself a collection.
+    if (is_array(property.type)) {
+        return CollectionType::List;
+    }
+    else if (is_set(property.type)) {
+        return CollectionType::Set;
+    }
+    else if (is_dictionary(property.type)) {
+        return CollectionType::Dictionary;
+    }
+    return std::nullopt;
+}
+
 ColKey add_column(Group& group, Table& table, Property const& property)
 {
     // Cannot directly insert a LinkingObjects column (a computed property).
@@ -113,37 +129,16 @@ ColKey add_column(Group& group, Table& table, Property const& property)
             return col;
         }
     }
+    auto collection_type = process_collection(property);
     if (property.type == PropertyType::Object) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        if (is_array(property.type)) {
-            return table.add_column_list(*link_table, property.name);
-        }
-        else if (is_set(property.type)) {
-            return table.add_column_set(*link_table, property.name);
-        }
-        else if (is_dictionary(property.type)) {
-            return table.add_column_dictionary(*link_table, property.name);
-        }
-        else {
-            return table.add_column(*link_table, property.name);
-        }
-    }
-    else if (is_array(property.type)) {
-        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                     is_nullable(property.type));
-    }
-    else if (is_set(property.type)) {
-        return table.add_column_set(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                    is_nullable(property.type));
-    }
-    else if (is_dictionary(property.type)) {
-        return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                           is_nullable(property.type));
+        return table.add_column(*link_table, property.name, collection_type);
     }
     else {
-        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
+        auto key =
+            table.add_column(to_core_type(property.type), property.name, is_nullable(property.type), collection_type);
         if (property.requires_index())
             table.add_search_index(key);
         if (property.requires_fulltext_index())
@@ -846,76 +841,117 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
     }
 }
 
+static const char* schema_mode_to_string(SchemaMode mode)
+{
+    switch (mode) {
+        case SchemaMode::Automatic:
+            return "Automatic";
+        case SchemaMode::Immutable:
+            return "Immutable";
+        case SchemaMode::ReadOnly:
+            return "ReadOnly";
+        case SchemaMode::SoftResetFile:
+            return "SoftResetFile";
+        case SchemaMode::HardResetFile:
+            return "HardResetFile";
+        case SchemaMode::AdditiveDiscovered:
+            return "AdditiveDiscovered";
+        case SchemaMode::AdditiveExplicit:
+            return "AdditiveExplicit";
+        case SchemaMode::Manual:
+            return "Manual";
+    }
+    return "";
+}
 
-void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
+void ObjectStore::apply_schema_changes(Transaction& transaction, uint64_t schema_version, Schema& target_schema,
                                        uint64_t target_schema_version, SchemaMode mode,
                                        std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
                                        std::function<void()> migration_function)
 {
-    create_metadata_tables(group);
+    using namespace std::chrono;
+    auto t1 = steady_clock::now();
+    auto logger = transaction.get_logger();
+    if (schema_version == ObjectStore::NotVersioned) {
+        logger->debug("Creating schema version %1 in mode '%2'", target_schema_version, schema_mode_to_string(mode));
+    }
+    else {
+        logger->debug("Migrating from schema version %1 to %2 in mode '%3'", schema_version, target_schema_version,
+                      schema_mode_to_string(mode));
+    }
+    util::ScopeExit cleanup([&]() noexcept {
+        auto t2 = steady_clock::now();
+        logger->debug("Migration did run in %1 us (%2 changes)", duration_cast<microseconds>(t2 - t1).count(),
+                      changes.size());
+    });
+
+    create_metadata_tables(transaction);
 
     if (mode == SchemaMode::AdditiveDiscovered || mode == SchemaMode::AdditiveExplicit) {
-        bool target_schema_is_newer =
-            (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned);
-
         // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
         bool update_indexes = true;
-        apply_additive_changes(group, changes, update_indexes);
+        apply_additive_changes(transaction, changes, update_indexes);
 
-        if (target_schema_is_newer)
-            set_schema_version(group, target_schema_version);
-
-        set_schema_keys(group, target_schema);
+        set_schema_version(transaction, target_schema_version);
+        set_schema_keys(transaction, target_schema);
         return;
     }
 
     if (schema_version == ObjectStore::NotVersioned) {
         if (mode != SchemaMode::ReadOnly) {
-            create_initial_tables(group, changes);
+            create_initial_tables(transaction, changes);
         }
-        set_schema_version(group, target_schema_version);
-        set_schema_keys(group, target_schema);
+        set_schema_version(transaction, target_schema_version);
+        set_schema_keys(transaction, target_schema);
         return;
     }
 
+    auto call_migration = [&] {
+        logger->debug("Calling migration function");
+        auto t3 = steady_clock::now();
+        migration_function();
+        auto t4 = steady_clock::now();
+        logger->debug("Migration function did run in %1 us", duration_cast<microseconds>(t4 - t3).count());
+    };
+
     if (mode == SchemaMode::Manual) {
         if (migration_function) {
-            migration_function();
+            call_migration();
         }
 
-        verify_no_changes_required(schema_from_group(group).compare(target_schema));
-        group.validate_primary_columns();
-        set_schema_keys(group, target_schema);
-        set_schema_version(group, target_schema_version);
+        verify_no_changes_required(schema_from_group(transaction).compare(target_schema));
+        transaction.validate_primary_columns();
+        set_schema_keys(transaction, target_schema);
+        set_schema_version(transaction, target_schema_version);
         return;
     }
 
     if (schema_version == target_schema_version) {
-        apply_non_migration_changes(group, changes);
-        set_schema_keys(group, target_schema);
+        apply_non_migration_changes(transaction, changes);
+        set_schema_keys(transaction, target_schema);
         return;
     }
 
-    auto old_schema = schema_from_group(group);
-    apply_pre_migration_changes(group, changes);
+    auto old_schema = schema_from_group(transaction);
+    apply_pre_migration_changes(transaction, changes);
     HandleBackLinksAutomatically handle_backlinks =
         handle_automatically_backlinks ? HandleBackLinksAutomatically::Yes : HandleBackLinksAutomatically::No;
     if (migration_function) {
-        set_schema_keys(group, target_schema);
-        migration_function();
+        set_schema_keys(transaction, target_schema);
+        call_migration();
 
         // Migration function may have changed the schema, so we need to re-read it
-        auto schema = schema_from_group(group);
-        apply_post_migration_changes(group, schema.compare(target_schema, mode), old_schema, DidRereadSchema::Yes,
-                                     handle_backlinks);
-        group.validate_primary_columns();
+        auto schema = schema_from_group(transaction);
+        apply_post_migration_changes(transaction, schema.compare(target_schema, mode), old_schema,
+                                     DidRereadSchema::Yes, handle_backlinks);
+        transaction.validate_primary_columns();
     }
     else {
-        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No, handle_backlinks);
+        apply_post_migration_changes(transaction, changes, {}, DidRereadSchema::No, handle_backlinks);
     }
 
-    set_schema_version(group, target_schema_version);
-    set_schema_keys(group, target_schema);
+    set_schema_version(transaction, target_schema_version);
+    set_schema_keys(transaction, target_schema);
 }
 
 Schema ObjectStore::schema_from_group(Group const& group)

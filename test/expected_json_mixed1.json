@@ -1,1 +1,39 @@
-[{"_id":999,"_key":0,"any":{"key":0,"table":"Bar"},"any_dict":{"key1":{"key":3,"table":"Bar"},"key2":{"key":4,"table":"Bar"}},"any_list":[{"key":1,"table":"Bar"},{"key":2,"table":"Bar"}]}]
+[
+  {
+    "_id": 999,
+    "any": {
+      "$link": {
+        "table": "Bar",
+        "key": 0
+      }
+    },
+    "any_list": [
+      {
+        "$link": {
+          "table": "Bar",
+          "key": 1
+        }
+      },
+      {
+        "$link": {
+          "table": "Bar",
+          "key": 2
+        }
+      }
+    ],
+    "any_dict": {
+      "key1": {
+        "$link": {
+          "table": "Bar",
+          "key": 3
+        }
+      },
+      "key2": {
+        "$link": {
+          "table": "Bar",
+          "key": 4
+        }
+      }
+    }
+  }
+]

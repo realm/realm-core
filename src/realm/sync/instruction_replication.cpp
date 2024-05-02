@@ -12,10 +12,10 @@ void SyncReplication::reset()
 
     m_last_table = nullptr;
     m_last_object = ObjKey();
-    m_last_field = ColKey();
+    m_last_field_name = StringData();
     m_last_class_name = InternString::npos;
     m_last_primary_key = Instruction::PrimaryKey();
-    m_last_field_name = InternString::npos;
+    m_last_interned_field_name = InternString::npos;
 }
 
 void SyncReplication::do_initiate_transact(Group& group, version_type current_version, bool history_updated)
@@ -32,7 +32,8 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         return Instruction::Payload{};
     }
 
-    switch (value.get_type()) {
+    auto type = value.get_type();
+    switch (type) {
         case type_Int: {
             return Instruction::Payload{value.get<int64_t>()};
         }
@@ -74,12 +75,19 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
             REALM_TERMINATE("as_payload() needs table/collection for links");
             break;
         }
-        case type_Mixed:
-            [[fallthrough]];
-        case type_LinkList: {
+        case type_Mixed: {
             REALM_TERMINATE("Invalid payload type");
             break;
         }
+    }
+    if (type == type_Dictionary) {
+        return Instruction::Payload(Instruction::Payload::Dictionary());
+    }
+    else if (type == type_List) {
+        return Instruction::Payload(Instruction::Payload::List());
+    }
+    else if (type == type_Set) {
+        return Instruction::Payload(Instruction::Payload::Set());
     }
     return Instruction::Payload{};
 }
@@ -162,8 +170,6 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
         case type_Decimal:
             return Type::Decimal;
         case type_Link:
-            return Type::Link;
-        case type_LinkList:
             return Type::Link;
         case type_TypedLink:
             return Type::Link;
@@ -298,11 +304,9 @@ void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey 
 }
 
 
-void SyncReplication::erase_class(TableKey table_key, size_t num_tables)
+void SyncReplication::erase_class(TableKey table_key, StringData table_name, size_t num_tables)
 {
-    Replication::erase_class(table_key, num_tables);
-
-    StringData table_name = m_transaction->get_table_name(table_key);
+    Replication::erase_class(table_key, table_name, num_tables);
 
     bool is_class = m_transaction->table_is_public(table_key);
 
@@ -324,7 +328,7 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
                                     Table* target_table)
 {
     Replication::insert_column(table, col_key, type, name, target_table);
-    using CollectionType = Instruction::AddColumn::CollectionType;
+    using CollectionType = Instruction::CollectionType;
 
     if (select_table(*table)) {
         Instruction::AddColumn instr;
@@ -332,6 +336,7 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
         instr.field = m_encoder.intern_string(name);
         instr.nullable = col_key.is_nullable();
         instr.type = get_payload_type(type);
+        instr.key_type = Instruction::Payload::Type::Null;
 
         if (col_key.is_list()) {
             instr.collection_type = CollectionType::List;
@@ -344,15 +349,10 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
         }
         else if (col_key.is_set()) {
             instr.collection_type = CollectionType::Set;
-            auto value_type = table->get_column_type(col_key);
-            REALM_ASSERT(value_type != type_LinkList);
-            instr.type = get_payload_type(value_type);
-            instr.key_type = Instruction::Payload::Type::Null;
         }
         else {
             REALM_ASSERT(!col_key.is_collection());
             instr.collection_type = CollectionType::Single;
-            instr.key_type = Instruction::Payload::Type::Null;
         }
 
         // Mixed columns are always nullable.
@@ -469,7 +469,7 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
         REALM_ASSERT(col != table->get_primary_key_column());
 
         Instruction::AddInteger instr;
-        populate_path_instr(instr, *table, ndx, col);
+        populate_path_instr(instr, *table, ndx, {col});
         instr.value = value;
         emit(instr);
     }
@@ -509,7 +509,7 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
         }
 
         Instruction::Update instr;
-        populate_path_instr(instr, *table, key, col);
+        populate_path_instr(instr, *table, key, {col});
         instr.value = as_payload(*table, col, value);
         instr.is_default = (variant == _impl::instr_SetDefault);
         emit(instr);
@@ -570,6 +570,7 @@ void SyncReplication::list_clear(const CollectionBase& view)
     if (select_collection(view)) {
         Instruction::Clear instr;
         populate_path_instr(instr, view);
+        instr.collection_type = Instruction::CollectionType::List;
         emit(instr);
     }
 }
@@ -605,6 +606,7 @@ void SyncReplication::set_clear(const CollectionBase& set)
     if (select_collection(set)) {
         Instruction::Clear instr;
         populate_path_instr(instr, set);
+        instr.collection_type = Instruction::CollectionType::Set;
         emit(instr);
     }
 }
@@ -656,13 +658,25 @@ void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, M
     }
 }
 
-void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
+void SyncReplication::dictionary_clear(const CollectionBase& dict)
 {
-    Replication::nullify_link(table, col_ndx, ndx);
+    Replication::dictionary_clear(dict);
+
+    if (select_collection(dict)) {
+        Instruction::Clear instr;
+        populate_path_instr(instr, dict);
+        instr.collection_type = Instruction::CollectionType::Dictionary;
+        emit(instr);
+    }
+}
+
+void SyncReplication::nullify_link(const Table* table, ColKey col_key, ObjKey ndx)
+{
+    Replication::nullify_link(table, col_key, ndx);
 
     if (select_table(*table)) {
         Instruction::Update instr;
-        populate_path_instr(instr, *table, ndx, col_ndx);
+        populate_path_instr(instr, *table, ndx, {col_key});
         REALM_ASSERT(!instr.is_array_update());
         instr.value = Instruction::Payload{realm::util::none};
         instr.is_default = false;
@@ -703,7 +717,7 @@ bool SyncReplication::select_table(const Table& table)
 
     m_last_class_name = emit_class_name(table);
     m_last_table = &table;
-    m_last_field = ColKey{};
+    m_last_field_name = StringData{};
     m_last_object = ObjKey{};
     m_last_primary_key.reset();
     return true;
@@ -732,49 +746,26 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const Table& table, ObjKey key,
-                                          ColKey field)
+                                          Path path)
 {
     REALM_ASSERT(key);
-    REALM_ASSERT(field);
+    // The first path entry will be the column key
+    REALM_ASSERT(path[0].is_col_key());
 
     if (table.is_embedded()) {
         // For embedded objects, Obj::traverse_path() yields the top object
         // first, then objects in the path in order.
         auto obj = table.get_object(key);
-        auto path_sizer = [&](size_t size) {
-            REALM_ASSERT(size != 0);
-            // Reserve 2 elements per path component, because link list entries
-            // have both a field and an index.
-            instr.path.m_path.reserve(size * 2);
-        };
+        auto full_path = obj.get_path();
+        // Populate top object in the normal way.
+        auto top_table = table.get_parent_group()->get_table(full_path.top_table);
 
-        auto visitor = [&](const Obj& path_obj, ColKey next_field, Mixed index) {
-            auto element_table = path_obj.get_table();
-            if (element_table->is_embedded()) {
-                StringData field_name = element_table->get_column_name(next_field);
-                InternString interned_field_name = m_encoder.intern_string(field_name);
-                instr.path.push_back(interned_field_name);
-            }
-            else {
-                // This is the top object, populate it the normal way.
-                populate_path_instr(instr, *element_table, path_obj.get_key(), next_field);
-            }
+        full_path.path_from_top.emplace_back(table.get_column_name(path[0].get_col_key()));
 
-            if (next_field.is_list()) {
-                instr.path.push_back(uint32_t(index.get_int()));
-            }
-            else if (next_field.is_dictionary()) {
-                InternString interned_field_name = m_encoder.intern_string(index.get_string());
-                instr.path.push_back(interned_field_name);
-            }
-        };
-
-        obj.traverse_path(visitor, path_sizer);
-
-        // The field in the embedded object is the last path component.
-        StringData field_in_embedded = table.get_column_name(field);
-        InternString interned_field_in_embedded = m_encoder.intern_string(field_in_embedded);
-        instr.path.push_back(interned_field_in_embedded);
+        for (auto it = path.begin() + 1; it != path.end(); ++it) {
+            full_path.path_from_top.emplace_back(std::move(*it));
+        }
+        populate_path_instr(instr, *top_table, full_path.top_objkey, full_path.path_from_top);
         return;
     }
 
@@ -782,7 +773,6 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     REALM_ASSERT(should_emit);
 
     instr.table = m_last_class_name;
-
     if (m_last_object == key) {
         instr.object = *m_last_primary_key;
     }
@@ -792,29 +782,43 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         m_last_primary_key = instr.object;
     }
 
-    if (m_last_field == field) {
-        instr.field = m_last_field_name;
+    StringData field_name = table.get_column_name(path[0].get_col_key());
+
+    if (m_last_field_name == field_name) {
+        instr.field = m_last_interned_field_name;
     }
     else {
-        instr.field = m_encoder.intern_string(table.get_column_name(field));
-        m_last_field = field;
-        m_last_field_name = instr.field;
+        instr.field = m_encoder.intern_string(field_name);
+        m_last_field_name = field_name;
+        m_last_interned_field_name = instr.field;
+    }
+    size_t sz = path.size();
+    instr.path.reserve(sz - 1);
+    for (size_t i = 1; i < sz; i++) {
+        auto& path_elem = path[i];
+        if (path_elem.is_ndx()) {
+            instr.path.push_back(uint32_t(path_elem.get_ndx()));
+        }
+        else {
+            REALM_ASSERT(path_elem.is_key());
+            InternString interned_field_name = m_encoder.intern_string(path_elem.get_key().c_str());
+            instr.path.push_back(interned_field_name);
+        }
     }
 }
 
-void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list)
+void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& collection)
 {
-    ConstTableRef source_table = list.get_table();
-    ObjKey source_obj = list.get_owner_key();
-    ColKey source_field = list.get_col_key();
-    populate_path_instr(instr, *source_table, source_obj, source_field);
+    ConstTableRef source_table = collection.get_table();
+    ObjKey source_obj = collection.get_owner_key();
+    populate_path_instr(instr, *source_table, source_obj, collection.get_short_path());
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list,
                                           uint32_t ndx)
 {
     populate_path_instr(instr, list);
-    instr.path.m_path.push_back(ndx);
+    instr.path.push_back(ndx);
 }
 
 } // namespace sync

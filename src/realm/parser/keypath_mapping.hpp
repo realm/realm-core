@@ -39,7 +39,7 @@ struct KeyPathElement {
     enum class KeyPathOperation { None, BacklinkTraversal, BacklinkCount, ListOfPrimitivesElementLength } operation;
     bool is_list_of_primitives() const
     {
-        return bool(col_key) && col_key.get_type() != col_type_LinkList && col_key.get_attrs().test(col_attr_List);
+        return bool(col_key) && col_key.get_type() != col_type_Link && col_key.is_list();
     }
 };
 
@@ -63,18 +63,20 @@ class KeyPathMapping {
 public:
     KeyPathMapping() = default;
     // returns true if added, false if duplicate key already exists
-    bool add_mapping(ConstTableRef table, std::string name, std::string alias);
-    bool remove_mapping(ConstTableRef table, std::string name);
+    bool add_mapping(ConstTableRef table, const std::string&, std::string alias);
+    bool remove_mapping(ConstTableRef table, const std::string&);
     bool has_mapping(ConstTableRef table, const std::string& name) const;
     util::Optional<std::string> get_mapping(TableKey table_key, const std::string& name) const;
     // table names are only used in backlink queries with the syntax '@links.TableName.property'
-    bool add_table_mapping(ConstTableRef table, std::string alias);
-    bool remove_table_mapping(std::string alias_to_remove);
+
+    bool add_table_mapping(ConstTableRef table, const std::string& alias);
+    bool remove_table_mapping(const std::string& alias_to_remove);
     bool has_table_mapping(const std::string& alias) const;
-    util::Optional<std::string> get_table_mapping(const std::string name) const;
-    std::string translate(const LinkChain&, const std::string& identifier);
-    std::string translate(ConstTableRef table, const std::string& identifier);
-    std::string translate_table_name(const std::string& identifier);
+    util::Optional<std::string> get_table_mapping(const std::string& name) const;
+
+    std::string translate(const LinkChain&, std::string_view identifier);
+    std::string translate(ConstTableRef table, std::string_view identifier);
+    std::string translate_table_name(std::string_view identifier);
 
 protected:
     std::unordered_map<std::pair<TableKey, std::string>, std::string, TableAndColHash> m_mapping;

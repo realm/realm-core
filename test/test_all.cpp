@@ -128,6 +128,7 @@ const char* file_order[] = {
 
     "large_tests*.cpp",
     "test_crypto.cpp",
+    "test_transform_collections_mixed.cpp",
     "test_transform.cpp",
     "test_array.cpp",
     "test_lang_bind_helper_sync.cpp",
@@ -203,7 +204,9 @@ class AggressiveGovernor : public util::PageReclaimGovernor {
 public:
     util::UniqueFunction<int64_t()> current_target_getter(size_t) override
     {
-        return []() { return 4096; };
+        return []() {
+            return 4096;
+        };
     }
     void report_target_result(int64_t) override {}
 };
@@ -291,9 +294,7 @@ public:
     {
     }
 
-    ~CustomReporter() noexcept
-    {
-    }
+    ~CustomReporter() noexcept {}
 
     void end(const TestContext& context, double elapsed_seconds) override
     {

@@ -180,12 +180,12 @@ static int search_ref(FILE* fp, int64_t ref, int64_t target, size_t level, size_
         char* buffer = malloc(byte_size * header.size);
         do_seek(fp, (size_t)(ref + 8), SEEK_SET);
         fread(buffer, byte_size * header.size, 1, fp);
-        for (size_t i = 0; i < header.size; i++) {
+        for (unsigned i = 0; i < header.size; i++) {
             stack[level] = i;
             int64_t subref = 1;
             switch (byte_size) {
                 case 1:
-                    subref = buffer[i];
+                    subref = ((int8_t*)buffer)[i];
                     break;
                 case 2:
                     subref = ((int16_t*)buffer)[i];
@@ -262,7 +262,7 @@ static void dump_index(FILE* fp, int64_t ref, const char* arr)
     }
 }
 
-static void usage()
+static void usage(void)
 {
     printf("Usage: realm-dump <file> [?][<ref>] [<array>]\n");
     exit(1);

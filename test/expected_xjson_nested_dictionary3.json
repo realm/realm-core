@@ -1,0 +1,18 @@
+[
+    {
+        "_key": 0,
+        "dict_dict_int": {
+            "Foo": {
+                "Key1": 10,
+                "Key2": 10,
+                "Key3": 10
+            },
+            "Foo1": {
+                "Key1": 20,
+                "Key2": 20,
+                "Key3": 20
+            }
+        },
+        "primaryKey": "t5o1"
+    }
+]

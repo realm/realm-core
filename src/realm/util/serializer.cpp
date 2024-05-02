@@ -137,7 +137,7 @@ std::string print_value<>(BinaryData data)
     if (data.is_null()) {
         return "NULL";
     }
-    return print_value<StringData>(StringData(data.data(), data.size()));
+    return util::format("binary(%1)", print_value<StringData>(StringData(data.data(), data.size())));
 }
 
 template <>
@@ -227,7 +227,7 @@ std::string print_value<>(StringData data)
     if (contains_invalids(data)) {
         std::string encode_buffer;
         encode_buffer.resize(util::base64_encoded_size(len));
-        util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+        util::base64_encode(data, encode_buffer);
         out = "B64\"" + encode_buffer + "\"";
     }
     else {
@@ -410,7 +410,7 @@ std::string SerialisationState::describe_column(ConstTableRef table, ColKey col_
 std::string SerialisationState::get_backlink_column_name(ConstTableRef from, ColKey col_key)
 {
     ColumnType col_type = col_key.get_type();
-    REALM_ASSERT_EX(col_type == col_type_Link || col_type == col_type_LinkList, col_type);
+    REALM_ASSERT_EX(col_type == col_type_Link, col_type);
 
     auto target_table = from->get_opposite_table(col_key);
     auto backlink_col = from->get_opposite_column(col_key);

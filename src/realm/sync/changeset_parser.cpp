@@ -54,7 +54,7 @@ struct State {
 
     util::Optional<Instruction::Payload::Type> read_optional_payload_type();
     Instruction::Payload::Type read_payload_type();
-    Instruction::AddColumn::CollectionType read_collection_type();
+    Instruction::CollectionType read_collection_type();
     Instruction::Payload read_payload();
     Instruction::Payload::Link read_link();
     Instruction::PrimaryKey read_object_key();
@@ -143,6 +143,10 @@ Instruction::Payload::Type State::read_payload_type()
             [[fallthrough]];
         case Type::Erased:
             [[fallthrough]];
+        case Type::Set:
+            [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
         case Type::ObjectValue:
@@ -175,10 +179,10 @@ Instruction::Payload::Type State::read_payload_type()
     parser_error("Unsupported data type");
 }
 
-Instruction::AddColumn::CollectionType State::read_collection_type()
+Instruction::CollectionType State::read_collection_type()
 {
-    using CollectionType = Instruction::AddColumn::CollectionType;
-    auto type = Instruction::AddColumn::CollectionType(read_int<uint8_t>());
+    using CollectionType = Instruction::CollectionType;
+    auto type = Instruction::CollectionType(read_int<uint8_t>());
     // Validate the type.
     switch (type) {
         case CollectionType::Single:
@@ -253,6 +257,10 @@ Instruction::Payload State::read_payload()
 
         case Type::Null:
             [[fallthrough]];
+        case Type::Set:
+            [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
         case Type::Erased:
@@ -301,17 +309,17 @@ Instruction::Path State::read_path()
 
     // Note: Not reserving `path_len`, because a corrupt changeset could cause std::bad_alloc to be thrown.
     if (path_len != 0)
-        path.m_path.reserve(16);
+        path.reserve(16);
 
     for (size_t i = 0; i < path_len; ++i) {
         int64_t element = read_int();
         if (element >= 0) {
             // Integer path element
-            path.m_path.emplace_back(uint32_t(element));
+            path.push_back(uint32_t(element));
         }
         else {
             // String path element
-            path.m_path.emplace_back(read_intern_string());
+            path.push_back(read_intern_string());
         }
     }
 
@@ -427,7 +435,7 @@ void State::parse_one()
             if (instr.type == Instruction::Payload::Type::Link) {
                 instr.link_target_table = read_intern_string();
             }
-            if (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
+            if (instr.collection_type == Instruction::CollectionType::Dictionary) {
                 instr.key_type = read_payload_type();
             }
             else {
@@ -478,8 +486,7 @@ void State::parse_one()
         case Instruction::Type::Clear: {
             Instruction::Clear instr;
             read_path_instr(instr);
-            uint32_t prior_size = read_int<uint32_t>();
-            static_cast<void>(prior_size); // Ignored
+            instr.collection_type = read_collection_type();
             m_handler(instr);
             return;
         }

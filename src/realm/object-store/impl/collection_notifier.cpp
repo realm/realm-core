@@ -26,6 +26,7 @@
 #include <realm/dictionary.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
+#include <realm/util/logger.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -129,6 +130,12 @@ CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
     : m_realm(std::move(realm))
     , m_transaction(Realm::Internal::get_transaction_ref(*m_realm))
 {
+    if (auto logger = m_transaction->get_logger()) {
+        // We only have logging at debug and trace levels
+        if (logger->would_log(util::LogCategory::notification, util::Logger::Level::debug)) {
+            m_logger = logger;
+        }
+    }
 }
 
 CollectionNotifier::~CollectionNotifier()
@@ -136,6 +143,9 @@ CollectionNotifier::~CollectionNotifier()
     // Need to do this explicitly to ensure m_realm is destroyed with the mutex
     // held to avoid potential double-deletion
     unregister();
+    if (m_logger) {
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "Notifier %1 gone", m_description);
+    }
 }
 
 VersionID CollectionNotifier::version() const noexcept
@@ -249,14 +259,16 @@ std::vector<NotificationCallback>::iterator CollectionNotifier::find_callback(ui
 
 void CollectionNotifier::unregister() noexcept
 {
-    std::lock_guard<std::mutex> lock(m_realm_mutex);
-    m_realm = nullptr;
+    {
+        std::lock_guard lock(m_realm_mutex);
+        m_realm = nullptr;
+    }
+    m_is_alive.store(false, std::memory_order_release);
 }
 
 bool CollectionNotifier::is_alive() const noexcept
 {
-    std::lock_guard<std::mutex> lock(m_realm_mutex);
-    return m_realm != nullptr;
+    return m_is_alive.load(std::memory_order_acquire);
 }
 
 std::unique_lock<std::mutex> CollectionNotifier::lock_target()
@@ -295,8 +307,9 @@ void CollectionNotifier::prepare_handover()
     REALM_ASSERT(m_change.empty());
     m_has_run = true;
 
-#ifdef REALM_DEBUG
     util::CheckedLockGuard lock(m_callback_mutex);
+    m_run_time_point = std::chrono::steady_clock::now();
+#ifdef REALM_DEBUG
     for (auto& callback : m_callbacks)
         REALM_ASSERT(!callback.skip_next);
 #endif
@@ -318,8 +331,60 @@ void CollectionNotifier::before_advance()
     });
 }
 
+static void log_changeset(util::Logger* logger, const CollectionChangeSet& changes, std::string_view description,
+                          std::chrono::microseconds elapsed)
+{
+    if (!logger) {
+        return;
+    }
+
+    logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                "Delivering notifications for %1 after %2 us", description, elapsed.count());
+    if (!logger->would_log(util::Logger::Level::trace)) {
+        return;
+    }
+    if (changes.empty()) {
+        logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   No changes");
+    }
+    else {
+        if (changes.collection_root_was_deleted) {
+            logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   collection deleted");
+        }
+        else if (changes.collection_was_cleared) {
+            logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   collection cleared");
+        }
+        else {
+            auto log = [logger](const char* change, const IndexSet& index_set) {
+                if (auto cnt = index_set.count()) {
+                    std::ostringstream ostr;
+                    bool first = true;
+                    for (auto [a, b] : index_set) {
+                        if (!first)
+                            ostr << ',';
+                        if (b > a + 1) {
+                            ostr << '[' << a << ',' << b - 1 << ']';
+                        }
+                        else {
+                            ostr << a;
+                        }
+                        first = false;
+                    }
+                    logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   %1 %2: %3", cnt,
+                                change, ostr.str().c_str());
+                }
+            };
+            log("deletions", changes.deletions);
+            log("insertions", changes.insertions);
+            log("modifications", changes.modifications);
+        }
+    }
+}
+
 void CollectionNotifier::after_advance()
 {
+    using namespace std::chrono;
+    auto now = steady_clock::now();
+
     for_each_callback([&](auto& lock, auto& callback) {
         if (callback.initial_delivered && callback.changes_to_deliver.empty()) {
             return;
@@ -331,7 +396,9 @@ void CollectionNotifier::after_advance()
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
+        auto elapsed = duration_cast<microseconds>(now - m_run_time_point);
         lock.unlock_unchecked();
+        log_changeset(m_logger.get(), changes, m_description, elapsed);
         cb.after(changes);
     });
 }
@@ -469,4 +536,25 @@ void NotifierPackage::after_advance()
 {
     for (auto& notifier : m_notifiers)
         notifier->after_advance();
+}
+
+NotifierRunLogger::NotifierRunLogger(util::Logger* logger, std::string_view name, std::string_view description)
+    : m_logger(logger)
+    , m_name(name)
+    , m_description(description)
+{
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        m_logger = logger;
+        m_start = std::chrono::steady_clock::now();
+    }
+}
+
+NotifierRunLogger::~NotifierRunLogger()
+{
+    using namespace std::chrono;
+    if (m_logger) {
+        auto now = steady_clock::now();
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "%1 %2 ran in %3 us", m_name,
+                      m_description, duration_cast<microseconds>(now - m_start).count());
+    }
 }

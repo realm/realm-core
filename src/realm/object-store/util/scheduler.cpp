@@ -41,7 +41,7 @@
 namespace realm::util {
 namespace {
 
-util::UniqueFunction<std::shared_ptr<Scheduler>()> s_factory = &Scheduler::make_platform_default;
+std::shared_ptr<Scheduler> (*s_factory)() = Scheduler::make_platform_default;
 
 class FrozenScheduler : public util::Scheduler {
 public:
@@ -108,7 +108,7 @@ void InvocationQueue::invoke_all()
 
 Scheduler::~Scheduler() = default;
 
-void Scheduler::set_default_factory(util::UniqueFunction<std::shared_ptr<Scheduler>()> factory)
+void Scheduler::set_default_factory(std::shared_ptr<Scheduler> (*factory)())
 {
     s_factory = std::move(factory);
 }

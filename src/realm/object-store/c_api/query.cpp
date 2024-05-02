@@ -166,6 +166,10 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
                 return type_Decimal;
             case RLM_TYPE_UUID:
                 return type_UUID;
+            case RLM_TYPE_LIST:
+                return type_List;
+            case RLM_TYPE_DICTIONARY:
+                return type_Dictionary;
         }
         throw LogicError{ErrorCodes::TypeMismatch, "Unsupported type"}; // LCOV_EXCL_LINE
         return type_Int;
@@ -401,6 +405,28 @@ RLM_API bool realm_results_get(realm_results_t* results, size_t index, realm_val
             *out_value = to_capi(mixed);
         }
         return true;
+    });
+}
+
+RLM_API realm_list_t* realm_results_get_list(realm_results_t* results, size_t index)
+{
+    return wrap_err([&]() {
+        realm_list_t* out = nullptr;
+        auto result_list = results->get_list(index);
+        if (result_list.is_valid())
+            out = new realm_list_t{result_list};
+        return out;
+    });
+}
+
+RLM_API realm_dictionary_t* realm_results_get_dictionary(realm_results_t* results, size_t index)
+{
+    return wrap_err([&]() {
+        realm_dictionary_t* out = nullptr;
+        auto result_dictionary = results->get_dictionary(index);
+        if (result_dictionary.is_valid())
+            out = new realm_dictionary_t{result_dictionary};
+        return out;
     });
 }
 

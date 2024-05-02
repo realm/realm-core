@@ -148,9 +148,7 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     if (c.collection_root_was_deleted) {
         collection_root_was_deleted = true;
     }
-
     collection_was_cleared = c.collection_was_cleared;
-
     c = {};
     verify();
 }

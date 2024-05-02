@@ -19,10 +19,7 @@
 #ifndef REALM_UTIL_SCOPE_EXIT_HPP
 #define REALM_UTIL_SCOPE_EXIT_HPP
 
-#include <type_traits>
-#include <utility>
-
-#include <realm/util/optional.hpp>
+#include <optional>
 
 namespace realm {
 namespace util {
@@ -43,20 +40,24 @@ public:
     ScopeExit(ScopeExit&& se) noexcept(std::is_nothrow_move_constructible<H>::value)
         : m_handler(std::move(se.m_handler))
     {
-        se.m_handler = none;
+        se.m_handler = std::nullopt;
     }
 
-    ~ScopeExit() noexcept
+    ~ScopeExit()
     {
         if (m_handler)
             (*m_handler)();
+    }
+    void cancel() noexcept
+    {
+        m_handler = std::nullopt;
     }
 
     static_assert(noexcept(std::declval<H>()()), "Handler must be nothrow executable");
     static_assert(std::is_nothrow_destructible<H>::value, "Handler must be nothrow destructible");
 
 private:
-    util::Optional<H> m_handler;
+    std::optional<H> m_handler;
 };
 
 template <class H>

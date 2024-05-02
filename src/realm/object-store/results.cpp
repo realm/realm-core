@@ -35,7 +35,8 @@ namespace realm {
 [[noreturn]] static void unsupported_operation(ColKey column, Table const& table, const char* operation)
 {
     auto type = ObjectSchema::from_core_type(column);
-    std::string_view collection_type = column.is_collection() ? collection_type_name(column) : "property";
+    std::string_view collection_type =
+        column.is_collection() ? collection_type_name(table.get_collection_type(column)) : "property";
     const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
     throw IllegalOperation(util::format("Operation '%1' not supported for %2%3 %4 '%5.%6'", operation, column_type,
                                         column.is_nullable() ? "?" : "", collection_type, table.get_class_name(),
@@ -461,6 +462,29 @@ Mixed Results::get_any(size_t ndx)
     throw OutOfBounds{"get_any() on Results", ndx, do_size()};
 }
 
+List Results::get_list(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    REALM_ASSERT(m_mode == Mode::Collection);
+    ensure_up_to_date();
+    if (size_t actual = actual_index(ndx); actual < m_collection->size()) {
+        return List{m_realm, m_collection->get_list(m_collection->get_path_element(actual))};
+    }
+    throw OutOfBounds{"get_list() on Results", ndx, m_collection->size()};
+}
+
+object_store::Dictionary Results::get_dictionary(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    REALM_ASSERT(m_mode == Mode::Collection);
+    ensure_up_to_date();
+    if (size_t actual = actual_index(ndx); actual < m_collection->size()) {
+        return object_store::Dictionary{m_realm,
+                                        m_collection->get_dictionary(m_collection->get_path_element(actual))};
+    }
+    throw OutOfBounds{"get_dictionary() on Results", ndx, m_collection->size()};
+}
+
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
 {
     util::CheckedUniqueLock lock(m_mutex);
@@ -786,13 +810,8 @@ Query Results::do_get_query() const
             return Query(m_table, std::make_unique<TableView>(m_table_view));
         }
         case Mode::Collection:
-            if (auto list = dynamic_cast<ObjList*>(m_collection.get())) {
-                return m_table->where(*list);
-            }
-            if (auto dict = dynamic_cast<Dictionary*>(m_collection.get())) {
-                if (dict->get_value_data_type() == type_Link) {
-                    return m_table->where(*dict);
-                }
+            if (auto objlist = m_collection->clone_as_obj_list()) {
+                return m_table->where(std::move(objlist));
             }
             return m_query;
         case Mode::Table:

@@ -35,78 +35,10 @@
 #include "realm/table_view.hpp"
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
+#include "realm/dictionary.hpp"
+#include "realm/index_string.hpp"
 
 namespace realm {
-
-// FIXME: This method belongs in obj.cpp.
-LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
-{
-    auto attr = get_table()->get_column_attr(col_key);
-    REALM_ASSERT(attr.test(col_attr_List));
-    bool nullable = attr.test(col_attr_Nullable);
-
-    switch (get_table()->get_column_type(col_key)) {
-        case type_Int: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Int>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Int>>(*this, col_key);
-        }
-        case type_Bool: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Bool>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Bool>>(*this, col_key);
-        }
-        case type_Float: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Float>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Float>>(*this, col_key);
-        }
-        case type_Double: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Double>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Double>>(*this, col_key);
-        }
-        case type_String: {
-            return std::make_unique<Lst<String>>(*this, col_key);
-        }
-        case type_Binary: {
-            return std::make_unique<Lst<Binary>>(*this, col_key);
-        }
-        case type_Timestamp: {
-            return std::make_unique<Lst<Timestamp>>(*this, col_key);
-        }
-        case type_Decimal: {
-            return std::make_unique<Lst<Decimal128>>(*this, col_key);
-        }
-        case type_ObjectId: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<ObjectId>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<ObjectId>>(*this, col_key);
-        }
-        case type_UUID: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<UUID>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<UUID>>(*this, col_key);
-        }
-        case type_TypedLink: {
-            return std::make_unique<Lst<ObjLink>>(*this, col_key);
-        }
-        case type_Mixed: {
-            return std::make_unique<Lst<Mixed>>(*this, col_key);
-        }
-        case type_LinkList:
-            return get_linklist_ptr(col_key);
-        case type_Link:
-            break;
-    }
-    REALM_TERMINATE("Unsupported column type");
-}
 
 /****************************** Lst aggregates *******************************/
 
@@ -134,17 +66,17 @@ void do_sort(std::vector<size_t>& indices, size_t size, util::FunctionRef<bool(s
 template <class T>
 void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
-    update_if_needed();
+    update();
 
     auto tree = m_tree.get();
     if (ascending) {
         do_sort(indices, size(), [tree](size_t i1, size_t i2) {
-            return unresolved_to_null(tree->get(i1)) < unresolved_to_null(tree->get(i2));
+            return tree->get(i1) < tree->get(i2);
         });
     }
     else {
         do_sort(indices, size(), [tree](size_t i1, size_t i2) {
-            return unresolved_to_null(tree->get(i1)) > unresolved_to_null(tree->get(i2));
+            return tree->get(i1) > tree->get(i2);
         });
     }
 }
@@ -180,7 +112,7 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 
     auto tree = m_tree.get();
     auto duplicates = min_unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
-        return unresolved_to_null(tree->get(i1)) == unresolved_to_null(tree->get(i2));
+        return tree->get(i1) == tree->get(i2);
     });
 
     // Erase the duplicates
@@ -192,17 +124,102 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
     }
 }
 
+/********************************** LstBase *********************************/
+
+template <>
+void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, JSONOutputMode output_mode,
+                                          util::FunctionRef<void(const Mixed&)> fn) const
+{
+    auto sz = size();
+    out << "[";
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        Mixed val = get_any(i);
+        if (val.is_type(type_TypedLink)) {
+            fn(val);
+        }
+        else {
+            val.to_json(out, output_mode);
+        }
+    }
+    out << "]";
+}
+
+/***************************** Lst<Stringdata> ******************************/
+
+template <>
+void Lst<StringData>::do_insert(size_t ndx, StringData value)
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        // Inserting a value already present is idempotent
+        index->insert(get_owner_key(), value);
+    }
+    m_tree->insert(ndx, value);
+}
+
+template <>
+void Lst<StringData>::do_set(size_t ndx, StringData value)
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        auto old_value = m_tree->get(ndx);
+        size_t nb_old = 0;
+        m_tree->for_all([&](StringData val) {
+            if (val == old_value) {
+                nb_old++;
+            }
+            return !(nb_old > 1);
+        });
+
+        if (nb_old == 1) {
+            // Remove last one
+            index->erase_string(get_owner_key(), old_value);
+        }
+        // Inserting a value already present is idempotent
+        index->insert(get_owner_key(), value);
+    }
+    m_tree->set(ndx, value);
+}
+
+template <>
+inline void Lst<StringData>::do_remove(size_t ndx)
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        auto old_value = m_tree->get(ndx);
+        size_t nb_old = 0;
+        m_tree->for_all([&](StringData val) {
+            if (val == old_value) {
+                nb_old++;
+            }
+            return !(nb_old > 1);
+        });
+
+        if (nb_old == 1) {
+            index->erase_string(get_owner_key(), old_value);
+        }
+    }
+    m_tree->erase(ndx);
+}
+
+template <>
+inline void Lst<StringData>::do_clear()
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        index->erase_list(get_owner_key(), *this);
+    }
+    m_tree->clear();
+}
+
 /********************************* Lst<Key> *********************************/
 
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
-    auto origin_table = m_obj.get_table();
+    auto origin_table = get_table_unchecked();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     ObjKey old_key = this->get(ndx);
     CascadeState state(CascadeState::Mode::Strong);
-    bool recurse =
-        m_obj.replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
+    bool recurse = replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
 
     m_tree->set(ndx, target_key);
 
@@ -222,9 +239,9 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 template <>
 void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 {
-    auto origin_table = m_obj.get_table();
+    auto origin_table = get_table_unchecked();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
-    m_obj.set_backlink(m_col_key, {target_table_key, target_key});
+    set_backlink(m_col_key, {target_table_key, target_key});
     m_tree->insert(ndx, target_key);
     if (target_key.is_unresolved()) {
         m_tree->set_context_flag(true);
@@ -234,12 +251,12 @@ void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 template <>
 void Lst<ObjKey>::do_remove(size_t ndx)
 {
-    auto origin_table = m_obj.get_table();
+    auto origin_table = get_table_unchecked();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     ObjKey old_key = get(ndx);
     CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
-    bool recurse = m_obj.remove_backlink(m_col_key, {target_table_key, old_key}, state);
+    bool recurse = remove_backlink(m_col_key, {target_table_key, old_key}, state);
 
     m_tree->erase(ndx);
 
@@ -255,8 +272,8 @@ void Lst<ObjKey>::do_remove(size_t ndx)
 template <>
 void Lst<ObjKey>::do_clear()
 {
-    auto origin_table = m_obj.get_table();
-    TableRef target_table = m_obj.get_target_table(m_col_key);
+    auto origin_table = get_table_unchecked();
+    TableRef target_table = get_obj().get_target_table(m_col_key);
 
     size_t sz = size();
     if (!target_table->is_embedded()) {
@@ -278,7 +295,7 @@ void Lst<ObjKey>::do_clear()
     for (size_t ndx = 0; ndx < sz; ++ndx) {
         ObjKey target_key = m_tree->get(ndx);
         Obj target_obj = target_table->get_object(target_key);
-        target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
+        target_obj.remove_one_backlink(backlink_col, get_obj().get_key()); // Throws
         // embedded objects should only have one incoming link
         REALM_ASSERT_EX(target_obj.get_backlink_count() == 0, target_obj.get_backlink_count());
         state.m_to_be_deleted.emplace_back(target_table_key, target_key);
@@ -295,12 +312,12 @@ void Lst<ObjLink>::do_set(size_t ndx, ObjLink target_link)
 {
     ObjLink old_link = get(ndx);
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-    bool recurse = m_obj.replace_backlink(m_col_key, old_link, target_link, state);
+    bool recurse = replace_backlink(m_col_key, old_link, target_link, state);
 
     m_tree->set(ndx, target_link);
 
     if (recurse) {
-        auto origin_table = m_obj.get_table();
+        auto origin_table = get_table_unchecked();
         _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
     }
 }
@@ -308,7 +325,7 @@ void Lst<ObjLink>::do_set(size_t ndx, ObjLink target_link)
 template <>
 void Lst<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
-    m_obj.set_backlink(m_col_key, target_link);
+    set_backlink(m_col_key, target_link);
     m_tree->insert(ndx, target_link);
 }
 
@@ -318,17 +335,283 @@ void Lst<ObjLink>::do_remove(size_t ndx)
     ObjLink old_link = get(ndx);
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
-    bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
+    bool recurse = remove_backlink(m_col_key, old_link, state);
 
     m_tree->erase(ndx);
 
     if (recurse) {
-        auto table = m_obj.get_table();
+        auto table = get_table_unchecked();
         _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
 }
 
-template <>
+/******************************** Lst<Mixed> *********************************/
+
+Lst<Mixed>& Lst<Mixed>::operator=(const Lst<Mixed>& other)
+{
+    if (this != &other) {
+        Base::operator=(other);
+        CollectionParent::operator=(other);
+
+        // Just reset the pointer and rely on init_from_parent() being called
+        // when the accessor is actually used.
+        m_tree.reset();
+        Base::reset_content_version();
+    }
+
+    return *this;
+}
+
+Lst<Mixed>& Lst<Mixed>::operator=(Lst<Mixed>&& other) noexcept
+{
+    if (this != &other) {
+        Base::operator=(std::move(other));
+        CollectionParent::operator=(std::move(other));
+
+        m_tree = std::exchange(other.m_tree, nullptr);
+        if (m_tree) {
+            m_tree->set_parent(this, 0);
+        }
+    }
+
+    return *this;
+}
+
+
+UpdateStatus Lst<Mixed>::init_from_parent(bool allow_create) const
+{
+    Base::update_content_version();
+
+    if (!m_tree) {
+        m_tree.reset(new BPlusTreeMixed(get_alloc()));
+        const ArrayParent* parent = this;
+        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+    }
+    try {
+        return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
+    }
+    catch (...) {
+        m_tree->detach();
+        throw;
+    }
+}
+
+UpdateStatus Lst<Mixed>::update_if_needed() const
+{
+    switch (get_update_status()) {
+        case UpdateStatus::Detached:
+            m_tree.reset();
+            return UpdateStatus::Detached;
+        case UpdateStatus::NoChange:
+            if (m_tree && m_tree->is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        case UpdateStatus::Updated:
+            return init_from_parent(false);
+    }
+    REALM_UNREACHABLE();
+}
+
+size_t Lst<Mixed>::find_first(const Mixed& value) const
+{
+    if (!update())
+        return not_found;
+
+    if (value.is_null()) {
+        auto ndx = m_tree->find_first(value);
+        auto size = ndx == not_found ? m_tree->size() : ndx;
+        for (size_t i = 0; i < size; ++i) {
+            if (m_tree->get(i).is_unresolved_link())
+                return i;
+        }
+        return ndx;
+    }
+    return m_tree->find_first(value);
+}
+
+Mixed Lst<Mixed>::set(size_t ndx, Mixed value)
+{
+    // get will check for ndx out of bounds
+    Mixed old = do_get(ndx, "set()");
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_set(*this, ndx, value);
+    }
+    if (!value.is_same_type(old) || value != old) {
+        do_set(ndx, value);
+        if (value.is_type(type_Dictionary, type_List)) {
+            m_tree->ensure_keys();
+            set_key(*m_tree, ndx);
+        }
+        bump_content_version();
+    }
+    return old;
+}
+
+void Lst<Mixed>::insert(size_t ndx, Mixed value)
+{
+    ensure_created();
+    auto sz = size();
+    CollectionBase::validate_index("insert()", ndx, sz + 1);
+    if (value.is_type(type_TypedLink)) {
+        get_table()->get_parent_group()->validate(value.get_link());
+    }
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_insert(*this, ndx, value, sz);
+    }
+    do_insert(ndx, value);
+    if (value.is_type(type_Dictionary, type_List)) {
+        m_tree->ensure_keys();
+        set_key(*m_tree, ndx);
+    }
+    bump_content_version();
+}
+
+void Lst<Mixed>::resize(size_t new_size)
+{
+    size_t current_size = size();
+    if (new_size != current_size) {
+        while (new_size > current_size) {
+            insert_null(current_size++);
+        }
+        remove(new_size, current_size);
+        Base::bump_both_versions();
+    }
+}
+
+Mixed Lst<Mixed>::remove(size_t ndx)
+{
+    // get will check for ndx out of bounds
+    Mixed old = do_get(ndx, "remove()");
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_erase(*this, ndx);
+    }
+
+    do_remove(ndx);
+    bump_content_version();
+    return old;
+}
+
+void Lst<Mixed>::remove(size_t from, size_t to)
+{
+    while (from < to) {
+        remove(--to);
+    }
+}
+
+void Lst<Mixed>::clear()
+{
+    if (size() > 0) {
+        if (Replication* repl = Base::get_replication()) {
+            repl->list_clear(*this);
+        }
+        CascadeState state;
+        bool recurse = remove_backlinks(state);
+
+        m_tree->clear();
+
+        if (recurse) {
+            auto table = get_table_unchecked();
+            _impl::TableFriend::remove_recursive(*table, state); // Throws
+        }
+        bump_content_version();
+    }
+}
+
+void Lst<Mixed>::move(size_t from, size_t to)
+{
+    auto sz = size();
+    CollectionBase::validate_index("move()", from, sz);
+    CollectionBase::validate_index("move()", to, sz);
+
+    if (from != to) {
+        if (Replication* repl = Base::get_replication()) {
+            repl->list_move(*this, from, to);
+        }
+        if (to > from) {
+            to++;
+        }
+        else {
+            from++;
+        }
+        // We use swap here as it handles the special case for StringData where
+        // 'to' and 'from' points into the same array. In this case you cannot
+        // set an entry with the result of a get from another entry in the same
+        // leaf.
+        m_tree->insert(to, Mixed());
+        m_tree->swap(from, to);
+        m_tree->erase(from);
+
+        bump_content_version();
+    }
+}
+
+void Lst<Mixed>::swap(size_t ndx1, size_t ndx2)
+{
+    auto sz = size();
+    CollectionBase::validate_index("swap()", ndx1, sz);
+    CollectionBase::validate_index("swap()", ndx2, sz);
+
+    if (ndx1 != ndx2) {
+        if (Replication* repl = Base::get_replication()) {
+            LstBase::swap_repl(repl, ndx1, ndx2);
+        }
+        m_tree->swap(ndx1, ndx2);
+        bump_content_version();
+    }
+}
+
+void Lst<Mixed>::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
+{
+    if (dict_or_list == CollectionType::Set) {
+        throw IllegalOperation("Set nested in List<Mixed> is not supported");
+    }
+    check_level();
+    insert(path_elem.get_ndx(), Mixed(0, dict_or_list));
+}
+
+void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType dict_or_list)
+{
+    if (dict_or_list == CollectionType::Set) {
+        throw IllegalOperation("Set nested in List<Mixed> is not supported");
+    }
+    check_level();
+    set(path_elem.get_ndx(), Mixed(0, dict_or_list));
+}
+
+template <class T>
+inline std::shared_ptr<T> Lst<Mixed>::do_get_collection(const PathElement& path_elem)
+{
+    update();
+    auto get_shared = [&]() -> std::shared_ptr<CollectionParent> {
+        auto weak = weak_from_this();
+
+        if (weak.expired()) {
+            REALM_ASSERT_DEBUG(m_level == 1);
+            return std::make_shared<Lst<Mixed>>(*this);
+        }
+
+        return weak.lock();
+    };
+
+    auto shared = get_shared();
+    auto ret = std::make_shared<T>(m_col_key, get_level() + 1);
+    ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
+    return ret;
+}
+
+DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
+{
+    return const_cast<Lst<Mixed>*>(this)->do_get_collection<Dictionary>(path_elem);
+}
+
+std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(const PathElement& path_elem) const
+{
+    return const_cast<Lst<Mixed>*>(this)->do_get_collection<Lst<Mixed>>(path_elem);
+}
+
 void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 {
     ObjLink old_link;
@@ -340,59 +623,287 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     }
     if (value.is_type(type_TypedLink)) {
         target_link = value.get<ObjLink>();
-        m_obj.get_table()->get_parent_group()->validate(target_link);
+        get_table_unchecked()->get_parent_group()->validate(target_link);
     }
 
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-    bool recurse = m_obj.replace_backlink(m_col_key, old_link, target_link, state);
+    bool recurse = Base::replace_backlink(m_col_key, old_link, target_link, state);
 
     m_tree->set(ndx, value);
 
     if (recurse) {
-        auto origin_table = m_obj.get_table();
+        auto origin_table = get_table_unchecked();
         _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
     }
 }
 
-template <>
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
     if (value.is_type(type_TypedLink)) {
-        m_obj.set_backlink(m_col_key, value.get<ObjLink>());
+        Base::set_backlink(m_col_key, value.get<ObjLink>());
     }
+
     m_tree->insert(ndx, value);
 }
 
-template <>
 void Lst<Mixed>::do_remove(size_t ndx)
 {
-    if (Mixed old_value = m_tree->get(ndx); old_value.is_type(type_TypedLink)) {
-        auto old_link = old_value.get<ObjLink>();
+    CascadeState state;
+    bool recurse = clear_backlink(ndx, state);
 
-        CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
-                                                                  : CascadeState::Mode::Strong);
-        bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
+    m_tree->erase(ndx);
 
-        m_tree->erase(ndx);
+    if (recurse) {
+        auto table = get_table_unchecked();
+        _impl::TableFriend::remove_recursive(*table, state); // Throws
+    }
+}
 
-        if (recurse) {
-            auto table = m_obj.get_table();
-            _impl::TableFriend::remove_recursive(*table, state); // Throws
-        }
+void Lst<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    update();
+
+    auto tree = m_tree.get();
+    if (ascending) {
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+            return unresolved_to_null(tree->get(i1)) < unresolved_to_null(tree->get(i2));
+        });
     }
     else {
-        m_tree->erase(ndx);
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+            return unresolved_to_null(tree->get(i1)) > unresolved_to_null(tree->get(i2));
+        });
     }
 }
 
-template <>
-void Lst<Mixed>::do_clear()
+void Lst<Mixed>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
-    size_t ndx = size();
-    while (ndx--) {
-        do_remove(ndx);
+    indices.clear();
+    sort(indices, sort_order.value_or(true));
+    if (indices.empty()) {
+        return;
+    }
+
+    auto tree = m_tree.get();
+    auto duplicates = min_unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
+        return unresolved_to_null(tree->get(i1)) == unresolved_to_null(tree->get(i2));
+    });
+
+    // Erase the duplicates
+    indices.erase(duplicates, indices.end());
+
+    if (!sort_order) {
+        // Restore original order
+        std::sort(indices.begin(), indices.end());
     }
 }
+
+util::Optional<Mixed> Lst<Mixed>::min(size_t* return_ndx) const
+{
+    if (update()) {
+        return MinHelper<Mixed>::eval(*m_tree, return_ndx);
+    }
+    return MinHelper<Mixed>::not_found(return_ndx);
+}
+
+util::Optional<Mixed> Lst<Mixed>::max(size_t* return_ndx) const
+{
+    if (update()) {
+        return MaxHelper<Mixed>::eval(*m_tree, return_ndx);
+    }
+    return MaxHelper<Mixed>::not_found(return_ndx);
+}
+
+util::Optional<Mixed> Lst<Mixed>::sum(size_t* return_cnt) const
+{
+    if (update()) {
+        return SumHelper<Mixed>::eval(*m_tree, return_cnt);
+    }
+    return SumHelper<Mixed>::not_found(return_cnt);
+}
+
+util::Optional<Mixed> Lst<Mixed>::avg(size_t* return_cnt) const
+{
+    if (update()) {
+        return AverageHelper<Mixed>::eval(*m_tree, return_cnt);
+    }
+    return AverageHelper<Mixed>::not_found(return_cnt);
+}
+
+void Lst<Mixed>::to_json(std::ostream& out, JSONOutputMode output_mode,
+                         util::FunctionRef<void(const Mixed&)> fn) const
+{
+    out << "[";
+
+    auto sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        Mixed val = m_tree->get(i);
+        if (val.is_type(type_TypedLink)) {
+            fn(val);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Dictionary dict(parent, i);
+            dict.to_json(out, output_mode, fn);
+        }
+        else if (val.is_type(type_List)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Lst<Mixed> list(parent, i);
+            list.to_json(out, output_mode, fn);
+        }
+        else {
+            val.to_json(out, output_mode);
+        }
+    }
+
+    out << "]";
+}
+
+ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
+{
+    auto ndx = m_tree->find_key(index.get_salt());
+    if (ndx != realm::not_found) {
+        auto val = get(ndx);
+        if (val.is_type(DataType(int(type)))) {
+            return val.get_ref();
+        }
+        throw realm::IllegalOperation(util::format("Not a %1", type));
+    }
+    throw StaleAccessor("This collection is no more");
+    return 0;
+}
+
+bool Lst<Mixed>::check_collection_ref(Index index, CollectionType type) const noexcept
+{
+    auto ndx = m_tree->find_key(index.get_salt());
+    if (ndx != realm::not_found) {
+        return get(ndx).is_type(DataType(int(type)));
+    }
+    return false;
+}
+
+void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType type)
+{
+    auto ndx = m_tree->find_key(index.get_salt());
+    if (ndx == realm::not_found) {
+        throw StaleAccessor("Collection has been deleted");
+    }
+    m_tree->set(ndx, Mixed(ref, type));
+}
+
+void Lst<Mixed>::add_index(Path& path, const Index& index) const
+{
+    auto ndx = m_tree->find_key(index.get_salt());
+    REALM_ASSERT(ndx != realm::not_found);
+    path.emplace_back(ndx);
+}
+
+size_t Lst<Mixed>::find_index(const Index& index) const
+{
+    update();
+    return m_tree->find_key(index.get_salt());
+}
+
+bool Lst<Mixed>::nullify(ObjLink link)
+{
+    size_t ndx = find_first(link);
+    if (ndx != realm::not_found) {
+        if (Replication* repl = Base::get_replication()) {
+            repl->list_erase(*this, ndx); // Throws
+        }
+
+        m_tree->erase(ndx);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            Mixed val = m_tree->get(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(ndx);
+                if (dict->nullify(link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(ndx);
+                if (list->nullify(link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool Lst<Mixed>::replace_link(ObjLink old_link, ObjLink replace_link)
+{
+    size_t ndx = find_first(old_link);
+    if (ndx != realm::not_found) {
+        set(ndx, replace_link);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            Mixed val = m_tree->get(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(ndx);
+                if (dict->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(ndx);
+                if (list->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool Lst<Mixed>::clear_backlink(size_t ndx, CascadeState& state) const
+{
+    Mixed value = m_tree->get(ndx);
+    if (value.is_type(type_TypedLink, type_Dictionary, type_List)) {
+        if (value.is_type(type_TypedLink)) {
+            auto link = value.get<ObjLink>();
+            if (link.get_obj_key().is_unresolved()) {
+                state.m_mode = CascadeState::Mode::All;
+            }
+            return Base::remove_backlink(m_col_key, link, state);
+        }
+        else if (value.is_type(type_List)) {
+            Lst<Mixed> list{*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx)};
+            return list.remove_backlinks(state);
+        }
+        else if (value.is_type(type_Dictionary)) {
+            Dictionary dict{*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx)};
+            return dict.remove_backlinks(state);
+        }
+    }
+    return false;
+}
+
+bool Lst<Mixed>::remove_backlinks(CascadeState& state) const
+{
+    size_t sz = size();
+    bool recurse = false;
+    for (size_t ndx = 0; ndx < sz; ndx++) {
+        if (clear_backlink(ndx, state)) {
+            recurse = true;
+        }
+    }
+    return recurse;
+}
+
+/********************************** LnkLst ***********************************/
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
@@ -440,6 +951,21 @@ void LnkLst::remove_all_target_rows()
     }
 }
 
+void LnkLst::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const
+{
+    out << "[";
+
+    auto sz = m_list.size();
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        Mixed val(m_list.get(i));
+        fn(val);
+    }
+
+    out << "]";
+}
+
 void LnkLst::replace_link(ObjKey old_val, ObjKey new_val)
 {
     update_if_needed();
@@ -463,7 +989,6 @@ void LnkLst::replace_link(ObjKey old_val, ObjKey new_val)
 
 // Force instantiation:
 template class Lst<ObjKey>;
-template class Lst<Mixed>;
 template class Lst<ObjLink>;
 template class Lst<int64_t>;
 template class Lst<bool>;

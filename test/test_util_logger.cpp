@@ -61,7 +61,7 @@ namespace {
 
 TEST(Util_Logger_LevelToFromString)
 {
-    auto check = [& test_context = test_context](util::Logger::Level level, const char* name) {
+    auto check = [&test_context = test_context](util::Logger::Level level, const char* name) {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out << level;
@@ -91,14 +91,23 @@ TEST(Util_Logger_LevelThreshold)
     using namespace realm::util;
     auto base_logger = std::make_shared<StderrLogger>();
     auto threadsafe_logger = std::make_shared<ThreadSafeLogger>(base_logger);
-    auto prefix_logger = PrefixLogger("test", threadsafe_logger); // created using Logger shared_ptr
-    auto prefix_logger2 = PrefixLogger("test2", prefix_logger);   // created using PrefixLogger
+    auto prefix_logger =
+        PrefixLogger(util::LogCategory::realm, "test", threadsafe_logger); // created using Logger shared_ptr
+    auto prefix_logger2 = PrefixLogger("test2", prefix_logger);            // created using PrefixLogger
 
-    auto default_log_level = Logger::get_default_level_threshold();
+    auto default_log_level = util::LogCategory::realm.get_default_level_threshold();
     CHECK(base_logger->get_level_threshold() == default_log_level);
     CHECK(threadsafe_logger->get_level_threshold() == default_log_level);
     CHECK(prefix_logger.get_level_threshold() == default_log_level);
     CHECK(prefix_logger2.get_level_threshold() == default_log_level);
+
+    PrefixLogger storage_logger(LogCategory::storage, "test", threadsafe_logger);
+    PrefixLogger query_logger(LogCategory::query, "test", threadsafe_logger);
+    PrefixLogger sync_logger(LogCategory::sync, "test", threadsafe_logger);
+    base_logger->set_level_threshold("Realm.Storage", Logger::Level::debug);
+    CHECK(storage_logger.get_level_threshold() == Logger::Level::debug);
+    CHECK(query_logger.get_level_threshold() == Logger::Level::debug);
+    CHECK(sync_logger.get_level_threshold() == default_log_level);
 
     base_logger->set_level_threshold(Logger::Level::error);
     CHECK(base_logger->get_level_threshold() == Logger::Level::error);
@@ -135,23 +144,20 @@ TEST(Util_Logger_LevelThreshold)
     CHECK(base_logger->get_level_threshold() == Logger::Level::info);
     CHECK(ll_logger->get_level_threshold() == Logger::Level::error);
     CHECK(ll_logger2->get_level_threshold() == Logger::Level::debug);
-
-    auto prefix_logger3 = PrefixLogger("test3", ll_logger);
-    auto prefix_logger4 = PrefixLogger("test4", ll_logger2);
 }
 
 
 TEST(Util_Logger_LocalThresholdLogger)
 {
     using namespace realm::util;
-    // Save the original level
-    auto orig_level = Logger::get_default_level_threshold();
+    // Get the original level
+    auto orig_level = LogCategory::realm.get_default_level_threshold();
 
     auto base_logger = std::make_shared<StderrLogger>();
     auto lt_logger = std::make_shared<LocalThresholdLogger>(base_logger);
     auto lt_logger2 = std::make_shared<LocalThresholdLogger>(base_logger, Logger::Level::trace);
-    auto prefix_logger = PrefixLogger("test", lt_logger);
-    auto prefix_logger2 = PrefixLogger("test2", lt_logger2);
+    auto prefix_logger = PrefixLogger(util::LogCategory::realm, "test", lt_logger);
+    auto prefix_logger2 = PrefixLogger(util::LogCategory::realm, "test2", lt_logger2);
 
     CHECK(base_logger->get_level_threshold() == orig_level);
     CHECK(lt_logger->get_level_threshold() == orig_level);
@@ -182,8 +188,37 @@ TEST(Util_Logger_LocalThresholdLogger)
     CHECK(lt_logger2->get_level_threshold() == Logger::Level::all);
     CHECK(prefix_logger2.get_level_threshold() == Logger::Level::all);
 
-    // Restore original level
-    Logger::set_default_level_threshold(orig_level);
+    CHECK_EQUAL(orig_level, LogCategory::realm.get_default_level_threshold());
+}
+
+
+TEST(Util_Logger_Categories)
+{
+    class StringLogger : public util::Logger {
+    public:
+        std::string operator()()
+        {
+            return std::move(message);
+        }
+
+    protected:
+        void do_log(const util::LogCategory&, util::Logger::Level, const std::string& m) override
+        {
+            message += m;
+        }
+        std::string message;
+    } logger;
+
+    logger.log(util::LogCategory::query, util::Logger::Level::debug, "Query");
+    CHECK(logger().empty());
+    logger.set_level_threshold("Realm.Storage.Query", util::Logger::Level::debug);
+    logger.log(util::LogCategory::object, util::Logger::Level::debug, "Object");
+    logger.log(util::LogCategory::query, util::Logger::Level::debug, "Query");
+    CHECK_EQUAL(logger(), "Query");
+    logger.set_level_threshold("Realm.Storage.Object", util::Logger::Level::debug);
+    logger.log(util::LogCategory::object, util::Logger::Level::debug, "Object");
+    logger.log(util::LogCategory::query, util::Logger::Level::debug, "Query");
+    CHECK_EQUAL(logger(), "ObjectQuery");
 }
 
 
@@ -201,7 +236,7 @@ TEST(Util_Logger_Stream)
             out_2 << "Foo " << i << "\n";
         }
     }
-    CHECK(out_1.str() == out_2.str());
+    CHECK_EQUAL(out_1.str(), out_2.str());
 }
 
 
@@ -280,7 +315,7 @@ TEST(Util_Logger_Prefix)
     std::ostringstream out_2;
     {
         auto root_logger = std::make_shared<util::StreamLogger>(out_1);
-        util::PrefixLogger logger1("Prefix: ", root_logger);
+        util::PrefixLogger logger1(util::LogCategory::realm, "Prefix: ", root_logger);
         util::PrefixLogger logger2("Prefix2: ", logger1);
         logger1.info("Foo");
         out_2 << "Prefix: Foo\n";
@@ -301,7 +336,7 @@ TEST(Util_Logger_ThreadSafe)
         std::vector<std::string> messages;
 
     protected:
-        void do_log(util::Logger::Level, const std::string& message) override
+        void do_log(const util::LogCategory&, util::Logger::Level, const std::string& message) override
         {
             messages.push_back(std::move(message));
         }
@@ -318,7 +353,9 @@ TEST(Util_Logger_ThreadSafe)
     const int num_threads = 8;
     std::unique_ptr<test_util::ThreadWrapper[]> threads(new test_util::ThreadWrapper[num_threads]);
     for (int i = 0; i < num_threads; ++i)
-        threads[i].start([&func, i] { func(i); });
+        threads[i].start([&func, i] {
+            func(i);
+        });
     for (int i = 0; i < num_threads; ++i)
         CHECK_NOT(threads[i].join());
 

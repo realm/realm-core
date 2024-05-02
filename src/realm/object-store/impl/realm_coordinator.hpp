@@ -233,7 +233,7 @@ private:
     Realm::Config m_config;
     std::shared_ptr<DB> m_db;
 
-    mutable util::CheckedMutex m_schema_cache_mutex;
+    util::CheckedMutex m_schema_cache_mutex;
     util::Optional<Schema> m_cached_schema GUARDED_BY(m_schema_cache_mutex);
     uint64_t m_schema_version GUARDED_BY(m_schema_cache_mutex) = -1;
     uint64_t m_schema_transaction_version_min GUARDED_BY(m_schema_cache_mutex) = 0;

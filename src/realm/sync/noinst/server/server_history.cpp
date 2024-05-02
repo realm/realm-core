@@ -1193,7 +1193,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
         auto apply = [&](const Changeset* c) -> bool {
             TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
             InstructionApplier applier{transaction};
-            applier.apply(*c, &logger);
+            applier.apply(*c);
             reset(); // Reset the instruction encoder
             return true;
         };
@@ -1330,8 +1330,8 @@ _impl::History* ServerHistory::_get_history_write()
 // Overriding member in Replication
 std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 {
-    auto server_hist = std::make_unique<ServerHistory>(m_context);                     // Throws
-    server_hist->initialize(*m_db);                                                    // Throws
+    auto server_hist = std::make_unique<ServerHistory>(m_context); // Throws
+    server_hist->initialize(*m_db);                                // Throws
     return std::unique_ptr<_impl::History>(server_hist.release());
 }
 

@@ -1,0 +1,17 @@
+[
+    {
+        "list_list_int2": [
+            [
+                {
+                    "$numberLong": "1"
+                }
+            ],
+            [
+                {
+                    "$numberLong": "2"
+                }
+            ]
+        ],
+        "primaryKey": "t2o1"
+    }
+]

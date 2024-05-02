@@ -40,8 +40,6 @@ void abort_if(bool cond, FormatStr fmt, Args... args)
 
 int main(int argc, char const* argv[])
 {
-    std::map<std::string, std::string> renames;
-    size_t link_depth = 0;
     bool output_schema = false;
     realm::JSONOutputMode output_mode = realm::output_mode_json;
 
@@ -52,9 +50,6 @@ int main(int argc, char const* argv[])
         realm::StringData arg(argv[idx]);
         if (arg == "--schema") {
             output_schema = true;
-        }
-        else if (arg == "--link-depth") {
-            link_depth = strtol(argv[++idx], nullptr, 0);
         }
         else if (arg == "--output-mode") {
             auto output_mode_val = strtol(argv[++idx], nullptr, 0);
@@ -92,7 +87,7 @@ int main(int argc, char const* argv[])
 
     auto print = [&](realm::TransactionRef tr) {
         if (output_schema) {
-            tr->schema_to_json(std::cout, &renames);
+            tr->schema_to_json(std::cout);
         }
         else if (table_filter.size()) {
             realm::TableRef target = tr->get_table(table_filter);
@@ -101,10 +96,10 @@ int main(int argc, char const* argv[])
             realm::TableView results = q.find_all();
             std::cout << realm::util::format("filter '%1' found %2 results", query_filter, results.size())
                       << std::endl;
-            results.to_json(std::cout, link_depth, renames, output_mode);
+            results.to_json(std::cout, output_mode);
         }
         else {
-            tr->to_json(std::cout, link_depth, &renames, output_mode);
+            tr->to_json(std::cout, output_mode);
         }
     };
 
@@ -123,17 +118,17 @@ int main(int argc, char const* argv[])
             print(db->start_read());
             return 0;
         }
-        catch (const realm::FileFormatUpgradeRequired&) {
-            options.allow_file_format_upgrade = true;
-            options.is_immutable = false;
-        }
         catch (const realm::IncompatibleHistories&) {
             hist = realm::sync::make_client_replication();
             options.allow_file_format_upgrade = false;
             options.is_immutable = true;
         }
-        catch (...) {
-            break;
+        catch (const realm::FileAccessError& e) {
+            if (e.code() != realm::ErrorCodes::FileFormatUpgradeRequired) {
+                throw;
+            }
+            options.allow_file_format_upgrade = true;
+            options.is_immutable = false;
         }
     }
 

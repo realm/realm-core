@@ -92,6 +92,10 @@ std::ostream& Changeset::print_value(std::ostream& os, const Instruction::Payloa
             break;
         case Type::Erased:
             break;
+        case Type::Set:
+            break;
+        case Type::List:
+            break;
         case Type::Dictionary:
             break;
         case Type::Null:
@@ -138,7 +142,7 @@ std::ostream& Changeset::print_value(std::ostream& os, const Instruction::Payloa
 std::ostream& Changeset::print_path(std::ostream& os, const Instruction::Path& path) const noexcept
 {
     bool first = true;
-    for (auto& element : path.m_path) {
+    for (auto& element : path) {
         if (!first) {
             os << '.';
         }
@@ -257,7 +261,7 @@ void Changeset::verify() const
     };
 
     auto verify_path = [&](const Instruction::Path& path) {
-        for (auto& element : path.m_path) {
+        for (auto& element : path) {
             mpark::visit(util::overload{[&](InternString str) {
                                             verify_intern_string(str);
                                         },
@@ -427,7 +431,7 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
     if (p.type == Instruction::Payload::Type::Link) {
         m_tracer.field("target_table", p.link_target_table);
     }
-    if (p.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
+    if (p.collection_type == Instruction::CollectionType::Dictionary) {
         m_tracer.field("key_type", p.key_type);
     }
 }
@@ -501,7 +505,7 @@ void Changeset::Printer::field(StringData n, Instruction::Payload::Type type)
     print_field(n, get_type_name(type));
 }
 
-void Changeset::Printer::field(StringData n, Instruction::AddColumn::CollectionType type)
+void Changeset::Printer::field(StringData n, Instruction::CollectionType type)
 {
     print_field(n, get_collection_type(type));
 }
@@ -558,7 +562,7 @@ void Changeset::Printer::field(StringData n, const Instruction::Path& path)
     std::stringstream ss;
     ss << "[";
     bool first = true;
-    for (auto& element : path.m_path) {
+    for (auto& element : path) {
         if (!first) {
             ss << ".";
         }

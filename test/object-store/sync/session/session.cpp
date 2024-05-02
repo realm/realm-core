@@ -41,25 +41,26 @@
 using namespace realm;
 using namespace realm::util;
 
-static const std::string dummy_device_id = "123400000000000000000000";
-
-static std::shared_ptr<SyncUser> get_user(const std::shared_ptr<app::App>& app)
-{
-    return app->sync_manager()->get_user("user_id", ENCODE_FAKE_JWT("fake_refresh_token"),
-                                         ENCODE_FAKE_JWT("fake_access_token"), dummy_device_id);
-}
-
 TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
     if (!EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
-    auto app = init_sync_manager.app();
+    using State = SyncUser::State;
+
+    TestSyncManager tsm;
+    auto& server = tsm.sync_server();
     const std::string realm_base_url = server.base_url();
 
+    auto check_for_sessions = [](TestUser& user, size_t count, SyncSession::State state) {
+        auto sessions = user.sync_manager()->get_all_sessions_for(user);
+        CHECK(sessions.size() == count);
+        for (auto& session : sessions) {
+            CHECK(session->state() == state);
+        }
+    };
+
     SECTION("a SyncUser can properly retrieve its owned sessions") {
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         auto session1 = sync_session(user, "/test1a-1");
         auto session2 = sync_session(user, "/test1a-2");
         EventLoop::main().run_until([&] {
@@ -67,72 +68,71 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         });
 
         // Check the sessions on the SyncUser.
-        REQUIRE(user->all_sessions().size() == 2);
-        auto s1 = user->session_for_on_disk_path(session1->path());
+        check_for_sessions(*user, 2, SyncSession::State::Active);
+        auto s1 = tsm.sync_manager()->get_existing_session(session1->path());
         REQUIRE(s1 == session1);
-        auto s2 = user->session_for_on_disk_path(session2->path());
+        auto s2 = tsm.sync_manager()->get_existing_session(session2->path());
         REQUIRE(s2 == session2);
     }
 
     SECTION("a SyncUser properly unbinds its sessions upon logging out") {
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         auto session1 = sync_session(user, "/test1b-1");
         auto session2 = sync_session(user, "/test1b-2");
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
 
-        // Log the user out.
         user->log_out();
         // The sessions should log themselves out.
         EventLoop::main().run_until([&] {
             return sessions_are_inactive(*session1, *session2);
         });
-        CHECK(user->all_sessions().size() == 0);
+        check_for_sessions(*user, 2, SyncSession::State::Inactive);
     }
 
     SECTION("a SyncUser defers binding new sessions until it is logged in") {
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         user->log_out();
-        REQUIRE(user->state() == SyncUser::State::LoggedOut);
+        REQUIRE(user->state() == State::LoggedOut);
         auto session1 = sync_session(user, "/test1c-1");
         auto session2 = sync_session(user, "/test1c-2");
         // Run the runloop many iterations to see if the sessions spuriously bind.
         spin_runloop();
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
-        REQUIRE(user->all_sessions().size() == 0);
+        check_for_sessions(*user, 2, SyncSession::State::Inactive);
         // Log the user back in via the sync manager.
-        user = get_user(app);
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
-        REQUIRE(user->all_sessions().size() == 2);
+        check_for_sessions(*user, 2, SyncSession::State::Active);
     }
 
     SECTION("a SyncUser properly rebinds existing sessions upon logging back in") {
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         auto session1 = sync_session(user, "/test1d-1");
         auto session2 = sync_session(user, "/test1d-2");
         // Make sure the sessions are bound.
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
-        REQUIRE(user->all_sessions().size() == 2);
+        check_for_sessions(*user, 2, SyncSession::State::Active);
         // Log the user out.
         user->log_out();
-        REQUIRE(user->state() == SyncUser::State::LoggedOut);
+        REQUIRE(user->state() == State::LoggedOut);
         // Run the runloop many iterations to see if the sessions spuriously rebind.
         spin_runloop();
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
-        REQUIRE(user->all_sessions().size() == 0);
+        check_for_sessions(*user, 2, SyncSession::State::Inactive);
         // Log the user back in via the sync manager.
-        user = get_user(app);
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
-        REQUIRE(user->all_sessions().size() == 2);
+        check_for_sessions(*user, 2, SyncSession::State::Active);
     }
 
     SECTION("sessions that were destroyed can be properly recreated when requested again") {
@@ -140,7 +140,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         std::weak_ptr<SyncSession> weak_session;
         std::string on_disk_path;
         util::Optional<SyncConfig> config;
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         {
             // Create the session within a nested scope, so we can control its lifetime.
             auto session = sync_session(
@@ -161,12 +161,12 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         auto session = sync_session(
             user, path, [](auto, auto) {}, SyncSessionStopPolicy::Immediately, &on_disk_path);
         CHECK(session);
-        session = user->session_for_on_disk_path(on_disk_path);
+        session = tsm.sync_manager()->get_existing_session(on_disk_path);
         CHECK(session);
     }
 
     SECTION("a user can create multiple sessions for the same URL") {
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         // Note that this should put the sessions at different paths.
         auto session1 = sync_session(user, "/test");
         auto session2 = sync_session(user, "/test");
@@ -180,9 +180,8 @@ TEST_CASE("sync: log-in", "[sync][session]") {
         return;
 
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
-    auto app = init_sync_manager.app();
-    auto user = get_user(app);
+    TestSyncManager tsm;
+    auto user = tsm.fake_user();
 
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
@@ -200,14 +199,12 @@ TEST_CASE("sync: log-in", "[sync][session]") {
         CHECK(error_count == 0);
     }
 
-    // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
     // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
 }
 
 TEST_CASE("SyncSession: close() API", "[sync][session]") {
-    TestSyncManager init_sync_manager;
-    auto app = init_sync_manager.app();
-    auto user = get_user(app);
+    TestSyncManager tsm;
+    auto user = tsm.fake_user();
 
     SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
         auto session = sync_session(user, "/test-close-for-active");
@@ -233,9 +230,8 @@ TEST_CASE("SyncSession: close() API", "[sync][session]") {
 }
 
 TEST_CASE("SyncSession: pause()/resume() API", "[sync][session]") {
-    TestSyncManager init_sync_manager;
-    auto app = init_sync_manager.app();
-    auto user = get_user(app);
+    TestSyncManager tsm;
+    auto user = tsm.fake_user();
 
     auto session = sync_session(user, "/test-close-for-active");
     EventLoop::main().run_until([&] {
@@ -286,9 +282,8 @@ TEST_CASE("SyncSession: pause()/resume() API", "[sync][session]") {
 }
 
 TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync][session]") {
-    TestSyncManager init_sync_manager;
-    auto app = init_sync_manager.app();
-    auto user = get_user(app);
+    TestSyncManager tsm;
+    auto user = tsm.fake_user();
 
     SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
         auto session = sync_session(user, "/test-close-for-active");
@@ -308,10 +303,30 @@ TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync][session]") {
     }
 }
 
+TEST_CASE("SyncSession: internal pause_async API", "[sync][session]") {
+    TestSyncManager tsm;
+    auto user = tsm.fake_user("close-api-tests-user");
+
+    auto session = sync_session(
+        user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
+    REQUIRE(sessions_are_active(*session));
+    auto dbref = SyncSession::OnlyForTesting::get_db(*session);
+    auto before = dbref.use_count();
+    auto future = SyncSession::OnlyForTesting::pause_async(*session);
+    future.get();
+    auto after = dbref.use_count();
+    // Check SessionImpl released the sync agent as result of SessionWrapper::finalize() being called.
+    REQUIRE_NOTHROW(dbref->claim_sync_agent());
+    // Check DBRef is released in SessionWrapper::finalize().
+    REQUIRE(after < before);
+}
+
 TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
-    TestSyncManager init_sync_manager({}, {false});
-    auto app = init_sync_manager.app();
-    auto user = get_user(app);
+    TestSyncManager tsm({}, {false});
+    auto user = tsm.fake_user();
     auto session = sync_session(user, "/update_configuration");
 
     SECTION("updates reported configuration") {
@@ -343,8 +358,7 @@ TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
 }
 
 TEST_CASE("sync: error handling", "[sync][session]") {
-    TestSyncManager init_sync_manager;
-    auto app = init_sync_manager.app();
+    TestSyncManager tsm;
 
     std::string on_disk_path;
     std::optional<SyncError> error;
@@ -355,9 +369,9 @@ TEST_CASE("sync: error handling", "[sync][session]") {
     };
 
     SECTION("reports DNS error") {
-        app->sync_manager()->set_sync_route("ws://invalid.com:9090");
+        tsm.sync_manager()->set_sync_route("ws://invalid.com:9090", true);
 
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         auto session = sync_session(user, "/test", store_sync_error);
         timed_wait_for(
             [&] {
@@ -375,14 +389,14 @@ TEST_CASE("sync: error handling", "[sync][session]") {
 #if !(defined(SWIFT_PACKAGE) || REALM_MOBILE)
     SECTION("reports TLS error as handshake failed") {
         TestSyncManager ssl_sync_manager({}, {StartImmediately{true}, EnableSSL{true}});
-        auto app = ssl_sync_manager.app();
-
-        auto user = get_user(app);
+        auto user = ssl_sync_manager.fake_user();
         auto session = sync_session(user, "/test", store_sync_error);
-        timed_wait_for([&] {
-            std::lock_guard lock(mutex);
-            return error.has_value();
-        });
+        timed_wait_for(
+            [&] {
+                std::lock_guard lock(mutex);
+                return error.has_value();
+            },
+            std::chrono::seconds(35));
         REQUIRE(error);
         CHECK(error->status.code() == ErrorCodes::TlsHandshakeFailed);
 #if REALM_HAVE_SECURE_TRANSPORT
@@ -396,11 +410,10 @@ TEST_CASE("sync: error handling", "[sync][session]") {
     }
 #endif // !defined(SWIFT_PACKAGE) && !REALM_MOBILE
 
-    using ProtocolError = realm::sync::ProtocolError;
     using ProtocolErrorInfo = realm::sync::ProtocolErrorInfo;
 
     SECTION("Doesn't treat unknown system errors as being fatal") {
-        auto user = get_user(app);
+        auto user = tsm.fake_user();
         auto session = sync_session(user, "/test", store_sync_error);
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
@@ -415,8 +428,12 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         REQUIRE_FALSE(error);
     }
 
+#if REALM_APP_SERVICES
+    using ProtocolError = realm::sync::ProtocolError;
     SECTION("Properly handles a client reset error") {
-        auto user = get_user(app);
+        OfflineAppSession oas;
+        auto user = oas.make_user();
+
         auto session = sync_session(user, "/test", store_sync_error);
         std::string on_disk_path = session->path();
         EventLoop::main().run_until([&] {
@@ -444,7 +461,9 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         std::string recovery_path = error->user_info[SyncError::c_recovery_file_path_key];
         auto idx = recovery_path.find("recovered_realm");
         CHECK(idx != std::string::npos);
-        idx = recovery_path.find(app->sync_manager()->recovery_directory_path());
+        idx = recovery_path.find(oas.app()->config().base_file_path);
+        CHECK(idx != std::string::npos);
+        idx = recovery_path.find(oas.app()->app_id());
         CHECK(idx != std::string::npos);
         if (just_before.tm_year == just_after.tm_year) {
             idx = recovery_path.find(util::format_local_time(just_after_raw, "%Y"));
@@ -459,6 +478,7 @@ TEST_CASE("sync: error handling", "[sync][session]") {
             CHECK(idx != std::string::npos);
         }
     }
+#endif // REALM_APP_SERVICES
 }
 
 TEST_CASE("sync: stop policy behavior", "[sync][session]") {
@@ -466,9 +486,9 @@ TEST_CASE("sync: stop policy behavior", "[sync][session]") {
         return;
 
     // Server is initially stopped so we can control when the session exits the dying state.
-    TestSyncManager init_sync_manager({}, {false});
-    auto& server = init_sync_manager.sync_server();
-    auto sync_manager = init_sync_manager.app()->sync_manager();
+    TestSyncManager tsm({}, {false});
+    auto& server = tsm.sync_server();
+    auto sync_manager = tsm.sync_manager();
     auto schema = Schema{
         {"object",
          {
@@ -479,7 +499,7 @@ TEST_CASE("sync: stop policy behavior", "[sync][session]") {
 
     std::atomic<bool> error_handler_invoked(false);
     Realm::Config config;
-    auto user = get_user(init_sync_manager.app());
+    auto user = tsm.fake_user();
 
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
         auto session = sync_session(
@@ -572,9 +592,8 @@ TEST_CASE("session restart", "[sync][session]") {
     if (!EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager({}, {false});
-    auto& server = init_sync_manager.sync_server();
-    auto app = init_sync_manager.app();
+    TestSyncManager tsm({}, {false});
+    auto& server = tsm.sync_server();
     Realm::Config config;
     auto schema = Schema{
         {"object",
@@ -584,7 +603,7 @@ TEST_CASE("session restart", "[sync][session]") {
          }},
     };
 
-    auto user = get_user(app);
+    auto user = tsm.fake_user();
     auto session = sync_session(
         user, "/test-restart", [&](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded, nullptr, schema,
         &config);
@@ -615,11 +634,12 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
         return;
 
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
-
+    TestSyncManager tsm;
+    auto user = tsm.fake_user();
+    ;
     // Create a synced Realm containing a class with two properties.
     {
-        SyncTestFile config1(init_sync_manager.app(), "schema-version-test");
+        SyncTestFile config1(user, "schema-version-test");
         config1.schema_version = 1;
         config1.schema = Schema{
             {"object",
@@ -634,7 +654,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
 
     // Download the existing Realm into a second local file without specifying a schema,
     // mirroring how `openAsync` works.
-    SyncTestFile config2(init_sync_manager.app(), "schema-version-test");
+    SyncTestFile config2(user, "schema-version-test");
     config2.schema_version = 1;
     {
         auto realm2 = Realm::get_shared_realm(config2);
@@ -645,7 +665,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
     // only a single property. This should not result in us trying to remove `property2`,
     // and will throw an exception if it does.
     {
-        SyncTestFile config3(init_sync_manager.app(), "schema-version-test");
+        SyncTestFile config3(user, "schema-version-test");
         config3.path = config2.path;
         config3.schema_version = 1;
         config3.schema = Schema{

@@ -1,0 +1,5 @@
+# Apply clang-format to all .cpp and .hpp files
+93b520449e01bfcdbe99c64186a878cda7c50c6e
+
+# Reformat code (#7622)
+0d73fdd35a6b55ec57b4e13b6046bbf9dfec6622

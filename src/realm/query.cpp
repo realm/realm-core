@@ -278,6 +278,12 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode>{new Node(null{}, col_key)};
     }
 
+    static std::unique_ptr<ParentNode> make(ColKey col_key, Mixed value)
+    {
+        return std::unique_ptr<ParentNode>{new Node(value.get<typename Node::TConditionValue>(), col_key)};
+    }
+
+    // overload for optional types
     template <class T = typename Node::TConditionValue>
     static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value,
                                    std::unique_ptr<ParentNode>>::type
@@ -317,6 +323,35 @@ struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, null)
     {
         return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_key)};
+    }
+
+    template <class T>
+    REALM_FORCEINLINE static std::unique_ptr<ParentNode> make(ColKey, T&&)
+    {
+        throw_type_mismatch_error();
+    }
+};
+
+template <class Cond>
+struct MakeConditionNode<TimestampNode<Cond>> {
+    static std::unique_ptr<ParentNode> make(ColKey col_key, Timestamp value)
+    {
+        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(std::move(value), col_key)};
+    }
+
+    // only enable certain template conditions of supported timestamp operations
+    template <typename... SubstitutionEnabler, typename U = Cond>
+    static std::enable_if_t<is_any_v<U, Equal, NotEqual, Greater, Less, GreaterEqual, LessEqual>,
+                            std::unique_ptr<ParentNode>>
+    make(ColKey col_key, Mixed value)
+    {
+        static_assert(sizeof...(SubstitutionEnabler) == 0, "Do not specify template arguments");
+        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(value.get<Timestamp>(), col_key)};
+    }
+
+    static std::unique_ptr<ParentNode> make(ColKey col_key, null)
+    {
+        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(null{}, col_key)};
     }
 
     template <class T>
@@ -380,7 +415,6 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
             return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
         }
         case type_Link:
-        case type_LinkList:
             if constexpr (std::is_same_v<T, Mixed> && realm::is_any_v<Cond, Equal, NotEqual>) {
                 ObjKey key;
                 if (value.is_type(type_Link)) {
@@ -852,6 +886,66 @@ Query& Query::like(ColKey column_key, Mixed value, bool case_sensitive)
         add_condition<LikeIns>(column_key, value);
     return *this;
 }
+Query& Query::in(ColKey column_key, const Mixed* begin, const Mixed* end)
+{
+    REALM_ASSERT(!column_key.is_collection());
+    ColumnType col_type = column_key.get_type();
+    std::unique_ptr<ParentNode> node;
+    try {
+        if (begin == end) {
+            node = std::make_unique<ExpressionNode>(std::make_unique<FalseExpression>());
+        }
+        else if (col_type == col_type_UUID) {
+            node = std::make_unique<UUIDNode<Equal>>(column_key, begin, end);
+        }
+        else if (col_type == col_type_ObjectId) {
+            node = std::make_unique<ObjectIdNode<Equal>>(column_key, begin, end);
+        }
+        else if (col_type == col_type_String) {
+            node = std::make_unique<StringNode<Equal>>(column_key, begin, end);
+        }
+        else if (col_type == col_type_Int) {
+            if (column_key.is_nullable()) {
+                node = std::make_unique<IntegerNode<ArrayIntNull, Equal>>(column_key, begin, end);
+            }
+            else {
+                node = std::make_unique<IntegerNode<ArrayInteger, Equal>>(column_key, begin, end);
+            }
+        }
+        else {
+            // general path for nodes that don't have this optimization yet
+            Query cond = this->m_table->where();
+            if (col_type == col_type_Mixed) {
+                for (const Mixed* it = begin; it != end; ++it) {
+                    cond.add_node(make_condition_node<Equal>(*m_table, column_key, *it));
+                    cond.Or();
+                }
+            }
+            else {
+                for (const Mixed* it = begin; it != end; ++it) {
+                    if (it->is_type(DataType(col_type))) {
+                        cond.add_node(make_condition_node<Equal>(*m_table, column_key, *it));
+                        cond.Or();
+                    }
+                    else if (it->is_null() && column_key.is_nullable()) {
+                        cond.add_node(make_condition_node<Equal>(*m_table, column_key, realm::null()));
+                        cond.Or();
+                    }
+                }
+            }
+            this->and_query(cond);
+            return *this;
+        }
+    }
+    catch (const InvalidArgument&) {
+        // if none of the arguments matched the right type we'd end up with an
+        // empty condition node which won't evaluate correctly. The right behaviour
+        // is to match nothing, so make a false condition
+        node = std::make_unique<ExpressionNode>(std::make_unique<FalseExpression>());
+    }
+    add_node(std::move(node));
+    return *this;
+}
 
 // ------------- size
 Query& Query::size_equal(ColKey column_key, int64_t value)
@@ -941,7 +1035,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 Query& Query::fulltext(ColKey column_key, StringData value)
 {
-    auto index = m_table->get_search_index(column_key);
+    auto index = m_table->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }
@@ -953,7 +1047,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
 
 Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_map)
 {
-    auto index = link_map.get_target_table()->get_search_index(column_key);
+    auto index = link_map.get_target_table()->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }
@@ -961,6 +1055,30 @@ Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_
     auto lm = std::make_unique<LinkMap>(link_map);
     auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key, std::move(lm))};
     add_node(std::move(node));
+    return *this;
+}
+
+Query& Query::greater(ColKey column_key, StringData value)
+{
+    add_condition<Greater>(column_key, value);
+    return *this;
+}
+
+Query& Query::greater_equal(ColKey column_key, StringData value)
+{
+    add_condition<GreaterEqual>(column_key, value);
+    return *this;
+}
+
+Query& Query::less(ColKey column_key, StringData value)
+{
+    add_condition<Less>(column_key, value);
+    return *this;
+}
+
+Query& Query::less_equal(ColKey column_key, StringData value)
+{
+    add_condition<LessEqual>(column_key, value);
     return *this;
 }
 
@@ -994,9 +1112,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
             auto pn = root_node();
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
-            if (node->has_search_index()) {
-                auto keys = node->index_based_keys();
-                REALM_ASSERT(keys);
+            if (auto keys = node->index_based_keys()) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
@@ -1198,8 +1314,9 @@ ObjKey Query::find() const
     bool do_log = false;
     std::chrono::steady_clock::time_point t1;
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description_safe());
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query find first: '%1'",
+                    get_description_safe());
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1258,8 +1375,8 @@ ObjKey Query::find() const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query first found: %1, Duration: %2 us", ret,
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query first found: %1, Duration: %2 us",
+                    ret, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
     return ret;
@@ -1273,14 +1390,15 @@ void Query::do_find_all(QueryStateBase& st) const
 
     if (st.limit() == 0) {
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query find all: limit = 0 -> result: 0");
+            logger->log(util::LogCategory::query, util::Logger::Level::debug,
+                        "Query find all: limit = 0 -> result: 0");
         }
         return;
     }
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description_safe(),
-                    int64_t(st.limit()));
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query find all: '%1', limit = %2",
+                    get_description_safe(), int64_t(st.limit()));
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1319,10 +1437,7 @@ void Query::do_find_all(QueryStateBase& st) const
             auto pn = root_node();
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
-            if (node->has_search_index()) {
-                auto keys = node->index_based_keys();
-                REALM_ASSERT(keys);
-
+            if (auto keys = node->index_based_keys()) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
@@ -1368,8 +1483,8 @@ void Query::do_find_all(QueryStateBase& st) const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query found: %1, Duration: %2 us", st.match_count(),
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query found: %1, Duration: %2 us",
+                    st.match_count(), std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 }
 
@@ -1395,7 +1510,7 @@ size_t Query::do_count(size_t limit) const
 
     if (limit == 0) {
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
+            logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
         }
         return 0;
     }
@@ -1410,15 +1525,15 @@ size_t Query::do_count(size_t limit) const
             cnt_all = std::min(m_table->size(), limit);
         }
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query count (no condition): limit = %1 -> result: %2",
-                        int64_t(limit), cnt_all);
+            logger->log(util::LogCategory::query, util::Logger::Level::debug,
+                        "Query count (no condition): limit = %1 -> result: %2", int64_t(limit), cnt_all);
         }
         return cnt_all;
     }
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description_safe(),
-                    int64_t(limit));
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query count: '%1', limit = %2",
+                    get_description_safe(), int64_t(limit));
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1438,9 +1553,7 @@ size_t Query::do_count(size_t limit) const
         auto pn = root_node();
         auto best = find_best_node(pn);
         auto node = pn->m_children[best];
-        if (node->has_search_index()) {
-            auto keys = node->index_based_keys();
-            REALM_ASSERT(keys);
+        if (auto keys = node->index_based_keys()) {
             if (pn->m_children.size() > 1) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
@@ -1485,7 +1598,7 @@ size_t Query::do_count(size_t limit) const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
@@ -1711,12 +1824,15 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
     if (auto root = root_node()) {
         description = root->describe_expression(state);
     }
-    else {
+    if (m_view) {
+        description += util::format(" VIEW { %1 element(s) }", m_view->size());
+    }
+    if (description.length() == 0) {
         // An empty query returns all results and one way to indicate this
         // is to serialise TRUEPREDICATE which is functionally equivalent
         description = "TRUEPREDICATE";
     }
-    if (this->m_ordering) {
+    if (m_ordering) {
         description += " " + m_ordering->get_description(m_table);
     }
     return description;
@@ -1735,9 +1851,6 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description() const
 {
-    if (m_view) {
-        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-    }
     util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
 }
@@ -1748,7 +1861,10 @@ std::string Query::get_description_safe() const noexcept
         util::serializer::SerialisationState state(m_table->get_parent_group());
         return get_description(state);
     }
-    catch (...) {
+    catch (const Exception& e) {
+        if (auto logger = m_table->get_logger()) {
+            logger->log(util::Logger::Level::warn, "Query::get_description() failed: '%1'", e.what());
+        }
     }
     return "Unknown Query";
 }

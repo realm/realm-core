@@ -20,15 +20,16 @@ namespace {
 class TableCompareLogger : public util::Logger {
 public:
     TableCompareLogger(StringData table_name, util::Logger& base_logger) noexcept
-        : util::Logger(base_logger.get_level_threshold())
+        : util::Logger()
         , m_table_name{table_name}
         , m_base_logger{base_logger}
     {
+        set_level_threshold(base_logger.get_level_threshold());
     }
-    void do_log(Level level, const std::string& message) override final
+    void do_log(const util::LogCategory& category, Level level, const std::string& message) override final
     {
-        ensure_prefix();                                          // Throws
-        Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+        ensure_prefix();                                                    // Throws
+        Logger::do_log(m_base_logger, category, level, m_prefix + message); // Throws
     }
 
 private:
@@ -49,15 +50,16 @@ private:
 class ObjectCompareLogger : public util::Logger {
 public:
     ObjectCompareLogger(Mixed pk, util::Logger& base_logger) noexcept
-        : util::Logger(base_logger.get_level_threshold())
+        : util::Logger()
         , m_pk{pk}
         , m_base_logger{base_logger}
     {
+        set_level_threshold(base_logger.get_level_threshold());
     }
-    void do_log(Level level, const std::string& message) override final
+    void do_log(const util::LogCategory& category, Level level, const std::string& message) override final
     {
-        ensure_prefix();                                          // Throws
-        Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+        ensure_prefix();                                                    // Throws
+        Logger::do_log(m_base_logger, category, level, m_prefix + message); // Throws
     }
 
 private:
@@ -69,8 +71,8 @@ private:
         if (REALM_LIKELY(!m_prefix.empty()))
             return;
         std::ostringstream out;
-        out << m_pk << ": ";                   // Throws
-        m_prefix = out.str();                  // Throws
+        out << m_pk << ": ";  // Throws
+        m_prefix = out.str(); // Throws
     }
 };
 
@@ -106,7 +108,7 @@ different:
 template <class T>
 bool compare_set_values(const Set<T>& a, const Set<T>& b)
 {
-    return compare_arrays(a, b, SetElementEquals<T>{});
+    return compare_arrays(a, b);
 }
 
 bool compare_dictionaries(const Dictionary& a, const Dictionary& b)
@@ -257,7 +259,7 @@ bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& l
                 equal = false;
                 continue;
             }
-            if (type_1 == type_Link || type_1 == type_LinkList) {
+            if (type_1 == type_Link) {
                 ConstTableRef target_1 = table_1.get_link_target(key_1);
                 ConstTableRef target_2 = table_2.get_link_target(key_2);
                 if (target_1->get_name() != target_2->get_name()) {
@@ -389,7 +391,7 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
         case type_TypedLink:
             // FIXME: Implement
             break;
-        case type_LinkList: {
+        case type_Link: {
             auto a = obj_1.get_list<ObjKey>(col.key_1);
             auto b = obj_2.get_list<ObjKey>(col.key_2);
             if (a.size() != b.size()) {
@@ -454,8 +456,6 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
             }
             break;
         }
-        case type_Link:
-            REALM_TERMINATE("Unsupported column type.");
     }
 
     return true;
@@ -615,8 +615,6 @@ bool compare_sets(const Column& col, const Obj& obj_1, const Obj& obj_2, util::L
         case type_TypedLink:
             // FIXME: Implement
             break;
-        case type_LinkList:
-            REALM_TERMINATE("Unsupported column type.");
     }
 
     return true;
@@ -846,8 +844,6 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
 
                 continue;
             }
-            case type_LinkList:
-                break;
         }
         REALM_TERMINATE("Unsupported column type.");
     }
@@ -871,12 +867,6 @@ bool compare_objects(Mixed& pk, const Table& table_1, const Table& table_2, cons
 } // anonymous namespace
 
 namespace realm::test_util {
-
-bool compare_tables(const Table& table_1, const Table& table_2)
-{
-    util::NullLogger logger;
-    return compare_tables(table_1, table_2, logger);
-}
 
 bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& logger)
 {
@@ -953,7 +943,7 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
 
 bool compare_groups(const Transaction& group_1, const Transaction& group_2)
 {
-    util::NullLogger logger;
+    util::StderrLogger logger(util::Logger::Level::off);
     return compare_groups(group_1, group_2, logger);
 }
 

@@ -323,7 +323,7 @@ void MigrationStore::create_subscriptions(SubscriptionStore& subs_store, const s
 
     // List of tables in the realm.
     auto table_keys = tr->get_table_keys();
-    for (const auto& key : table_keys) {
+    for (auto key : table_keys) {
         if (!tr->table_is_public(key)) {
             continue;
         }

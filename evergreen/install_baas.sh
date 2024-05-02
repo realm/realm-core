@@ -107,6 +107,19 @@ function setup_baas_dependencies() {
                 DISTRO_NAME="$(. /etc/os-release ; echo "${ID}")"
                 DISTRO_VERSION="$(. /etc/os-release ; echo "${VERSION_ID}")"
                 DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}")"
+                if [[ "${DISTRO_NAME}" == "linuxmint" ]]; then
+                    CODENAME="$(. /etc/os-release ; echo "${UBUNTU_CODENAME}")"
+                    case "${CODENAME}" in
+                        bionic) DISTRO_VERSION_MAJOR=18;;
+                        focal) DISTRO_VERSION_MAJOR=20;;
+                        jammy) DISTRO_VERSION_MAJOR=22;;
+                        # noble) DISTRO_VERSION_MAJOR=24;;
+                        *)
+                            echo "Error: unsupported version of linuxmint ${DISTRO_VERSION}"
+                            exit 1
+                        ;;
+                    esac
+                fi
             elif [[ -e /etc/redhat-release ]]; then
                 # /etc/redhat-release covers RHEL
                 DISTRO_NAME=rhel
@@ -365,16 +378,16 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 # If a baas branch or commit version was not provided use the one locked in our dependencies
 if [[ -z "${BAAS_VERSION}" ]]; then
-    dep_file="dependencies.list"
+    dep_file="dependencies.yml"
     test_path1="${BASE_PATH}/../${dep_file}"
     test_path2="${BASE_PATH}/${dep_file}"
     if [[ -f "${test_path1}" ]]; then
         # if this was run locally then check up a directory
-        get_var_from_file BAAS_VERSION "${test_path1}"
+        BAAS_VERSION=$(sed -rn 's/^BAAS_VERSION: (.*)/\1/p' < "${test_path1}")
     elif [[ -f "${test_path2}" ]]; then
         # if this is run from an evergreen remote host
-        # then the dependencies.list file has been copied over
-        get_var_from_file BAAS_VERSION "${test_path2}"
+        # then the dependencies.yml file has been copied over
+        BAAS_VERSION=$(sed -rn 's/^BAAS_VERSION: (.*)/\1/p' < "${test_path2}")
     else
         echo "could not find '${test_path1}' or '${test_path2}'"
         ls "${BASE_PATH}/.."

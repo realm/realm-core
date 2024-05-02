@@ -174,7 +174,7 @@ std::string ClientProtocol::compressed_hex_dump(BinaryData blob)
     std::string encode_buffer;
     auto encoded_size = util::base64_encoded_size(buf.size());
     encode_buffer.resize(encoded_size);
-    util::base64_encode(buf.data(), buf.size(), encode_buffer.data(), encode_buffer.size());
+    util::base64_encode(buf, encode_buffer);
 
     return encode_buffer;
 }
@@ -215,7 +215,8 @@ void ServerProtocol::insert_single_changeset_download_message(OutputBuffer& out,
     entry.changeset.write_to(out);
 
     if (logger.would_log(util::Logger::Level::trace)) {
-        logger.trace("DOWNLOAD: insert single changeset (server_version=%1, "
+        logger.trace(util::LogCategory::changeset,
+                     "DOWNLOAD: insert single changeset (server_version=%1, "
                      "client_version=%2, timestamp=%3, client_file_ident=%4, "
                      "original_changeset_size=%5, changeset_size=%6, changeset='%7').",
                      changeset_info.server_version, changeset_info.client_version, entry.origin_timestamp,
@@ -244,7 +245,8 @@ void ServerProtocol::make_download_message(int protocol_version, OutputBuffer& o
     std::size_t body_size = (body_is_compressed ? compressed_body_size : uncompressed_body_size);
     out.write(body, body_size);
 
-    logger.detail("Sending: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
+    logger.detail(util::LogCategory::changeset,
+                  "Sending: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                   "latest_server_version=%3, latest_server_version_salt=%4, "
                   "upload_client_version=%5, upload_server_version=%6, "
                   "num_changesets=%7, is_body_compressed=%8, body_size=%9, "

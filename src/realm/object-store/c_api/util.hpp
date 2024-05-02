@@ -69,7 +69,7 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
         // Anything goes
         return;
     }
-    if (val.get_type() == type_TypedLink && (col_type == col_type_Link || col_type == col_type_LinkList)) {
+    if (val.get_type() == type_TypedLink && (col_type == col_type_Link)) {
         auto obj_link = val.get<ObjLink>();
         if (table.get_link_target(col_key)->get_key() != obj_link.get_table_key()) {
             report_type_mismatch(realm, table, col_key);

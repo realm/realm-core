@@ -540,6 +540,11 @@ struct ListOfObjects : public LinkedCollectionBase {
         return 0;
     }
     constexpr static bool allows_storing_nulls = false;
+
+    List get_collection(SharedRealm r, Obj obj)
+    {
+        return List(r, obj, get_link_col_key(obj.get_table()));
+    }
 };
 
 struct ListOfMixedLinks : public LinkedCollectionBase {
@@ -618,6 +623,10 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
         return num_unresolved;
     }
     constexpr static bool allows_storing_nulls = true;
+    List get_collection(SharedRealm r, Obj obj)
+    {
+        return List(r, obj, get_link_col_key(obj.get_table()));
+    }
 };
 
 struct SetOfObjects : public LinkedCollectionBase {
@@ -667,6 +676,11 @@ struct SetOfObjects : public LinkedCollectionBase {
         return 0;
     }
     constexpr static bool allows_storing_nulls = false;
+
+    object_store::Set get_collection(SharedRealm r, Obj obj)
+    {
+        return object_store::Set(r, obj, get_link_col_key(obj.get_table()));
+    }
 };
 
 struct SetOfMixedLinks : public LinkedCollectionBase {
@@ -725,6 +739,11 @@ struct SetOfMixedLinks : public LinkedCollectionBase {
         return num_unresolved;
     }
     constexpr static bool allows_storing_nulls = true;
+
+    object_store::Set get_collection(SharedRealm r, Obj obj)
+    {
+        return object_store::Set(r, obj, get_link_col_key(obj.get_table()));
+    }
 };
 
 struct DictionaryOfObjects : public LinkedCollectionBase {
@@ -789,6 +808,10 @@ struct DictionaryOfObjects : public LinkedCollectionBase {
     void reset_test_state() override
     {
         key_counter = 0;
+    }
+    object_store::Dictionary get_collection(SharedRealm r, Obj obj)
+    {
+        return object_store::Dictionary(r, obj, get_link_col_key(obj.get_table()));
     }
     size_t key_counter = 0;
     constexpr static bool allows_storing_nulls = true;
@@ -864,6 +887,11 @@ struct DictionaryOfMixedLinks : public LinkedCollectionBase {
     }
     size_t key_counter = 0;
     constexpr static bool allows_storing_nulls = true;
+
+    object_store::Dictionary get_collection(SharedRealm r, Obj obj)
+    {
+        return object_store::Dictionary(r, obj, get_link_col_key(obj.get_table()));
+    }
 };
 
 

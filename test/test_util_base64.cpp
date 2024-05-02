@@ -42,36 +42,28 @@ TEST(Base64_Decode)
         "SGVsb G8sIF\ndvc mxkIQ==", // contains whitespace
     };
 
-    static const char* expected[] = {
-        "",
-        "f",
-        "fo",
-        "foo",
-        "floo",
-        "floor",
-        "Hello, World!"
-    };
+    static const char* expected[] = {"", "f", "fo", "foo", "floo", "floor", "Hello, World!"};
 
     static const size_t num_tests = sizeof(inputs) / sizeof(inputs[0]);
 
     for (size_t i = 0; i < num_tests; ++i) {
-        r = base64_decode(inputs[i], buffer.data(), buffer.size());
+        r = base64_decode({inputs[i], strlen(inputs[i])}, buffer);
         CHECK(r);
         CHECK_EQUAL(StringData(buffer.data(), *r), expected[i]);
     }
 
     static const char* bad_inputs[] = {
-        "!",       // invalid char
-        ":",       // invalid char
-        "Zg===",   // invalid length
-        "====",    // only padding
-        "()",      // invalid chars
+        "!",        // invalid char
+        ":",        // invalid char
+        "Zg===",    // invalid length
+        "====",     // only padding
+        "()",       // invalid chars
         "Zm9v====", // wrong amount of padding
     };
     static const size_t num_bad_tests = sizeof(bad_inputs) / sizeof(bad_inputs[0]);
 
     for (size_t i = 0; i < num_bad_tests; ++i) {
-        r = base64_decode(bad_inputs[i], buffer.data(), buffer.size());
+        r = base64_decode({bad_inputs[i], strlen(bad_inputs[i])}, buffer);
         CHECK(!r);
     }
 }
@@ -81,7 +73,7 @@ TEST(Base64_Decode_AdjacentBuffers)
 {
     char buffer[10] = "Zg==\0"; // "f" + blank space + terminating zero
     const char expected[] = "f";
-    Optional<size_t> r = base64_decode(buffer, buffer + 4, 3);
+    Optional<size_t> r = base64_decode({buffer, 4}, {buffer + 4, 3});
     CHECK(r);
     CHECK_EQUAL(*r, 1);
     CHECK_EQUAL(StringData{buffer + 4}, StringData{expected});
@@ -90,7 +82,6 @@ TEST(Base64_Decode_AdjacentBuffers)
 namespace {
 
 struct TestBuffers {
-
     const char* decoded_buffer;
     size_t decoded_buffer_size;
     const char* encoded_buffer;
@@ -105,22 +96,22 @@ TEST(Base64_Encode)
     buffer.resize(100);
 
     TestBuffers tbs[] = {
-        TestBuffers {"", 0, "", 0},
-        TestBuffers {"\x00\x00\x00", 3, "AAAA", 4},
-        TestBuffers {"\x00\x00\x01", 3, "AAAB", 4},
-        TestBuffers {"\x80", 1, "gA==", 4},
-        TestBuffers {"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10", 16, "AQIDBAUGBwgJCgsMDQ4PEA==", 24}
-
+        TestBuffers{"", 0, "", 0},
+        TestBuffers{"\x00\x00\x00", 3, "AAAA", 4},
+        TestBuffers{"\x00\x00\x01", 3, "AAAB", 4},
+        TestBuffers{"\x80", 1, "gA==", 4},
+        TestBuffers{"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10", 16,
+                    "AQIDBAUGBwgJCgsMDQ4PEA==", 24},
     };
 
     const size_t num_tests = sizeof(tbs) / sizeof(tbs[0]);
 
     for (size_t i = 0; i < num_tests; ++i) {
-        size_t return_size = base64_encode(tbs[i].decoded_buffer, tbs[i].decoded_buffer_size, buffer.data(), buffer.size());
+        size_t return_size = base64_encode({tbs[i].decoded_buffer, tbs[i].decoded_buffer_size}, buffer);
         CHECK_EQUAL(return_size, tbs[i].encoded_buffer_size);
         CHECK_EQUAL(StringData(buffer.data(), return_size), tbs[i].encoded_buffer);
 
-        Optional<size_t> return_size_opt = base64_decode(StringData(tbs[i].encoded_buffer, tbs[i].encoded_buffer_size), buffer.data(), buffer.size());
+        Optional<size_t> return_size_opt = base64_decode({tbs[i].encoded_buffer, tbs[i].encoded_buffer_size}, buffer);
         CHECK(return_size_opt);
         CHECK_EQUAL(*return_size_opt, tbs[i].decoded_buffer_size);
         for (size_t j = 0; j < *return_size_opt; ++j) {
@@ -131,13 +122,14 @@ TEST(Base64_Encode)
 
 TEST(Base64_DecodeToVector)
 {
+    using namespace std::string_view_literals;
     {
-        Optional<std::vector<char>> vec = base64_decode_to_vector("======");
+        Optional<std::vector<char>> vec = base64_decode_to_vector("======"sv);
         CHECK(!vec);
     }
 
     {
-        Optional<std::vector<char>> vec = base64_decode_to_vector("SGVsb G8sIF\ndvc mxkIQ==");
+        Optional<std::vector<char>> vec = base64_decode_to_vector("SGVsb G8sIF\ndvc mxkIQ=="sv);
         std::string str(vec->begin(), vec->end());
         CHECK_EQUAL("Hello, World!", str);
     }

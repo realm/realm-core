@@ -75,4 +75,4 @@ Table* TableRef::operator->() const
 }
 
 
-}
+} // namespace realm

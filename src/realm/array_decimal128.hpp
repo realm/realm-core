@@ -61,14 +61,32 @@ public:
 
     bool is_null(size_t ndx) const
     {
-        return this->get_width() == 0 || get(ndx).is_null();
+        if (m_width == 0) {
+            return !get_context_flag();
+        }
+        return get(ndx).is_null();
     }
 
     Decimal128 get(size_t ndx) const
     {
         REALM_ASSERT(ndx < m_size);
-        auto values = reinterpret_cast<Decimal128*>(this->m_data);
-        return values[ndx];
+        switch (m_width) {
+            case 0:
+                return get_context_flag() ? Decimal128() : Decimal128(realm::null());
+            case 4: {
+                auto values = reinterpret_cast<Decimal128::Bid32*>(this->m_data);
+                return Decimal128(values[ndx]);
+            }
+            case 8: {
+                auto values = reinterpret_cast<Decimal128::Bid64*>(this->m_data);
+                return Decimal128(values[ndx]);
+            }
+            case 16: {
+                auto values = reinterpret_cast<Decimal128*>(this->m_data);
+                return values[ndx];
+            }
+        }
+        return {};
     }
 
     Mixed get_any(size_t ndx) const override;
@@ -94,11 +112,17 @@ public:
 
     size_t find_first(Decimal128 value, size_t begin = 0, size_t end = npos) const noexcept;
 
+    uint8_t get_width() const noexcept
+    {
+        return m_width;
+    }
+
 protected:
     size_t calc_byte_len(size_t num_items, size_t) const override
     {
         return num_items * sizeof(Decimal128) + header_size;
     }
+    size_t upgrade_leaf(uint8_t width);
 };
 
 } // namespace realm

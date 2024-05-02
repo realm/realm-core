@@ -122,7 +122,6 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
         [&](const Instruction::AddTable::TopLevelTable& spec) {
             auto table_type = (spec.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
             if (spec.pk_type == Instruction::Payload::Type::GlobalKey) {
-                log("sync::create_table(group, \"%1\", %2);", table_name, table_type);
                 m_transaction.get_or_add_table(table_name, table_type);
             }
             else {
@@ -134,8 +133,6 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 StringData pk_field = get_string(spec.pk_field);
                 bool nullable = spec.pk_nullable;
 
-                log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4, %5);", table_name,
-                    pk_type, pk_field, nullable, table_type);
                 if (!m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable,
                                                                      table_type)) {
                     bad_transaction_log("AddTable: The existing table '%1' has different properties", table_name);
@@ -149,7 +146,6 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 }
             }
             else {
-                log("group.add_embedded_table(\"%1\");", table_name);
                 m_transaction.add_table(table_name, Table::Type::Embedded);
             }
         },
@@ -169,7 +165,6 @@ void InstructionApplier::operator()(const Instruction::EraseTable& instr)
         bad_transaction_log("table does not exist");
     }
 
-    log("sync::erase_table(m_group, \"%1\")", table_name);
     m_transaction.remove_table(table_name);
 }
 
@@ -179,75 +174,65 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
     ColKey pk_col = table->get_primary_key_column();
     m_last_object_key = instr.object;
 
-    mpark::visit(
-        util::overload{
-            [&](mpark::monostate) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(NULL) on table without a primary key");
-                }
-                if (!table->is_nullable(pk_col)) {
-                    bad_transaction_log("CreateObject(NULL) on a table with a non-nullable primary key");
-                }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), realm::util::none);",
-                    table->get_name());
-                m_last_object = table->create_object_with_primary_key(util::none);
-            },
-            [&](int64_t pk) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(Int) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_Int) {
-                    bad_transaction_log("CreateObject(Int) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), pk);
-                m_last_object = table->create_object_with_primary_key(pk);
-            },
-            [&](InternString pk) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(String) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_String) {
-                    bad_transaction_log("CreateObject(String) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                StringData str = get_string(pk);
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), \"%2\");", table->get_name(),
-                    str);
-                m_last_object = table->create_object_with_primary_key(str);
-            },
-            [&](const ObjectId& id) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(ObjectId) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_ObjectId) {
-                    bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
-                m_last_object = table->create_object_with_primary_key(id);
-            },
-            [&](const UUID& id) {
-                if (!pk_col) {
-                    bad_transaction_log("CreateObject(UUID) on table without a primary key");
-                }
-                if (table->get_column_type(pk_col) != type_UUID) {
-                    bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
-                                        table->get_column_type(pk_col));
-                }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
-                m_last_object = table->create_object_with_primary_key(id);
-            },
-            [&](GlobalKey key) {
-                if (pk_col) {
-                    bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
-                }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), GlobalKey{%2, %3});",
-                    table->get_name(), key.hi(), key.lo());
-                m_last_object = table->create_object(key);
-            },
-        },
-        instr.object);
+    mpark::visit(util::overload{
+                     [&](mpark::monostate) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(NULL) on table without a primary key");
+                         }
+                         if (!table->is_nullable(pk_col)) {
+                             bad_transaction_log("CreateObject(NULL) on a table with a non-nullable primary key");
+                         }
+                         m_last_object = table->create_object_with_primary_key(util::none);
+                     },
+                     [&](int64_t pk) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(Int) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_Int) {
+                             bad_transaction_log("CreateObject(Int) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         m_last_object = table->create_object_with_primary_key(pk);
+                     },
+                     [&](InternString pk) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(String) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_String) {
+                             bad_transaction_log("CreateObject(String) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         StringData str = get_string(pk);
+                         m_last_object = table->create_object_with_primary_key(str);
+                     },
+                     [&](const ObjectId& id) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(ObjectId) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_ObjectId) {
+                             bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         m_last_object = table->create_object_with_primary_key(id);
+                     },
+                     [&](const UUID& id) {
+                         if (!pk_col) {
+                             bad_transaction_log("CreateObject(UUID) on table without a primary key");
+                         }
+                         if (table->get_column_type(pk_col) != type_UUID) {
+                             bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
+                                                 table->get_column_type(pk_col));
+                         }
+                         m_last_object = table->create_object_with_primary_key(id);
+                     },
+                     [&](GlobalKey key) {
+                         if (pk_col) {
+                             bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
+                         }
+                         m_last_object = table->create_object(key);
+                     },
+                 },
+                 instr.object);
 }
 
 void InstructionApplier::operator()(const Instruction::EraseObject& instr)
@@ -270,8 +255,12 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
     switch (payload.type) {
         case Type::ObjectValue:
             return visitor(Instruction::Payload::ObjectValue{});
+        case Type::Set:
+            return visitor(Instruction::Payload::Set{});
+        case Type::List:
+            return visitor(Instruction::Payload::List{});
         case Type::Dictionary:
-            return bad_transaction_log("Nested dictionaries not supported yet");
+            return visitor(Instruction::Payload::Dictionary{});
         case Type::Erased:
             return visitor(Instruction::Payload::Erased{});
         case Type::GlobalKey:
@@ -338,7 +327,8 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto data_type = DataType(col.get_type());
 
             auto visitor = [&](const mpark::variant<ObjLink, Mixed, Instruction::Payload::ObjectValue,
-                                                    Instruction::Payload::Erased>& arg) {
+                                                    Instruction::Payload::Dictionary, Instruction::Payload::List,
+                                                    Instruction::Payload::Set, Instruction::Payload::Erased>& arg) {
                 if (const auto link_ptr = mpark::get_if<ObjLink>(&arg)) {
                     if (data_type == type_Mixed || data_type == type_TypedLink) {
                         obj.set_any(col, *link_ptr, m_instr.is_default);
@@ -384,6 +374,15 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 else if (const auto erase_ptr = mpark::get_if<Instruction::Payload::Erased>(&arg)) {
                     m_applier->bad_transaction_log("Update: Dictionary erase at object field");
                 }
+                else if (mpark::get_if<Instruction::Payload::Dictionary>(&arg)) {
+                    obj.set_collection(col, CollectionType::Dictionary);
+                }
+                else if (mpark::get_if<Instruction::Payload::List>(&arg)) {
+                    obj.set_collection(col, CollectionType::List);
+                }
+                else if (mpark::get_if<Instruction::Payload::Set>(&arg)) {
+                    obj.set_collection(col, CollectionType::Set);
+                }
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
@@ -410,7 +409,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.set(index, link);
                     }
-                    else if (data_type == type_LinkList || data_type == type_Link) {
+                    else if (data_type == type_Link) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
@@ -453,6 +452,15 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                     // Embedded object creation is idempotent, and link lists cannot
                     // contain nulls, so this is a no-op.
                 },
+                [&](const Instruction::Payload::Dictionary&) {
+                    list.set_collection(size_t(index), CollectionType::Dictionary);
+                },
+                [&](const Instruction::Payload::List&) {
+                    list.set_collection(size_t(index), CollectionType::List);
+                },
+                [&](const Instruction::Payload::Set&) {
+                    list.set_collection(size_t(index), CollectionType::Set);
+                },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("Update: Dictionary erase of list element");
                 },
@@ -480,10 +488,19 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                     }
                 },
                 [&](const Instruction::Payload::Erased&) {
-                    dict.erase(key);
+                    dict.try_erase(key);
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
                     dict.create_and_insert_linked_object(key);
+                },
+                [&](const Instruction::Payload::Dictionary&) {
+                    dict.insert_collection(key.get_string(), CollectionType::Dictionary);
+                },
+                [&](const Instruction::Payload::List&) {
+                    dict.insert_collection(key.get_string(), CollectionType::List);
+                },
+                [&](const Instruction::Payload::Set&) {
+                    dict.insert_collection(key.get_string(), CollectionType::Set);
                 },
             };
 
@@ -532,7 +549,7 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
 void InstructionApplier::operator()(const Instruction::AddColumn& instr)
 {
     using Type = Instruction::Payload::Type;
-    using CollectionType = Instruction::AddColumn::CollectionType;
+    using CollectionType = Instruction::CollectionType;
 
     // Temporarily swap out the last object key so it doesn't get included in error messages
     TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
@@ -543,9 +560,6 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     if (ColKey existing_key = table->get_column_key(col_name)) {
         DataType new_type = get_data_type(instr.type);
         ColumnType existing_type = existing_key.get_type();
-        if (existing_type == col_type_LinkList) {
-            existing_type = col_type_Link;
-        }
         if (existing_type != ColumnType(new_type)) {
             bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (expected %3, got %4)",
                                 table->get_name(), col_name, existing_type, new_type);
@@ -668,11 +682,12 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
-            auto col = list.get_col_key();
-            auto data_type = DataType(col.get_type());
+            auto data_type = list.get_data_type();
             auto table = list.get_table();
             auto table_name = table->get_name();
-            auto field_name = table->get_column_name(col);
+            auto field_name = [&] {
+                return table->get_column_name(list.get_col_key());
+            };
 
             if (index > m_instr.prior_size) {
                 m_applier->bad_transaction_log("ArrayInsert: Invalid insertion index (index = %1, prior_size = %2)",
@@ -700,11 +715,11 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.insert(index, link);
                     }
-                    else if (data_type == type_LinkList || data_type == type_Link) {
+                    else if (data_type == type_Link) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
-                        auto target_table = table->get_link_target(col);
+                        auto target_table = table->get_link_target(list.get_col_key());
                         if (target_table->get_key() != link.get_table_key()) {
                             m_applier->bad_transaction_log(
                                 "ArrayInsert: Target table mismatch (expected '%1', got '%2')",
@@ -715,34 +730,37 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                     }
                     else {
                         m_applier->bad_transaction_log(
-                            "ArrayInsert: Type mismatch in list at '%2.%1' (expected link type, was %3)", field_name,
-                            table_name, data_type);
+                            "ArrayInsert: Type mismatch in list at '%2.%1' (expected link type, was %3)",
+                            field_name(), table_name, data_type);
                     }
                 },
                 [&](Mixed value) {
-                    if (value.is_null()) {
-                        if (col.is_nullable()) {
+                    if (data_type == type_Mixed) {
+                        list.insert_any(index, value);
+                    }
+                    else if (value.is_null()) {
+                        if (list.get_col_key().is_nullable()) {
                             list.insert_null(index);
                         }
                         else {
                             m_applier->bad_transaction_log("ArrayInsert: NULL in non-nullable list '%2.%1'",
-                                                           field_name, table_name);
+                                                           field_name(), table_name);
                         }
                     }
                     else {
-                        if (data_type == type_Mixed || value.get_type() == data_type) {
+                        if (value.get_type() == data_type) {
                             list.insert_any(index, value);
                         }
                         else {
                             m_applier->bad_transaction_log(
-                                "ArrayInsert: Type mismatch in list at '%2.%1' (expected %3, got %4)", field_name,
+                                "ArrayInsert: Type mismatch in list at '%2.%1' (expected %3, got %4)", field_name(),
                                 table_name, data_type, value.get_type());
                         }
                     }
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
-                    if (col.get_type() == col_type_LinkList || col.get_type() == col_type_Link) {
-                        auto target_table = list.get_table()->get_link_target(col);
+                    if (data_type == type_Link) {
+                        auto target_table = list.get_table()->get_link_target(list.get_col_key());
                         if (!target_table->is_embedded()) {
                             m_applier->bad_transaction_log(
                                 "ArrayInsert: Creation of embedded object of type '%1', which is not "
@@ -756,12 +774,24 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                     }
                     else {
                         m_applier->bad_transaction_log(
-                            "ArrayInsert: Creation of embedded object in non-link list field '%2.%1'", field_name,
+                            "ArrayInsert: Creation of embedded object in non-link list field '%2.%1'", field_name(),
                             table_name);
                     }
                 },
                 [&](const Instruction::Payload::Dictionary&) {
-                    m_applier->bad_transaction_log("Dictionary payload for ArrayInsert");
+                    REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
+                    auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                    mixed_list.insert_collection(size_t(index), CollectionType::Dictionary);
+                },
+                [&](const Instruction::Payload::List&) {
+                    REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
+                    auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                    mixed_list.insert_collection(size_t(index), CollectionType::List);
+                },
+                [&](const Instruction::Payload::Set&) {
+                    REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
+                    auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                    mixed_list.insert_collection(size_t(index), CollectionType::Set);
                 },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("Dictionary erase payload for ArrayInsert");
@@ -846,23 +876,121 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 
 void InstructionApplier::operator()(const Instruction::Clear& instr)
 {
+    // For collections and nested collections in Mixed, applying a Clear instruction
+    // implicitly sets the collection type (of the clear instruction) too.
     struct ClearResolver : public PathResolver {
         ClearResolver(InstructionApplier* applier, const Instruction::Clear& instr)
             : PathResolver(applier, instr, "Clear")
         {
+            switch (instr.collection_type) {
+                case Instruction::CollectionType::Single:
+                    break;
+                case Instruction::CollectionType::List:
+                    m_collection_type = CollectionType::List;
+                    break;
+                case Instruction::CollectionType::Dictionary:
+                    m_collection_type = CollectionType::Dictionary;
+                    break;
+                case Instruction::CollectionType::Set:
+                    m_collection_type = CollectionType::Set;
+                    break;
+            }
         }
         void on_list(LstBase& list) override
         {
+            // list property
+            if (m_collection_type && *m_collection_type != CollectionType::List) {
+                m_applier->bad_transaction_log("Clear: Not a List");
+            }
             list.clear();
+        }
+        Status on_list_index(LstBase& list, uint32_t index) override
+        {
+            REALM_ASSERT(m_collection_type);
+            REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
+            auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+            if (index >= mixed_list.size()) {
+                m_applier->bad_transaction_log("Clear: Index out of bounds (%1 > %2)", index,
+                                               mixed_list.size()); // Throws
+            }
+            auto val = mixed_list.get(index);
+            if (val.is_type(type_Dictionary)) {
+                Dictionary d(mixed_list, mixed_list.get_key(index));
+                d.clear();
+            }
+            else if (val.is_type(type_List)) {
+                Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
+                l.clear();
+            }
+            else if (val.is_type(type_Set)) {
+                m_applier->bad_transaction_log("Clear: Item at index %1 is a Set",
+                                               index); // Throws
+            }
+            mixed_list.set_collection(size_t(index), *m_collection_type);
+            return Status::Pending;
         }
         void on_dictionary(Dictionary& dict) override
         {
+            // dictionary property
+            if (m_collection_type && *m_collection_type != CollectionType::Dictionary) {
+                m_applier->bad_transaction_log("Clear: Not a Dictionary");
+            }
             dict.clear();
+        }
+        Status on_dictionary_key(Dictionary& dict, Mixed key) override
+        {
+            REALM_ASSERT(m_collection_type);
+            auto val = dict.get(key);
+            if (val.is_type(type_Dictionary)) {
+                Dictionary d(dict, dict.build_index(key));
+                d.clear();
+            }
+            else if (val.is_type(type_List)) {
+                Lst<Mixed> l(dict, dict.build_index(key));
+                l.clear();
+            }
+            else if (val.is_type(type_Set)) {
+                m_applier->bad_transaction_log("Clear: Item at key '%1' is a Set",
+                                               key); // Throws
+            }
+            dict.insert_collection(key.get_string(), *m_collection_type);
+            return Status::Pending;
         }
         void on_set(SetBase& set) override
         {
+            // set property
+            if (m_collection_type && *m_collection_type != CollectionType::Set) {
+                m_applier->bad_transaction_log("Clear: Not a Set");
+            }
             set.clear();
         }
+        void on_property(Obj& obj, ColKey col_key) override
+        {
+            if (col_key.get_type() == col_type_Mixed) {
+                REALM_ASSERT(m_collection_type);
+                auto val = obj.get<Mixed>(col_key);
+                if (val.is_type(type_Dictionary)) {
+                    Dictionary dict(obj, col_key);
+                    dict.clear();
+                }
+                else if (val.is_type(type_List)) {
+                    Lst<Mixed> list(obj, col_key);
+                    list.clear();
+                }
+                else if (val.is_type(type_Set)) {
+                    m_applier->bad_transaction_log("Clear: Mixed property is a Set"); // Throws
+                }
+                obj.set_collection(col_key, *m_collection_type);
+                return;
+            }
+
+            PathResolver::on_property(obj, col_key);
+        }
+
+    private:
+        // The server may not send the type for collection properties (non-Mixed)
+        // since the clients don't send it either before v13.
+        std::optional<CollectionType> m_collection_type;
     };
     ClearResolver(this, instr).resolve();
 }
@@ -968,6 +1096,13 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
             , m_instr(instr)
         {
         }
+        void on_property(Obj& obj, ColKey col) override
+        {
+            // This better be a mixed column
+            REALM_ASSERT(col.get_type() == col_type_Mixed);
+            auto set = obj.get_set<Mixed>(col);
+            on_set(set);
+        }
         void on_set(SetBase& set) override
         {
             auto col = set.get_col_key();
@@ -1027,6 +1162,12 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
                 [&](const Instruction::Payload::Dictionary&) {
                     m_applier->bad_transaction_log("SetInsert: Sets of dictionaries are not supported.");
                 },
+                [&](const Instruction::Payload::List&) {
+                    m_applier->bad_transaction_log("SetInsert: Sets of lists are not supported.");
+                },
+                [&](const Instruction::Payload::Set&) {
+                    m_applier->bad_transaction_log("SetInsert: Sets of sets are not supported.");
+                },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("SetInsert: Dictionary erase payload in SetInsert");
                 },
@@ -1048,6 +1189,13 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
             : PathResolver(applier, instr, "SetErase")
             , m_instr(instr)
         {
+        }
+        void on_property(Obj& obj, ColKey col) override
+        {
+            // This better be a mixed column
+            REALM_ASSERT(col.get_type() == col_type_Mixed);
+            auto set = obj.get_set<Mixed>(col);
+            on_set(set);
         }
         void on_set(SetBase& set) override
         {
@@ -1104,6 +1252,12 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
                     m_applier->bad_transaction_log("SetErase: Sets of embedded objects are not supported.");
+                },
+                [&](const Instruction::Payload::List&) {
+                    m_applier->bad_transaction_log("SetErase: Sets of lists are not supported.");
+                },
+                [&](const Instruction::Payload::Set&) {
+                    m_applier->bad_transaction_log("SetErase: Sets of sets are not supported.");
                 },
                 [&](const Instruction::Payload::Dictionary&) {
                     m_applier->bad_transaction_log("SetErase: Sets of dictionaries are not supported.");
@@ -1180,15 +1334,15 @@ util::Optional<Obj> InstructionApplier::get_top_object(const Instruction::Object
     }
 }
 
-std::unique_ptr<LstBase> InstructionApplier::get_list_from_path(Obj& obj, ColKey col)
+LstBasePtr InstructionApplier::get_list_from_path(Obj& obj, ColKey col)
 {
     // For link columns, `Obj::get_listbase_ptr()` always returns an instance whose concrete type is
     // `LnkLst`, which uses condensed indexes. However, we are interested in using non-condensed
     // indexes, so we need to manually construct a `Lst<ObjKey>` instead for lists of non-embedded
     // links.
     REALM_ASSERT(col.is_list());
-    std::unique_ptr<LstBase> list;
-    if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
+    LstBasePtr list;
+    if (col.get_type() == col_type_Link) {
         auto table = obj.get_table();
         if (!table->get_link_target(col)->is_embedded()) {
             list = obj.get_list_ptr<ObjKey>(col);
@@ -1348,7 +1502,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
 
     if (col.is_list()) {
         if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
-            std::unique_ptr<LstBase> list = InstructionApplier::get_list_from_path(obj, col);
+            auto list = InstructionApplier::get_list_from_path(obj, col);
             ++m_it_begin;
             return resolve_list_element(*list, *pindex);
         }
@@ -1363,6 +1517,25 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         }
         on_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'", m_instr_name,
                               field_name, obj.get_table()->get_name()));
+    }
+    else if (col.get_type() == col_type_Mixed) {
+        auto val = obj.get<Mixed>(col);
+        if (val.is_type(type_Dictionary)) {
+            if (auto pkey = mpark::get_if<InternString>(&*m_it_begin)) {
+                Dictionary dict(obj, col);
+                ++m_it_begin;
+                return resolve_dictionary_element(dict, *pkey);
+            }
+        }
+        if (val.is_type(type_List)) {
+            if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                Lst<Mixed> list(obj, col);
+                ++m_it_begin;
+                return resolve_list_element(list, *pindex);
+            }
+        }
+        on_error(util::format("%1: Not a list or dictionary on field '%2' in class '%3'", m_instr_name, field_name,
+                              obj.get_table()->get_name()));
     }
     else if (col.get_type() == col_type_Link) {
         auto target = obj.get_table()->get_link_target(col);
@@ -1405,7 +1578,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
     auto col = list.get_col_key();
     auto field_name = list.get_table()->get_column_name(col);
 
-    if (col.get_type() == col_type_LinkList) {
+    if (col.get_type() == col_type_Link) {
         auto target = list.get_table()->get_link_target(col);
         if (!target->is_embedded()) {
             on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name, field_name,
@@ -1432,6 +1605,28 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
     }
     else {
+        if (list.get_data_type() == type_Mixed) {
+            auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+            if (index < mixed_list.size()) {
+                auto val = mixed_list.get(index);
+
+                if (val.is_type(type_Dictionary)) {
+                    if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+                        Dictionary d(mixed_list, mixed_list.get_key(index));
+                        ++m_it_begin;
+                        return resolve_dictionary_element(d, *pfield);
+                    }
+                }
+                if (val.is_type(type_List)) {
+                    if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                        Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
+                        ++m_it_begin;
+                        return resolve_list_element(l, *pindex);
+                    }
+                }
+            }
+        }
+
         on_error(util::format(
             "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
             m_instr_name, field_name, list.get_table()->get_name(), col.get_type()));
@@ -1479,6 +1674,21 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
         }
     }
     else {
+        auto val = dict.get(string_key);
+        if (val.is_type(type_Dictionary)) {
+            if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+                Dictionary d(dict, dict.build_index(string_key));
+                ++m_it_begin;
+                return resolve_dictionary_element(d, *pfield);
+            }
+        }
+        if (val.is_type(type_List)) {
+            if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                Lst<Mixed> l(dict, dict.build_index(string_key));
+                ++m_it_begin;
+                return resolve_list_element(l, *pindex);
+            }
+        }
         on_error(
             util::format("%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'",
                          m_instr_name, field_name, table->get_name(), col.get_type()));

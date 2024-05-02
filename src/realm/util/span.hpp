@@ -47,18 +47,14 @@ namespace realm::_impl {
 // std::array, C arrays, and Span have separate conversions which need to be
 // used instead of the generic one.
 template <typename T>
-struct IsSpan : public std::false_type {
-};
+struct IsSpan : public std::false_type {};
 template <typename T, size_t extent>
-struct IsSpan<util::Span<T, extent>> : public std::true_type {
-};
+struct IsSpan<util::Span<T, extent>> : public std::true_type {};
 
 template <typename T>
-struct IsStdArray : public std::false_type {
-};
+struct IsStdArray : public std::false_type {};
 template <typename T, size_t size>
-struct IsStdArray<std::array<T, size>> : public std::true_type {
-};
+struct IsStdArray<std::array<T, size>> : public std::true_type {};
 
 // msvc v19.28 hits an internal compiler error if these are inline in the
 // template using them rather than type aliases. This appears to be fixed in

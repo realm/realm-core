@@ -32,10 +32,10 @@ abstract class TypeBase {
     return this.kind === kind;
   }
 
-  isOptional(): this is Template & { name: "util::Optional" };
+  isOptional(): this is Template & { name: "std::optional" };
   isOptional(type: string): boolean;
   isOptional(type?: string): boolean {
-    return this.isTemplate("util::Optional") && (!type || ("name" in this.args[0] && this.args[0].name === type));
+    return this.isTemplate("std::optional") && (!type || ("name" in this.args[0] && this.args[0].name === type));
   }
 
   isNullable(): this is Template & { name: "Nullable" };
@@ -117,7 +117,10 @@ export class RRef extends WrapperType {
 }
 
 export class Arg {
-  constructor(public name: string, public type: Type) {
+  constructor(
+    public name: string,
+    public type: Type,
+  ) {
     assert(!name.startsWith("_"), `argument "${name}" starts with a '_', but that is reserved`);
   }
 
@@ -220,7 +223,10 @@ export class Func extends TypeBase {
 
 export class Template extends TypeBase {
   readonly kind = "Template";
-  constructor(public name: string, public args: Type[]) {
+  constructor(
+    public name: string,
+    public args: Type[],
+  ) {
     super();
   }
 
@@ -483,7 +489,10 @@ export class Opaque extends NamedType {
 }
 
 export class Enumerator {
-  constructor(public name: string, public value: number) {}
+  constructor(
+    public name: string,
+    public value: number,
+  ) {}
 }
 
 export class Enum extends NamedType {

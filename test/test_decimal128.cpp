@@ -71,7 +71,7 @@ TEST(Decimal_Basics)
     test_double(0.1 / 1000 / 1000 / 1000 / 1000 / 1000 / 1000, "1.00000000000000E-19");
     test_double(0.01 * 1000 * 1000 * 1000 * 1000 * 1000 * 1000, "1.00000000000000E16");
     test_double(3.141592653589793238, "3.14159265358979"); // only 15 significant digits when converting from double
-    Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
+    Decimal128 pi = Decimal128("3.141592653589793238");    // 19 significant digits
     CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
     Decimal128::Bid128 bid;
     int exp;
@@ -117,7 +117,7 @@ TEST(Decimal_Basics)
 
 TEST(Decimal_Int64_Conversions)
 {
-    auto check_roundtrip = [=](int64_t v) {
+    auto check_roundtrip = [this](int64_t v) {
         int64_t v2 = 0;
         CHECK(Decimal128(v).to_int(v2));
         CHECK_EQUAL(v, v2);
@@ -187,19 +187,46 @@ TEST(Decimal_Array)
     const char str0[] = "12345.67";
     const char str1[] = "1000.00";
     const char str2[] = "-45";
+    const char str3[] = "123.456e100";
 
     ArrayDecimal128 arr(Allocator::get_default());
     arr.create();
+    arr.add(Decimal128(realm::null()));
+    CHECK_EQUAL(arr.get_width(), 0);
+    CHECK_EQUAL(arr.get(0), Decimal128(realm::null()));
+    CHECK(arr.is_null(0));
+    arr.add(Decimal128());
+    CHECK_EQUAL(arr.get_width(), 4);
+    CHECK_EQUAL(arr.get(0), Decimal128(realm::null()));
+    CHECK_EQUAL(arr.get(1), Decimal128());
+    CHECK(arr.is_null(0));
+    CHECK_NOT(arr.is_null(1));
 
+    arr.clear();
+    arr.add(Decimal128());
+    CHECK_EQUAL(arr.get_width(), 0);
+    CHECK_EQUAL(arr.get(0), Decimal128());
+    CHECK_NOT(arr.is_null(0));
+    arr.add(Decimal128(realm::null()));
+    CHECK_EQUAL(arr.get_width(), 4);
+    CHECK_EQUAL(arr.get(0), Decimal128());
+    CHECK_EQUAL(arr.get(1), Decimal128(realm::null()));
+    CHECK_NOT(arr.is_null(0));
+    CHECK(arr.is_null(1));
+
+    arr.clear();
     arr.add(Decimal128(str0));
     arr.add(Decimal128(str1));
     arr.insert(1, Decimal128(str2));
+    arr.add(Decimal128(realm::null()));
 
     Decimal128 id2(str2);
     CHECK_EQUAL(arr.get(0), Decimal128(str0));
     CHECK_EQUAL(arr.get(1), id2);
     CHECK_EQUAL(arr.get(2), Decimal128(str1));
     CHECK_EQUAL(arr.find_first(id2), 1);
+    CHECK_EQUAL(arr.find_first(Decimal128("1000")), 2);
+    CHECK_EQUAL(arr.find_first(Decimal128(realm::null())), 3);
 
     arr.erase(1);
     CHECK_EQUAL(arr.get(1), Decimal128(str1));
@@ -209,11 +236,100 @@ TEST(Decimal_Array)
     arr.move(arr1, 1);
 
     CHECK_EQUAL(arr.size(), 1);
-    CHECK_EQUAL(arr1.size(), 1);
+    CHECK_EQUAL(arr1.size(), 2);
     CHECK_EQUAL(arr1.get(0), Decimal128(str1));
+    CHECK_EQUAL(arr1.get(1), Decimal128(realm::null()));
+
+    arr.add(Decimal128(str3)); // size 8
+    arr1.move(arr, 1);
+
+    CHECK_EQUAL(arr.size(), 3);
+    CHECK_EQUAL(arr1.size(), 1);
+    CHECK_EQUAL(arr.get(0), Decimal128(str0));
+    CHECK_EQUAL(arr.get(1), Decimal128(str3));
+    CHECK_EQUAL(arr.get(2), Decimal128(realm::null()));
+    CHECK_EQUAL(arr1.get(0), Decimal128(str1));
+    CHECK_EQUAL(arr.find_first(Decimal128("123.456000e100")), 1);
+
+    arr.clear();
+    CHECK_EQUAL(arr.size(), 0);
+
+    arr.add(Decimal128(0));
+    arr.add(Decimal128(realm::null()));
+    CHECK_NOT(arr.is_null(0));
+    CHECK(arr.is_null(1));
 
     arr.destroy();
     arr1.destroy();
+}
+
+TEST(Decimal_ArrayUpdgrade)
+{
+    Decimal128 size_0{realm::null()};
+    Decimal128 size_4{"100"};
+    Decimal128 large_size_4("8388607e90");
+    Decimal128 small_size_4("8388607e-90");
+    Decimal128 size_8{"123.456e100"};
+    Decimal128 large_size_8("9007199254740991e369");
+    Decimal128 small_size_8("9007199254740991e-369");
+    Decimal128 size_16{"3.141592653589793238462643"};
+
+    ArrayDecimal128 arr(Allocator::get_default());
+    arr.create();
+
+    arr.add(size_0);
+    CHECK_EQUAL(arr.get(0), size_0);
+    arr.add(size_4); // 0 -> 4
+    arr.add(large_size_4);
+    arr.add(small_size_4);
+    CHECK_EQUAL(arr.get_width(), 4);
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_4);
+    CHECK_EQUAL(arr.get(2), large_size_4);
+    CHECK_EQUAL(arr.get(3), small_size_4);
+    arr.add(size_8); // 4 -> 8
+    arr.add(large_size_8);
+    arr.add(small_size_8);
+    CHECK_EQUAL(arr.get_width(), 8);
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_4);
+    CHECK_EQUAL(arr.get(2), large_size_4);
+    CHECK_EQUAL(arr.get(3), small_size_4);
+    CHECK_EQUAL(arr.get(4), size_8);
+    CHECK_EQUAL(arr.get(5), large_size_8);
+    CHECK_EQUAL(arr.get(6), small_size_8);
+    arr.add(size_16); // 8 -> 16
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_4);
+    CHECK_EQUAL(arr.get(2), large_size_4);
+    CHECK_EQUAL(arr.get(3), small_size_4);
+    CHECK_EQUAL(arr.get(4), size_8);
+    CHECK_EQUAL(arr.get(5), large_size_8);
+    CHECK_EQUAL(arr.get(6), small_size_8);
+    CHECK_EQUAL(arr.get(7), size_16);
+
+    arr.clear();
+    arr.add(size_4);
+    CHECK_EQUAL(arr.get(0), size_4);
+    arr.add(size_16); // 4 -> 16
+    CHECK_EQUAL(arr.get(0), size_4);
+    CHECK_EQUAL(arr.get(1), size_16);
+
+    arr.clear();
+    arr.add(size_0);
+    CHECK_EQUAL(arr.get(0), size_0);
+    arr.add(size_8); // 0 -> 8
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_8);
+
+    arr.clear();
+    arr.add(size_0);
+    CHECK_EQUAL(arr.get(0), size_0);
+    arr.add(size_16); // 0 -> 16
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_16);
+
+    arr.destroy();
 }
 
 TEST(Decimal_Table)

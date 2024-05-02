@@ -28,6 +28,7 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+/*
 TEST(TypedLinks_Single)
 {
     Group g;
@@ -100,6 +101,7 @@ TEST(TypedLinks_List)
     paul.remove();
     CHECK_EQUAL(pluto.get_backlink_count(), 0);
 }
+*/
 
 TEST(TypedLinks_Mixed)
 {
@@ -213,8 +215,6 @@ TEST(TypedLinks_Clear)
     auto dog = g.add_table("dog");
     auto cat = g.add_table("cat");
     auto person = g.add_table("person");
-    auto col_typed = person->add_column(type_TypedLink, "typed");
-    auto col_list_typed = person->add_column_list(type_TypedLink, "typed_list");
     auto col_mixed = person->add_column(type_Mixed, "mixed");
     auto col_list_mixed = person->add_column_list(type_Mixed, "mixed_list");
 
@@ -222,10 +222,8 @@ TEST(TypedLinks_Clear)
     cat->create_object();
     auto paul = person->create_object();
 
-    paul.set(col_typed, ObjLink{dog->get_key(), pluto.get_key()});
-    paul.get_list<ObjLink>(col_list_typed).add({dog->get_key(), pluto.get_key()});
-    paul.set(col_mixed, Mixed(ObjLink{dog->get_key(), pluto.get_key()}));
-    paul.get_list<Mixed>(col_list_mixed).add(ObjLink{dog->get_key(), pluto.get_key()});
+    paul.set(col_mixed, Mixed(pluto.get_link()));
+    paul.get_list<Mixed>(col_list_mixed).add(pluto.get_link());
 
     person->clear();
     g.verify();

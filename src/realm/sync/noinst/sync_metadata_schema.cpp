@@ -62,23 +62,19 @@ void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetad
     for (auto& table : *tables) {
         auto& table_ref = found_tables.at(table.name);
         for (auto& column : table.columns) {
-            if (column.data_type == type_LinkList) {
+            if (column.data_type == type_Link) {
                 auto target_table_it = found_tables.find(column.target_table);
                 if (target_table_it == found_tables.end()) {
                     throw LogicError(ErrorCodes::InvalidArgument,
                                      util::format("cannot link to non-existant table %1 from internal sync table %2",
                                                   column.target_table, table.name));
                 }
-                *column.key_out = table_ref->add_column_list(*target_table_it->second, column.name);
-            }
-            else if (column.data_type == type_Link) {
-                auto target_table_it = found_tables.find(column.target_table);
-                if (target_table_it == found_tables.end()) {
-                    throw LogicError(ErrorCodes::InvalidArgument,
-                                     util::format("cannot link to non-existant table %1 from internal sync table %2",
-                                                  column.target_table, table.name));
+                if (column.is_list) {
+                    *column.key_out = table_ref->add_column_list(*target_table_it->second, column.name);
                 }
-                *column.key_out = table_ref->add_column(*target_table_it->second, column.name);
+                else {
+                    *column.key_out = table_ref->add_column(*target_table_it->second, column.name);
+                }
             }
             else {
                 *column.key_out = table_ref->add_column(column.data_type, column.name, column.is_optional);
@@ -155,12 +151,12 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
                                  col.name, table.name));
             }
 
-            if (col.data_type == type_LinkList &&
-                table_ref->get_link_target(col_key)->get_name() != col.target_table) {
-                throw RuntimeError(ErrorCodes::RuntimeError,
-                                   util::format("column %1 in sync internal table %2 links to the wrong table %3",
-                                                col.name, table.name,
-                                                table_ref->get_link_target(col_key)->get_name()));
+            if (col.data_type == type_Link) {
+                if (table_ref->get_link_target(col_key)->get_name() != col.target_table) {
+                    RuntimeError(ErrorCodes::RuntimeError,
+                                 util::format("column %1 in sync internal table %2 links to the wrong table %3",
+                                              col.name, table.name, table_ref->get_link_target(col_key)->get_name()));
+                }
             }
             *col.key_out = col_key;
         }

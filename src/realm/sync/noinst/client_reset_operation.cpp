@@ -57,7 +57,8 @@ bool perform_client_reset(util::Logger& logger, DB& db, DB& fresh_db, ClientResy
                           util::FunctionRef<void(int64_t)> on_flx_version, bool recovery_is_allowed)
 {
     REALM_ASSERT(mode != ClientResyncMode::Manual);
-    logger.debug("Possibly beginning client reset operation: realm_path = %1, mode = %2, recovery_allowed = %3",
+    logger.debug(util::LogCategory::reset,
+                 "Possibly beginning client reset operation: realm_path = %1, mode = %2, recovery_allowed = %3",
                  db.get_path(), mode, recovery_is_allowed);
 
     auto always_try_clean_up = util::make_scope_exit([&]() noexcept {
@@ -68,7 +69,8 @@ bool perform_client_reset(util::Logger& logger, DB& db, DB& fresh_db, ClientResy
             DB::delete_files(path_to_clean, nullptr, delete_lockfile);
         }
         catch (const std::exception& err) {
-            logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
+            logger.warn(util::LogCategory::reset,
+                        "In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
                         "an exception: '%2'",
                         path_to_clean, err.what());
             // ignored, this is just a best effort
@@ -81,7 +83,8 @@ bool perform_client_reset(util::Logger& logger, DB& db, DB& fresh_db, ClientResy
     auto latest_version = db.get_version_id_of_latest_snapshot();
     bool local_realm_exists = latest_version.version > 1;
     if (!local_realm_exists) {
-        logger.debug("Local Realm file has never been written to, so skipping client reset.");
+        logger.debug(util::LogCategory::reset,
+                     "Local Realm file has never been written to, so skipping client reset.");
         return false;
     }
 

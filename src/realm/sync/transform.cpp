@@ -341,7 +341,7 @@ public:
             m_fields.emplace(n, get_type_name(type));
         }
 
-        void field(StringData n, Instruction::AddColumn::CollectionType type) override
+        void field(StringData n, Instruction::CollectionType type) override
         {
             m_fields.emplace(n, get_collection_type(type));
         }
@@ -421,7 +421,7 @@ public:
             diff_field(n, get_type_name(type));
         }
 
-        void field(StringData n, Instruction::AddColumn::CollectionType type) override
+        void field(StringData n, Instruction::CollectionType type) override
         {
             diff_field(n, get_collection_type(type));
         }
@@ -892,6 +892,10 @@ struct MergeUtils {
                 return true;
             case Type::Erased:
                 return true;
+            case Type::Set:
+                return true;
+            case Type::List:
+                return true;
             case Type::Dictionary:
                 return true;
             case Type::ObjectValue:
@@ -1034,39 +1038,6 @@ struct MergeUtils {
     // shorter path than the right, and the entire left path is the initial
     // sequence of the right.
 
-    bool is_prefix_of(const Instruction::AddTable& left, const Instruction::TableInstruction& right) const noexcept
-    {
-        return same_table(left, right);
-    }
-
-    bool is_prefix_of(const Instruction::EraseTable& left, const Instruction::TableInstruction& right) const noexcept
-    {
-        return same_table(left, right);
-    }
-
-    bool is_prefix_of(const Instruction::AddColumn&, const Instruction::TableInstruction&) const noexcept
-    {
-        // Right side is a schema instruction.
-        return false;
-    }
-
-    bool is_prefix_of(const Instruction::EraseColumn&, const Instruction::TableInstruction&) const noexcept
-    {
-        // Right side is a schema instruction.
-        return false;
-    }
-
-    bool is_prefix_of(const Instruction::AddColumn& left, const Instruction::ObjectInstruction& right) const noexcept
-    {
-        return same_column(left, right);
-    }
-
-    bool is_prefix_of(const Instruction::EraseColumn& left,
-                      const Instruction::ObjectInstruction& right) const noexcept
-    {
-        return same_column(left, right);
-    }
-
     bool is_prefix_of(const Instruction::ObjectInstruction&, const Instruction::TableInstruction&) const noexcept
     {
         // Right side is a schema instruction.
@@ -1079,25 +1050,31 @@ struct MergeUtils {
         return same_object(left, right);
     }
 
-    bool is_prefix_of(const Instruction::PathInstruction&, const Instruction::TableInstruction&) const noexcept
+    // Returns the next path element if the first path is a parent of the second path.
+    // Example:
+    //  * is_prefix_of(field1.123.field2, field1.123.field2.456) = 456
+    //  * is_prefix_of(field1.123.field2, field1.123.field3.456) = {}
+
+    std::optional<Instruction::Path::Element> is_prefix_of(const Instruction::PathInstruction&,
+                                                           const Instruction::TableInstruction&) const noexcept
     {
         // Path instructions can never be full prefixes of table-level instructions. Note that this also covers
         // ObjectInstructions.
-        return false;
+        return {};
     }
 
-    bool is_prefix_of(const Instruction::PathInstruction& left,
-                      const Instruction::PathInstruction& right) const noexcept
+    std::optional<Instruction::Path::Element> is_prefix_of(const Instruction::PathInstruction& left,
+                                                           const Instruction::PathInstruction& right) const noexcept
     {
         if (left.path.size() < right.path.size() && same_field(left, right)) {
             for (size_t i = 0; i < left.path.size(); ++i) {
                 if (!same_path_element(left.path[i], right.path[i])) {
-                    return false;
+                    return {};
                 }
             }
-            return true;
+            return right.path[left.path.size()];
         }
-        return false;
+        return {};
     }
 
     // True if the left side is an instruction that touches a container within
@@ -1378,7 +1355,7 @@ DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddTable);
 
 DEFINE_NESTED_MERGE(Instruction::EraseTable)
 {
-    if (is_prefix_of(outer, inner)) {
+    if (same_table(outer, inner)) {
         inner_side.discard();
     }
 }
@@ -1489,21 +1466,29 @@ DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseObject);
 
 
-/// Set rules
+/// Update rules
 
 DEFINE_NESTED_MERGE(Instruction::Update)
 {
     using Type = Instruction::Payload::Type;
 
-    if (outer.value.type == Type::ObjectValue || outer.value.type == Type::Dictionary) {
-        // Creating an embedded object or a dictionary is an idempotent
-        // operation, and should not eliminate updates to the subtree.
+    if (outer.value.type == Type::ObjectValue) {
+        // Creating an embedded object is an idempotent operation, and should
+        // not eliminate updates to the subtree.
         return;
     }
 
     // Setting a value higher up in the hierarchy overwrites any modification to
     // the inner value, regardless of when this happened.
-    if (is_prefix_of(outer, inner)) {
+    if (auto next_element = is_prefix_of(outer, inner)) {
+        //  If this is a collection in mixed, we will allow the inner instruction
+        //  to pass so long as it references the proper type (list or dictionary).
+        if (outer.value.type == Type::List && mpark::holds_alternative<uint32_t>(*next_element)) {
+            return;
+        }
+        else if (outer.value.type == Type::Dictionary && mpark::holds_alternative<InternString>(*next_element)) {
+            return;
+        }
         inner_side.discard();
     }
 }
@@ -1533,17 +1518,25 @@ DEFINE_MERGE(Instruction::Update, Instruction::Update)
         }
 
         if (left.value.type != right.value.type) {
-            // Embedded object / dictionary creation should always lose to an
-            // Update(value), because these structures are nested, and we need to
-            // discard any update inside the structure.
-            if (left.value.type == Type::Dictionary || left.value.type == Type::ObjectValue) {
+            // Embedded object creation should always lose to an Update(value),
+            // because these structures are nested, and we need to discard any
+            // update inside the structure.
+            if (left.value.type == Type::ObjectValue) {
                 left_side.discard();
                 return;
             }
-            else if (right.value.type == Type::Dictionary || right.value.type == Type::ObjectValue) {
+            else if (right.value.type == Type::ObjectValue) {
                 right_side.discard();
                 return;
             }
+        }
+
+        // Updates to List or Dictionary are idempotent. If both sides are setting to the same value,
+        // let them both pass through. It is important that the instruction application rules reflect this.
+        // If it is not two lists or dictionaries, then the normal last-writer-wins rules will take effect below.
+        if (left.value.type == right.value.type &&
+            (left.value.type == Type::List || left.value.type == Type::Dictionary)) {
+            return;
         }
 
         // CONFLICT: Two updates of the same element.
@@ -1581,19 +1574,33 @@ DEFINE_MERGE(Instruction::AddInteger, Instruction::Update)
         // RESOLUTION: If the Add was later than the Set, add its value to
         // the payload of the Set instruction. Otherwise, discard it.
 
-        if (!(right.value.type == Instruction::Payload::Type::Int || right.value.is_null())) {
-            bad_merge(right_side, right,
-                      "Merge error: right.value.type == Instruction::Payload::Type::Int || right.value.is_null()");
-        }
-
         bool right_is_default = !right.is_array_update() && right.is_default;
+
+        // Five Cases Here:
+        // 1. AddInteger is after Update and Update is of a non-integer type
+        //     - Discard the AddInteger; AddInteger to a mixed field is a no-op
+        // 2: AddInteger is after the Update and the Update instruction contains an integer payload:
+        //     - We increment the Update instruction payload
+        // 3: AddInteger is after Update and Update is null:
+        //     - No conflict
+        // 4: Update is after AddInteger and Update.default is false
+        //     - Discard the AddInteger
+        // 5: Update is after AddInteger and Update.default is true
+        //     - Treat the Update as if it were before the AddInteger instruction
 
         // Note: AddInteger survives SetDefault, regardless of timestamp.
         if (right_side.timestamp() < left_side.timestamp() || right_is_default) {
             if (right.value.is_null()) {
-                // The AddInteger happened "after" the Set(null). This becomes a
-                // no-op, but if the server later integrates a Set(int) that
+                // The AddInteger happened "after" the Update(null). This becomes a
+                // no-op, but if the server later integrates a Update(int) that
                 // came-before the AddInteger, it will be taken into account again.
+                return;
+            }
+
+            // The AddInteger happened after an Update with a non int type
+            // This must be operating on a mixed field. Discard the AddInteger
+            if (right.value.type != Instruction::Payload::Type::Int) {
+                left_side.discard();
                 return;
             }
 
@@ -1685,22 +1692,67 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
     }
 }
 
+DEFINE_MERGE(Instruction::Clear, Instruction::Update)
+{
+    using Type = Instruction::Payload::Type;
+    using CollectionType = Instruction::CollectionType;
+
+    // The two instructions are at the same level of nesting.
+    if (same_path(left, right)) {
+        REALM_ASSERT(right.value.type != Type::Set);
+        // If both sides are setting/operating on the same type, let them both pass through.
+        // It is important that the instruction application rules reflect this.
+        // If it is not two lists or dictionaries, then the normal last-writer-wins rules will take effect below.
+        if (left.collection_type == CollectionType::List && right.value.type == Type::List) {
+            return;
+        }
+        if (left.collection_type == CollectionType::Dictionary && right.value.type == Type::Dictionary) {
+            return;
+        }
+
+        // CONFLICT: Clear and Update of the same element.
+        //
+        // RESOLUTION: Discard the instruction with the lower timestamp. This has the
+        // effect of preserving insertions that came after the clear (if it has the
+        // higher timestamp), or preserve additional updates (and potential insertions)
+        // that came after the update.
+        if (left_side.timestamp() < right_side.timestamp()) {
+            left_side.discard();
+        }
+        else {
+            right_side.discard();
+        }
+    }
+}
+
 // Handled by nested rule
-DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::Update);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::Update);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Update);
 
 
 /// AddInteger rules
 
-DEFINE_NESTED_MERGE_NOOP(Instruction::AddInteger);
+DEFINE_NESTED_MERGE(Instruction::AddInteger)
+{
+    if (is_prefix_of(outer, inner)) {
+        inner_side.discard();
+    }
+}
+
+DEFINE_MERGE(Instruction::Clear, Instruction::AddInteger)
+{
+    // The two instructions are at the same level of nesting.
+    if (same_path(left, right)) {
+        right_side.discard();
+    }
+}
+
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddInteger);
-DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddInteger);
 
@@ -1725,15 +1777,15 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
         }
 
         if (left.collection_type != right.collection_type) {
-            auto collection_type_name = [](Instruction::AddColumn::CollectionType type) -> const char* {
+            auto collection_type_name = [](Instruction::CollectionType type) -> const char* {
                 switch (type) {
-                    case Instruction::AddColumn::CollectionType::Single:
+                    case Instruction::CollectionType::Single:
                         return "single value";
-                    case Instruction::AddColumn::CollectionType::List:
+                    case Instruction::CollectionType::List:
                         return "list";
-                    case Instruction::AddColumn::CollectionType::Dictionary:
+                    case Instruction::CollectionType::Dictionary:
                         return "dictionary";
-                    case Instruction::AddColumn::CollectionType::Set:
+                    case Instruction::CollectionType::Set:
                         return "set";
                 }
                 REALM_TERMINATE("");
@@ -2365,20 +2417,21 @@ void Transformer::merge_changesets(file_ident_type local_file_ident, util::Span<
         Changeset& our_changeset = *our_changesets[i];
         size_t num_instructions = our_changeset.size();
         our_num_instructions += num_instructions;
-        logger.trace("Scanning local changeset [%1/%2] (%3 instructions)", i + 1, our_changesets.size(),
-                     num_instructions);
+        logger.trace(util::LogCategory::changeset, "Scanning local changeset [%1/%2] (%3 instructions)", i + 1,
+                     our_changesets.size(), num_instructions);
 
         their_index.scan_changeset(our_changeset);
     }
 
     // Build the index.
     for (size_t i = 0; i < their_changesets.size(); ++i) {
-        logger.trace("Indexing incoming changeset [%1/%2] (%3 instructions)", i + 1, their_changesets.size(),
-                     their_changesets[i].size());
+        logger.trace(util::LogCategory::changeset, "Indexing incoming changeset [%1/%2] (%3 instructions)", i + 1,
+                     their_changesets.size(), their_changesets[i].size());
         their_index.add_changeset(their_changesets[i]);
     }
 
-    logger.debug("Finished changeset indexing (incoming: %1 changeset(s) / %2 instructions, local: %3 "
+    logger.debug(util::LogCategory::changeset,
+                 "Finished changeset indexing (incoming: %1 changeset(s) / %2 instructions, local: %3 "
                  "changeset(s) / %4 instructions, conflict group(s): %5)",
                  their_changesets.size(), their_num_instructions, our_changesets.size(), our_num_instructions,
                  their_index.get_num_conflict_groups());
@@ -2425,6 +2478,7 @@ void Transformer::merge_changesets(file_ident_type local_file_ident, util::Span<
 
     for (size_t i = 0; i < our_changesets.size(); ++i) {
         logger.trace(
+            util::LogCategory::changeset,
             "Transforming local changeset [%1/%2] through %3 incoming changeset(s) with %4 conflict group(s)", i + 1,
             our_changesets.size(), their_changesets.size(), their_index.get_num_conflict_groups());
         Changeset* our_changeset = our_changesets[i];
@@ -2435,7 +2489,8 @@ void Transformer::merge_changesets(file_ident_type local_file_ident, util::Span<
         transformer.transform(); // Throws
     }
 
-    logger.debug("Finished transforming %1 local changesets through %2 incoming changesets (%3 vs %4 "
+    logger.debug(util::LogCategory::changeset,
+                 "Finished transforming %1 local changesets through %2 incoming changesets (%3 vs %4 "
                  "instructions, in %5 conflict groups)",
                  our_changesets.size(), their_changesets.size(), our_num_instructions, their_num_instructions,
                  their_index.get_num_conflict_groups());

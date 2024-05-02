@@ -443,3 +443,26 @@ TEST(Mixed_set_non_link_assertion)
     dest_obj.remove(); // triggers an assertion failure if the backlink was not removed
     source_obj.remove();
 }
+
+TEST(Mixed_LinkSelfAssignment)
+{
+    Group g;
+    auto source = g.add_table("source");
+    auto dest = g.add_table("dest");
+    ColKey mixed_col = source->add_column(type_Mixed, "mixed");
+    auto source_obj = source->create_object();
+    auto dest_obj = dest->create_object();
+
+    CHECK_EQUAL(dest_obj.get_backlink_count(), 0);
+
+    source_obj.set(mixed_col, Mixed{ObjLink{dest->get_key(), dest_obj.get_key()}});
+    CHECK_EQUAL(dest_obj.get_backlink_count(), 1);
+
+    // Re-assign the same link, which should not update backlinks
+    source_obj.set(mixed_col, Mixed{ObjLink{dest->get_key(), dest_obj.get_key()}});
+    CHECK_EQUAL(dest_obj.get_backlink_count(), 1);
+
+    dest_obj.remove();
+    CHECK_EQUAL(source_obj.get<Mixed>(mixed_col), Mixed());
+    source_obj.remove();
+}

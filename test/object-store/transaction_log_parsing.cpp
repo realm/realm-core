@@ -34,6 +34,7 @@
 #include <realm.hpp>
 
 #include <iostream>
+#include <random>
 
 using namespace realm;
 
@@ -59,7 +60,7 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key];
-        info.collections.push_back({m_table_key, m_list.get_owner_key(), m_list.get_col_key(), &c});
+        info.collections.push_back({m_table_key, m_list.get_owner_key(), m_list.get_stable_path(), &c});
         _impl::transaction::advance(*m_group, info);
 
         if (info.collections.empty()) {

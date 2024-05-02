@@ -23,7 +23,7 @@ public:
 
     void async_write(const char* data, size_t size, WriteCompletionHandler handler)
     {
-        m_logger_ptr->trace("async_write, size = %1", size);
+        m_logger_ptr->trace(util::LogCategory::network, "async_write, size = %1", size);
         m_buffer.insert(m_buffer.end(), data, data + size);
         do_read();
         handler(std::error_code{}, size);
@@ -31,7 +31,7 @@ public:
 
     void async_read(char* buffer, size_t size, ReadCompletionHandler handler)
     {
-        m_logger_ptr->trace("async_read, size = %1", size);
+        m_logger_ptr->trace(util::LogCategory::network, "async_read, size = %1", size);
         REALM_ASSERT(!m_reader_waiting);
         m_reader_waiting = true;
         m_plain_async_read = true;
@@ -43,7 +43,7 @@ public:
 
     void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler)
     {
-        m_logger_ptr->trace("async_read_until, size = %1, delim = %2", size, delim);
+        m_logger_ptr->trace(util::LogCategory::network, "async_read_until, size = %1, delim = %2", size, delim);
         REALM_ASSERT(!m_reader_waiting);
         m_reader_waiting = true;
         m_plain_async_read = false;
@@ -71,7 +71,8 @@ private:
 
     void do_read()
     {
-        m_logger_ptr->trace("do_read(), m_buffer.size = %1, m_reader_waiting = %2, m_read_size = %3", m_buffer.size(),
+        m_logger_ptr->trace(util::LogCategory::network,
+                            "do_read(), m_buffer.size = %1, m_reader_waiting = %2, m_read_size = %3", m_buffer.size(),
                             m_reader_waiting, m_read_size);
         if (!m_reader_waiting)
             return;
@@ -92,7 +93,7 @@ private:
 
     void transfer(size_t size)
     {
-        m_logger_ptr->trace("transfer()");
+        m_logger_ptr->trace(util::LogCategory::network, "transfer()");
         std::copy(m_buffer.begin(), m_buffer.begin() + size, m_read_buffer);
         m_buffer.erase(m_buffer.begin(), m_buffer.begin() + size);
         m_reader_waiting = false;
@@ -101,7 +102,7 @@ private:
 
     void delim_not_found()
     {
-        m_logger_ptr->trace("delim_not_found");
+        m_logger_ptr->trace(util::LogCategory::network, "delim_not_found");
         m_reader_waiting = false;
         m_handler(util::MiscExtErrors::delim_not_found, 0);
     }
@@ -222,7 +223,7 @@ public:
         n_write_errors++;
     }
 
-    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, const std::string_view*) override
+    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, std::string_view) override
     {
         n_protocol_errors++;
     }

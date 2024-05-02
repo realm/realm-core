@@ -22,11 +22,11 @@
 #include <util/test_utils.hpp>
 #include <util/sync/sync_test_utils.hpp>
 
+#include <realm/list.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
-
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
@@ -140,6 +140,7 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
         VersionID current_local_version = wt_local.get_version_of_current_transaction();
 
         util::NullLogger logger;
+
         if (m_mode == ClientResyncMode::Recover) {
             auto history_local = dynamic_cast<sync::ClientHistory*>(wt_local.get_replication()->_get_history_write());
             std::vector<sync::ClientHistory::LocalChange> local_changes =
@@ -192,13 +193,12 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
     };
 
     TestSyncManager init_sync_manager;
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
+    SyncTestFile config(init_sync_manager, "default");
     config.automatic_change_notifications = false;
     config.schema = schema;
     ClientResyncMode reset_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
     config.sync_config->client_resync_mode = reset_mode;
-    SyncTestFile config2(init_sync_manager.app(), "default");
+    SyncTestFile config2(init_sync_manager, "default");
 
     auto populate_objects = [&](SharedRealm realm, size_t num_objects) {
         TableRef table = get_table(*realm, "object");

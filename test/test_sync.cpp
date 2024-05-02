@@ -107,11 +107,11 @@ private:
     auto name = DB::create(make_client_replication(), name##_path);
 
 template <typename Function>
-void write_transaction(DBRef db, Function&& function)
+DB::version_type write_transaction(DBRef db, Function&& function)
 {
     WriteTransaction wt(db);
     function(wt);
-    wt.commit();
+    return wt.commit();
 }
 
 ClientReplication& get_replication(DBRef db)
@@ -2986,8 +2986,11 @@ TEST(Sync_UploadDownloadProgress_1)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    uint_fast64_t global_snapshot_version;
-
+    std::atomic<uint_fast64_t> downloaded_bytes;
+    std::atomic<uint_fast64_t> downloadable_bytes;
+    std::atomic<uint_fast64_t> uploaded_bytes;
+    std::atomic<uint_fast64_t> uploadable_bytes;
+    std::atomic<uint_fast64_t> snapshot_version;
     {
         int handler_entry = 0;
 
@@ -2995,73 +2998,40 @@ TEST(Sync_UploadDownloadProgress_1)
         std::mutex mutex;
         std::condition_variable cond_var;
 
-        std::atomic<uint_fast64_t> downloaded_bytes;
-        std::atomic<uint_fast64_t> downloadable_bytes;
-        std::atomic<uint_fast64_t> uploaded_bytes;
-        std::atomic<uint_fast64_t> uploadable_bytes;
-        std::atomic<uint_fast64_t> progress_version;
-        std::atomic<uint_fast64_t> snapshot_version;
-
         ClientServerFixture fixture(server_dir, test_context);
         fixture.start();
 
         Session session = fixture.make_session(db, "/test");
 
         auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                    uint_fast64_t uploadable, uint_fast64_t progress, uint_fast64_t snapshot) {
+                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
             downloaded_bytes = downloaded;
             downloadable_bytes = downloadable;
             uploaded_bytes = uploaded;
             uploadable_bytes = uploadable;
-            progress_version = progress;
             snapshot_version = snapshot;
-
-            if (handler_entry == 0) {
-                std::unique_lock<std::mutex> lock(mutex);
-                cond_var_signaled = true;
-                lock.unlock();
-                cond_var.notify_one();
-            }
             ++handler_entry;
         };
 
         std::unique_lock<std::mutex> lock(mutex);
         session.set_progress_handler(progress_handler);
+        session.set_connection_state_change_listener([&](ConnectionState state, util::Optional<ErrorInfo>) {
+            if (state == ConnectionState::connected) {
+                std::unique_lock<std::mutex> lock(mutex);
+                cond_var_signaled = true;
+                lock.unlock();
+                cond_var.notify_one();
+            }
+        });
         session.bind();
         cond_var.wait(lock, [&] {
             return cond_var_signaled;
         });
+        CHECK_EQUAL(handler_entry, 0);
 
-        CHECK_EQUAL(downloaded_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(downloadable_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(uploaded_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(uploadable_bytes, uint_fast64_t(0));
-        CHECK_GREATER_EQUAL(snapshot_version, uint_fast64_t(1));
-
-        uint_fast64_t commit_version;
-        {
-            WriteTransaction wt{db};
-            TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
-            tr->add_column(type_Int, "integer column");
-            commit_version = wt.commit();
-        }
-
-        session.wait_for_upload_complete_or_client_stopped();
-        session.wait_for_download_complete_or_client_stopped();
-
-        CHECK_EQUAL(downloaded_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(downloadable_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploaded_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
-        CHECK_GREATER(progress_version, uint_fast64_t(0));
-        CHECK_GREATER_EQUAL(snapshot_version, commit_version);
-
-        {
-            WriteTransaction wt{db};
-            TableRef tr = wt.get_table("class_table");
-            tr->create_object_with_primary_key(1).set("integer column", 42);
-            commit_version = wt.commit();
-        }
+        auto commit_version = write_transaction(db, [](WriteTransaction& wt) {
+            wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
+        });
 
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
@@ -3072,7 +3042,19 @@ TEST(Sync_UploadDownloadProgress_1)
         CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
         CHECK_GREATER_EQUAL(snapshot_version, commit_version);
 
-        global_snapshot_version = snapshot_version;
+
+        commit_version = write_transaction(db, [](WriteTransaction& wt) {
+            wt.get_table("class_table")->create_object_with_primary_key(1);
+        });
+
+        session.wait_for_upload_complete_or_client_stopped();
+        session.wait_for_download_complete_or_client_stopped();
+
+        CHECK_EQUAL(downloaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(downloadable_bytes, uint_fast64_t(0));
+        CHECK_NOT_EQUAL(uploaded_bytes, uint_fast64_t(0));
+        CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
+        CHECK_GREATER_EQUAL(snapshot_version, commit_version);
     }
 
     {
@@ -3085,32 +3067,19 @@ TEST(Sync_UploadDownloadProgress_1)
         std::mutex mutex;
         std::condition_variable cond_var;
 
-        Client::Config config;
-        config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
-        auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
-        config.socket_provider = socket_provider;
-        config.reconnect_mode = ReconnectMode::testing;
-        Client client(config);
-
-        Session::Config sess_config;
-        sess_config.server_address = "no server";
-        sess_config.server_port = 8000;
-        sess_config.realm_identifier = "/test";
-        sess_config.signed_user_token = g_signed_test_user_token;
-
-        Session session(client, db, nullptr, nullptr, std::move(sess_config));
+        ClientServerFixture fixture(server_dir, test_context);
+        fixture.start();
+        Session session = fixture.make_session(db, "/test");
 
         int number_of_handler_calls = 0;
 
-        auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                    uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                    uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
-            CHECK_EQUAL(downloaded_bytes, 0);
-            CHECK_EQUAL(downloadable_bytes, 0);
-            CHECK_NOT_EQUAL(uploaded_bytes, 0);
-            CHECK_NOT_EQUAL(uploadable_bytes, 0);
-            CHECK_EQUAL(progress_version, 0);
-            CHECK_EQUAL(snapshot_version, global_snapshot_version);
+        auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
+                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
+            CHECK_EQUAL(downloaded, downloaded_bytes);
+            CHECK_EQUAL(downloadable, downloaded_bytes);
+            CHECK_EQUAL(uploaded, uploaded_bytes);
+            CHECK_GREATER(uploadable, uploaded_bytes);
+            CHECK_GREATER(snapshot, snapshot_version);
             number_of_handler_calls++;
 
             std::unique_lock<std::mutex> lock(mutex);
@@ -3122,11 +3091,13 @@ TEST(Sync_UploadDownloadProgress_1)
         std::unique_lock<std::mutex> lock(mutex);
         session.set_progress_handler(progress_handler);
         session.bind();
+        write_transaction(db, [](WriteTransaction& wt) {
+            wt.get_table("class_table")->create_object_with_primary_key(2);
+        });
         cond_var.wait(lock, [&] {
             return cond_var_signaled;
         });
 
-        client.shutdown();
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3154,17 +3125,15 @@ TEST(Sync_UploadDownloadProgress_2)
     uint_fast64_t downloadable_bytes_1 = 123;
     uint_fast64_t uploaded_bytes_1 = 123;
     uint_fast64_t uploadable_bytes_1 = 123;
-    uint_fast64_t progress_version_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
     auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                  uint_fast64_t snapshot_version, double, double) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
         uploadable_bytes_1 = uploadable_bytes;
-        progress_version_1 = progress_version;
         snapshot_version_1 = snapshot_version;
     };
 
@@ -3174,17 +3143,15 @@ TEST(Sync_UploadDownloadProgress_2)
     uint_fast64_t downloadable_bytes_2 = 123;
     uint_fast64_t uploaded_bytes_2 = 123;
     uint_fast64_t uploadable_bytes_2 = 123;
-    uint_fast64_t progress_version_2 = 123;
     uint_fast64_t snapshot_version_2 = 0;
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                  uint_fast64_t snapshot_version, double, double) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
         uploadable_bytes_2 = uploadable_bytes;
-        progress_version_2 = progress_version;
         snapshot_version_2 = snapshot_version;
     };
 
@@ -3202,7 +3169,6 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_EQUAL(downloaded_bytes_2, downloadable_bytes_2);
     CHECK_EQUAL(downloaded_bytes_1, downloaded_bytes_2);
     CHECK_EQUAL(downloadable_bytes_1, 0);
-    CHECK_GREATER(progress_version_1, 0);
     CHECK_GREATER(snapshot_version_1, 0);
 
     CHECK_EQUAL(uploaded_bytes_1, 0);
@@ -3210,7 +3176,6 @@ TEST(Sync_UploadDownloadProgress_2)
 
     CHECK_EQUAL(uploaded_bytes_2, 0);
     CHECK_EQUAL(uploadable_bytes_2, 0);
-    CHECK_GREATER(progress_version_2, 0);
     CHECK_GREATER(snapshot_version_2, 0);
 
     write_transaction(db_1, [](WriteTransaction& wt) {
@@ -3355,7 +3320,6 @@ TEST(Sync_UploadDownloadProgress_3)
         wt.commit();
     }
 
-
     Client::Config client_config;
     client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(client_config.logger, "");
@@ -3384,18 +3348,16 @@ TEST(Sync_UploadDownloadProgress_3)
     uint_fast64_t downloadable_bytes_1 = 123;
     uint_fast64_t uploaded_bytes_1 = 123;
     uint_fast64_t uploadable_bytes_1 = 123;
-    uint_fast64_t progress_version_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
     auto progress_handler = [&, entry = int(0), promise = util::CopyablePromiseHolder(std::move(signal_pf.promise))](
                                 uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
+                                uint_fast64_t snapshot_version, double, double) mutable {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
         uploadable_bytes_1 = uploadable_bytes;
-        progress_version_1 = progress_version;
         snapshot_version_1 = snapshot_version;
 
         if (entry == 0) {
@@ -3403,13 +3365,7 @@ TEST(Sync_UploadDownloadProgress_3)
             CHECK_EQUAL(downloadable_bytes, 0);
             CHECK_EQUAL(uploaded_bytes, 0);
             CHECK_NOT_EQUAL(uploadable_bytes, 0);
-            CHECK_EQUAL(snapshot_version, 2);
-        }
-
-        if (entry == 0) {
-            server_thread.start([&] {
-                server.run();
-            });
+            CHECK_EQUAL(snapshot_version, 4);
         }
 
         if (should_signal_cond_var) {
@@ -3420,6 +3376,10 @@ TEST(Sync_UploadDownloadProgress_3)
     };
 
     session.set_progress_handler(progress_handler);
+
+    server_thread.start([&] {
+        server.run();
+    });
 
     session.bind();
 
@@ -3432,7 +3392,6 @@ TEST(Sync_UploadDownloadProgress_3)
     CHECK_EQUAL(downloadable_bytes_1, 0);
     CHECK_NOT_EQUAL(uploaded_bytes_1, 0);
     CHECK_NOT_EQUAL(uploadable_bytes_1, 0);
-    CHECK_GREATER(progress_version_1, 0);
     CHECK_GREATER_EQUAL(snapshot_version_1, 2);
 
     server.stop();
@@ -3506,39 +3465,29 @@ TEST(Sync_UploadDownloadProgress_4)
 
     auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                  uint_fast64_t snapshot_version, double, double) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_NOT_EQUAL(uploadable_bytes, 0);
 
         switch (entry_1) {
             case 0:
-                // Session is bound and initial state is reported
-                CHECK_EQUAL(progress_version, 0);
-                CHECK_EQUAL(uploaded_bytes, 0);
-                CHECK_EQUAL(snapshot_version, 3);
-                break;
-
-            case 1:
                 // We've received the empty DOWNLOAD message and now have reliable
                 // download progress
-                CHECK_EQUAL(progress_version, 1);
                 CHECK_EQUAL(uploaded_bytes, 0);
                 CHECK_EQUAL(snapshot_version, 5);
                 break;
 
-            case 2:
+            case 1:
                 // First UPLOAD is complete, but we still have more to upload
                 // because the changesets are too large to batch into a single upload
-                CHECK_EQUAL(progress_version, 1);
                 CHECK_GREATER(uploaded_bytes, 0);
                 CHECK_LESS(uploaded_bytes, uploadable_bytes);
                 CHECK_EQUAL(snapshot_version, 6);
                 break;
 
-            case 3:
+            case 2:
                 // Second UPLOAD is complete and we're done uploading
-                CHECK_EQUAL(progress_version, 1);
                 CHECK_EQUAL(uploaded_bytes, uploadable_bytes);
                 CHECK_EQUAL(snapshot_version, 7);
                 break;
@@ -3554,7 +3503,7 @@ TEST(Sync_UploadDownloadProgress_4)
     session_1.wait_for_upload_complete_or_client_stopped();
     session_1.wait_for_download_complete_or_client_stopped();
 
-    CHECK_EQUAL(entry_1, 4);
+    CHECK_EQUAL(entry_1, 3);
 
     Session session_2 = fixture.make_session(db_2, "/test");
 
@@ -3562,32 +3511,22 @@ TEST(Sync_UploadDownloadProgress_4)
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                  uint_fast64_t snapshot_version, double, double) {
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
 
         switch (entry_2) {
             case 0:
-                // Session is bound and initial state is reported
-                CHECK_EQUAL(progress_version, 0);
-                CHECK_EQUAL(downloaded_bytes, 0);
-                CHECK_EQUAL(downloadable_bytes, 0);
-                CHECK_EQUAL(snapshot_version, 1);
-                break;
-
-            case 1:
                 // First DOWNLOAD message received. Some data is downloaded, but
                 // download isn't compelte
-                CHECK_EQUAL(progress_version, 1);
                 CHECK_GREATER(downloaded_bytes, 0);
                 CHECK_GREATER(downloadable_bytes, 0);
                 CHECK_LESS(downloaded_bytes, downloadable_bytes);
                 CHECK_EQUAL(snapshot_version, 3);
                 break;
 
-            case 2:
+            case 1:
                 // Second DOWNLOAD message received. Download is now complete.
-                CHECK_EQUAL(progress_version, 1);
                 CHECK_GREATER(downloaded_bytes, 0);
                 CHECK_GREATER(downloadable_bytes, 0);
                 CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
@@ -3603,7 +3542,7 @@ TEST(Sync_UploadDownloadProgress_4)
 
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
-    CHECK_EQUAL(entry_2, 3);
+    CHECK_EQUAL(entry_2, 2);
 }
 
 
@@ -3615,32 +3554,39 @@ TEST(Sync_UploadDownloadProgress_5)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    auto [progress_handled_promise, progress_handled] = util::make_promise_future<void>();
+    std::mutex mutex;
+    std::condition_variable session_cv;
+    bool signaled = false;
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
     Session session = fixture.make_session(db, "/test");
 
-    auto progress_handler = [&, promise = util::CopyablePromiseHolder(std::move(progress_handled_promise))](
-                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
+                                uint_fast64_t snapshot_version, double, double) mutable {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
-
-        if (progress_version > 0) {
-            CHECK_EQUAL(snapshot_version, 3);
-            promise.get_promise().emplace_value();
-        }
+        CHECK_EQUAL(snapshot_version, 3);
+        std::lock_guard lock{mutex};
+        signaled = true;
+        session_cv.notify_one();
     };
 
     session.set_progress_handler(progress_handler);
 
-    session.bind();
-    progress_handled.get();
+    {
+        std::unique_lock lock{mutex};
+        session.bind();
+        // Wait until the progress handler is called on the session before tearing down the client
+        session_cv.wait_for(lock, std::chrono::seconds(5), [&]() {
+            return signaled;
+        });
+    }
+    CHECK(signaled);
 
     // The check is that we reach this point.
 }
@@ -3678,27 +3624,35 @@ TEST(Sync_UploadDownloadProgress_6)
     client_config.one_connection_per_session = false;
     Client client(client_config);
 
+    util::ScopeExit cleanup([&]() noexcept {
+        client.shutdown_and_wait();
+        server.stop();
+        server_thread.join();
+    });
+
     Session::Config session_config;
     session_config.server_address = "localhost";
     session_config.server_port = server_port;
     session_config.realm_identifier = "/test";
+    session_config.service_identifier = "/realm-sync";
     session_config.signed_user_token = g_signed_test_user_token;
 
     std::mutex mutex;
     std::condition_variable session_cv;
+    bool signaled = false;
     auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t snapshot_version, double, double) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
-        CHECK_EQUAL(progress_version, 0);
-        CHECK_EQUAL(snapshot_version, 1);
+        CHECK_EQUAL(snapshot_version, 3);
         std::lock_guard lock{mutex};
         session.reset();
+        signaled = true;
         session_cv.notify_one();
     };
 
@@ -3708,14 +3662,12 @@ TEST(Sync_UploadDownloadProgress_6)
         std::unique_lock lock{mutex};
         session->bind();
         // Wait until the progress handler is called on the session before tearing down the client
-        session_cv.wait_for(lock, std::chrono::seconds(30), [&session]() {
-            return !bool(session);
+        session_cv.wait_for(lock, std::chrono::seconds(5), [&]() {
+            return signaled;
         });
     }
-
-    client.shutdown_and_wait();
-    server.stop();
-    server_thread.join();
+    CHECK(signaled);
+    CHECK(!(session));
 
     // The check is that we reach this point without deadlocking or throwing an assert while tearing
     // down the active session
@@ -3790,7 +3742,7 @@ TEST(Sync_UploadProgress_EmptyCommits)
 
     std::atomic<int> entry = 0;
     session.set_progress_handler(
-        [&](uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t) {
+        [&](uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, double, double) {
             ++entry;
         });
     session.bind();
@@ -3801,9 +3753,9 @@ TEST(Sync_UploadProgress_EmptyCommits)
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_upload_complete_or_client_stopped();
 
-    // Binding produces three notifications: the initial state, one after receiving
+    // Binding produces two notifications: one after receiving
     // the DOWNLOAD message, and one after uploading the schema
-    CHECK_EQUAL(entry, 3);
+    CHECK_EQUAL(entry, 2);
 
     // No notification sent because an empty commit doesn't change uploadable_bytes
     {
@@ -3812,7 +3764,7 @@ TEST(Sync_UploadProgress_EmptyCommits)
     }
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_upload_complete_or_client_stopped();
-    CHECK_EQUAL(entry, 3);
+    CHECK_EQUAL(entry, 2);
 
     // Both the external and local commits are empty, so again no change in
     // uploadable_bytes
@@ -3825,7 +3777,7 @@ TEST(Sync_UploadProgress_EmptyCommits)
     }
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_upload_complete_or_client_stopped();
-    CHECK_EQUAL(entry, 3);
+    CHECK_EQUAL(entry, 2);
 
     // Local commit is empty, but the changeset created by the external write
     // is discovered after the local write, resulting in two notifications (one
@@ -3840,7 +3792,7 @@ TEST(Sync_UploadProgress_EmptyCommits)
     }
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_upload_complete_or_client_stopped();
-    CHECK_EQUAL(entry, 5);
+    CHECK_EQUAL(entry, 4);
 }
 
 TEST(Sync_MultipleSyncAgentsNotAllowed)
@@ -4088,7 +4040,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
 
     auto progress_handler_1 = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                   std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                  std::uint_fast64_t, std::uint_fast64_t) {
+                                  std::uint_fast64_t, double, double) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -4101,8 +4053,8 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     std::uint_fast64_t uploadable_bytes_2 = 0;
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes, uint_fast64_t,
-                                  uint_fast64_t) {
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes, uint_fast64_t, double,
+                                  double) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -4242,7 +4194,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
     auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* progress_version */, uint_fast64_t /* snapshot_version */) {
+                                  uint_fast64_t /* snapshot_version */, double, double) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -4256,7 +4208,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* progress_version */, uint_fast64_t /* snapshot_version */) {
+                                  uint_fast64_t /* snapshot_version */, double, double) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -4677,7 +4629,7 @@ TEST(Sync_BatchedUploadMessages)
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t snapshot_version, double, double) {
         CHECK_GREATER(uploadable_bytes, 1000);
 
         // This is the important check. If the changesets were not batched,
@@ -4686,7 +4638,6 @@ TEST(Sync_BatchedUploadMessages)
         CHECK(uploaded_bytes == 0 || uploaded_bytes == uploadable_bytes);
         CHECK_EQUAL(0, downloaded_bytes);
         CHECK_EQUAL(0, downloadable_bytes);
-        static_cast<void>(progress_version);
         static_cast<void>(snapshot_version);
     };
 
@@ -4730,13 +4681,12 @@ TEST(Sync_UploadLogCompactionEnabled)
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t snapshot_version, double, double) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
         static_cast<void>(snapshot_version);
-        if (progress_version > 0)
-            CHECK_NOT_EQUAL(downloadable_bytes, 0);
+        CHECK_NOT_EQUAL(downloadable_bytes, 0);
     };
 
     session_2.set_progress_handler(progress_handler);
@@ -4789,13 +4739,12 @@ TEST(Sync_UploadLogCompactionDisabled)
 
     auto progress_handler = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                 std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version) {
+                                std::uint_fast64_t snapshot_version, double, double) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
         static_cast<void>(snapshot_version);
-        if (progress_version > 0)
-            CHECK_NOT_EQUAL(0, downloadable_bytes);
+        CHECK_NOT_EQUAL(0, downloadable_bytes);
     };
 
     Session session_2 = fixture.make_session(db_2, "/test");
@@ -5861,9 +5810,12 @@ NONCONCURRENT_TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util
 TEST(Sync_Mixed)
 {
     // Test replication and synchronization of Mixed values and lists.
-
-    TEST_CLIENT_DB(db_1);
-    TEST_CLIENT_DB(db_2);
+    DBOptions options;
+    options.logger = test_context.logger;
+    SHARED_GROUP_TEST_PATH(db_1_path);
+    SHARED_GROUP_TEST_PATH(db_2_path);
+    auto db_1 = DB::create(make_client_replication(), db_1_path, options);
+    auto db_2 = DB::create(make_client_replication(), db_2_path, options);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
@@ -5937,6 +5889,7 @@ TEST(Sync_Mixed)
     }
 }
 
+/*
 TEST(Sync_TypedLinks)
 {
     // Test replication and synchronization of Mixed values and lists.
@@ -5997,6 +5950,7 @@ TEST(Sync_TypedLinks)
         CHECK_EQUAL(l2.get_obj_key(), fops->begin()->get_key());
     }
 }
+*/
 
 TEST(Sync_Dictionary)
 {
@@ -6099,6 +6053,329 @@ TEST(Sync_Dictionary)
         CHECK_EQUAL(dict.size(), 0);
 
         CHECK(compare_groups(read_1, read_2));
+    }
+}
+
+TEST(Sync_CollectionInMixed)
+{
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+    session_1.bind();
+    session_2.bind();
+
+    Timestamp now{std::chrono::system_clock::now()};
+
+    write_transaction(db_1, [&](WriteTransaction& tr) {
+        auto& g = tr.get_group();
+        auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+
+        auto foo = table->create_object_with_primary_key(123);
+
+        // Create dictionary in Mixed property
+        foo.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = foo.get_dictionary_ptr(col_any);
+        dict->insert("hello", "world");
+        dict->insert("cnt", 7);
+        dict->insert("when", now);
+        // Insert a List in a Dictionary
+        dict->insert_collection("list", CollectionType::List);
+        auto l = dict->get_list("list");
+        l->add(5);
+        l->insert_collection(1, CollectionType::List);
+        l->get_list(1)->add(7);
+
+        auto bar = table->create_object_with_primary_key(456);
+
+        // Create list in Mixed property
+        bar.set_collection(col_any, CollectionType::List);
+        auto list = bar.get_list_ptr<Mixed>(col_any);
+        list->add("John");
+        list->insert(0, 5);
+    });
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_2, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+        CHECK_EQUAL(table->size(), 2);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto dict = obj.get_dictionary_ptr(col_any);
+        CHECK(dict->get_value_data_type() == type_Mixed);
+        CHECK_EQUAL(dict->size(), 4);
+
+        // Check that values are replicated
+        Mixed val = dict->get("hello");
+        CHECK_EQUAL(val.get_string(), "world");
+        val = dict->get("cnt");
+        CHECK_EQUAL(val.get_int(), 7);
+        val = dict->get("when");
+        CHECK_EQUAL(val.get<Timestamp>(), now);
+        CHECK_EQUAL(dict->get_list("list")->get(0).get_int(), 5);
+
+        // Erase dictionary element
+        dict->erase("cnt");
+        // Replace dictionary element
+        dict->insert("hello", "goodbye");
+
+        obj = table->get_object_with_primary_key(456);
+        auto list = obj.get_list_ptr<Mixed>(col_any);
+        // Check that values are replicated
+        CHECK_EQUAL(list->get(0).get_int(), 5);
+        CHECK_EQUAL(list->get(1).get_string(), "John");
+        // Replace list element
+        list->set(1, "Paul");
+        // Erase list element
+        list->remove(0);
+    });
+
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_1, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+        CHECK_EQUAL(table->size(), 2);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto dict = obj.get_dictionary(col_any);
+        CHECK_EQUAL(dict.size(), 3);
+
+        Mixed val = dict["hello"];
+        CHECK_EQUAL(val.get_string(), "goodbye");
+        val = dict.get("when");
+        CHECK_EQUAL(val.get<Timestamp>(), now);
+
+        // Dictionary clear
+        dict.clear();
+
+        obj = table->get_object_with_primary_key(456);
+        auto list = obj.get_list_ptr<Mixed>(col_any);
+        CHECK_EQUAL(list->size(), 1);
+        CHECK_EQUAL(list->get(0).get_string(), "Paul");
+        // List clear
+        list->clear();
+    });
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_2, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+
+        CHECK_EQUAL(table->size(), 2);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto dict = obj.get_dictionary(col_any);
+        CHECK_EQUAL(dict.size(), 0);
+
+        // Replace dictionary with list on property
+        obj.set_collection(col_any, CollectionType::List);
+
+        obj = table->get_object_with_primary_key(456);
+        auto list = obj.get_list<Mixed>(col_any);
+        CHECK_EQUAL(list.size(), 0);
+        // Replace list with Dictionary on property
+        obj.set_collection(col_any, CollectionType::Dictionary);
+    });
+
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+
+        auto table = read_2.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+
+        CHECK_EQUAL(table->size(), 2);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto list = obj.get_list<Mixed>(col_any);
+        CHECK_EQUAL(list.size(), 0);
+
+        obj = table->get_object_with_primary_key(456);
+        auto dict = obj.get_dictionary(col_any);
+        CHECK_EQUAL(dict.size(), 0);
+
+        CHECK(compare_groups(read_1, read_2));
+    }
+}
+
+TEST(Sync_CollectionInCollection)
+{
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+    session_1.bind();
+    session_2.bind();
+
+    Timestamp now{std::chrono::system_clock::now()};
+
+    write_transaction(db_1, [&](WriteTransaction& tr) {
+        auto& g = tr.get_group();
+        auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+
+        auto foo = table->create_object_with_primary_key(123);
+
+        // Create dictionary in Mixed property
+        foo.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = foo.get_dictionary_ptr(col_any);
+        dict->insert("hello", "world");
+        dict->insert("cnt", 7);
+        dict->insert("when", now);
+        // Insert a List in a Dictionary
+        dict->insert_collection("collection", CollectionType::List);
+        auto l = dict->get_list("collection");
+        l->add(5);
+
+        auto bar = table->create_object_with_primary_key(456);
+
+        // Create list in Mixed property
+        bar.set_collection(col_any, CollectionType::List);
+        auto list = bar.get_list_ptr<Mixed>(col_any);
+        list->add("John");
+        list->insert(0, 5);
+        // Insert dictionary in List
+        list->insert_collection(2, CollectionType::Dictionary);
+        auto d = list->get_dictionary(2);
+        d->insert("One", 1);
+        d->insert("Two", 2);
+    });
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_2, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+        CHECK_EQUAL(table->size(), 2);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto dict = obj.get_dictionary_ptr(col_any);
+        CHECK(dict->get_value_data_type() == type_Mixed);
+        CHECK_EQUAL(dict->size(), 4);
+
+        // Replace List with Dictionary
+        dict->insert_collection("collection", CollectionType::Dictionary);
+        auto d = dict->get_dictionary("collection");
+        d->insert("Three", 3);
+        d->insert("Four", 4);
+
+        obj = table->get_object_with_primary_key(456);
+        auto list = obj.get_list_ptr<Mixed>(col_any);
+        // Replace Dictionary with List
+        list->set_collection(2, CollectionType::List);
+        auto l = list->get_list(2);
+        l->add(47);
+    });
+
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+
+        auto table = read_2.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+
+        CHECK_EQUAL(table->size(), 2);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto dict = obj.get_dictionary_ptr(col_any);
+        auto d = dict->get_dictionary("collection");
+        CHECK_EQUAL(d->get("Four").get_int(), 4);
+
+        obj = table->get_object_with_primary_key(456);
+        auto list = obj.get_list_ptr<Mixed>(col_any);
+        auto l = list->get_list(2);
+        CHECK_EQUAL(l->get_any(0).get_int(), 47);
+    }
+}
+
+TEST(Sync_DeleteCollectionInCollection)
+{
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+    session_1.bind();
+    session_2.bind();
+
+    Timestamp now{std::chrono::system_clock::now()};
+
+    write_transaction(db_1, [&](WriteTransaction& tr) {
+        auto& g = tr.get_group();
+        auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+
+        auto foo = table->create_object_with_primary_key(123);
+
+        // Create list in Mixed property
+        foo.set_json(col_any, R"([
+            {
+              "1_map": {
+                "2_string": "map value"
+               },
+              "1_list": ["list value"]
+            }
+        ])");
+    });
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_2, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+        CHECK_EQUAL(table->size(), 1);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto list = obj.get_list<Mixed>(col_any);
+        auto dict = list.get_dictionary(0);
+        dict->erase("1_map");
+    });
+
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+
+        auto table = read_1.get_table("class_Table");
+        auto col_any = table->get_column_key("any");
+
+        CHECK_EQUAL(table->size(), 1);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto list = obj.get_list<Mixed>(col_any);
+        auto dict = list.get_dictionary(0);
+        CHECK_EQUAL(dict->size(), 1);
     }
 }
 
@@ -6350,10 +6627,12 @@ TEST(Sync_BundledRealmFile)
 
 TEST(Sync_UpgradeToClientHistory)
 {
-    SHARED_GROUP_TEST_PATH(db1_path);
-    SHARED_GROUP_TEST_PATH(db2_path);
-    auto db_1 = DB::create(make_in_realm_history(), db1_path);
-    auto db_2 = DB::create(make_in_realm_history(), db2_path);
+    DBOptions options;
+    options.logger = test_context.logger;
+    SHARED_GROUP_TEST_PATH(db_1_path);
+    SHARED_GROUP_TEST_PATH(db_2_path);
+    auto db_1 = DB::create(make_in_realm_history(), db_1_path, options);
+    auto db_2 = DB::create(make_in_realm_history(), db_2_path, options);
     {
         auto tr = db_1->start_write();
 
@@ -6389,16 +6668,23 @@ TEST(Sync_UpgradeToClientHistory)
 
         auto list = baa.get_list<Int>(col_list);
         list.add(1);
+        list.add(0);
         list.add(2);
         list.add(3);
+        list.set(1, 5);
+        list.remove(1);
         auto set = baa.get_set<Int>(col_set);
         set.insert(4);
+        set.insert(2);
         set.insert(5);
         set.insert(6);
+        set.erase(2);
         auto dict = baa.get_dictionary(col_dict);
+        dict.insert("key6", 6);
         dict.insert("key7", 7);
         dict.insert("key8", 8);
         dict.insert("key9", 9);
+        dict.erase("key6");
 
         for (int i = 0; i < 100; i++) {
             foobaas->create_object_with_primary_key(ObjectId::gen()).set(col_time, Timestamp(::time(nullptr), i));
@@ -7009,6 +7295,18 @@ TEST(Sync_RowForGlobalKey)
             CHECK_NOT(row_ndx);
         }
     }
+}
+
+TEST(Sync_FirstPromoteToWriteAdvancesRead)
+{
+    TEST_CLIENT_DB(db);
+    auto db2 = DB::create(make_client_replication(), db_path);
+    auto read = db->start_read();
+    db2->start_write()->commit();
+    // This will hit `ClientHistory::update_from_ref_and_version()` with m_group
+    // unset since it's advancing the read transaction without ever having been
+    // in a write transaction before.
+    read->promote_to_write();
 }
 
 

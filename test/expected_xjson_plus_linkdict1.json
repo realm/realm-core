@@ -1,45 +1,51 @@
 [
-    {
-        "primaryKey": "t1o1",
-        "int1": {
-            "$numberLong": "100"
-        },
-        "linkA": {
-            "$linkDictionary": {
-                "table": "table2",
-                "values": {
-                    "key1": "t2o2"
-                }
-            }
-        }
+  {
+    "primaryKey": "t1o1",
+    "int1": {
+      "$numberLong": "100"
     },
-    {
-        "primaryKey": "t1o3",
-        "int1": {
-            "$numberLong": "300"
-        },
-        "linkA": {
-            "$linkDictionary": {
-                "table": "table2",
-                "values": {}
-            }
+    "dict": {
+      "$dictionary": {
+        "key1": {
+          "$link": {
+            "table": "table2",
+            "key": "t2o2"
+          }
         }
-    },
-    {
-        "primaryKey": "t1o2",
-        "int1": {
-            "$numberLong": "200"
-        },
-        "linkA": {
-            "$linkDictionary": {
-                "table": "table2",
-                "values": {
-                    "key2": "t2o2",
-                    "key4": null,
-                    "key5": null,
-                    "key3": "t2o3"
-                }
-            }
-        }
+      }
     }
+  },
+  {
+    "primaryKey": "t1o3",
+    "int1": {
+      "$numberLong": "300"
+    },
+    "dict": {
+      "$dictionary": {}
+    }
+  },
+  {
+    "primaryKey": "t1o2",
+    "int1": {
+      "$numberLong": "200"
+    },
+    "dict": {
+      "$dictionary": {
+        "key2": {
+          "$link": {
+            "table": "table2",
+            "key": "t2o2"
+          }
+        },
+        "key3": {
+          "$link": {
+            "table": "table2",
+            "key": "t2o3"
+          }
+        },
+        "key4": null,
+        "key5": null
+      }
+    }
+  }
 ]

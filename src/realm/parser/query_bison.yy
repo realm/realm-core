@@ -36,17 +36,6 @@
     class SubqueryNode;
 
     enum class CompareType: char;
-    struct PathElem {
-        std::string id;
-        Mixed index;
-        std::string buffer;
-        PathElem() {}
-        PathElem(const PathElem& other);
-        PathElem& operator=(const PathElem& other);
-        PathElem(std::string s) : id(s) {}
-        PathElem(std::string s, Mixed i) : id(s), index(i) { index.use_buffer(buffer); }
-    };
-
   }
   using namespace realm::query_parser;
 
@@ -93,10 +82,9 @@ using namespace realm::query_parser;
   ANY     "any"
   ALL     "all"
   NONE    "none"
-  BACKLINK "@links"
   MAX     "@max"
   MIN     "@min"
-  SUM     "@sun"
+  SUM     "@sum"
   AVG     "@average"
   AND     "&&"
   OR      "||"
@@ -120,6 +108,7 @@ using namespace realm::query_parser;
 %token <std::string> LINK "link"
 %token <std::string> TYPED_LINK "typed link"
 %token <std::string> ARG "argument"
+%token <std::string> KP_ARG "keypath"
 %token <std::string> BEGINSWITH "beginswith"
 %token <std::string> ENDSWITH "endswith"
 %token <std::string> CONTAINS "contains"
@@ -132,11 +121,16 @@ using namespace realm::query_parser;
 %token <std::string> SORT "sort"
 %token <std::string> DISTINCT "distinct"
 %token <std::string> LIMIT "limit"
+%token <std::string> BINARY "binary"
 %token <std::string> ASCENDING "ascending"
 %token <std::string> DESCENDING "descending"
+%token <std::string> INDEX_FIRST "FIRST"
+%token <std::string> INDEX_LAST  "LAST"
+%token <std::string> INDEX_SIZE  "SIZE"
 %token <std::string> SIZE "@size"
 %token <std::string> TYPE "@type"
 %token <std::string> KEY_VAL "key or value"
+%token <std::string> BACKLINK "@links"
 %type  <bool> direction
 %type  <CompareType> equality relational stringop
 %type  <int> aggr_op
@@ -160,7 +154,6 @@ using namespace realm::query_parser;
 %type  <DescriptorOrderingNode*> post_query
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
 %type  <std::string> id
-%type  <PathElem> path_elem
 %type  <PropertyNode*> simple_prop
 
 %destructor { } <int>
@@ -173,7 +166,6 @@ using namespace realm::query_parser;
              if (auto alt = $$->get_altitude())
                yyo << "', '" << *alt; 
              yyo << "']"; }}  <std::optional<GeoPoint>>;
-%printer { yyo << $$.id; } <PathElem>;
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;
 %printer { yyo << string_for_op($$); } <CompareType>;
@@ -312,7 +304,7 @@ constant
     : primary_key               { $$ = $1; }
     | INFINITY                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
     | NAN                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, $1); }
-    | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, $1); }
+    | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING_BASE64, $1); }
     | FLOAT                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, $1); }
     | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
     | LINK                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, $1); }
@@ -320,7 +312,6 @@ constant
     | TRUE                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
     | FALSE                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
     | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
-    | ARG                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $1); }
     | comp_type ARG             { $$ = drv.m_parse_nodes.create<ConstantNode>(ExpressionComparisonType($1), $2); }
     | OBJ '(' STRING ',' primary_key ')'
                                 { 
@@ -328,6 +319,8 @@ constant
                                     tmp->add_table($3);
                                     $$ = tmp;
                                 }
+    | BINARY '(' STRING ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_STR, $3); }
+    | BINARY '(' BASE64 ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_BASE64, $3); }
 
 primary_key
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
@@ -335,6 +328,7 @@ primary_key
     | STRING                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, $1); }
     | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }
     | OID                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, $1); }
+    | ARG                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $1); }
 
 boolexpr
     : "truepredicate"           { $$ = drv.m_parse_nodes.create<TrueOrFalseNode>(true); }
@@ -348,6 +342,7 @@ comp_type
 post_op
     : %empty                    { $$ = nullptr; }
     | '.' SIZE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::SIZE);}
+    | '[' INDEX_SIZE ']'        { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::SIZE);}
     | '.' TYPE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::TYPE);}
 
 aggr_op
@@ -374,14 +369,15 @@ stringop
     | LIKE                      { $$ = CompareType::LIKE; }
 
 path
-    : path_elem                 { $$ = drv.m_parse_nodes.create<PathNode>($1); }
-    | path '.' path_elem        { $1->add_element($3); $$ = $1; }
-
-path_elem
-    : id                        { $$ = PathElem{$1}; }
-    | id '[' NATURAL0 ']'       { $$ = PathElem{$1, int64_t(strtoll($3.c_str(), nullptr, 0))}; }
-    | id '[' STRING ']'         { $$ = PathElem{$1, $3.substr(1, $3.size() - 2)}; }
-    | id '[' ARG ']'            { $$ = PathElem{$1, drv.get_arg_for_index($3)}; }
+    : id                        { $$ = drv.m_parse_nodes.create<PathNode>($1); }
+    | KP_ARG                    { $$ = drv.m_parse_nodes.create<PathNode>($1, PathNode::ArgTag()); }
+    | path '.' id               { $1->add_element($3); $$ = $1; }
+    | path '[' NATURAL0 ']'     { $1->add_element(size_t(strtoll($3.c_str(), nullptr, 0))); $$ = $1; }
+    | path '[' INDEX_FIRST ']'  { $1->add_element(size_t(0)); $$ = $1; }
+    | path '[' INDEX_LAST ']'   { $1->add_element(size_t(-1)); $$ = $1; }
+    | path '[' '*' ']'          { $1->add_element(PathElement::AllTag()); $$ = $1; }
+    | path '[' STRING ']'       { $1->add_element($3.substr(1, $3.size() - 2)); $$ = $1; }
+    | path '[' ARG ']'          { $1->add_element(drv.get_arg_for_index($3)); $$ = $1; }
 
 id  
     : ID                        { $$ = $1; }
@@ -399,6 +395,10 @@ id
     | DESCENDING                { $$ = $1; }
     | IN                        { $$ = $1; }
     | TEXT                      { $$ = $1; }
+    | BINARY                    { $$ = $1; }
+    | INDEX_FIRST               { $$ = $1; }
+    | INDEX_LAST                { $$ = $1; }
+    | INDEX_SIZE                { $$ = $1; }
 %%
 
 void

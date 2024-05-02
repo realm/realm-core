@@ -1995,117 +1995,6 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
 }
 
 namespace {
-// A base class for transaction log parsers so that tests which want to test
-// just a single part of the transaction log handling don't have to implement
-// the entire interface
-class NoOpTransactionLogParser {
-public:
-    NoOpTransactionLogParser(TestContext& context)
-        : test_context(context)
-    {
-    }
-
-    TableKey get_current_table() const
-    {
-        return m_current_table;
-    }
-
-    std::pair<ColKey, ObjKey> get_current_linkview() const
-    {
-        return {m_current_linkview_col, m_current_linkview_row};
-    }
-
-protected:
-    TestContext& test_context;
-
-private:
-    TableKey m_current_table;
-    ColKey m_current_linkview_col;
-    ObjKey m_current_linkview_row;
-
-public:
-    void parse_complete() {}
-
-    bool select_table(TableKey t)
-    {
-        m_current_table = t;
-        return true;
-    }
-
-    bool select_collection(ColKey col_key, ObjKey obj_key)
-    {
-        m_current_linkview_col = col_key;
-        m_current_linkview_row = obj_key;
-        return true;
-    }
-
-    // Default no-op implementations of all of the mutation instructions
-    bool insert_group_level_table(TableKey)
-    {
-        return false;
-    }
-    bool erase_class(TableKey)
-    {
-        return false;
-    }
-    bool rename_class(TableKey)
-    {
-        return false;
-    }
-    bool insert_column(ColKey)
-    {
-        return false;
-    }
-    bool erase_column(ColKey)
-    {
-        return false;
-    }
-    bool rename_column(ColKey)
-    {
-        return false;
-    }
-    bool set_link_type(ColKey)
-    {
-        return false;
-    }
-    bool create_object(ObjKey)
-    {
-        return false;
-    }
-    bool remove_object(ObjKey)
-    {
-        return false;
-    }
-    bool collection_set(size_t)
-    {
-        return false;
-    }
-    bool collection_clear(size_t)
-    {
-        return false;
-    }
-    bool collection_erase(size_t)
-    {
-        return false;
-    }
-    bool collection_insert(size_t)
-    {
-        return false;
-    }
-    bool collection_move(size_t, size_t)
-    {
-        return false;
-    }
-    bool modify_object(ColKey, ObjKey)
-    {
-        return false;
-    }
-    bool typed_link_change(ColKey, TableKey)
-    {
-        return true;
-    }
-};
-
 struct AdvanceReadTransact {
     template <typename Func>
     static void call(TransactionRef tr, Func* func)
@@ -2142,8 +2031,12 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
     {
         // With no changes, the handler should not be called at all
-        struct : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+        struct Parser : _impl::NoOpTransactionLogParser {
+            TestContext& test_context;
+            Parser(TestContext& context)
+                : test_context(context)
+            {
+            }
             void parse_complete()
             {
                 CHECK(false);
@@ -2157,10 +2050,15 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         auto wt = sg->start_write();
         wt->commit();
 
-        struct foo : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
-
+        struct Parser : _impl::NoOpTransactionLogParser {
+            TestContext& test_context;
             bool called = false;
+
+            Parser(TestContext& context)
+                : test_context(context)
+            {
+            }
+
             void parse_complete()
             {
                 called = true;
@@ -2172,12 +2070,16 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
     ObjKey o0, o1;
     {
         // Make a simple modification and verify that the appropriate handler is called
-        struct foo : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
-
+        struct Parser : _impl::NoOpTransactionLogParser {
+            TestContext& test_context;
             size_t expected_table = 0;
             TableKey t1;
             TableKey t2;
+
+            Parser(TestContext& context)
+                : test_context(context)
+            {
+            }
 
             bool create_object(ObjKey)
             {
@@ -2221,15 +2123,19 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         wt.get_table("table 2")->remove_object(o1);
         wt.commit();
 
-        struct : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+        struct Parser : _impl::NoOpTransactionLogParser {
+            TestContext& test_context;
+            Parser(TestContext& context)
+                : test_context(context)
+            {
+            }
 
             bool remove_object(ObjKey o)
             {
                 CHECK(o == o1 || o == o0);
                 return true;
             }
-            bool select_collection(ColKey col, ObjKey o)
+            bool select_collection(ColKey col, ObjKey o, const StablePath&)
             {
                 CHECK(col == link_list_col);
                 CHECK(o == okey);
@@ -2274,8 +2180,12 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         WriteTransaction wt(sg);
         wt.get_table("link origin")->begin()->get_linklist(c3).clear();
         wt.commit();
-        struct : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+        struct Parser : _impl::NoOpTransactionLogParser {
+            TestContext& test_context;
+            Parser(TestContext& context)
+                : test_context(context)
+            {
+            }
 
             bool collection_clear(size_t old_size) const
             {
@@ -2314,11 +2224,14 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
-        struct : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+        struct Parser : _impl::NoOpTransactionLogParser {
+            TestContext& test_context;
+            Parser(TestContext& context)
+                : test_context(context)
+            {
+            }
 
             bool modify_object(ColKey, ObjKey) const
             {
@@ -5281,7 +5194,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
     // session participants must still agree
     {
         // No history
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path, DBOptions(crypt_key()));
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history();
@@ -5310,7 +5223,7 @@ TEST(LangBindHelper_InRealmHistory_Upgrade)
     SHARED_GROUP_TEST_PATH(path_2);
     {
         // No history
-        DBRef sg = DB::create(path_2, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path_2, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -5335,7 +5248,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     }
     {
         // No history
-        CHECK_THROW(DB::create(path, false, DBOptions(crypt_key())), IncompatibleHistories);
+        CHECK_THROW(DB::create(path, DBOptions(crypt_key())), IncompatibleHistories);
     }
 }
 

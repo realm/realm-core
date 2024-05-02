@@ -45,7 +45,7 @@ struct Fixture {
 
         WriteTransaction wt{sg_2};
         InstructionApplier applier{wt};
-        applier.apply(result, test_context.logger.get());
+        applier.apply(result);
         wt.commit();
     }
 

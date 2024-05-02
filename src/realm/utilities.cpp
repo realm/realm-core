@@ -72,9 +72,6 @@ namespace realm {
 signed char sse_support = -1;
 signed char avx_support = -1;
 
-StringCompareCallback string_compare_callback = nullptr;
-string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
-
 void cpuid_init()
 {
 #ifdef REALM_COMPILER_SSE

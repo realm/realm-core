@@ -98,6 +98,57 @@ RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t* dic
     });
 }
 
+RLM_API realm_list_t* realm_dictionary_insert_list(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        dictionary->insert_collection(k, CollectionType::List);
+        return new realm_list_t{dictionary->get_list(k)};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        dictionary->insert_collection(k, CollectionType::Dictionary);
+        return new realm_dictionary_t{dictionary->get_dictionary(k)};
+    });
+}
+
+
+RLM_API realm_list_t* realm_dictionary_get_list(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        return new realm_list_t{dictionary->get_list(k)};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_dictionary_get_dictionary(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        return new realm_dictionary_t{dictionary->get_dictionary(k)};
+    });
+}
+
 RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t* dict, realm_value_t key)
 {
     return wrap_err([&]() {

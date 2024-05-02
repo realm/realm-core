@@ -145,8 +145,7 @@ public:
 
 /******************************** Value Nodes ********************************/
 
-class ValueNode : public ExpressionNode {
-};
+class ValueNode : public ExpressionNode {};
 
 class ConstantNode : public ValueNode {
 public:
@@ -156,7 +155,9 @@ public:
         NAN_VAL,
         FLOAT,
         STRING,
-        BASE64,
+        STRING_BASE64,
+        BINARY_STR,
+        BINARY_BASE64,
         TIMESTAMP,
         UUID_T,
         OID,
@@ -189,14 +190,18 @@ public:
     }
     void add_table(std::string table_name)
     {
-        target_table = table_name.substr(1, table_name.size() - 2);
+        m_target_table = table_name.substr(1, table_name.size() - 2);
     }
 
     std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
-    std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
-    util::Optional<ExpressionComparisonType> m_comp_type;
-    std::string target_table;
+    Mixed get_value();
+
+private:
+    std::string m_decode_buffer;
+    std::optional<ExpressionComparisonType> m_comp_type;
+    std::optional<std::string> m_target_table;
+    void decode_b64();
 };
 
 class GeospatialNode : public ValueNode {
@@ -273,18 +278,42 @@ private:
 
 class PathNode : public ParserNode {
 public:
-    std::vector<PathElem> path_elems;
+    struct ArgTag {};
+    Path path_elems;
+    Path::iterator current_path_elem;
 
-    PathNode(PathElem first)
+    PathNode(const PathElement& first)
     {
         add_element(first);
     }
+    PathNode(const std::string& arg_str, ArgTag)
+        : arg(arg_str)
+    {
+    }
+    bool at_end() const
+    {
+        return current_path_elem == path_elems.end();
+    }
+    const std::string& next_identifier()
+    {
+        return (current_path_elem++)->get_key();
+    }
+    const std::string& last_identifier()
+    {
+        return path_elems.back().get_key();
+    }
+
+    void resolve_arg(ParserDriver*);
     LinkChain visit(ParserDriver*, util::Optional<ExpressionComparisonType> = util::none);
-    void add_element(const PathElem& elem)
+    void add_element(const PathElement& elem)
     {
         if (backlink) {
-            path_elems.back().id = path_elems.back().id + "." + elem.id;
+            if (!elem.is_key()) {
+                throw yy::parser::syntax_error("An ID must follow @links");
+            }
+            backlink_str += "." + elem.get_key();
             if (backlink == 2) {
+                path_elems.push_back(backlink_str);
                 backlink = 0;
             }
             else {
@@ -292,13 +321,25 @@ public:
             }
         }
         else {
-            if (elem.id == "@links")
+            if (elem.is_key() && elem.get_key() == "@links") {
                 backlink = 1;
-            path_elems.push_back(elem);
+                backlink_str = "@links";
+            }
+            else {
+                path_elems.push_back(elem);
+            }
+        }
+    }
+    void finish()
+    {
+        if (backlink) {
+            path_elems.push_back(backlink_str);
         }
     }
 
 private:
+    std::string arg;
+    std::string backlink_str;
     int backlink = 0;
 };
 
@@ -312,10 +353,11 @@ public:
         : path(path)
         , comp_type(ct)
     {
+        path->finish();
     }
-    const std::string& identifier() const
+    const std::string& get_identifier() const
     {
-        return path->path_elems.back().id;
+        return identifier;
     }
     const LinkChain& link_chain() const
     {
@@ -329,6 +371,7 @@ public:
 
 private:
     LinkChain m_link_chain;
+    std::string identifier;
 };
 
 class AggrNode : public ValueNode {
@@ -535,7 +578,7 @@ public:
 class DescriptorNode : public ParserNode {
 public:
     enum Type { SORT, DISTINCT, LIMIT };
-    std::vector<std::vector<PathElem>> columns;
+    std::vector<Path> columns;
     std::vector<bool> ascending;
     size_t limit = size_t(-1);
     Type type;
@@ -627,7 +670,8 @@ public:
         parse_error = true;
     }
 
-    Mixed get_arg_for_index(const std::string&);
+    PathElement get_arg_for_index(const std::string&);
+    std::string get_arg_for_key_path(const std::string& i);
     double get_arg_for_coordinate(const std::string&);
 
     template <class T>
@@ -635,9 +679,8 @@ public:
     template <class T>
     Query simple_query(CompareType op, ColKey col_key, T val);
     std::pair<SubexprPtr, SubexprPtr> cmp(const std::vector<ExpressionNode*>& values);
-    SubexprPtr column(LinkChain&, const std::string&);
-    SubexprPtr dictionary_column(LinkChain&, const std::string&);
-    void backlink(LinkChain&, const std::string&);
+    SubexprPtr column(LinkChain&, PathNode*);
+    void backlink(LinkChain&, std::string_view table_name, std::string_view column_name);
     std::string translate(const LinkChain&, const std::string&);
 
 private:

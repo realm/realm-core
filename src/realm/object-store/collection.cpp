@@ -25,6 +25,9 @@
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/dictionary.hpp>
+#include <realm/object-store/set.hpp>
 
 namespace realm::object_store {
 
@@ -259,6 +262,28 @@ size_t Collection::hash() const noexcept
 {
     auto& impl = *m_coll_base;
     return hash_combine(impl.get_owner_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+}
+
+void Collection::insert_collection(const PathElement& path, CollectionType type)
+{
+    verify_in_transaction();
+    m_coll_base->insert_collection(path, type);
+}
+
+void Collection::set_collection(const PathElement& path, CollectionType type)
+{
+    verify_in_transaction();
+    m_coll_base->set_collection(path, type);
+}
+
+List Collection::get_list(const PathElement& path) const
+{
+    return List{m_realm, m_coll_base->get_list(path)};
+}
+
+Dictionary Collection::get_dictionary(const PathElement& path) const
+{
+    return Dictionary{m_realm, m_coll_base->get_dictionary(path)};
 }
 
 } // namespace realm::object_store

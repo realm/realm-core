@@ -33,6 +33,7 @@
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
 #include "realm/dictionary.hpp"
+#include "realm/list.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -791,7 +792,7 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
 
     ObjKey key = values.get(ndx);
     if (key != null_key) {
-        remove_backlinks(get_real_key(ndx), col_key, std::vector<ObjKey>{key}, state);
+        do_remove_backlinks(get_real_key(ndx), col_key, std::vector<ObjKey>{key}, state);
     }
     values.erase(ndx);
 }
@@ -836,15 +837,15 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 if (attr.test(col_attr_Dictionary)) {
                     if (col_type == col_type_Mixed || col_type == col_type_Link) {
                         Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
-                        const Dictionary dict = obj.get_dictionary(col_key);
+                        Dictionary dict(obj, col_key);
                         dict.remove_backlinks(state);
                     }
                 }
-                else if (col_type == col_type_LinkList || col_type == col_type_Link) {
+                else if (col_type == col_type_Link) {
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
-                        remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
+                        do_remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
                     }
                 }
                 else if (col_type == col_type_TypedLink) {
@@ -859,18 +860,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                     }
                 }
                 else if (col_type == col_type_Mixed) {
-                    BPlusTree<Mixed> list(m_alloc);
-                    list.init_from_ref(ref);
-                    for (size_t i = 0; i < list.size(); i++) {
-                        Mixed val = list.get(i);
-                        if (val.is_type(type_TypedLink)) {
-                            ObjLink link = val.get<ObjLink>();
-                            auto target_obj = origin_table->get_parent_group()->get_object(link);
-                            ColKey backlink_col_key =
-                                target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-                            target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));
-                        }
-                    }
+                    Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+                    Lst<Mixed> list(obj, col_key);
+                    list.remove_backlinks(state);
                 }
                 Array::destroy_deep(ref, m_alloc);
             }
@@ -1157,7 +1149,7 @@ void Cluster::verify() const
                 case col_type_UUID:
                     verify_list<UUID>(arr, *sz);
                     break;
-                case col_type_LinkList:
+                case col_type_Link:
                     verify_list<ObjKey>(arr, *sz);
                     break;
                 default:
@@ -1481,10 +1473,9 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 }
 // LCOV_EXCL_STOP
 
-void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const std::vector<ObjKey>& keys,
-                               CascadeState& state) const
+void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey origin_col_key,
+                               const std::vector<ObjKey>& keys, CascadeState& state)
 {
-    const Table* origin_table = m_tree_top.get_owning_table();
     TableRef target_table = origin_table->get_opposite_table(origin_col_key);
     ColKey backlink_col_key = origin_table->get_opposite_column(origin_col_key);
     bool strong_links = target_table->is_embedded();
@@ -1510,10 +1501,9 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
     }
 }
 
-void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const std::vector<ObjLink>& links,
-                               CascadeState& state) const
+void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey origin_col_key,
+                               const std::vector<ObjLink>& links, CascadeState& state)
 {
-    const Table* origin_table = m_tree_top.get_owning_table();
     Group* group = origin_table->get_parent_group();
     TableKey origin_table_key = origin_table->get_key();
 

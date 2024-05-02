@@ -115,7 +115,7 @@ cc_object {
 genrule {
     name: "version_numbers.hpp",
     srcs: [
-        "dependencies.list",
+        "dependencies.yml",
         "src/realm/version_numbers.hpp.in",
     ],
     out: ["realm/version_numbers.hpp"],
@@ -148,6 +148,7 @@ cc_defaults {
         "-fPIC",
         "-DREALM_NO_CONFIG",
         "-DREALM_HAVE_OPENSSL=1",
+        "-DREALM_USE_SYSTEM_OPENSSL_PATHS=0",
         "-DREALM_INCLUDE_CERTS=1",
         "-DREALM_ENABLE_ENCRYPTION=1",
         "-DREALM_ENABLE_SYNC=1",

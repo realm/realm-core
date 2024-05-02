@@ -23,7 +23,7 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/impl/app_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/util/scheduler.hpp>
@@ -36,6 +36,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 
 using namespace realm;
@@ -123,12 +124,6 @@ void SyncSession::become_active()
     }
 }
 
-void SyncSession::restart_session()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-    do_restart_session(std::move(lock));
-}
-
 void SyncSession::become_dying(util::CheckedUniqueLock lock)
 {
     REALM_ASSERT(m_state != State::Dying);
@@ -175,13 +170,23 @@ void SyncSession::become_paused(util::CheckedUniqueLock lock)
     do_become_inactive(std::move(lock), Status::OK(), true);
 }
 
+void SyncSession::restart_session()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    switch (m_state) {
+        case State::Active:
+            do_restart_session(std::move(lock));
+            break;
+        case State::WaitingForAccessToken:
+        case State::Paused:
+        case State::Dying:
+        case State::Inactive:
+            return;
+    }
+}
+
 void SyncSession::do_restart_session(util::CheckedUniqueLock)
 {
-    // Nothing to do if the sync session is currently paused
-    // It will be resumed when resume() is called
-    if (m_state == State::Paused)
-        return;
-
     // Go straight to inactive so the progress completion waiters will
     // continue to wait until the session restarts and completes the
     // upload/download sync
@@ -251,7 +256,7 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
         cancel_pending_waits(std::move(lock), status);
     }
     if (user) {
-        user->log_out();
+        user->request_log_out();
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
@@ -286,10 +291,10 @@ static bool check_for_redirect_response(const app::AppError& error)
     return false;
 }
 
-util::UniqueFunction<void(util::Optional<app::AppError>)>
+util::UniqueFunction<void(std::optional<app::AppError>)>
 SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool restart_session)
 {
-    return [session, restart_session](util::Optional<app::AppError> error) {
+    return [session, restart_session](std::optional<app::AppError> error) {
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
@@ -297,10 +302,7 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
             session->cancel_pending_waits(std::move(lock), refresh_error);
         }
         else if (error) {
-            if (error->code() == ErrorCodes::ClientAppDeallocated) {
-                return; // this response came in after the app shut down, ignore it
-            }
-            else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
+            if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
                 // there was a problem locally before even sending the request to the server
                 // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in,
@@ -338,8 +340,14 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
                 // internal backoff timer which will happen automatically so nothing needs to
                 // happen here.
                 util::CheckedUniqueLock lock(session->m_state_mutex);
+                // If updating access token while opening realm, just become active at this point
+                // and try to use the current access token.
                 if (session->m_state == State::WaitingForAccessToken) {
                     session->become_active();
+                }
+                // If `cancel_waits_on_nonfatal_error` is true, then cancel the waiters and pass along the error
+                else if (session->config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
+                    session->cancel_pending_waits(std::move(lock), error->to_status()); // unlocks the mutex
                 }
             }
         }
@@ -395,13 +403,6 @@ SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, co
     }
 }
 
-std::shared_ptr<SyncManager> SyncSession::sync_manager() const
-{
-    util::CheckedLockGuard lk(m_state_mutex);
-    REALM_ASSERT(m_sync_manager);
-    return m_sync_manager->shared_from_this();
-}
-
 void SyncSession::detach_from_sync_manager()
 {
     shutdown_and_wait();
@@ -413,23 +414,15 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 {
     util::CheckedLockGuard config_lock(m_config_mutex);
     // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
-    std::string recovery_path;
     auto original_path = path();
     error.user_info[SyncError::c_original_file_path_key] = original_path;
+    using Action = SyncFileAction;
+    auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
+    std::string recovery_path = m_config.sync_config->user->create_file_action(
+        action, original_path, m_config.sync_config->recovery_directory);
     if (should_backup == ShouldBackup::yes) {
-        recovery_path = util::reserve_unique_file_name(
-            m_sync_manager->recovery_directory_path(m_config.sync_config->recovery_directory),
-            util::create_timestamped_template("recovered_realm"));
         error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
     }
-    using Action = SyncFileActionMetadata::Action;
-    auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    m_sync_manager->perform_metadata_update([action, original_path = std::move(original_path),
-                                             recovery_path = std::move(recovery_path),
-                                             partition_value = m_config.sync_config->partition_value,
-                                             identity = m_config.sync_config->user->identity()](const auto& manager) {
-        manager.make_file_action_metadata(original_path, partition_value, identity, action, recovery_path);
-    });
 }
 
 void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
@@ -486,22 +479,24 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     if (m_state != State::Active) {
         return;
     }
-    std::shared_ptr<SyncSession> fresh_sync_session;
+    RealmConfig fresh_config;
     {
         util::CheckedLockGuard config_lock(m_config_mutex);
-        RealmConfig config = m_config;
-        config.path = fresh_path;
+        fresh_config = m_config;
+        fresh_config.path = fresh_path;
         // in case of migrations use the migrated config
-        auto fresh_config = m_migrated_sync_config ? *m_migrated_sync_config : *m_config.sync_config;
+        auto fresh_sync_config = m_migrated_sync_config ? *m_migrated_sync_config : *m_config.sync_config;
         // deep copy the sync config so we don't modify the live session's config
-        config.sync_config = std::make_shared<SyncConfig>(fresh_config);
-        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        fresh_sync_session = m_sync_manager->get_session(db, config);
-        auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
-        // the fresh Realm may apply writes to this db after it has outlived its sync session
-        // the writes are used to generate a changeset for recovery, but are never committed
-        history.set_write_validator_factory({});
+        fresh_config.sync_config = std::make_shared<SyncConfig>(fresh_sync_config);
+        fresh_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        fresh_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
     }
+
+    auto fresh_sync_session = m_sync_manager->get_session(db, fresh_config);
+    auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
+    // the fresh Realm may apply writes to this db after it has outlived its sync session
+    // the writes are used to generate a changeset for recovery, but are never committed
+    history.set_write_validator_factory({});
 
     fresh_sync_session->assert_mutex_unlocked();
     // The fresh realm uses flexible sync.
@@ -627,9 +622,32 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     revive_if_needed();
 }
 
+util::Future<void> SyncSession::pause_async()
+{
+    {
+        util::CheckedUniqueLock lock(m_state_mutex);
+        // Nothing to wait for if the session is already paused or inactive.
+        if (m_state == SyncSession::State::Paused || m_state == SyncSession::State::Inactive) {
+            return util::Future<void>::make_ready();
+        }
+    }
+    // Transition immediately to `paused` state. Calling this function must guarantee that any
+    // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
+    // must have been destroyed upon return. This allows the caller to follow up with a call to
+    // sync::Client::notify_session_terminated() in order to be notified when the Realm file is closed. This works
+    // so long as this SyncSession object remains in the `paused` state after the invocation of shutdown().
+    pause();
+    return m_client.notify_session_terminated();
+}
+
 void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::SessionErrorInfo&& error)
 {
     session.handle_error(std::move(error));
+}
+
+util::Future<void> SyncSession::OnlyForTesting::pause_async(SyncSession& session)
+{
+    return session.pause_async();
 }
 
 // This method should only be called from within the error handler callback registered upon the underlying
@@ -638,7 +656,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    util::Optional<ShouldBackup> delete_file;
+    std::optional<ShouldBackup> delete_file;
     bool log_out_user = false;
     bool unrecognized_by_client = false;
 
@@ -655,6 +673,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
             case sync::ProtocolErrorInfo::Action::ProtocolViolation:
+                next_state = NextStateAfterError::inactive;
                 break;
             case sync::ProtocolErrorInfo::Action::Warning:
                 break; // not fatal, but should be bubbled up to the user below.
@@ -679,7 +698,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                         [[fallthrough]];
                     case ClientResyncMode::Recover:
                         download_fresh_realm(error.server_requests_action);
-                        return; // do not propgate the error to the user at this point
+                        return; // do not propagate the error to the user at this point
                 }
                 break;
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
@@ -708,20 +727,24 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 return;
             case sync::ProtocolErrorInfo::Action::RefreshUser:
                 if (auto u = user()) {
-                    u->refresh_custom_data(false, handle_refresh(shared_from_this(), false));
-                    return;
+                    u->request_access_token(handle_refresh(shared_from_this(), false));
                 }
-                break;
+                return;
             case sync::ProtocolErrorInfo::Action::RefreshLocation:
                 if (auto u = user()) {
-                    u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
-                    return;
+                    u->request_refresh_location(handle_refresh(shared_from_this(), true));
                 }
-                break;
+                return;
             case sync::ProtocolErrorInfo::Action::LogOutUser:
                 next_state = NextStateAfterError::inactive;
                 log_out_user = true;
                 break;
+            case sync::ProtocolErrorInfo::Action::MigrateSchema:
+                util::CheckedUniqueLock lock(m_state_mutex);
+                // Should only be received for FLX sync.
+                REALM_ASSERT(m_original_sync_config->flx_sync_requested);
+                m_previous_schema_version = error.previous_schema_version;
+                return; // do not propagate the error to the user at this point
         }
     }
     else {
@@ -767,7 +790,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 
     if (log_out_user) {
         if (auto u = user())
-            u->log_out();
+            u->request_log_out();
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
@@ -796,14 +819,17 @@ void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status erro
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
-                                         uint64_t uploadable, uint64_t download_version, uint64_t snapshot_version)
+                                         uint64_t uploadable, uint64_t snapshot_version, double download_estimate,
+                                         double upload_estimate)
 {
-    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
+    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, snapshot_version, download_estimate,
+                               upload_estimate);
 }
 
 static sync::Session::Config::ClientReset make_client_reset_config(const RealmConfig& base_config,
                                                                    const std::shared_ptr<SyncConfig>& sync_config,
-                                                                   DBRef&& fresh_copy, bool recovery_is_allowed)
+                                                                   DBRef&& fresh_copy, bool recovery_is_allowed,
+                                                                   bool schema_migration_detected)
 {
     REALM_ASSERT(sync_config->client_resync_mode != ClientResyncMode::Manual);
 
@@ -816,6 +842,12 @@ static sync::Session::Config::ClientReset make_client_reset_config(const RealmCo
     // or after callback we need to make sure to initialize the local schema
     // before the client reset happens.
     if (!sync_config->notify_before_client_reset && !sync_config->notify_after_client_reset)
+        return config;
+
+    // We cannot initialize the local schema in case of a sync schema migration.
+    // Currently, a schema migration involves breaking changes so opening the realm
+    // with the new schema results in a crash.
+    if (schema_migration_detected)
         return config;
 
     RealmConfig realm_config = base_config;
@@ -865,7 +897,7 @@ void SyncSession::create_sync_session()
 
     sync::Session::Config session_config;
     session_config.signed_user_token = sync_config.user->access_token();
-    session_config.user_id = sync_config.user->identity();
+    session_config.user_id = sync_config.user->user_id();
     session_config.realm_identifier = sync_config.partition_value;
     session_config.verify_servers_ssl_certificate = sync_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = sync_config.ssl_trust_certificate_path;
@@ -875,6 +907,7 @@ void SyncSession::create_sync_session()
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
     session_config.session_reason =
         client_reset::is_fresh_path(m_config.path) ? sync::SessionReason::ClientReset : sync::SessionReason::Sync;
+    session_config.schema_version = m_config.schema_version;
 
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
@@ -884,16 +917,22 @@ void SyncSession::create_sync_session()
     }
 
     {
-        std::string sync_route = m_sync_manager->sync_route();
+        // At this point the sync route was either updated when the first App request was performed, or
+        // was populated by a generated value that will be used for first contact. If the generated sync
+        // route is not correct, either a redirection will be received or the connection will fail,
+        // resulting in an update to both the access token and the location.
+        auto [sync_route, verified] = m_sync_manager->sync_route();
+        REALM_ASSERT_EX(!sync_route.empty(), "Server URL cannot be empty");
 
         if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
                                            session_config.service_identifier)) {
             throw sync::BadServerUrl(sync_route);
         }
-        // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
-        // the session is created. How to resolve this?
+        session_config.server_verified = verified;
+
         m_server_url = sync_route;
+        m_server_url_verified = verified;
     }
 
     if (sync_config.authorization_header_name) {
@@ -907,8 +946,10 @@ void SyncSession::create_sync_session()
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS;
         // Use the original sync config, not the updated one from the migration store
-        session_config.client_reset_config = make_client_reset_config(
-            m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
+        session_config.client_reset_config =
+            make_client_reset_config(m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy),
+                                     allowed_to_recover, m_previous_schema_version.has_value());
+        session_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
         m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     }
 
@@ -919,23 +960,18 @@ void SyncSession::create_sync_session()
     // Set up the wrapped progress handler callback
     m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
                                                 uint_fast64_t uploaded, uint_fast64_t uploadable,
-                                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                                uint_fast64_t snapshot_version, double download_estimate,
+                                                double upload_estimate) {
         if (auto self = weak_self.lock()) {
-            self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, progress_version,
-                                         snapshot_version);
+            self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, snapshot_version,
+                                         download_estimate, upload_estimate);
         }
     });
 
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
     m_session->set_connection_state_change_listener(
-        [weak_self](sync::ConnectionState state, util::Optional<sync::SessionErrorInfo> error) {
-            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
-            // nothing useful we can do with them.
-            auto self = weak_self.lock();
-            if (!self) {
-                return;
-            }
+        [weak_self](sync::ConnectionState state, std::optional<sync::SessionErrorInfo> error) {
             using cs = sync::ConnectionState;
             ConnectionState new_state = [&] {
                 switch (state) {
@@ -948,19 +984,35 @@ void SyncSession::create_sync_session()
                 }
                 REALM_UNREACHABLE();
             }();
-            util::CheckedUniqueLock lock(self->m_connection_state_mutex);
-            auto old_state = self->m_connection_state;
-            self->m_connection_state = new_state;
-            lock.unlock();
-
-            if (old_state != new_state) {
-                self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
-            }
-
-            if (error) {
-                self->handle_error(std::move(*error));
+            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
+            // nothing useful we can do with them.
+            if (auto self = weak_self.lock()) {
+                self->update_connection_state(new_state);
+                if (error) {
+                    self->handle_error(std::move(*error));
+                }
             }
         });
+}
+
+void SyncSession::update_connection_state(ConnectionState new_state)
+{
+    if (new_state == ConnectionState::Connected) {
+        util::CheckedLockGuard lock(m_config_mutex);
+        m_server_url_verified = true;
+    }
+
+    ConnectionState old_state;
+    {
+        util::CheckedLockGuard lock(m_connection_state_mutex);
+        old_state = m_connection_state;
+        m_connection_state = new_state;
+    }
+
+    // Notify any registered connection callbacks of the state transition
+    if (old_state != new_state) {
+        m_connection_change_notifier.invoke_callbacks(old_state, new_state);
+    }
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
@@ -1060,12 +1112,17 @@ void SyncSession::resume()
 void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
 {
     auto u = user();
+    // If the sync manager has a valid route and the user and it's access token
+    // are valid, then revive the session.
     if (!u || !u->access_token_refresh_required()) {
         become_active();
         m_state_mutex.unlock(lock);
         return;
     }
 
+    // Otherwise, either the access token has expired or the location info hasn't
+    // been requested since the app was started - request a new access token to
+    // refresh both.
     become_waiting_for_access_token();
     // Release the lock for SDKs with a single threaded
     // networking implementation such as our test suite
@@ -1105,7 +1162,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             break;
         case State::Paused:
         case State::Inactive: {
-            // We need to register from the sync manager if it still exists so that we don't end up
+            // We need to unregister from the sync manager if it still exists so that we don't end up
             // holding the DBRef open after the session is closed. Otherwise we can end up preventing
             // the user from deleting the realm when it's in the paused/inactive state.
             if (m_sync_manager) {
@@ -1124,7 +1181,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
 void SyncSession::shutdown_and_wait()
 {
     {
-        // Transition immediately to `inactive` state. Calling this function must gurantee that any
+        // Transition immediately to `inactive` state. Calling this function must guarantee that any
         // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
         // must have been destroyed upon return. This allows the caller to follow up with a call to
         // sync::Client::wait_for_session_terminations_or_client_stopped() in order to wait for the
@@ -1138,30 +1195,36 @@ void SyncSession::shutdown_and_wait()
     m_client.wait_for_session_terminations();
 }
 
-void SyncSession::update_access_token(const std::string& signed_token)
+void SyncSession::update_access_token(std::string_view signed_token)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
-    // We don't expect there to be a session when waiting for access token, but if there is, refresh its token.
-    // If not, the latest token will be seeded from SyncUser::access_token() on session creation.
-    if (m_session) {
-        m_session->refresh(signed_token);
-    }
-    if (m_state == State::WaitingForAccessToken) {
-        become_active();
+    switch (m_state) {
+        case State::Active:
+            m_session->refresh(signed_token);
+            break;
+        case State::WaitingForAccessToken:
+            become_active();
+            break;
+        case State::Paused:
+            // token will be pulled from user when the session is unpaused
+            return;
+        case State::Dying:
+        case State::Inactive:
+            do_revive(std::move(lock));
+            break;
     }
 }
 
 void SyncSession::initiate_access_token_refresh()
 {
     if (auto session_user = user()) {
-        session_user->refresh_custom_data(handle_refresh(shared_from_this(), false));
+        session_user->request_access_token(handle_refresh(shared_from_this(), false));
     }
 }
 
-void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> callback,
-                                          _impl::SyncProgressNotifier::NotifierType direction)
+void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> callback, ProgressDirection direction)
 {
-    bool is_download = (direction == _impl::SyncProgressNotifier::NotifierType::download);
+    bool is_download = (direction == ProgressDirection::download);
 
     m_completion_request_counter++;
     m_completion_callbacks.emplace_hint(m_completion_callbacks.end(), m_completion_request_counter,
@@ -1332,10 +1395,10 @@ void SyncSession::update_subscription_store(bool flx_sync_requested, std::option
             // waiters
             auto subscription_store = std::move(m_flx_subscription_store);
             lock.unlock();
-            subscription_store->terminate();
             auto tr = m_db->start_write();
+            subscription_store->reset(*tr);
             history.set_write_validator_factory(nullptr);
-            tr->rollback();
+            tr->commit();
         }
         return;
     }
@@ -1462,7 +1525,7 @@ uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierC
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         token_value = m_progress_notifier_token++;
-        NotifierPackage package{std::move(notifier), util::none, m_local_transaction_version, is_streaming,
+        NotifierPackage package{std::move(notifier), m_local_transaction_version, is_streaming,
                                 direction == NotifierType::download};
         if (!m_current_progress) {
             // Simply register the package, since we have no data yet.
@@ -1470,7 +1533,7 @@ uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierC
             return token_value;
         }
         bool skip_registration = false;
-        invocation = package.create_invocation(*m_current_progress, skip_registration);
+        invocation = package.create_invocation(*m_current_progress, skip_registration, true);
         if (skip_registration) {
             token_value = 0;
         }
@@ -1489,16 +1552,13 @@ void SyncProgressNotifier::unregister_callback(uint64_t token)
 }
 
 void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
-                                  uint64_t download_version, uint64_t snapshot_version)
+                                  uint64_t snapshot_version, double download_estimate, double upload_estimate)
 {
-    // Ignore progress messages from before we first receive a DOWNLOAD message
-    if (download_version == 0)
-        return;
-
     std::vector<util::UniqueFunction<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded, snapshot_version};
+        m_current_progress = Progress{uploadable,      downloadable,      uploaded,        downloaded,
+                                      upload_estimate, download_estimate, snapshot_version};
 
         for (auto it = m_packages.begin(); it != m_packages.end();) {
             bool should_delete = false;
@@ -1518,31 +1578,49 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 }
 
 util::UniqueFunction<void()>
-SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
+SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired,
+                                                         bool initial_registration)
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
-    uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    if (!is_streaming) {
-        // If the sync client has not yet processed all of the local
-        // transactions then the uploadable data is incorrect and we should
-        // not invoke the callback
-        if (!is_download && snapshot_version > current_progress.snapshot_version)
-            return [] {};
+    uint64_t transferable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    double progress_estimate = is_download ? current_progress.download_estimate : current_progress.upload_estimate;
 
-        // The initial download size we get from the server is the uncompacted
-        // size, and so the download may complete before we actually receive
-        // that much data. When that happens, transferrable will drop and we
-        // need to use the new value instead of the captured one.
-        if (!captured_transferrable || *captured_transferrable > transferrable)
-            captured_transferrable = transferrable;
-        transferrable = *captured_transferrable;
+    // If the sync client has not yet processed all of the local
+    // transactions then the uploadable data is incorrect and we should
+    // not invoke the callback
+    if (!is_download && snapshot_version > current_progress.snapshot_version)
+        return [] {};
+
+    // for download only invoke the callback on registration if is in active data transfer,
+    // otherwise delay notifying until an update with the new transfer signaled
+    if (is_download && !started_notifying && progress_estimate >= 1) {
+        if (initial_registration) {
+            initial_transferred = transferred;
+            return [] {};
+        }
+        else if (initial_transferred == transferred)
+            return [] {};
     }
 
-    // A notifier is expired if at least as many bytes have been transferred
-    // as were originally considered transferrable.
-    is_expired = !is_streaming && transferred >= transferrable;
+    started_notifying = true;
+
+    // only capture and adjust transferable bytes for upload non-streaming to provide
+    // the progress of upload for the callback registered right after the commit
+    if (!is_streaming && !is_download) {
+        if (!captured_transferable || *captured_transferable > transferable)
+            captured_transferable = transferable;
+        transferable = *captured_transferable;
+    }
+
+    // A notifier is expired for upload if at least as many bytes have been transferred
+    // as were originally considered transferable based on local committed version
+    // on callback registration, or when simply 1.0 progress is reached for download
+    // since the amount of bytes is not precisely known until the end
+    if (!is_streaming)
+        is_expired = is_download ? progress_estimate >= 1 : transferred >= transferable;
+
     return [=, notifier = notifier] {
-        notifier(transferred, transferrable);
+        notifier(transferred, transferable, progress_estimate);
     };
 }
 
@@ -1601,4 +1679,60 @@ util::Future<std::string> SyncSession::send_test_command(std::string body)
     }
 
     return m_session->send_test_command(std::move(body));
+}
+
+void SyncSession::migrate_schema(util::UniqueFunction<void(Status)>&& callback)
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    // If the schema migration is already in progress, just wait to complete.
+    if (m_schema_migration_in_progress) {
+        add_completion_callback(std::move(callback), ProgressDirection::download);
+        return;
+    }
+    m_schema_migration_in_progress = true;
+
+    // Perform the migration:
+    //  1. Pause the sync session
+    //  2. Once the sync client releases the realm file:
+    //      a. Delete all tables (private and public)
+    //      b. Reset the subscription store
+    //      d. Empty the sync history and adjust cursors
+    //      e. Reset file ident (the server flags the old ident as in the case of a client reset)
+    // 3. Resume the session (the client asks for a new file ident)
+    // See `sync_schema_migration::perform_schema_migration` for more details.
+
+    CompletionCallbacks callbacks;
+    std::swap(m_completion_callbacks, callbacks);
+    auto guard = util::make_scope_exit([&]() noexcept {
+        util::CheckedUniqueLock lock(m_state_mutex);
+        if (m_completion_callbacks.empty())
+            std::swap(callbacks, m_completion_callbacks);
+        else
+            m_completion_callbacks.merge(std::move(callbacks));
+    });
+    m_state_mutex.unlock(lock);
+
+    auto future = pause_async();
+    std::move(future).get_async(
+        [callback = std::move(callback), weak_session = weak_from_this()](Status status) mutable {
+            if (!status.is_ok())
+                return callback(status);
+
+            auto session = weak_session.lock();
+            if (!session) {
+                status = Status(ErrorCodes::InvalidSession, "Sync session was destroyed during schema migration");
+                return callback(status);
+            }
+            sync_schema_migration::perform_schema_migration(*session->m_db);
+            {
+                util::CheckedUniqueLock lock(session->m_state_mutex);
+                session->m_previous_schema_version.reset();
+                session->m_schema_migration_in_progress = false;
+                session->m_subscription_store_base.reset();
+                session->m_flx_subscription_store.reset();
+            }
+            session->update_subscription_store(true, {});
+            session->wait_for_download_completion(std::move(callback));
+            session->resume();
+        });
 }

@@ -2,6 +2,19 @@ add_subdirectory(util)
 add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+    set(CATCH_CONFIG_CONSOLE_WIDTH 300)
+elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "Disable Catch support for POSIX signals on Apple platforms other than macOS")
+endif()
+set(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS ON CACHE BOOL "Enable Catch2's optional standard library stringmakers")
+add_subdirectory(external/catch)
+
+# Cmake does not let us easily set the deployment target per-target, but Catch2
+# can use modern features because we only run tests on recent OS versions.
+target_compile_definitions(Catch2 PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
+
 # AFL and LIBFUZZER not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT EMSCRIPTEN AND NOT ANDROID)
     add_subdirectory(fuzzy)
@@ -52,6 +65,7 @@ set(CORE_TEST_SOURCES
     test_json.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_list.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
     test_optional.cpp
@@ -119,7 +133,7 @@ set(FUZZY_TEST_SOURCES fuzz_group.cpp)
 
 set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
 
-set_source_files_properties(test_query_geo.cpp PROPERTIES
+set_source_files_properties(test_query_geo.cpp test_json.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
     # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
     COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
@@ -140,7 +154,7 @@ file(GLOB REQUIRED_TEST_FILES
 
 add_library(CoreTestLib OBJECT ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 enable_stdfilesystem(CoreTestLib)
-target_link_libraries(CoreTestLib QueryParser)
+target_link_libraries(CoreTestLib QueryParser Bson)
 
 add_executable(CoreTests main.cpp test_all.cpp ${REQUIRED_TEST_FILES})
 target_link_libraries(CoreTests CoreTestLib TestUtil)
@@ -200,6 +214,7 @@ if(REALM_ENABLE_SYNC)
         test_sync_subscriptions.cpp
         test_sync_pending_bootstraps.cpp
         test_sync_error_backoff.cpp
+        test_transform_collections_mixed.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp
         test_util_circular_buffer.cpp

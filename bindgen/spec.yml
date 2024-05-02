@@ -20,6 +20,7 @@ headers:
   - "realm/object-store/sync/sync_manager.hpp"
   - "realm/object-store/sync/sync_session.hpp"
   - "realm/object-store/sync/sync_user.hpp"
+  - "realm/object-store/sync/app_user.hpp"
   - "realm/object-store/sync/mongo_collection.hpp"
   - "realm/util/bson/bson.hpp"
 
@@ -35,6 +36,7 @@ primitives:
   - void
   - std::string
   - std::string_view
+  - std::chrono::milliseconds
   # TODO: see if we need nullable versions of these. For now null buffers are treated as empty.
   - StringData
   - OwnedBinaryData
@@ -70,7 +72,7 @@ typeAliases:
   ErrorCodes::Error: int32_t
 
 templates: # value tells you how many arguments it takes ('*' means any number)
-  util::Optional: 1
+  std::optional: 1
   std::vector: 1
   std::shared_ptr: 1
   std::pair: 2
@@ -125,7 +127,6 @@ mixedInfo:
       type: ObjKey
   unusedDataTypes:
     - Mixed
-    - LinkList
   extraCtors:
     - Obj
     - Geospatial
@@ -169,20 +170,18 @@ enums:
       Collection: 896 # Array | Set | Dictionary
       Flags: 960 # Nullable | Collection
 
+  CollectionType:
+    values:
+      List: 19
+      Set: 20
+      Dictionary: 21
+
   TableType:
     cppName: ObjectSchema::ObjectType
     values:
       TopLevel: 0
       Embedded: 1
       TopLevelAsymmetric: 0x2
-
-  ClientResetMode:
-    cppName: ClientResyncMode
-    values:
-      - Manual
-      - DiscardLocal 
-      - Recover
-      - RecoverOrDiscard
 
   DataType:
     cppName: DataType::Type
@@ -197,16 +196,9 @@ enums:
       Double: 10
       Decimal: 11
       Link: 12
-      LinkList: 13
       ObjectId: 15
       TypedLink: 16
       UUID: 17
-
-  AppCacheMode:
-    cppName: app::App::CacheMode
-    values:
-      - Enabled
-      - Disabled
 
   AuthProvider:
     cppName: app::AuthProvider
@@ -220,12 +212,28 @@ enums:
       - USERNAME_PASSWORD
       - FUNCTION
       - API_KEY
+
+  AppCacheMode:
+    cppName: app::App::CacheMode
+    values:
+      - Enabled
+      - Disabled
+
+  ClientResetMode:
+    cppName: ClientResyncMode
+    values:
+      - Manual
+      - DiscardLocal
+      - Recover
+      - RecoverOrDiscard
+
   MetadataMode:
-    cppName: SyncClientConfig::MetadataMode
+    cppName: app::AppConfig::MetadataMode
     values:
       - NoEncryption
       - Encryption
-      - NoMetadata
+      - InMemory
+
   LoggerLevel:
     cppName: util::Logger::Level
     values:
@@ -238,6 +246,7 @@ enums:
       - error
       - fatal
       - off
+
   HttpMethod:
     cppName: app::HttpMethod
     values:
@@ -246,11 +255,13 @@ enums:
       - patch
       - put
       - del
+
   SyncSessionStopPolicy:
     values:
       - Immediately
       - LiveIndefinitely
       - AfterChangesUploaded
+
   SyncSessionState:
     cppName: SyncSession::State
     values:
@@ -258,12 +269,14 @@ enums:
       - Dying
       - Inactive
       - WaitingForAccessToken
+
   SyncSessionConnectionState:
     cppName: SyncSession::ConnectionState
     values:
       - Disconnected
       - Connecting
       - Connected
+
   SyncErrorAction:
     cppName: sync::ProtocolErrorInfo::Action
     values:
@@ -275,17 +288,26 @@ enums:
       - DeleteRealm
       - ClientReset
       - ClientResetNoRecovery
+
+  SyncFileAction:
+    cppName: SyncFileAction
+    values:
+      - DeleteRealm
+      - BackUpThenDeleteRealm
+
   ProgressDirection:
     cppName: SyncSession::ProgressDirection
     values:
       - upload
       - download
+
   SyncUserState:
     cppName: SyncUser::State
     values:
       - LoggedOut
       - LoggedIn
       - Removed
+
   SyncSubscriptionSetState:
     cppName: sync::SubscriptionSet::State
     values:
@@ -296,12 +318,14 @@ enums:
       - Error
       - Superseded
       - AwaitingMark
+
   WatchStreamState:
     cppName: app::WatchStream::State
     values:
       - NEED_DATA
       - HAVE_EVENT
       - HAVE_ERROR
+
   ProxyType:
     cppName: SyncConfig::ProxyConfig::Type
     values:
@@ -375,7 +399,7 @@ records:
     fields:
       longitude: double
       latitude: double
-      altitude: 
+      altitude:
         type: double
         default: std::numeric_limits<double>::quiet_NaN()
 
@@ -392,7 +416,7 @@ records:
   GeoPolygon:
     fields:
       points: std::vector<std::vector<GeoPoint>>
-      
+
   RealmConfig:
     fields:
       path: std::string
@@ -409,7 +433,7 @@ records:
       in_memory:
         type: bool
         default: false
-      schema: util::Optional<std::vector<ObjectSchema>>
+      schema: std::optional<std::vector<ObjectSchema>>
       schema_version:
         type: SchemaVersion
         default: -1
@@ -434,7 +458,7 @@ records:
         default: false
 
   UserIdentity:
-    cppName: SyncUserIdentity
+    cppName: app::UserIdentity
     fields:
       id:
         type: std::string
@@ -447,7 +471,7 @@ records:
       id:
         type: ObjectId
       key:
-        type: util::Optional<std::string>
+        type: std::optional<std::string>
       name:
         type: std::string
       disabled:
@@ -473,31 +497,31 @@ records:
         type: bool
         default: false
       error_handler: 'Nullable<std::function<(session: SharedSyncSession, error: SyncError) off_thread -> void>>'
-      custom_http_headers: 
+      custom_http_headers:
         type: 'std::map<std::string, std::string>'
         default: {}
       client_validate_ssl:
         type: bool
         default: true
-      ssl_trust_certificate_path: util::Optional<std::string>
+      ssl_trust_certificate_path: std::optional<std::string>
       ssl_verify_callback: Nullable<SSLVerifyCallback>
       client_resync_mode:
-        type: ClientResetMode 
+        type: ClientResetMode
         default: ClientResyncMode::Manual;
       notify_before_client_reset: 'Nullable<std::function<(before_frozen: SharedRealm) off_thread -> void>>'
       notify_after_client_reset: 'Nullable<std::function<(before_frozen: SharedRealm, after: ThreadSafeReference, did_recover: bool) off_thread -> void>>'
       cancel_waits_on_nonfatal_error:
         type: bool
         default: false
-      proxy_config: util::Optional<SyncProxyConfig>
-        
+      proxy_config: std::optional<SyncProxyConfig>
+
   SyncSubscription:
     cppName: sync::Subscription
     fields:
       id: ObjectId
       created_at: Timestamp
       updated_at: Timestamp
-      name: util::Optional<std::string>
+      name: std::optional<std::string>
       object_class_name: std::string
       query_string: std::string
 
@@ -537,6 +561,22 @@ records:
       before_notify: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>'
       schema_did_change: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>' # new schema available as r.schema
 
+  ResumptionDelayInfo:
+    cppName: sync::ResumptionDelayInfo
+    fields:
+      max_resumption_delay_interval:
+        type: std::chrono::milliseconds
+        default: 3000000
+      resumption_delay_interval:
+        type: std::chrono::milliseconds
+        default: 1000
+      resumption_delay_backoff_multiplier:
+        type: int
+        default: 2
+      delay_jitter_divisor:
+        type: int
+        default: 4
+
   SyncClientTimeouts:
     fields:
       connect_timeout:
@@ -554,14 +594,12 @@ records:
       fast_reconnect_limit:
         type: uint64_t
         default: 60000
+      reconnect_backoff_info:
+        type: ResumptionDelayInfo
+        default: {}
 
   SyncClientConfig:
     fields:
-      base_file_path: std::string
-      metadata_mode:
-        type: MetadataMode
-        default: MetadataMode::Encryption
-      custom_encryption_key: util::Optional<EncryptionKey>
       logger_factory: Nullable<LoggerFactory>
       log_level:
         type: LoggerLevel
@@ -620,7 +658,7 @@ records:
       body: std::string
 
   DeviceInfo:
-    cppName: app::App::Config::DeviceInfo
+    cppName: app::AppConfig::DeviceInfo
     fields:
       platform_version: std::string
       sdk_version: std::string
@@ -632,13 +670,22 @@ records:
       bundle_id: std::string
 
   AppConfig:
-    cppName: app::App::Config
+    cppName: app::AppConfig
     fields:
       app_id: std::string
       transport: SharedGenericNetworkTransport
-      base_url: util::Optional<std::string>
-      default_request_timeout_ms: util::Optional<uint64_t>
+      base_url: std::optional<std::string>
+      default_request_timeout_ms: std::optional<uint64_t>
       device_info: DeviceInfo
+      base_file_path: std::string
+      sync_client_config: SyncClientConfig
+      metadata_mode:
+        type: MetadataMode
+        default: MetadataMode::Encryption
+      custom_encryption_key: std::optional<EncryptionKey>
+      security_access_group:
+        type: std::string
+        default: ""
 
   CompensatingWriteErrorInfo:
    cppName: sync::CompensatingWriteErrorInfo
@@ -646,6 +693,12 @@ records:
      object_name: std::string
      reason: std::string
      primary_key: Mixed
+
+  SaltedFileIdent:
+    cppName: sync::SaltedFileIdent
+    fields:
+      ident: uint64_t
+      salt: int64_t
 
 opaqueTypes:
   - Schema
@@ -673,8 +726,8 @@ classes:
       make_network_transport: '(runRequest: (request: const Request&, callback: util::UniqueFunction<(response: Response&&)>&&) off_thread) -> SharedGenericNetworkTransport'
       delete_data_for_object: '(realm: SharedRealm, object_type: StringData)'
       base64_decode: '(input: StringData) -> BinaryData'
-      make_logger_factory: '(log: (level: LoggerLevel, message: const std::string&) off_thread) -> LoggerFactory'
-      make_logger:  '(log: (level: LoggerLevel, message: const std::string&) off_thread) -> SharedLogger'
+      make_logger_factory: '(log: (category: const std::string&, level: LoggerLevel, message: const std::string&) off_thread) -> LoggerFactory'
+      make_logger:  '(log: (category: const std::string&, level: LoggerLevel, message: const std::string&) off_thread) -> SharedLogger'
       simulate_sync_error: '(session: SyncSession&, code: const int&, message: const std::string&, type: const std::string&, is_fatal: bool)'
       consume_thread_safe_reference_to_shared_realm: '(tsr: ThreadSafeReference) -> SharedRealm'
       file_exists: '(path: StringData) -> bool'
@@ -685,16 +738,26 @@ classes:
       # Converts char* and length to a combined string_view argument to callback.
       # TODO: Consider making preverify_ok a bool.
       make_ssl_verify_callback: '(callback: (server_address: const std::string&, server_port: int, pem_data: std::string_view, preverify_ok: int, depth: int) off_thread -> bool) -> SSLVerifyCallback'
+      needs_file_format_upgrade: '(config: const RealmConfig&) -> bool'
+      sync_user_as_app_user: '(sync_user: Nullable<std::shared_ptr<SyncUser>>) -> Nullable<std::shared_ptr<User>>'
+
+  LogCategoryRef:
+    cppName: util::LogCategoryRef
+    needsDeref: true
+    properties:
+      get_default_level_threshold: LoggerLevel
+    methods:
+      set_default_level_threshold: '(level: LoggerLevel)'
+    staticMethods:
+      get_category: '(name: std::string_view) -> LogCategoryRef'
 
   Logger:
     cppName: util::Logger
     sharedPtrWrapped: SharedLogger
     properties:
       get_default_logger: SharedLogger
-      get_default_level_threshold: LoggerLevel
     staticMethods:
-      set_default_logger: '(logger: SharedLogger)'
-      set_default_level_threshold: '(level: LoggerLevel)'
+      set_default_logger: '(logger: Nullable<SharedLogger>)'
 
   ConstTableRef:
     needsDeref: true
@@ -743,6 +806,7 @@ classes:
         - '(column: ColKey, value: Mixed)'
         - sig: '(column: ColKey, value: Mixed, is_default: bool)'
           suffix: with_default
+      set_collection: '(column: ColKey, type: CollectionType) -> Obj'
       get_linked_object: '(column: ColKey) const -> Nullable<Obj>'
       to_string: () const -> std::string
       get_backlink_count: '() const -> count_t'
@@ -841,6 +905,8 @@ classes:
           suffix: 'obj'
       get_any: '(index: count_t) -> Mixed'
       get_dictionary_element: '(index: count_t) -> std::pair<StringData, Mixed>'
+      get_list: '(index: count_t) -> List'
+      get_dictionary: '(index: count_t) -> Dictionary'
       filter: '(query: Query&&) const -> Results'
       sort:
         - '(order: SortDescriptor&&) const -> Results'
@@ -849,13 +915,13 @@ classes:
       limit: '(max_count: count_t) const -> Results'
       snapshot: '() const -> Results'
       freeze: '(frozen_realm: SharedRealm) const -> Results'
-      max: '(column: ColKey) -> util::Optional<Mixed>'
-      min: '(column: ColKey) -> util::Optional<Mixed>'
-      average: '(column: ColKey) -> util::Optional<Mixed>'
-      sum: '(column: ColKey) -> util::Optional<Mixed>'
+      max: '(column: ColKey) -> std::optional<Mixed>'
+      min: '(column: ColKey) -> std::optional<Mixed>'
+      average: '(column: ColKey) -> std::optional<Mixed>'
+      sum: '(column: ColKey) -> std::optional<Mixed>'
       clear: ()
 
-      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
+      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
 
   Realm:
     sharedPtrWrapped: SharedRealm
@@ -869,7 +935,7 @@ classes:
         # - suffix: from_reference_with_sched
         #   sig: '(thread: ThreadSafeReference, scheduler: SharedScheduler) -> SharedRealm'
       get_synchronized_realm: '(config: RealmConfig) -> SharedAsyncOpenTask'
-      #make_shared_realm: '(config: Realm::Config, version: util::Optional<VersionID>, coordinator: std::shared_ptr<_impl::RealmCoordinator>) -> SharedRealm'
+      #make_shared_realm: '(config: Realm::Config, version: std::optional<VersionID>, coordinator: std::shared_ptr<_impl::RealmCoordinator>) -> SharedRealm'
       get_schema_version: '(config: const RealmConfig&) const -> SchemaVersion'
 
     properties:
@@ -883,7 +949,7 @@ classes:
 
       get_number_of_versions: uint64_t
       read_transaction_version: VersionID
-      current_transaction_version: util::Optional<VersionID>
+      current_transaction_version: std::optional<VersionID>
 
       auto_refresh: bool
 
@@ -926,7 +992,7 @@ classes:
         - () const
         - suffix: maybe_throw
           sig: '(throw_on_error: bool) const'
-      
+
       create_key_path_array: '(table_name: StringData, key_paths: const std::vector<std::string>&) -> KeyPathArray'
 
       close: ()
@@ -943,7 +1009,7 @@ classes:
     constructors:
       make: '(realm: SharedRealm, obj: Obj)'
     methods:
-      add_callback: '(cb: (changes: ObjectChangeSet), keyPaths: util::Optional<KeyPathArray>) -> uint64_t'
+      add_callback: '(cb: (changes: ObjectChangeSet), keyPaths: std::optional<KeyPathArray>) -> uint64_t'
       remove_callback: '(token: uint64_t)'
 
   NotificationToken:
@@ -989,14 +1055,18 @@ classes:
         - '(order: SortDescriptor) const -> Results'
         - sig: '(keyPaths: std::vector<std::pair<std::string, bool>> const&) const -> Results'
           suffix: 'by_name'
-      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
+      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
 
   List:
     base: Collection
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(ndx: count_t) -> Obj'
+          suffix: 'obj'
+      get_list: '(path_elem: int) -> List'
+      get_dictionary: '(path_elem: int) -> Dictionary'
       move: '(source_ndx: count_t, dest_ndx: count_t)'
       remove: '(ndx: count_t)'
       remove_all: '()'
@@ -1005,22 +1075,24 @@ classes:
       delete_all: '()'
       insert_any: '(list_ndx: count_t, value: Mixed)'
       insert_embedded: '(ndx: count_t) -> Obj'
+      insert_collection: '(path_elem: int, dict_or_list: CollectionType)'
       set_any: '(list_ndx: count_t, value: Mixed)'
       set_embedded: '(list_ndx: count_t) -> Obj'
+      set_collection: '(path_element: int, dict_or_list: CollectionType)'
       filter: '(q: Query) const -> Results'
       freeze: '(frozen_realm: SharedRealm const&) const -> List'
 
       max:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       min:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       average:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       sum:
         - '() const -> Mixed'
@@ -1033,7 +1105,9 @@ classes:
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(ndx: count_t) -> Obj'
+          suffix: 'obj'
       insert_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_all: '()'
@@ -1053,16 +1127,16 @@ classes:
       # assign_symmetric_difference: '(rhs: const Collection&) -> void'
 
       max:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       min:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       average:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       sum:
         - '() const -> Mixed'
@@ -1083,12 +1157,15 @@ classes:
         - sig: '(key: StringData) const -> Obj'
           cppName: get<Obj> # TODO can't distinguish null from missing
       get_pair: '(ndx: count_t) const -> std::pair<StringData, Mixed>'
+      get_list: '(path_elem: std::string) -> List'
+      get_dictionary: '(path_elem: std::string) -> Dictionary'
       contains: '(key: StringData) -> bool'
       freeze: '(frozen_realm: SharedRealm const&) const -> Dictionary'
-      add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
+      add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
       insert_any: '(key: StringData, value: Mixed) -> std::pair<count_t, bool>'
       insert_embedded: '(key: StringData) -> Obj'
-      try_get_any: '(key: StringData) const -> util::Optional<Mixed>'
+      insert_collection: '(path_elem: std::string, dict_or_list: CollectionType)'
+      try_get_any: '(key: StringData) const -> std::optional<Mixed>'
       remove_all: '()'
       try_erase: '(key: StringData) -> bool'
 
@@ -1125,47 +1202,58 @@ classes:
       provider: AuthProvider
       provider_as_string: std::string
 
-  SyncUserSubscriptionToken:
-    cppName: SyncUser::Token
+  UserSubscriptionToken:
+    cppName: app::User::Token
 
   SyncUser:
+    cppName: SyncUser
     sharedPtrWrapped: SharedSyncUser
+
+  User:
+    base: SyncUser
+    cppName: app::User
+    sharedPtrWrapped: SharedUser
     properties:
-      all_sessions: std::vector<SharedSyncSession>
       is_logged_in: bool
-      identity: const std::string&
-      provider_type: const std::string&
-      local_identity: const std::string&
+      user_id: std::string
+      app_id: std::string
+      legacy_identities: std::vector<std::string>
       access_token: std::string
       refresh_token: std::string
+      state: SyncUserState
+      is_anonymous: bool
       device_id: std::string
       has_device_id: bool
-      user_profile: UserProfile 
+      user_profile: UserProfile
       identities: std::vector<UserIdentity>
-      custom_data: util::Optional<bson::BsonDocument>
-      sync_manager: SharedSyncManager
-      state: SyncUserState
+      custom_data: std::optional<bson::BsonDocument>
       subscribers_count: count_t
+      app: SharedApp
     methods:
       log_out: ()
-      session_for_on_disk_path: '(path: StringData) -> Nullable<SharedSyncSession>'
-      subscribe: '(observer: (user: IgnoreArgument<const SyncUser&>)) -> SyncUserSubscriptionToken'
-      unsubscribe: '(token: SyncUserSubscriptionToken)'
-      # TODO update methods?
+      subscribe: '(observer: (user: IgnoreArgument<const User&>)) -> UserSubscriptionToken'
+      unsubscribe: '(token: UserSubscriptionToken)'
+      path_for_realm: '(config: SyncConfig&, custom_file_name: std::optional<std::string>&) -> std::string'
+      access_token_refresh_required: '() -> bool'
+# #      request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      track_realm: '(path: std::string_view)'
+      create_file_action: '(action: SyncFileAction, original_path: std::string_view, requested_recovery_dir: std::optional<std::string>, partition_value: std::string_view) -> std::string'
 
   UserProfile:
-    cppName: SyncUserProfile
+    cppName: app::UserProfile
     methods:
-      name: '() -> util::Optional<std::string>'
-      email: '() -> util::Optional<std::string>'
-      picture_url: '() -> util::Optional<std::string>'
-      first_name: '() -> util::Optional<std::string>'
-      last_name: '() -> util::Optional<std::string>'
-      gender: '() -> util::Optional<std::string>'
-      birthday: '() -> util::Optional<std::string>'
-      min_age: '() -> util::Optional<std::string>'
-      max_age: '() -> util::Optional<std::string>'
-      data: '() -> bson::BsonDocument'  
+      name: '() -> std::optional<std::string>'
+      email: '() -> std::optional<std::string>'
+      picture_url: '() -> std::optional<std::string>'
+      first_name: '() -> std::optional<std::string>'
+      last_name: '() -> std::optional<std::string>'
+      gender: '() -> std::optional<std::string>'
+      birthday: '() -> std::optional<std::string>'
+      min_age: '() -> std::optional<std::string>'
+      max_age: '() -> std::optional<std::string>'
+      data: '() -> bson::BsonDocument'
 
   AppSubscriptionToken:
     cppName: app::App::Token
@@ -1175,27 +1263,27 @@ classes:
     sharedPtrWrapped: SharedApp
     properties:
       config: const AppConfig&
-      current_user: Nullable<SharedSyncUser>
-      all_users: std::vector<SharedSyncUser>
+      current_user: Nullable<SharedUser>
+      all_users: std::vector<SharedUser>
       sync_manager: SharedSyncManager
       subscribers_count: count_t
     staticMethods:
-      get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
+      get_app: '(mode: AppCacheMode, config: const AppConfig&) -> SharedApp'
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
       clear_cached_apps: ()
       close_all_sync_sessions: ()
 
     methods:
-      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: util::Optional<AppError>)>&&)'
+      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedUser>&, err: std::optional<AppError>)>&&)'
       log_out:
-        - '(cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-        - sig: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+        - '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+        - sig: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
           suffix: user
-      refresh_custom_data: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      link_user: '(user: SharedSyncUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: util::Optional<AppError>)>&&)'
-      switch_user: '(user: SharedSyncUser)'
-      remove_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      delete_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      refresh_custom_data: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      link_user: '(user: SharedUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedUser>&, err: std::optional<AppError>)>&&)'
+      switch_user: '(user: SharedUser)'
+      remove_user: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      delete_user: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       usernamePasswordProviderClient:
         - sig: () -> UsernamePasswordProviderClient
           cppName: provider_client<app::App::UsernamePasswordProviderClient>
@@ -1205,8 +1293,11 @@ classes:
       push_notification_client: '(service_name: const std::string&) -> PushClient'
       subscribe: '(observer: (app: IgnoreArgument<const App&>)) -> AppSubscriptionToken'
       unsubscribe: '(token: AppSubscriptionToken)'
-      call_function: '(user: const SharedSyncUser&, name: std::string, args: EJsonArray, service_name: util::Optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: util::Optional<AppError>)>)'
-      make_streaming_request: '(user: SharedSyncUser, name: std::string, args: bson::BsonArray, service_name: util::Optional<std::string>) -> Request'
+      call_function: '(user: const SharedUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
+      make_streaming_request: '(user: SharedUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
+      update_base_url: '(base_url: std::string_view, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      get_base_url: '() const -> std::string'
+      immediately_run_file_actions: '(realm_path: std::string) -> bool'
 
   WatchStream:
     cppName: app::WatchStream
@@ -1221,29 +1312,29 @@ classes:
   PushClient:
     cppName: app::PushClient
     methods:
-      register_device: '(registration_token: const std::string&, sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      deregister_device: '(sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      register_device: '(registration_token: const std::string&, sync_user: const SharedUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      deregister_device: '(sync_user: const SharedUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   UsernamePasswordProviderClient:
     cppName: app::App::UsernamePasswordProviderClient
     methods:
-      register_email: '(email: const std::string&, password: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      retry_custom_confirmation: '(email: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      confirm_user: '(token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      resend_confirmation_email: '(email: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      reset_password: '(password: const std::string&, token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      send_reset_password_email: '(email: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      call_reset_password_function: '(email: const std::string&, password: const std::string&, args: const bson::BsonArray&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      register_email: '(email: const std::string&, password: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      retry_custom_confirmation: '(email: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      confirm_user: '(token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      resend_confirmation_email: '(email: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      reset_password: '(password: const std::string&, token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      send_reset_password_email: '(email: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      call_reset_password_function: '(email: const std::string&, password: const std::string&, args: const bson::BsonArray&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   UserAPIKeyProviderClient:
     cppName: app::App::UserAPIKeyProviderClient
     methods:
-      create_api_key: '(name: const std::string&, user: SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: util::Optional<AppError>)>&&)'
-      fetch_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: util::Optional<AppError>)>&&)'
-      fetch_api_keys: '(user: const SharedSyncUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: util::Optional<AppError>)>&&)'
-      delete_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      enable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      disable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      create_api_key: '(name: const std::string&, user: SharedUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_keys: '(user: const SharedUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: std::optional<AppError>)>&&)'
+      delete_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      enable_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      disable_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   # See Helpers::make_loger_factory to construct one.
   # Using an opaque class here rather than exposing the factory to avoid having to
@@ -1260,7 +1351,6 @@ classes:
       log_level: LoggerLevel
       has_existing_sessions: bool
     methods:
-      immediately_run_file_actions: '(original_name: std::string) -> bool'
       set_session_multiplexing: '(allowed: bool)'
       set_log_level: '(level: LoggerLevel)'
       set_logger_factory: '(factory: LoggerFactory)'
@@ -1268,8 +1358,8 @@ classes:
       set_timeouts: '(timeouts: SyncClientTimeouts)'
       reconnect: ()
       wait_for_sessions_to_terminate: ()
-      path_for_realm: '(config: SyncConfig, custom_file_name: util::Optional<std::string>) -> StringData'
-      get_existing_active_session: '(path: const std::string&) -> SharedSyncSession'
+      get_existing_active_session: '(path: const std::string&) -> Nullable<SharedSyncSession>'
+      get_all_sessions_for: '(user: const User&) -> std::vector<SharedSyncSession>'
 
   ThreadSafeReference: {}
   AsyncOpenTask:
@@ -1277,7 +1367,7 @@ classes:
     methods:
       start: '(callback: AsyncCallback<(realm: Nullable<ThreadSafeReference>, error: Nullable<std::exception_ptr>) off_thread>)'
       cancel: ()
-      register_download_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t) off_thread) -> uint64_t'
+      register_download_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t, progress_estimate: double) off_thread) -> uint64_t'
       unregister_download_progress_notifier: '(token: uint64_t)'
 
   SyncSession:
@@ -1288,11 +1378,11 @@ classes:
       path: std::string
       user: SharedSyncUser
       config: SyncConfig
-      full_realm_url: util::Optional<std::string>
+      full_realm_url: std::string
     methods:
       wait_for_upload_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
       wait_for_download_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
-      register_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t) off_thread, direction: ProgressDirection, is_streaming: bool) -> uint64_t'
+      register_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t, progress_estimate: double) off_thread, direction: ProgressDirection, is_streaming: bool) -> uint64_t'
       unregister_progress_notifier: '(token: uint64_t)'
       register_connection_change_callback: '(callback: (old_state: SyncSessionConnectionState, new_state: SyncSessionConnectionState) off_thread) -> uint64_t'
       unregister_connection_change_callback: '(token: uint64_t)'
@@ -1302,6 +1392,7 @@ classes:
       force_close: ()
       shutdown_and_wait: ()
       update_configuration: '(config: SyncConfig)'
+      get_file_ident: '() -> SaltedFileIdent'
 
   SSLVerifyCallback:
     cppName: std::function<SyncConfig::SSLVerifyCallback>
@@ -1317,7 +1408,7 @@ classes:
       size: count_t
     methods:
       make_mutable_copy: () const -> MutableSyncSubscriptionSet
-      get_state_change_notification: '(notify_when: SyncSubscriptionSetState, callback: AsyncCallback<(new_state: util::Optional<SyncSubscriptionSetState>, err: util::Optional<Status>) off_thread>) const'
+      get_state_change_notification: '(notify_when: SyncSubscriptionSetState, callback: AsyncCallback<(new_state: std::optional<SyncSubscriptionSetState>, err: std::optional<Status>) off_thread>) const'
       at: '(index: count_t) const -> const SyncSubscription&'
       find:
         - sig: '(name: StringData) const -> Nullable<const SyncSubscription*>'

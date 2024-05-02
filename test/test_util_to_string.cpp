@@ -107,7 +107,6 @@ TEST(ToString_DataTypes)
     CHECK_ENUM(type_Double);
     CHECK_ENUM(type_Decimal);
     CHECK_ENUM(type_Link);
-    CHECK_ENUM(type_LinkList);
     CHECK_ENUM(type_ObjectId);
     CHECK_ENUM(type_TypedLink);
     CHECK_ENUM(type_UUID);
@@ -125,7 +124,6 @@ TEST(ToString_DataTypes)
     CHECK_ENUM(col_type_Double);
     CHECK_ENUM(col_type_Decimal);
     CHECK_ENUM(col_type_Link);
-    CHECK_ENUM(col_type_LinkList);
     CHECK_ENUM(col_type_BackLink);
     CHECK_ENUM(col_type_ObjectId);
     CHECK_ENUM(col_type_TypedLink);
@@ -135,8 +133,7 @@ TEST(ToString_DataTypes)
     CHECK_ENUM(col_type_OldDateTime);
 }
 
-struct StreamableType {
-};
+struct StreamableType {};
 static std::ostream& operator<<(std::ostream& os, StreamableType)
 {
     return os << "Custom streamable type";

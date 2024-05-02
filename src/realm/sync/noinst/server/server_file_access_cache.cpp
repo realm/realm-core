@@ -14,7 +14,7 @@ void ServerFileAccessCache::proper_close_all()
 void ServerFileAccessCache::access(Slot& slot)
 {
     if (slot.is_open()) {
-        m_logger.trace("Using already open Realm file: %1", slot.realm_path); // Throws
+        m_logger.trace(util::LogCategory::server, "Using already open Realm file: %1", slot.realm_path); // Throws
 
         // Move to front
         REALM_ASSERT(m_first_open_file);

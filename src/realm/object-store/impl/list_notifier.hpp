@@ -33,7 +33,8 @@ public:
 
 private:
     PropertyType m_type;
-    std::unique_ptr<CollectionBase> m_list;
+    CollectionBasePtr m_list;
+    CollectionParent* m_collection_parent = nullptr;
 
     // The last-seen size of the collection so that when the parent of the collection
     // is deleted we can report each row as being deleted

@@ -213,7 +213,7 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
 
         WriteTransaction wt{sg_2};
         InstructionApplier applier{wt};
-        applier.apply(result, test_context.logger.get());
+        applier.apply(result);
         wt.commit();
 
         // Check same invariants as above.

@@ -399,7 +399,9 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
     CHECK_THROW(latest->refresh(), RuntimeError);
 }
 
-TEST(Sync_SubscriptionStoreInternalSchemaMigration)
+// Only runs if REALM_MAX_BPNODE_SIZE is 1000 since that's what the pre-created
+// test realm files were created with
+TEST_IF(Sync_SubscriptionStoreInternalSchemaMigration, REALM_MAX_BPNODE_SIZE == 1000)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
 
@@ -646,7 +648,9 @@ TEST(Sync_SubscriptionStoreTerminate)
     CHECK_EQUAL(store->get_latest().version(), 3);
     CHECK_EQUAL(store->get_pending_subscriptions().size(), 3);
 
-    store->terminate(); // notifications are called on this thread
+    auto write_tr = fixture.db->start_write();
+    store->reset(*write_tr); // notifications are called on this thread
+    write_tr->commit();
 
     CHECK_EQUAL(hit_count, 3);
     CHECK_EQUAL(store->get_latest().version(), 0);

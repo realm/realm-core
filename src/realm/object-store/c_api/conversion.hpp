@@ -144,6 +144,10 @@ static inline Mixed from_capi(realm_value_t val)
             return Mixed{ObjLink{TableKey(val.link.target_table), ObjKey(val.link.target)}};
         case RLM_TYPE_UUID:
             return Mixed{UUID{from_capi(val.uuid)}};
+        case RLM_TYPE_LIST:
+            return Mixed{0, CollectionType::List};
+        case RLM_TYPE_DICTIONARY:
+            return Mixed{0, CollectionType::Dictionary};
     }
     REALM_TERMINATE("Invalid realm_value_t"); // LCOV_EXCL_LINE
 }
@@ -155,7 +159,8 @@ static inline realm_value_t to_capi(Mixed value)
         val.type = RLM_TYPE_NULL;
     }
     else {
-        switch (value.get_type()) {
+        auto type = value.get_type();
+        switch (type) {
             case type_Int: {
                 val.type = RLM_TYPE_INT;
                 val.integer = value.get<int64_t>();
@@ -218,9 +223,15 @@ static inline realm_value_t to_capi(Mixed value)
                 break;
             }
 
-            case type_LinkList:
             case type_Mixed:
                 REALM_TERMINATE("Invalid Mixed value type"); // LCOV_EXCL_LINE
+            default:
+                if (type == type_List) {
+                    val.type = RLM_TYPE_LIST;
+                }
+                else if (type == type_Dictionary) {
+                    val.type = RLM_TYPE_DICTIONARY;
+                }
         }
     }
 
@@ -416,6 +427,21 @@ static inline Property from_capi(const realm_property_info_t& p) noexcept
         }
     }
     return prop;
+}
+
+static inline std::optional<CollectionType> from_capi(realm_collection_type_e type)
+{
+    switch (type) {
+        case RLM_COLLECTION_TYPE_NONE:
+            break;
+        case RLM_COLLECTION_TYPE_LIST:
+            return CollectionType::List;
+        case RLM_COLLECTION_TYPE_SET:
+            return CollectionType::Set;
+        case RLM_COLLECTION_TYPE_DICTIONARY:
+            return CollectionType::Dictionary;
+    }
+    return {};
 }
 
 static inline realm_property_info_t to_capi(const Property& prop) noexcept

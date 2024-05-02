@@ -67,30 +67,32 @@ TConditionValue:    Type of values in condition column. That is, int64_t, float,
 #define REALM_QUERY_ENGINE_HPP
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <sstream>
 #include <string>
-#include <array>
+#include <typeindex>
 
+#include <realm/array_backlink.hpp>
 #include <realm/array_basic.hpp>
-#include <realm/array_key.hpp>
-#include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
-#include <realm/array_timestamp.hpp>
+#include <realm/array_bool.hpp>
 #include <realm/array_decimal128.hpp>
 #include <realm/array_fixed_bytes.hpp>
-#include <realm/array_mixed.hpp>
+#include <realm/array_key.hpp>
 #include <realm/array_list.hpp>
-#include <realm/array_bool.hpp>
-#include <realm/array_backlink.hpp>
-#include <realm/column_type_traits.hpp>
-#include <realm/query_conditions.hpp>
-#include <realm/table.hpp>
+#include <realm/array_mixed.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/column_type_traits.hpp>
+#include <realm/index_string.hpp>
+#include <realm/query_conditions.hpp>
+#include <realm/query_expression.hpp>
+#include <realm/table.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/serializer.hpp>
 #include <realm/utilities.hpp>
-#include <realm/index_string.hpp>
 
 #include <map>
 #include <unordered_set>
@@ -178,9 +180,7 @@ public:
         cluster_changed();
     }
 
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     virtual size_t find_all_local(size_t start, size_t end);
@@ -225,7 +225,7 @@ public:
         return s;
     }
 
-    bool consume_condition(ParentNode& other, bool ignore_indexes)
+    bool consume_condition(ParentNode& other, bool ignore_indexes, std::optional<size_t> num_identical_conditions)
     {
         // We can only combine conditions if they're the same operator on the
         // same column and there's no additional conditions ANDed on
@@ -245,9 +245,21 @@ public:
         // choose 2. The exception is if we're inside a Not group or if the query is restricted to a view, as in those
         // cases end will always be start+1 and we'll have O(N*M) runtime even with a search index, so we want to
         // combine even with an index.
-        if (has_search_index() && !ignore_indexes)
+        //
+        // If the column is not a string type, then as the number of conditions increases, the cost of using the index
+        // for each condition rises faster than using a hash set to check if each value in a leaf matches a condition.
+        // So if there are _many_ conditions (as defined below), combine conditions even if an index is present.
+        if (has_search_index() && !ignore_indexes &&
+            (m_condition_column_key.get_type() == col_type_String || !num_identical_conditions ||
+             *num_identical_conditions < c_threshold_of_conditions_overwhelming_index))
             return false;
         return do_consume_condition(other);
+    }
+
+    constexpr static size_t c_threshold_of_conditions_overwhelming_index = 100;
+    bool num_conditions_may_need_combination_counts(size_t num_total_conditions)
+    {
+        return num_total_conditions >= c_threshold_of_conditions_overwhelming_index;
     }
 
     std::unique_ptr<ParentNode> m_child;
@@ -272,9 +284,7 @@ protected:
     }
 
 private:
-    virtual void table_changed()
-    {
-    }
+    virtual void table_changed() {}
     virtual void cluster_changed()
     {
         // TODO: Should eventually be pure
@@ -297,12 +307,11 @@ protected:
         : ParentNode(from)
     {
     }
-
 };
 
 class IndexEvaluator {
 public:
-    void init(StringIndex* index, Mixed value);
+    void init(SearchIndex* index, Mixed value);
     void init(std::vector<ObjKey>* storage);
 
     size_t do_search_index(const Cluster* cluster, size_t start, size_t end);
@@ -457,6 +466,27 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
     return realm::npos;
 }
 
+template <size_t linear_search_threshold, class LeafType, class NeedleContainer>
+static size_t find_all_haystack(LeafType& leaf, NeedleContainer& needles, size_t start, size_t end,
+                                QueryStateBase* state)
+{
+    if (needles.size() < linear_search_threshold) {
+        for (size_t i = start; i < end; ++i) {
+            auto element = leaf.get(i);
+            if (std::find(needles.begin(), needles.end(), element) != needles.end())
+                state->match(i);
+        }
+    }
+    else {
+        for (size_t i = start; i < end; ++i) {
+            auto element = leaf.get(i);
+            if (needles.count(element))
+                state->match(i);
+        }
+    }
+    return end;
+}
+
 template <class LeafType>
 class IntegerNode<LeafType, Equal> : public IntegerNodeBase<LeafType> {
 public:
@@ -468,6 +498,29 @@ public:
         : BaseType(value, column_key)
     {
     }
+    IntegerNode(ColKey col, const Mixed* begin, const Mixed* end)
+        : BaseType(realm::npos, col)
+    {
+        static_assert(is_any_v<TConditionValue, std::optional<int64_t>, int64_t>, "unexpected type change");
+        for (const Mixed* it = begin; it != end; ++it) {
+            if constexpr (std::is_same_v<TConditionValue, std::optional<int64_t>>) {
+                if (it->is_null()) {
+                    m_needles.insert(std::nullopt);
+                    continue;
+                }
+            }
+            if (const int64_t* val = it->get_if<int64_t>()) {
+                m_needles.insert(*val);
+            }
+            else if (const double* val = it->get_if<double>()) {
+                // JS encodes numbers as double
+                // only add this value if it represents an integer
+                if (*val == double(int64_t(*val))) {
+                    m_needles.insert(int64_t(*val));
+                }
+            }
+        }
+    }
 
     void init(bool will_query_ranges) override
     {
@@ -475,7 +528,7 @@ public:
         m_nb_needles = m_needles.size();
 
         if (has_search_index() && m_nb_needles == 0) {
-            StringIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            SearchIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
             m_index_evaluator = IndexEvaluator();
             m_index_evaluator->init(index, BaseType::m_value);
             IntegerNodeBase<LeafType>::m_dT = 0;
@@ -486,11 +539,17 @@ public:
     {
         auto& other = static_cast<ThisType&>(node);
         REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
-        REALM_ASSERT(other.m_needles.empty());
         if (m_needles.empty()) {
             m_needles.insert(this->m_value);
         }
-        m_needles.insert(other.m_value);
+        if (other.m_needles.empty()) {
+            m_needles.insert(other.m_value);
+        }
+        else {
+            for (const auto& val : other.m_needles) {
+                m_needles.insert(val);
+            }
+        }
         return true;
     }
 
@@ -532,6 +591,9 @@ public:
 
     size_t find_all_local(size_t start, size_t end) override
     {
+        if (m_nb_needles) {
+            return find_all_haystack<22>(*this->m_leaf, m_needles, start, end, ParentNode::m_state);
+        }
         return BaseType::template find_all_local<Equal>(start, end);
     }
 
@@ -842,7 +904,7 @@ public:
 
         if constexpr (std::is_same_v<TConditionFunction, Equal>) {
             if (m_index_evaluator) {
-                StringIndex* index = m_table->get_search_index(m_condition_column_key);
+                SearchIndex* index = m_table->get_search_index(m_condition_column_key);
                 m_index_evaluator->init(index, m_value);
                 this->m_dT = 0;
             }
@@ -953,7 +1015,7 @@ public:
 
         if constexpr (std::is_same_v<TConditionFunction, Equal>) {
             if (m_index_evaluator) {
-                StringIndex* index =
+                SearchIndex* index =
                     TimestampNodeBase::m_table->get_search_index(TimestampNodeBase::m_condition_column_key);
                 m_index_evaluator->init(index, TimestampNodeBase::m_value);
                 this->m_dT = 0;
@@ -1162,27 +1224,41 @@ class FixedBytesNode<Equal, ObjectType, ArrayType> : public FixedBytesNodeBase<O
 public:
     using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
     using BaseType = FixedBytesNodeBase<ObjectType, ArrayType>;
+    using ThisType = FixedBytesNode<Equal, ObjectType, ArrayType>;
+
+    FixedBytesNode(ColKey col, const Mixed* begin, const Mixed* end)
+        : BaseType(realm::null(), col)
+    {
+        REALM_ASSERT(begin && end);
+        REALM_ASSERT(begin != end);
+        for (const Mixed* val = begin; val != end; ++val) {
+            if (val->is_null()) {
+                m_needles.insert(std::nullopt);
+                continue;
+            }
+            if (const ObjectType* v = val->get_if<ObjectType>()) {
+                m_needles.insert({*v});
+            }
+        }
+        if (m_needles.size() == 0) {
+            throw InvalidArgument("No arguments to compare to");
+        }
+    }
 
     void init(bool will_query_ranges) override
     {
         BaseType::init(will_query_ranges);
+        m_nb_needles = m_needles.size();
 
         if (!this->m_value_is_null) {
             m_optional_value = this->m_value;
         }
-
-        if (m_index_evaluator) {
-            StringIndex* index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
+        if (m_nb_needles == 0 && has_search_index()) {
+            m_index_evaluator = std::make_optional(IndexEvaluator{});
+            SearchIndex* index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
             m_index_evaluator->init(index, m_optional_value);
             this->m_dT = 0;
         }
-    }
-
-    void table_changed() override
-    {
-        const bool has_index =
-            this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
     }
 
     const IndexEvaluator* index_based_keys() override
@@ -1192,7 +1268,7 @@ public:
 
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1201,6 +1277,9 @@ public:
         size_t s = realm::npos;
 
         if (start < end) {
+            if (m_nb_needles) {
+                return find_first_haystack<22>(*this->m_leaf, m_needles, start, end);
+            }
             if (m_index_evaluator) {
                 return m_index_evaluator->do_search_index(this->m_cluster, start, end);
             }
@@ -1218,13 +1297,41 @@ public:
         return s;
     }
 
+    bool do_consume_condition(ParentNode& node) override
+    {
+        auto& other = static_cast<ThisType&>(node);
+        REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
+        if (m_needles.empty()) {
+            m_needles.insert(this->m_value_is_null ? std::nullopt : std::make_optional(this->m_value));
+        }
+        if (other.m_needles.empty()) {
+            m_needles.insert(other.m_value_is_null ? std::nullopt : std::make_optional(other.m_value));
+        }
+        else {
+            for (const auto& val : other.m_needles) {
+                m_needles.insert(val);
+            }
+        }
+        return true;
+    }
+
     std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(this->m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, this->m_condition_column_key) + " " + Equal::description() +
-               " " +
-               (this->m_value_is_null ? util::serializer::print_value(realm::null())
-                                      : util::serializer::print_value(this->m_value));
+        std::string col_descr = state.describe_column(this->m_table, this->m_condition_column_key);
+        if (m_needles.empty()) {
+            return util::format("%1 %2 %3", col_descr, Equal::description(),
+                                (this->m_value_is_null ? util::serializer::print_value(realm::null())
+                                                       : util::serializer::print_value(this->m_value)));
+        }
+        std::string list_contents;
+        bool is_first = true;
+        for (auto it : m_needles) {
+            list_contents +=
+                util::format("%1%2", is_first ? "" : ", ", util::serializer::print_value(it)); // "it" may be null
+            is_first = false;
+        }
+        return util::format("%1 IN {%2}", col_descr, list_contents);
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -1235,6 +1342,8 @@ public:
 protected:
     std::optional<ObjectType> m_optional_value;
     std::optional<IndexEvaluator> m_index_evaluator;
+    std::unordered_set<std::optional<ObjectType>> m_needles;
+    size_t m_nb_needles = 0;
 };
 
 
@@ -1302,7 +1411,7 @@ protected:
     void get_ownership()
     {
         if (m_value.is_type(type_String, type_Binary)) {
-            auto bin = m_value.get_binary();
+            auto bin = m_value.export_to_type<BinaryData>();
             m_buffer = OwnedBinaryData(bin.data(), bin.size());
             auto tmp = m_buffer.get();
             if (m_value.is_type(type_String)) {
@@ -1475,6 +1584,7 @@ public:
 
     StringNodeBase(StringData v, ColKey column)
         : m_value(v.is_null() ? util::none : util::make_optional(std::string(v)))
+        , m_string_value(m_value)
     {
         m_condition_column_key = column;
         m_dT = 10.0;
@@ -1510,6 +1620,7 @@ public:
     StringNodeBase(const StringNodeBase& from)
         : ParentNode(from)
         , m_value(from.m_value)
+        , m_string_value(m_value)
         , m_is_string_enum(from.m_is_string_enum)
     {
     }
@@ -1517,17 +1628,14 @@ public:
     std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        StringData sd;
-        if (bool(StringNodeBase::m_value)) {
-            sd = StringData(*StringNodeBase::m_value);
-        }
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(sd);
+               util::serializer::print_value(m_string_value);
     }
 
 protected:
     std::optional<std::string> m_value;
     std::optional<ArrayString> m_leaf;
+    StringData m_string_value;
 
     bool m_is_string_enum = false;
 
@@ -1545,9 +1653,14 @@ protected:
 template <class TConditionFunction>
 class StringNode : public StringNodeBase {
 public:
+    constexpr static bool case_sensitive_comparison =
+        is_any_v<TConditionFunction, Greater, GreaterEqual, Less, LessEqual>;
     StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
     {
+        if constexpr (case_sensitive_comparison) {
+            return;
+        }
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
         if (!upper || !lower) {
@@ -1572,8 +1685,15 @@ public:
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
 
-            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
-                return s;
+            if constexpr (case_sensitive_comparison) {
+                // case insensitive not implemented for: >, >=, <, <=
+                if (cond(t, m_string_value))
+                    return s;
+            }
+            else {
+                if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
+                    return s;
+            }
         }
         return not_found;
     }
@@ -1638,7 +1758,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
 
-            if (cond(StringData(m_value), m_charmap, t))
+            if (cond(m_string_value, m_charmap, t))
                 return s;
         }
         return not_found;
@@ -1719,7 +1839,7 @@ public:
             if (!bool(m_value)) {
                 return s;
             }
-            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), m_charmap, t))
+            if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), m_charmap, t))
                 return s;
         }
         return not_found;
@@ -1763,17 +1883,9 @@ public:
 
     void init(bool) override;
 
-    void table_changed() override
-    {
-        StringNodeBase::table_changed();
-        const bool has_index =
-            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
-    }
-
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return bool(m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General);
     }
 
     void cluster_changed() override
@@ -1819,6 +1931,7 @@ public:
         : StringNodeEqualBase(v, column)
     {
     }
+    StringNode(ColKey col, const Mixed* begin, const Mixed* end);
 
     void _search_index_init() override;
 
@@ -1900,7 +2013,6 @@ private:
 };
 
 
-class LinkMap;
 class StringNodeFulltext : public StringNodeEqualBase {
 public:
     StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm = {});
@@ -2090,17 +2202,68 @@ public:
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
 
 private:
+    struct ConditionType {
+        ConditionType(const ParentNode& node)
+            : m_col(node.m_condition_column_key.value)
+            , m_type(typeid(node))
+        {
+        }
+        int64_t m_col;
+        std::type_index m_type;
+        bool operator<(const ConditionType& other) const
+        {
+            return this->m_col < other.m_col && this->m_type < other.m_type;
+        }
+        bool operator!=(const ConditionType& other) const
+        {
+            return this->m_col != other.m_col || this->m_type != other.m_type;
+        }
+    };
+
     void combine_conditions(bool ignore_indexes)
     {
+        // Although ColKey is not unique per table, it is not important to consider
+        // the table when sorting here because ParentNode::m_condition_column_key
+        // is only a valid ColKey when the node has a direct condition on a column
+        // of the table this query is running on. Any link query nodes use a special
+        // LinkChain state to store the column path.
         std::sort(m_conditions.begin(), m_conditions.end(), [](auto& a, auto& b) {
-            return a->m_condition_column_key < b->m_condition_column_key;
+            return ConditionType(*a) < ConditionType(*b);
         });
 
-        auto prev = m_conditions.begin()->get();
+        bool compute_condition_counts = num_conditions_may_need_combination_counts(m_conditions.size());
+        util::FlatMap<ConditionType, size_t> condition_type_counts;
+        if (compute_condition_counts) {
+            for (auto it = m_conditions.begin(); it != m_conditions.end();) {
+                // no need to try to combine anything other than simple nodes that
+                // filter directly on a top-level column since the only nodes that
+                // support combinations are string/int/uuid/oid <Equal> types
+                if (!(*it)->m_condition_column_key) {
+                    ++it;
+                    continue;
+                }
+                ConditionType cur_type(*(*it));
+                auto next = std::upper_bound(it, m_conditions.end(), cur_type,
+                                             [](const ConditionType& a, const std::unique_ptr<ParentNode>& b) {
+                                                 return a < ConditionType(*b);
+                                             });
+                condition_type_counts[cur_type] = next - it;
+                it = next;
+            }
+        }
+
+        ParentNode* prev = m_conditions.begin()->get();
+        std::optional<size_t> cur_type_count;
+        if (compute_condition_counts) {
+            cur_type_count = condition_type_counts[ConditionType{*prev}];
+        }
         auto cond = [&](auto& node) {
-            if (prev->consume_condition(*node, ignore_indexes))
+            if (prev->consume_condition(*node, ignore_indexes, cur_type_count))
                 return true;
             prev = &*node;
+            if (compute_condition_counts) {
+                cur_type_count = condition_type_counts[ConditionType{*prev}];
+            }
             return false;
         };
         m_conditions.erase(std::remove_if(m_conditions.begin() + 1, m_conditions.end(), cond), m_conditions.end());
@@ -2108,7 +2271,7 @@ private:
 
     // start index of the last find for each cond
     std::vector<size_t> m_start;
-    // last looked at index of the lasft find for each cond
+    // last looked at index of the last find for each cond
     // is a matching index if m_was_match is true
     std::vector<size_t> m_last;
     std::vector<bool> m_was_match;
@@ -2328,7 +2491,7 @@ public:
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
         auto column_type = origin_column_key.get_type();
-        REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
+        REALM_ASSERT(column_type == col_type_Link);
         REALM_ASSERT(!m_target_keys.empty());
     }
 

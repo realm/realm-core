@@ -431,4 +431,28 @@ TEST(BPlusTree_LeafCache)
     tree.destroy();
 }
 
+TEST(BPlusTree_UpgradeFromArray)
+{
+    // This test is only effective when node size is 4
+    for (auto sz : {15, 16, 17, 65, 256, 257}) {
+        Array arr(Allocator::get_default());
+        arr.create(Node::type_Normal, false, 0, 0);
+
+        for (int i = 0; i < sz; i++) {
+            arr.add(i);
+        }
+
+        BPlusTree<Int> tree(Allocator::get_default());
+        tree.init_from_ref(arr.get_ref());
+        tree.split_if_needed();
+
+        tree.add(100);
+        CHECK_EQUAL(tree.size(), sz + 1);
+        CHECK_EQUAL(tree.get(sz), 100);
+        tree.verify();
+
+        tree.destroy();
+    }
+}
+
 #endif // TEST_BPLUS_TREE

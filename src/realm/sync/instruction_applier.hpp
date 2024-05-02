@@ -40,15 +40,15 @@ struct InstructionApplier {
     ///
     /// FIXME: Consider using std::error_code instead of throwing
     /// BadChangesetError.
-    void apply(const Changeset&, util::Logger*);
+    void apply(const Changeset&);
 
-    void begin_apply(const Changeset&, util::Logger*) noexcept;
+    void begin_apply(const Changeset&) noexcept;
     void end_apply() noexcept;
 
 protected:
     util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&,
                                        const std::string_view& instr = "(unspecified)");
-    static std::unique_ptr<LstBase> get_list_from_path(Obj& obj, ColKey col);
+    static LstBasePtr get_list_from_path(Obj& obj, ColKey col);
     StringData get_string(InternString) const;
     StringData get_string(StringBufferRange) const;
     BinaryData get_binary(StringBufferRange) const;
@@ -59,23 +59,15 @@ protected:
     friend struct Instruction; // to allow visitor
 
     template <class A>
-    static void apply(A& applier, const Changeset&, util::Logger*);
+    static void apply(A& applier, const Changeset&);
 
     // Allows for in-place modification of changeset while applying it
     template <class A>
-    static void apply(A& applier, Changeset&, util::Logger*);
+    static void apply(A& applier, Changeset&);
 
     TableRef table_for_class_name(StringData) const; // Throws
 
     Transaction& m_transaction;
-
-    template <class... Args>
-    void log(const char* fmt, Args&&... args)
-    {
-        if (m_logger) {
-            m_logger->trace(fmt, std::forward<Args>(args)...); // Throws
-        }
-    }
 
     bool check_links_exist(const Instruction::Payload& payload);
     bool allows_null_links(const Instruction::PathInstruction& instr, const std::string_view& instr_name);
@@ -122,7 +114,6 @@ protected:
 
 private:
     const Changeset* m_log = nullptr;
-    util::Logger* m_logger = nullptr;
 
     Group::TableNameBuffer m_table_name_buffer;
     InternString m_last_table_name;
@@ -156,16 +147,14 @@ inline InstructionApplier::InstructionApplier(Transaction& group) noexcept
 {
 }
 
-inline void InstructionApplier::begin_apply(const Changeset& log, util::Logger* logger) noexcept
+inline void InstructionApplier::begin_apply(const Changeset& log) noexcept
 {
     m_log = &log;
-    m_logger = logger;
 }
 
 inline void InstructionApplier::end_apply() noexcept
 {
     m_log = nullptr;
-    m_logger = nullptr;
     m_last_table_name = InternString{};
     m_last_field_name = InternString{};
     m_last_table = TableRef{};
@@ -176,9 +165,9 @@ inline void InstructionApplier::end_apply() noexcept
 }
 
 template <class A>
-inline void InstructionApplier::apply(A& applier, const Changeset& changeset, util::Logger* logger)
+inline void InstructionApplier::apply(A& applier, const Changeset& changeset)
 {
-    applier.begin_apply(changeset, logger);
+    applier.begin_apply(changeset);
     for (auto instr : changeset) {
         if (!instr)
             continue;
@@ -188,9 +177,9 @@ inline void InstructionApplier::apply(A& applier, const Changeset& changeset, ut
 }
 
 template <class A>
-inline void InstructionApplier::apply(A& applier, Changeset& changeset, util::Logger* logger)
+inline void InstructionApplier::apply(A& applier, Changeset& changeset)
 {
-    applier.begin_apply(changeset, logger);
+    applier.begin_apply(changeset);
     for (auto instr : changeset) {
         if (!instr)
             continue;
@@ -202,9 +191,9 @@ inline void InstructionApplier::apply(A& applier, Changeset& changeset, util::Lo
     applier.end_apply();
 }
 
-inline void InstructionApplier::apply(const Changeset& log, util::Logger* logger)
+inline void InstructionApplier::apply(const Changeset& log)
 {
-    apply(*this, log, logger); // Throws
+    apply(*this, log); // Throws
 }
 
 } // namespace sync

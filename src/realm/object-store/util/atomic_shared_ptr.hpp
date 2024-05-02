@@ -31,12 +31,10 @@ namespace _impl {
 // HasAtomicPtrOps to either true_type or false_type
 
 template <typename, typename = std::void_t<>>
-struct HasAtomicPtrOps : std::false_type {
-};
+struct HasAtomicPtrOps : std::false_type {};
 
 template <class T>
-struct HasAtomicPtrOps<T, std::void_t<decltype(std::atomic_load(std::declval<T*>()))>> : std::true_type {
-};
+struct HasAtomicPtrOps<T, std::void_t<decltype(std::atomic_load(std::declval<T*>()))>> : std::true_type {};
 } // namespace _impl
 
 namespace util {

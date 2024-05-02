@@ -170,6 +170,11 @@ RLM_API bool realm_config_get_disable_format_upgrade(const realm_config_t* confi
     return config->disable_format_upgrade;
 }
 
+RLM_API bool realm_config_needs_file_format_upgrade(const realm_config_t* config)
+{
+    return config->needs_file_format_upgrade();
+}
+
 RLM_API void realm_config_set_disable_format_upgrade(realm_config_t* config, bool b)
 {
     config->disable_format_upgrade = b;

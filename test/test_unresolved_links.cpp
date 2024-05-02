@@ -270,6 +270,17 @@ TEST(Unresolved_LinkList)
 
     LnkLst stock_copy{stock1};
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
+    CHECK_EQUAL(stock_copy.size(), 4);
+
+    // Also check that the context flag is copied over when replacing the root during erase
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 3);
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 2);
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 1);
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 0);
 }
 
 TEST(Unresolved_LinkSet)
@@ -325,6 +336,15 @@ TEST(Unresolved_LinkSet)
 
     LnkSet stock_copy{stock1};
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
+    CHECK_EQUAL(stock_copy.size(), 4);
+    stock_copy.erase(skoda.get_key());
+    check_sorted(stock_copy, {volvo, bmw, mercedes});
+    stock_copy.erase(mercedes.get_key());
+    check_sorted(stock_copy, {volvo, bmw});
+    stock_copy.erase(bmw.get_key());
+    check_sorted(stock_copy, {volvo});
+    stock_copy.erase(volvo.get_key());
+    check_sorted(stock_copy, {});
 }
 
 TEST(Unresolved_Dictionary)
@@ -367,6 +387,17 @@ TEST(Unresolved_Dictionary)
 
     Dictionary stock_copy{stock1};
     CHECK_EQUAL(stock_copy.get("5").get<ObjKey>(), mercedes.get_key());
+    CHECK_EQUAL(stock_copy.size(), 5);
+    stock_copy.erase("5");
+    CHECK_EQUAL(stock_copy.size(), 4);
+    stock_copy.erase("4");
+    CHECK_EQUAL(stock_copy.size(), 3);
+    stock_copy.erase("3");
+    CHECK_EQUAL(stock_copy.size(), 2);
+    stock_copy.erase("2");
+    CHECK_EQUAL(stock_copy.size(), 1);
+    stock_copy.erase("1");
+    CHECK_EQUAL(stock_copy.size(), 0);
 }
 
 TEST(Unresolved_NullKey)

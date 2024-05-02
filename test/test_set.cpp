@@ -125,9 +125,9 @@ TEST(Set_Mixed)
                                   56.f,
                                   88.,
                                   "Hello, World!",
+                                  "ådsel", // Carrion
                                   "æbler", // Apples
                                   "ørken", // Dessert
-                                  "ådsel", // Carrion
                                   Timestamp(1, 2),
                                   ObjectId::gen(),
                                   UUID("01234567-9abc-4def-9012-3456789abcde"),
@@ -189,13 +189,13 @@ TEST(Set_Mixed_SortStringAndBinary)
     set.sort(indices, false);
     CHECK_EQUAL(indices, (std::vector<size_t>{4, 3, 2, 1, 0}));
 
-    // Binary values which should be interleaved with the strings
+    // Binary values which should come after strings
     set.insert(BinaryData("b", 1));
     set.insert(BinaryData("d", 1));
     set.sort(indices, true);
-    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1, 4, 2, 5, 3, 6}));
+    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1, 2, 3, 4, 5, 6}));
     set.sort(indices, false);
-    CHECK_EQUAL(indices, (std::vector<size_t>{6, 3, 5, 2, 4, 1, 0}));
+    CHECK_EQUAL(indices, (std::vector<size_t>{6, 5, 4, 3, 2, 1, 0}));
 
     // Non-empty but no strings
     set.clear();
@@ -245,7 +245,6 @@ TEST(Set_Links)
     auto cabs = g.add_table("class_Cab");
 
     ColKey col_links = foos->add_column_set(*bars, "links");
-    ColKey col_typed_links = foos->add_column_set(type_TypedLink, "typed_links");
     ColKey col_mixeds = foos->add_column_set(type_Mixed, "mixeds");
 
     auto foo = foos->create_object();
@@ -261,7 +260,6 @@ TEST(Set_Links)
 
     auto set_links = foo.get_set<ObjKey>(col_links);
     auto lnkset_links = foo.get_setbase_ptr(col_links);
-    auto set_typed_links = foo.get_set<ObjLink>(col_typed_links);
     auto set_mixeds = foo.get_set<Mixed>(col_mixeds);
 
     set_links.insert(bar1.get_key());
@@ -282,28 +280,6 @@ TEST(Set_Links)
     CHECK_EQUAL(bar1.get_backlink_count(), 0);
     set_links.insert(bar1.get_key());
 
-    set_typed_links.insert(bar1.get_link());
-    set_typed_links.insert(bar2.get_link());
-    set_typed_links.insert(cab1.get_link());
-    set_typed_links.insert(cab2.get_link());
-    CHECK_EQUAL(set_typed_links.size(), 4);
-
-    set_typed_links.insert(bar1.get_link());
-    CHECK_EQUAL(set_typed_links.size(), 4);
-    set_typed_links.insert(bar2.get_link());
-    CHECK_EQUAL(set_typed_links.size(), 4);
-    set_typed_links.insert(cab1.get_link());
-    CHECK_EQUAL(set_typed_links.size(), 4);
-    set_typed_links.insert(cab2.get_link());
-    CHECK_EQUAL(set_typed_links.size(), 4);
-
-    CHECK_EQUAL(bar1.get_backlink_count(), 2);
-    CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
-    CHECK_NOT_EQUAL(set_typed_links.find(bar2.get_link()), realm::npos);
-    CHECK_NOT_EQUAL(set_typed_links.find(cab1.get_link()), realm::npos);
-    CHECK_NOT_EQUAL(set_typed_links.find(cab2.get_link()), realm::npos);
-    CHECK_EQUAL(set_typed_links.find(bar3.get_link()), realm::npos);
-
     set_mixeds.insert(bar1.get_link());
     set_mixeds.insert(bar2.get_link());
     set_mixeds.insert(cab1.get_link());
@@ -314,7 +290,7 @@ TEST(Set_Links)
     set_mixeds.insert(cab2.get_link());
 
     CHECK_EQUAL(set_mixeds.size(), 4);
-    CHECK_EQUAL(bar1.get_backlink_count(), 3);
+    CHECK_EQUAL(bar1.get_backlink_count(), 2);
     CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(bar2.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(cab1.get_link()), realm::npos);
@@ -325,11 +301,9 @@ TEST(Set_Links)
     set_links.insert(bar4.get_key());
 
     CHECK_EQUAL(set_links.size(), 3);
-    CHECK_EQUAL(set_typed_links.size(), 3);
     CHECK_EQUAL(set_mixeds.size(), 3);
 
     CHECK_EQUAL(set_links.find(bar1.get_key()), realm::npos);
-    CHECK_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
 
     auto bar2_key = bar2.get_key();
@@ -338,7 +312,6 @@ TEST(Set_Links)
 
     CHECK_EQUAL(set_links.size(), 3);
     CHECK_EQUAL(lnkset_links->size(), 2); // Unresolved link was hidden from LnkSet
-    CHECK_EQUAL(set_typed_links.size(), 3);
     CHECK_EQUAL(set_mixeds.size(), 3);
 
     CHECK_EQUAL(set_links.find(bar2_key), realm::npos);               // The original bar2 key is no longer in the set
@@ -346,7 +319,6 @@ TEST(Set_Links)
     CHECK_EQUAL(lnkset_links->find_any(bar2.get_key()), realm::npos); // The unresolved bar2 key is hidden by LnkSet
     CHECK_EQUAL(lnkset_links->find_any(bar3.get_key()), 0);
     CHECK_EQUAL(lnkset_links->find_any(bar4.get_key()), 1);
-    CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
 
     // g.to_json(std::cout);

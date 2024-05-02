@@ -207,10 +207,9 @@ RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_chan
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t* changes,
                                                       size_t* out_num_deletions, size_t* out_num_insertions,
                                                       size_t* out_num_modifications, size_t* out_num_moves,
-                                                      bool* out_collection_was_cleared)
+                                                      bool* out_collection_was_cleared,
+                                                      bool* out_collection_was_deleted)
 {
-    // FIXME: This has O(n) performance, which seems ridiculous.
-
     if (out_num_deletions)
         *out_num_deletions = changes->deletions.count();
     if (out_num_insertions)
@@ -221,6 +220,8 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
         *out_num_moves = changes->moves.size();
     if (out_collection_was_cleared)
         *out_collection_was_cleared = changes->collection_was_cleared;
+    if (out_collection_was_deleted)
+        *out_collection_was_deleted = changes->collection_root_was_deleted;
 }
 
 static inline void copy_index_ranges(const IndexSet& index_set, realm_index_range_t* out_ranges, size_t max)
@@ -264,7 +265,8 @@ RLM_API void realm_collection_changes_get_ranges(
 }
 
 RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
-                                          size_t* out_insertion_size, size_t* out_modification_size)
+                                          size_t* out_insertion_size, size_t* out_modification_size,
+                                          bool* out_was_deleted)
 {
     if (out_deletions_size)
         *out_deletions_size = changes->deletions.size();
@@ -272,12 +274,15 @@ RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* chan
         *out_insertion_size = changes->insertions.size();
     if (out_modification_size)
         *out_modification_size = changes->modifications.size();
+    if (out_was_deleted)
+        *out_was_deleted = changes->collection_root_was_deleted;
 }
 
 RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes,
                                                realm_value_t* deletion_keys, size_t* deletions_size,
                                                realm_value_t* insertion_keys, size_t* insertions_size,
-                                               realm_value_t* modification_keys, size_t* modifications_size)
+                                               realm_value_t* modification_keys, size_t* modifications_size,
+                                               bool* collection_was_cleared)
 {
     auto fill = [](const auto& collection, realm_value_t* out, size_t* n) {
         if (!out || !n)
@@ -295,6 +300,8 @@ RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t*
     fill(changes->deletions, deletion_keys, deletions_size);
     fill(changes->insertions, insertion_keys, insertions_size);
     fill(changes->modifications, modification_keys, modifications_size);
+    if (collection_was_cleared)
+        *collection_was_cleared = changes->collection_was_cleared;
 }
 
 static inline void copy_indices(const IndexSet& index_set, size_t* out_indices, size_t max)
