@@ -370,10 +370,6 @@ public:
     {
         return m_config;
     }
-    realm::app::GenericNetworkTransport* transport()
-    {
-        return m_config.transport.get();
-    }
 
     std::vector<realm::bson::BsonDocument> get_documents(realm::app::User& user, const std::string& object_type,
                                                          size_t expected_count) const;

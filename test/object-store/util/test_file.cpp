@@ -407,8 +407,7 @@ TestAppSession::~TestAppSession()
                       << "\n";
         }
     }
-    if (m_delete_app) {
-        REQUIRE(m_app_session);
+    if (m_delete_app && m_app_session) {
         m_app_session->admin_api.delete_app(m_app_session->server_app_id);
     }
 }
@@ -456,7 +455,6 @@ std::shared_ptr<realm::SyncUser> TestAppSession::log_in_user(std::optional<realm
     }
     return result.get_value();
 }
-
 
 std::vector<bson::BsonDocument> TestAppSession::get_documents(app::User& user, const std::string& object_type,
                                                               size_t expected_count) const

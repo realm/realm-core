@@ -2895,7 +2895,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     promise.get_promise().emplace_value(std::move(error));
                 };
 
-            auto transport = static_cast<SynchronousTestTransport*>(session.transport());
+            auto transport = static_cast<SynchronousTestTransport*>(session.config().transport.get());
             transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
             auto session = app->sync_manager()->get_existing_session(config.path);

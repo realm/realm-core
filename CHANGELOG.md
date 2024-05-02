@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Update TestAppSession to take a config object and be restarted. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
 
 ----------------------------------------------
 
