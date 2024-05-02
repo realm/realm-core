@@ -4820,9 +4820,9 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 obj.set_collection(col, CollectionType::List);
                 List list{realm, obj, col};
                 list.insert_collection(0, CollectionType::List);
+                list.insert_collection(1, CollectionType::List);
                 auto n_list = list.get_list(0);
                 n_list.insert(0, Mixed{30});
-                list.insert_collection(1, CollectionType::List);
                 n_list = list.get_list(1);
                 n_list.insert(0, Mixed{31});
             })
@@ -4846,9 +4846,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto col = table->get_column_key("any_mixed");
                 List list{remote_realm, obj, col};
                 REQUIRE(list.size() == 2);
-                list.remove(0);
+                list.remove(0); // remove list with 30 in it.
+                REQUIRE(list.size() == 1);
                 auto n_list = list.get_list(0);
-                REQUIRE(n_list.get_any(0).get_int() == 31);
+                REQUIRE(n_list.get_any(0).get_int() == 31); // new position 0 is the list with entry set to 31
             })
             ->on_post_reset([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -5284,6 +5285,102 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(ndict.get_any("String").get_string() == "Test");
                     REQUIRE(ndict.get_any("Int2").get_int() == 6);
                     REQUIRE(ndict.get_any("Int3").get_int() == 9);
+                }
+            })
+            ->run();
+    }
+    SECTION("Verify prefix/suffix copy logic for list in mixed.") {
+        // dictionaries go key by key so they have a different logic.
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(oas.app()->current_user(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::List);
+                List list{realm, obj, col};
+                list.insert_collection(0, CollectionType::List);
+                auto nlist = list.get_list(0);
+                nlist.add(Mixed{1});
+                nlist.add(Mixed{2});
+                nlist.add(Mixed{3});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                List list{local_realm, obj, col};
+                REQUIRE(list.size() == 1);
+                auto nlist = list.get_list(0);
+                REQUIRE(nlist.size() == 3);
+                nlist.add(Mixed{4});
+                nlist.add(Mixed{5});
+                nlist.add(Mixed{6});
+                nlist.add(Mixed{7});
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                advance_and_notify(*remote_realm);
+                TableRef table = get_table(*remote_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                List list{remote_realm, obj, col};
+                REQUIRE(list.size() == 1);
+                auto nlist = list.get_list(0);
+                REQUIRE(nlist.size() == 3);
+                nlist.add(Mixed{4});
+                nlist.add(Mixed{5});
+                nlist.add(Mixed{8});
+                nlist.add(Mixed{9});
+                nlist.add(Mixed{6});
+                nlist.add(Mixed{7});
+                REQUIRE(nlist.size() == 9);
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // db must be equal to remote
+                    List list{local_realm, obj, col};
+                    REQUIRE(list.size() == 1);
+                    auto nlist = list.get_list(0);
+                    REQUIRE(nlist.size() == 9);
+                    REQUIRE(nlist.get_any(0).get_int() == 1);
+                    REQUIRE(nlist.get_any(1).get_int() == 2);
+                    REQUIRE(nlist.get_any(2).get_int() == 3);
+                    REQUIRE(nlist.get_any(3).get_int() == 4);
+                    REQUIRE(nlist.get_any(4).get_int() == 5);
+                    REQUIRE(nlist.get_any(5).get_int() == 8);
+                    REQUIRE(nlist.get_any(6).get_int() == 9);
+                    REQUIRE(nlist.get_any(7).get_int() == 6);
+                    REQUIRE(nlist.get_any(8).get_int() == 7);
+                }
+                else {
+                    List list{local_realm, obj, col};
+                    REQUIRE(list.size() == 1);
+                    auto nlist = list.get_list(0);
+                    REQUIRE(nlist.size() == 13);
+                    REQUIRE(nlist.get_any(0).get_int() == 1);
+                    REQUIRE(nlist.get_any(1).get_int() == 2);
+                    REQUIRE(nlist.get_any(2).get_int() == 3);
+                    REQUIRE(nlist.get_any(3).get_int() == 4);
+                    REQUIRE(nlist.get_any(4).get_int() == 5);
+                    REQUIRE(nlist.get_any(5).get_int() == 6);
+                    REQUIRE(nlist.get_any(6).get_int() == 7);
+                    REQUIRE(nlist.get_any(7).get_int() == 4);
+                    REQUIRE(nlist.get_any(8).get_int() == 5);
+                    REQUIRE(nlist.get_any(9).get_int() == 8);
+                    REQUIRE(nlist.get_any(10).get_int() == 9);
+                    REQUIRE(nlist.get_any(11).get_int() == 6);
+                    REQUIRE(nlist.get_any(12).get_int() == 7);
                 }
             })
             ->run();
