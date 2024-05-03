@@ -350,13 +350,13 @@ public:
     }
     const std::shared_ptr<realm::SyncManager>& sync_manager() const
     {
-        REQUIRE(m_app);
+        REALM_ASSERT(m_app);
         return m_app->sync_manager();
     }
 
     std::shared_ptr<realm::app::User> current_user() const
     {
-        REQUIRE(m_app);
+        REALM_ASSERT(m_app);
         return m_app->current_user();
     }
     std::pair<realm::app::AppCredentials, std::shared_ptr<realm::SyncUser>> create_user_and_log_in();

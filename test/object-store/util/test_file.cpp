@@ -359,7 +359,7 @@ TestAppSession::TestAppSession(AppSession session, Config config, DeleteApp dele
     if (!m_config.storage_path || m_config.storage_path->empty()) {
         m_config.storage_path.emplace(util::make_temp_dir() + random_string(10));
     }
-    REQUIRE(m_config.storage_path);
+    REALM_ASSERT(m_config.storage_path);
     util::try_make_dir(*m_config.storage_path);
 
     if (!m_config.transport) {
@@ -395,6 +395,7 @@ TestAppSession::~TestAppSession()
 {
     if (m_app) {
         m_app->sync_manager()->tear_down_for_testing();
+        m_app.reset();
     }
     app::App::clear_cached_apps();
     // If the app session is being deleted or the config tells us to, delete the storage path
@@ -414,7 +415,7 @@ TestAppSession::~TestAppSession()
 
 std::pair<realm::app::AppCredentials, std::shared_ptr<realm::SyncUser>> TestAppSession::create_user_and_log_in()
 {
-    REQUIRE(m_app);
+    REALM_ASSERT(m_app);
     AutoVerifiedEmailCredentials creds;
     auto pf = util::make_promise_future<std::shared_ptr<realm::SyncUser>>();
     m_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
@@ -430,15 +431,16 @@ std::pair<realm::app::AppCredentials, std::shared_ptr<realm::SyncUser>> TestAppS
         });
     auto result = pf.future.get_no_throw();
     if (!result.is_ok()) {
-        FAIL(util::format("Failed to log in: %1", result.get_status()));
+        throw RuntimeError(result.get_status().code(),
+                           util::format("Failed to create user: %1", result.get_status()));
     }
     return std::make_pair(creds, result.get_value());
 }
 
 std::shared_ptr<realm::SyncUser> TestAppSession::log_in_user(std::optional<realm::app::AppCredentials> user_creds)
 {
-    REQUIRE(m_app);
-    REQUIRE((user_creds || m_config.user_creds));
+    REALM_ASSERT(m_app);
+    REALM_ASSERT((user_creds || m_config.user_creds));
     auto pf = util::make_promise_future<std::shared_ptr<realm::SyncUser>>();
     m_app->log_in_with_credentials(
         *user_creds, [promise = util::CopyablePromiseHolder<std::shared_ptr<realm::SyncUser>>(std::move(pf.promise))](
@@ -451,7 +453,7 @@ std::shared_ptr<realm::SyncUser> TestAppSession::log_in_user(std::optional<realm
         });
     auto result = pf.future.get_no_throw();
     if (!result.is_ok()) {
-        FAIL(util::format("Failed to log in: %1", result.get_status()));
+        throw RuntimeError(result.get_status().code(), util::format("Failed to log in: %1", result.get_status()));
     }
     return result.get_value();
 }
