@@ -415,7 +415,7 @@ TestAppSession::~TestAppSession()
 std::pair<realm::app::AppCredentials, std::shared_ptr<realm::SyncUser>> TestAppSession::create_user_and_log_in()
 {
     REQUIRE(m_app);
-    AutoVerifiedEmailCredentials creds(m_app_session->config.app_name);
+    AutoVerifiedEmailCredentials creds;
     auto pf = util::make_promise_future<std::shared_ptr<realm::SyncUser>>();
     m_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
         creds.email, creds.password,
