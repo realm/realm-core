@@ -4968,11 +4968,9 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     auto logger = util::Logger::get_default_logger();
     FLXSyncTestHarness harness("flx_role_change_bootstrap", {person_schema, {"role", "firstName", "lastName"}});
     auto& app_session = harness.session().app_session();
+    /** TODO: Remove when switching to use Protocol version in RCORE-1972 */
     // Enable the role change bootstraps
     REQUIRE(app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
-    // Ensure the feature flag is enabled
-    // TODO: Fix once an updated baasaas solution is in place
-    // REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
 
     // Get the current rules so it can be updated during the test
     auto rule = app_session.admin_api.get_default_rule(app_session.server_app_id);

@@ -2,8 +2,7 @@ PACKAGE_NAME: realm-core
 VERSION: 14.6.2
 OPENSSL_VERSION: 3.2.0
 ZLIB_VERSION: 1.2.13
-# 5138f5c is 2024 Apr 19
-# BAAS_VERSION: 5138f5c924f9f376d31cbc2b1819e1d934600277
-# BAAS_VERSION_TYPE: githash
-BAAS_VERSION: master
-BAAS_VERSION_TYPE: branch
+# TODO: Remove when switching to use Protocol version in RCORE-1972 and merging to master
+# 51d0e54 is BAAS-30091 - 2024 May 01
+BAAS_VERSION: 51d0e5411b9dab52cb24977d470c2c910d1b18c8
+BAAS_VERSION_TYPE: githash
