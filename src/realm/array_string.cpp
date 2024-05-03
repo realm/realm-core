@@ -57,7 +57,7 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
             if (arr->get_context_flag_from_header(arr->get_header())) {
                 // init for new interned strings (replacing old enum strings)
                 m_type = Type::interned_strings;
-                REALM_ASSERT_DEBUG(m_string_interner);
+                // consider if we want this invariant: REALM_ASSERT_DEBUG(m_string_interner);
             }
             else {
                 // init for old enum strings

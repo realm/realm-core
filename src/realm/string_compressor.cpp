@@ -26,25 +26,11 @@ namespace realm {
 
 StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index, bool writable)
 {
+    m_compression_map.resize(65536, {0, 0, 0});
+    m_symbols.reserve(65536);
     m_data = std::make_unique<Array>(alloc);
     m_data->set_parent(&parent, index);
     refresh(writable);
-
-#if 0
-    m_compression_map.resize(65536, {0, 0, 0});
-    m_symbols.reserve(65536);
-
-    m_data = std::make_unique<Array>(alloc);
-    m_data->set_parent(&parent, index);
-    if (parent.get_as_ref(index)) {
-        m_data->update_from_parent();
-    }
-    else {
-        m_data->create(NodeHeader::type_Normal, false, 0, 0);
-        m_data->update_parent();
-    }
-    rebuild_internal();
-#endif
 }
 
 void StringCompressor::refresh(bool writable)
@@ -72,12 +58,22 @@ static size_t symbol_pair_hash(CompressionSymbol a, CompressionSymbol b)
 
 void StringCompressor::rebuild_internal()
 {
-    m_symbols.resize(0);
-    m_symbols.reserve(65536);
-    m_compression_map.clear();
-    m_compression_map.resize(65536, {0, 0, 0});
     auto num_symbols = m_data->size();
-    for (size_t i = 0; i < num_symbols; ++i) {
+    if (num_symbols == m_symbols.size())
+        return;
+    if (num_symbols < m_symbols.size()) {
+        // fewer symbols (likely a rollback) -- remove last ones added
+        while (num_symbols < m_symbols.size()) {
+            auto& def = m_symbols.back();
+            auto hash = symbol_pair_hash(def.expansion_a, def.expansion_b);
+            REALM_ASSERT(m_compression_map[hash].id == def.id);
+            m_compression_map[hash] = {0, 0, 0};
+            m_symbols.pop_back();
+        }
+        return;
+    }
+    // we have new symbols to add
+    for (size_t i = m_symbols.size(); i < num_symbols; ++i) {
         auto pair = m_data->get(i);
         SymbolDef def;
         def.id = i + 256;
