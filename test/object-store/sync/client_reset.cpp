@@ -6068,6 +6068,13 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 ndictionary.insert("Key", other_obj.get_link());
 
                 CHECK(other_obj.get_backlink_count() == 1);
+                CHECK(table->query("any_mixed['Key-Setup'].@type == 'string'").count() == 1);
+                CHECK(table->query("any_mixed['Key-Setup'] == 'Setup'").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>'].@type == 'dictionary'").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>'].@size == 1").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].@type == 'link'").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key']._id == $0", std::vector<Mixed>{Mixed{pk_val}})
+                          .count() == 1);
             })
             ->make_local_changes([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -6085,7 +6092,8 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dictionary{local_realm, obj, col};
                 auto ndictionary = dictionary.get_dictionary("<Setup>");
                 ndictionary.insert("Key", other_obj.get_link());
-                CHECK(other_obj.get_backlink_count() == 2);
+                CHECK(other_obj.get_backlink_count() ==
+                      2); // this check is wrong, wait for https://github.com/realm/realm-core/pull/7677
 
                 auto link = ndictionary.get_any("Key");
                 CHECK(other_obj.get_key() == link.get_link().get_obj_key());
@@ -6096,6 +6104,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 for (size_t i = 0; i < list.size(); ++i) {
                     CHECK(list_linked.get_any(i).get_int() == list.get_any(i).get_int());
                 }
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@type == 'list'").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@size == 2").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[0] == 1").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[1] == 2").count() == 1);
             })
             ->on_post_local_changes([&](SharedRealm realm) {
                 advance_and_notify(*realm);
@@ -6130,6 +6142,11 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     CHECK(list_linked.get_any(i).get_int() == list.get_any(i).get_int());
                 }
                 CHECK(other_obj.get_backlink_count() == 2);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@type == 'list'").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@size == 3").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[0] == 1").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[1] == 2").count() == 1);
+                CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[2] == 3").count() == 1);
             })
             ->on_post_reset([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -6143,6 +6160,11 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto other_col = other_table->get_column_key("any_mixed");
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     // db must be equal to remote
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@type == 'list'").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@size == 3").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[0] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[1] == 2").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[2] == 3").count() == 1);
                 }
                 else {
                     // recover we should try to recover the links
@@ -6161,6 +6183,13 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     for (int i = 0; i < 5; ++i) {
                         CHECK(list.get_any(i).get_int() == expected[i]);
                     }
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@type == 'list'").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@size == 5").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[0] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[1] == 2").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[2] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[3] == 2").count() == 1);
+                    CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[4] == 3").count() == 1);
                 }
             })
             ->run();
@@ -6232,6 +6261,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 for (size_t i = 0; i < list.size(); ++i) {
                     CHECK(list_linked.get_any(i).get_int() == list.get_any(i).get_int());
                 }
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@type == 'list'").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@size == 2").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[0] == 1").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[1] == 2").count() == 1);
             })
             ->on_post_local_changes([&](SharedRealm realm) {
                 advance_and_notify(*realm);
@@ -6264,6 +6297,11 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 for (size_t i = 0; i < list.size(); ++i) {
                     CHECK(list_linked.get_any(i).get_int() == list.get_any(i).get_int());
                 }
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@type == 'list'").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@size == 3").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[0] == 1").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[1] == 2").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[2] == 3").count() == 1);
             })
             ->on_post_reset([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -6271,6 +6309,11 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(table->size() == 1);
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     // db must be equal to remote
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@type == 'list'").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@size == 3").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[0] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[1] == 2").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[2] == 3").count() == 1);
                 }
                 else {
                     TableRef other_table_one = get_table(*local_realm, "Other_one");
@@ -6278,14 +6321,14 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(other_table_one->size() == 1);
                     REQUIRE(other_table_two->size() == 1);
                     auto obj = table->get_object(0);
-                    // auto other_obj_one = other_table_one->get_object(0);
+                    auto other_obj_one = other_table_one->get_object(0);
                     auto other_obj_two = other_table_two->get_object(0);
                     auto col = table->get_column_key("any_mixed");
-                    //                    auto other_col_one = other_table_one->get_column_key("any_mixed");
+                    auto other_col_one = other_table_one->get_column_key("any_mixed");
                     auto other_col_two = other_table_two->get_column_key("any_mixed");
 
-
-                    // recover we should try to recover the links
+                    // check that the link change was recovered, but that the state
+                    // of each destination object did not change
                     object_store::Dictionary dictionary{local_realm, obj, col};
                     CHECK(dictionary.size() == 1);
                     auto ndictionary = dictionary.get_dictionary("MyDictionary");
@@ -6295,12 +6338,28 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     auto obj_two = other_table_two->get_object(link.get_obj_key());
                     CHECK(obj_two.is_valid());
                     CHECK(other_obj_two.get_key() == obj_two.get_key());
-                    List list{local_realm, obj_two, other_col_two};
-                    CHECK(list.size() == 3);
-                    std::vector<int> expected{1, 2, 3};
-                    for (int i = 0; i < 3; ++i) {
-                        CHECK(list.get_any(i).get_int() == expected[i]);
+                    {
+                        List list{local_realm, obj_two, other_col_two};
+                        CHECK(list.size() == 3);
+                        std::vector<int> expected{1, 2, 3};
+                        for (int i = 0; i < 3; ++i) {
+                            CHECK(list.get_any(i).get_int() == expected[i]);
+                        }
                     }
+                    {
+                        List list{local_realm, other_obj_one, other_col_one};
+                        CHECK(list.size() == 2);
+                        std::vector<int> expected{1, 2};
+                        for (int i = 0; i < 2; ++i) {
+                            CHECK(list.get_any(i).get_int() == expected[i]);
+                        }
+                    }
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@type == 'list'").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed.@size == 2").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[0] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[1] == 2").count() == 1);
+                    CHECK(other_table_one->query("any_mixed.@size == 2").count() == 1);
+                    CHECK(other_table_two->query("any_mixed.@size == 3").count() == 1);
                 }
             })
             ->run();
@@ -6372,6 +6431,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 for (size_t i = 0; i < list.size(); ++i) {
                     CHECK(list_linked.get_any(i).get_int() == list.get_any(i).get_int());
                 }
+                CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed.@type == 'list'").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed.@size == 2").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed[0] == 1").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed[1] == 2").count() == 1);
             })
             ->on_post_local_changes([&](SharedRealm realm) {
                 advance_and_notify(*realm);
@@ -6404,6 +6467,11 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 for (size_t i = 0; i < list.size(); ++i) {
                     CHECK(list_linked.get_any(i).get_int() == list.get_any(i).get_int());
                 }
+                CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed.@type == 'list'").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed.@size == 3").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[0] == 1").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[1] == 2").count() == 1);
+                CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[2] == 3").count() == 1);
             })
             ->on_post_reset([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -6411,6 +6479,12 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(table->size() == 1);
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     // db must be equal to remote
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed.@type == 'list'").count() ==
+                          1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed.@size == 3").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[0] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[1] == 2").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[2] == 3").count() == 1);
                 }
                 else {
                     TableRef other_table_one = get_table(*local_realm, "Other_one");
@@ -6423,7 +6497,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     auto col = table->get_column_key("any_mixed");
                     auto other_col_one = other_table_one->get_column_key("any_mixed");
                     auto other_col_two = other_table_two->get_column_key("any_mixed");
-
 
                     // recover we should try to recover the links
                     object_store::Dictionary dictionary{local_realm, obj, col};
@@ -6456,6 +6529,18 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     for (int i = 0; i < 2; ++i) {
                         CHECK(list1.get_any(i).get_int() == expected1[i]);
                     }
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed.@type == 'list'").count() ==
+                          1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed.@size == 3").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[0] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[1] == 2").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[2] == 3").count() == 1);
+
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed.@type == 'list'").count() ==
+                          1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed.@size == 2").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed[0] == 1").count() == 1);
+                    CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed[1] == 2").count() == 1);
                 }
             })
             ->run();
