@@ -637,14 +637,14 @@ TEST(Shared_EncryptedRemap)
 TEST(Shared_Initial)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::vector<char> key;
+    std::optional<EncryptionKeyType> key;
 
     CHECK_NOT(DB::needs_file_format_upgrade(path, key)); // File not created yet
 
-    auto key_str = crypt_key();
+    auto key2 = crypt_key();
     {
         // Create a new shared db
-        DBRef sg = DB::create(path, DBOptions(key_str));
+        DBRef sg = DB::create(path, DBOptions(key2));
 
         // Verify that new group is empty
         {
@@ -652,9 +652,7 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
     }
-    if (key_str) {
-        key.insert(key.end(), key_str, key_str + strlen(key_str));
-    }
+    key = key2;
     CHECK_NOT(DB::needs_file_format_upgrade(path, key));
 }
 
@@ -4494,8 +4492,8 @@ TEST(Shared_ClearOnError_ResetInvalidFile)
 #if REALM_ENABLE_ENCRYPTION
 TEST(Shared_ClearOnError_ChangeEncryptionKey)
 {
-    auto key_1 = "1234567890123456789012345678901123456789012345678901234567890123";
-    auto key_2 = "2234567890123456789012345678901123456789012345678901234567890123";
+    auto key_1 = crypt_key("1234567890123456789012345678901123456789012345678901234567890123", true);
+    auto key_2 = crypt_key("2234567890123456789012345678901123456789012345678901234567890123", true);
 
     SHARED_GROUP_TEST_PATH(path);
     DBOptions options;
@@ -4519,7 +4517,7 @@ TEST(Shared_ClearOnError_ChangeEncryptionKey)
     }
 
     { // change from encrypted to unencrypted
-        options.encryption_key = nullptr;
+        options.encryption_key.reset();
         auto db = DB::create(path, options);
         WriteTransaction wt(db);
         CHECK_NOT(wt.get_table("table 2"));

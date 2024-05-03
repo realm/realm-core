@@ -88,34 +88,35 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStr
     return d;
 }
 
-OSStatus get_key(CFStringRef account, CFStringRef service, std::vector<char>& result)
+OSStatus get_key(CFStringRef account, CFStringRef service, util::EncryptionKeyType& result)
 {
     auto search_dictionary = build_search_dictionary(account, service);
     CFDataRef retained_key_data;
     OSStatus status = SecItemCopyMatching(search_dictionary.get(), (CFTypeRef*)&retained_key_data);
     if (status == errSecSuccess) {
         CFPtr<CFDataRef> key_data = adoptCF(retained_key_data);
-        auto key_bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(key_data.get()));
-        result.assign(key_bytes, key_bytes + CFDataGetLength(key_data.get()));
+        auto key_bytes = reinterpret_cast<const util::EncryptionKeyStorageType*>(CFDataGetBytePtr(key_data.get()));
+        result = util::EncryptionKeyType(*key_bytes);
     }
     return status;
 }
 
-OSStatus set_key(const std::vector<char>& key, CFStringRef account, CFStringRef service)
+OSStatus set_key(const util::EncryptionKeyType& key, CFStringRef account, CFStringRef service)
 {
     auto search_dictionary = build_search_dictionary(account, service);
     CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, reinterpret_cast<const UInt8*>(key.data()),
-                                                        key.size(), kCFAllocatorNull));
+    auto key_scoped_storage = key.data();
+    auto key_ptr = reinterpret_cast<const UInt8*>(key_scoped_storage->data());
+    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, key_ptr, util::EncryptionKeySize, kCFAllocatorNull));
     CFDictionaryAddValue(search_dictionary.get(), kSecValueData, key_data.get());
     return SecItemAdd(search_dictionary.get(), nullptr);
 }
 
-std::vector<char> generate_key()
+util::EncryptionKeyType generate_key()
 {
-    std::vector<char> key(64);
+    util::EncryptionKeyStorageType key;
     arc4random_buf(key.data(), key.size());
-    return key;
+    return util::EncryptionKeyType(std::move(key));
 }
 #endif // REALM_PLATFORM_APPLE
 } // anonymous namespace
@@ -630,12 +631,7 @@ TEST_CASE("app metadata: encryption", "[sync][metadata]") {
         realm_config.encryption_key = make_test_encryption_key(0);
         CHECK_THROWS(Realm::get_shared_realm(realm_config));
 
-        if (key) {
-            realm_config.encryption_key = *key;
-        }
-        else {
-            realm_config.encryption_key.clear();
-        }
+        realm_config.encryption_key = key;
         CHECK_NOTHROW(Realm::get_shared_realm(realm_config));
     };
 

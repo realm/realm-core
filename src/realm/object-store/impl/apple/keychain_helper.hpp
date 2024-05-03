@@ -31,11 +31,11 @@ namespace realm::keychain {
 
 // Get the stored encryption key for the metadata realm if one exists.
 std::optional<util::EncryptionKeyType> get_existing_metadata_realm_key(std::string_view app_id,
-                                                                 std::string_view access_group);
+                                                                       std::string_view access_group);
 // Create a new encryption key and store it in the keychain. Returns none if
 // the key could not be stored.
 std::optional<util::EncryptionKeyType> create_new_metadata_realm_key(std::string_view app_id,
-                                                               std::string_view access_group);
+                                                                     std::string_view access_group);
 
 // Delete the encryption key for the metadata realm from the keychain.
 void delete_metadata_realm_encryption_key(std::string_view app_id, std::string_view access_group);

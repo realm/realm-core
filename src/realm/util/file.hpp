@@ -121,7 +121,14 @@ struct OnlyForTestingPageSizeChange {
     ~OnlyForTestingPageSizeChange();
 };
 
-using EncryptionKeyType = SensitiveBuffer<std::array<uint8_t, 64>>;
+typedef SensitiveBuffer<std::array<uint8_t, 64>> EncryptionKeyType;
+
+typedef EncryptionKeyType::element_type EncryptionKeyStorageType;
+static_assert(std::is_pod<EncryptionKeyStorageType>::value); // for the use with the reinterpret_cast
+static_assert(std::is_pod<std::decay<decltype(*EncryptionKeyType().data())>::type>::value);
+
+constexpr size_t EncryptionKeySize = std::tuple_size<decltype(EncryptionKeyStorageType())>::value;
+static_assert(EncryptionKeySize == 64);
 
 /// This class provides a RAII abstraction over the concept of a file
 /// descriptor (or file handle).
@@ -398,11 +405,11 @@ public:
     /// mappings are created or any data is read from or written to the file.
     ///
     /// \param key A 64-byte encryption key, or null to disable encryption.
-    void set_encryption_key(std::optional<EncryptionKeyType> key);
+    void set_encryption_key(std::optional<util::EncryptionKeyType> key);
 
     /// Get the encryption key set by set_encryption_key(),
     /// null_ptr if no key set.
-    const std::optional<EncryptionKeyType>& get_encryption_key() const;
+    const std::optional<util::EncryptionKeyType>& get_encryption_key() const;
 
     /// Set the path used for emulating file locks. If not set explicitly,
     /// the emulation will use the path of the file itself suffixed by ".fifo"
@@ -654,7 +661,7 @@ private:
     std::string m_fifo_path;
 #endif
 #endif
-    std::optional<EncryptionKeyType> m_encryption_key;
+    std::optional<util::EncryptionKeyType> m_encryption_key;
     std::string m_path;
     std::optional<UniqueID> m_cached_unique_id;
 

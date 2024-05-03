@@ -1089,6 +1089,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             REQUIRE(err.value()->is_client_reset_requested());
         }
 
+#if REALM_ENABLE_ENCRYPTION
         SECTION("should honor encryption key for downloaded Realm") {
             local_config.encryption_key = util::File::EncryptionKeyType({'a'});
 
@@ -1103,6 +1104,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 })
                 ->run();
         }
+#endif
 
         SECTION("delete and insert new") {
             constexpr int64_t new_value = 42;

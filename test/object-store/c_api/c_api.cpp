@@ -815,9 +815,10 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(app_config->security_access_group == "group.io.realm.test");
 
         auto enc_key = make_test_encryption_key(123);
-        realm_app_config_set_metadata_encryption_key(app_config.get(), reinterpret_cast<uint8_t*>(enc_key.data()));
+        realm_app_config_set_metadata_encryption_key(app_config.get(),
+                                                     reinterpret_cast<const uint8_t*>(enc_key.data()->data()));
         CHECK(app_config->custom_encryption_key);
-        CHECK(std::equal(enc_key.begin(), enc_key.end(), app_config->custom_encryption_key->begin()));
+        CHECK(enc_key == *app_config->custom_encryption_key);
 
         test_util::TestDirGuard temp_dir(util::make_temp_dir());
         realm_app_config_set_base_file_path(app_config.get(), temp_dir.c_str());

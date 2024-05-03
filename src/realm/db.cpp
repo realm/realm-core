@@ -2183,16 +2183,15 @@ void DB::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
-bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key)
+bool DB::needs_file_format_upgrade(const std::string& file,
+                                   const std::optional<util::EncryptionKeyType>& encryption_key)
 {
     SlabAlloc alloc;
     SlabAlloc::Config cfg;
     cfg.session_initiator = false;
     cfg.read_only = true;
     cfg.no_create = true;
-    if (!encryption_key.empty()) {
-        cfg.encryption_key = encryption_key.data();
-    }
+    cfg.encryption_key = encryption_key;
     try {
         alloc.attach_file(file, cfg);
         if (auto current_file_format_version = alloc.get_committed_file_format_version()) {

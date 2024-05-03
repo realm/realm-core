@@ -31,6 +31,9 @@ using namespace realm;
 using util::adoptCF;
 using util::CFPtr;
 using util::string_view_to_cfstring;
+using util::EncryptionKeyType;
+using util::EncryptionKeyStorageType;
+using util::EncryptionKeySize;
 
 namespace {
 
@@ -54,11 +57,6 @@ void keychain_access_exception(int32_t error_code)
     throw RuntimeError(ErrorCodes::RuntimeError,
                        util::format("Keychain returned unexpected status code: %1", error_code));
 }
-
-using EncryptionKeyType = util::EncryptionKeyType;
-using EncryptionKeyRawType = EncryptionKeyType::element_type;
-constexpr size_t key_size = EncryptionKeyRawType().size();
-static_assert(key_size == 64);
 
 const CFStringRef s_legacy_account = CFSTR("metadata");
 const CFStringRef s_service = CFSTR("io.realm.sync.keychain");
@@ -93,11 +91,11 @@ bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
         case errSecSuccess: {
             // Key was previously stored. Extract it.
             CFPtr<CFDataRef> key_data = adoptCF(retained_key_data);
-            if (key_size != CFDataGetLength(key_data.get()))
+            if (EncryptionKeySize != CFDataGetLength(key_data.get()))
                 return false;
 
-            auto& key_bytes = *reinterpret_cast<const std::array<uint8_t, 64>*>(CFDataGetBytePtr(key_data.get()));
-            result.emplace(key_bytes);
+            auto key_bytes = reinterpret_cast<const EncryptionKeyStorageType*>(CFDataGetBytePtr(key_data.get()));
+            result.emplace(*key_bytes);
             return true;
         }
         case errSecItemNotFound:
@@ -128,8 +126,9 @@ bool set_key(std::optional<EncryptionKeyType>& key, CFStringRef account, CFStrin
 
     auto search_dictionary = build_search_dictionary(account, service, string_view_to_cfstring(group).get());
     CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, reinterpret_cast<const UInt8*>(key->data()->data()),
-                                                        key_size, kCFAllocatorNull));
+    auto key_scoped_storage = key->data();
+    auto key_ptr = reinterpret_cast<const UInt8*>(key_scoped_storage->data());
+    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, key_ptr, EncryptionKeySize, kCFAllocatorNull));
     if (!key_data)
         throw std::bad_alloc();
 
@@ -249,8 +248,8 @@ std::optional<EncryptionKeyType> get_existing_metadata_realm_key(std::string_vie
 std::optional<EncryptionKeyType> create_new_metadata_realm_key(std::string_view app_id, std::string_view access_group)
 {
     auto cf_app_id = string_view_to_cfstring(app_id);
-    EncryptionKeyRawType key_buffer;
-    arc4random_buf(key_buffer.data(), key_size);
+    EncryptionKeyStorageType key_buffer;
+    arc4random_buf(key_buffer.data(), EncryptionKeySize);
     std::optional<EncryptionKeyType> key(std::move(key_buffer));
 
     // See above for why macOS is different

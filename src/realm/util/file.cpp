@@ -1811,7 +1811,7 @@ bool File::for_each(const std::string& dir_path, ForEachHandler handler)
 }
 
 
-void File::set_encryption_key(std::optional<EncryptionKeyType> key)
+void File::set_encryption_key(std::optional<util::EncryptionKeyType> key)
 {
 #if REALM_ENABLE_ENCRYPTION
     m_encryption_key = std::move(key);
@@ -1822,7 +1822,7 @@ void File::set_encryption_key(std::optional<EncryptionKeyType> key)
 #endif
 }
 
-const std::optional<util::File::EncryptionKeyType>& File::get_encryption_key() const
+const std::optional<util::EncryptionKeyType>& File::get_encryption_key() const
 {
     return m_encryption_key;
 }
