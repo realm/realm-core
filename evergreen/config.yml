@@ -172,6 +172,7 @@ functions:
           fi
 
           set_cmake_var realm_vars REALM_NO_TESTS BOOL ${no_tests|Off}
+          set_cmake_var realm_vars CMAKE_COMPILE_WARNING_AS_ERROR BOOL On
 
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
@@ -1569,7 +1570,6 @@ buildvariants:
     run_with_encryption: 1
   tasks:
   - name: core_tests_group
-  - name: test-on-exfat
 
 - name: macos-release
   display_name: "MacOS 11.0 x86_64 (Release build)"
@@ -1586,6 +1586,7 @@ buildvariants:
   tasks:
   - name: benchmarks
   - name: compile_test
+  - name: test-on-exfat
 
 - name: macos-1100-arm64-release
   display_name: "MacOS 11 arm64 (Release benchmarks)"
@@ -1617,7 +1618,6 @@ buildvariants:
   - name: compile_test
   - name: swift-build-and-test
   - name: validate-installed-headers
-  - name: test-on-exfat
 
 - name: macos-14-release
   display_name: "MacOS 14 arm64 (Release build)"
@@ -1631,14 +1631,12 @@ buildvariants:
     cmake_build_type: Release
     xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
-
   tasks:
   - name: compile_test_and_package
   # benchmarks are disabled for now because of perf problems on AWS macos instances.
   # - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
-  - name: test-on-exfat
 
 - name: macos-asan
   display_name: "MacOS 14 arm64 (ASAN)"

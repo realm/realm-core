@@ -3094,7 +3094,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                              {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
         }
     }
-    else if constexpr (test_type_is_set) {
+    if constexpr (test_type_is_set) {
         SECTION("remote adds two links to objects which are both removed by local") {
             reset_collection({RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5),
                               CreateObject("dest", 6), Add{6}, Remove{dest_pk_1}},

@@ -173,8 +173,8 @@
 #endif
 #else
 #if defined(_MSC_VER)
-#define BSON_ALIGNED_BEGIN(_N) __declspec (align (BSON_ALIGN_OF_PTR))
-#define BSON_ALIGNED_END(_N)
+#define BSON_ALIGNED_BEGIN(_N) _Pragma("warning(push)") _Pragma("warning(disable: 4359)") __declspec (align (BSON_ALIGN_OF_PTR))
+#define BSON_ALIGNED_END(_N) _Pragma("warning(pop)")
 #else
 #define BSON_ALIGNED_BEGIN(_N)
 #define BSON_ALIGNED_END(_N) \
