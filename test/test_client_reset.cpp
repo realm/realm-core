@@ -1071,7 +1071,7 @@ TEST(ClientReset_TrackReset_Existing_empty_V1_table)
     CHECK(reset->error == error);
     timestamp = Timestamp(std::chrono::system_clock::now());
     // Verify timestamp is at least close to current time
-    CHECK((reset->time.get_seconds() - timestamp.get_seconds() < 5));
+    CHECK(abs(reset->time.get_seconds() - timestamp.get_seconds()) < 5);
 }
 
 TEST_TYPES(ClientReset_TrackReset_v2, std::true_type, std::false_type)
@@ -1094,42 +1094,6 @@ TEST_TYPES(ClientReset_TrackReset_v2, std::true_type, std::false_type)
     auto timestamp = Timestamp(std::chrono::system_clock::now());
     // Verify timestamp is at least close to current time
     CHECK((reset->time.get_seconds() - timestamp.get_seconds() < 5));
-}
-
-TEST(ClientReset_DifferentAction)
-{
-    SHARED_GROUP_TEST_PATH(test_path);
-    DBRef db = DB::create(make_client_replication(), test_path);
-    Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
-    bool recovery_allowed = true;
-    {
-        auto wt = db->start_write();
-        _impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal, recovery_allowed,
-                                         sync::ProtocolErrorInfo::Action::RevertToPBS, error);
-    }
-    {
-        auto wt = db->start_read();
-        auto reset = _impl::client_reset::has_pending_reset(*wt);
-        CHECK(reset->mode == ClientResyncMode::DiscardLocal);
-        CHECK(reset->recovery_allowed = recovery_allowed);
-        CHECK(reset->action == sync::ProtocolErrorInfo::Action::RevertToPBS);
-        CHECK(reset->error == error);
-    }
-    {
-        auto wt = db->start_write();
-        auto mode = _impl::client_reset::reset_precheck_guard(
-            *wt, ClientResyncMode::RecoverOrDiscard, recovery_allowed, sync::ProtocolErrorInfo::Action::MigrateToFLX,
-            error, *test_context.logger);
-        CHECK(mode == ClientResyncMode::RecoverOrDiscard);
-    }
-    {
-        auto wt = db->start_read();
-        auto reset = _impl::client_reset::has_pending_reset(*wt);
-        CHECK(reset->mode == ClientResyncMode::Recover);
-        CHECK(reset->action == sync::ProtocolErrorInfo::Action::MigrateToFLX);
-        CHECK(reset->recovery_allowed = recovery_allowed);
-        CHECK(reset->error == error);
-    }
 }
 
 TEST(ClientReset_UninitializedFile)
