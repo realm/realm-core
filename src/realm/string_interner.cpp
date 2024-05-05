@@ -19,7 +19,7 @@
 #include <realm/string_interner.hpp>
 #include <realm/string_data.hpp>
 
-#include <realm/array.hpp>
+#include <realm/array_unsigned.hpp>
 
 namespace realm {
 
@@ -36,7 +36,7 @@ StringInterner::StringInterner(Allocator& alloc, Array& parent, ColKey col_key, 
     m_top->set_parent(&parent, index);
     m_data = std::make_unique<Array>(alloc);
     m_data->set_parent(m_top.get(), Pos_Data);
-    m_current_leaf = std::make_unique<Array>(alloc);
+    m_current_leaf = std::make_unique<ArrayUnsigned>(alloc);
     m_col_key = col_key;
     update_from_parent(writable);
 #if 0
@@ -132,7 +132,10 @@ void StringInterner::rebuild_internal()
     auto last_hi = hi;
     m_current_leaf->set_parent(m_data.get(), hi);
     REALM_ASSERT_DEBUG(m_data->get_as_ref(hi));
-    m_current_leaf->update_from_parent();
+    if (m_current_leaf->is_attached())
+        m_current_leaf->update_from_parent();
+    else
+        m_current_leaf->init_from_ref(m_current_leaf->get_ref_from_parent());
     while (curr_entry < internal_size) {
         REALM_ASSERT_DEBUG(leaf_offset < m_current_leaf->size());
         size_t length = m_current_leaf->get(leaf_offset++);
@@ -191,11 +194,14 @@ StringID StringInterner::intern(StringData sd)
     if (!m_current_leaf->is_attached() || (index & 0xFF) == 0) {
         m_current_leaf->set_parent(m_data.get(), index >> 8);
         if ((index & 0xFF) == 0) {
-            m_current_leaf->create(NodeHeader::type_Normal, false, 0, 0);
+            m_current_leaf->create(0, 65535);
             m_data->add(m_current_leaf->get_ref());
         }
         else {
-            m_current_leaf->update_from_parent();
+            if (m_current_leaf->is_attached())
+                m_current_leaf->update_from_parent();
+            else
+                m_current_leaf->init_from_ref(m_current_leaf->get_ref_from_parent());
         }
     }
     m_top->adjust(Pos_Size, 2); // type is has_Refs, so increment is by 2

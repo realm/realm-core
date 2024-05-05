@@ -47,6 +47,7 @@ namespace realm {
 using StringID = size_t;
 
 class Array;
+class ArrayUnsigned;
 class Allocator;
 
 class StringInterner {
@@ -67,7 +68,7 @@ private:
     Array& m_parent; // need to be able to check if this is attached or not
     std::unique_ptr<Array> m_top;
     std::unique_ptr<Array> m_data;
-    std::unique_ptr<Array> m_current_leaf;
+    std::unique_ptr<ArrayUnsigned> m_current_leaf;
     void rebuild_internal();
 
     ColKey m_col_key;

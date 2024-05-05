@@ -19,7 +19,7 @@
 #include <realm/string_compressor.hpp>
 #include <realm/string_data.hpp>
 
-#include <realm/array.hpp>
+#include <realm/array_unsigned.hpp>
 
 #include <iostream>
 namespace realm {
@@ -28,7 +28,7 @@ StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index
 {
     m_compression_map.resize(65536, {0, 0, 0});
     m_symbols.reserve(65536);
-    m_data = std::make_unique<Array>(alloc);
+    m_data = std::make_unique<ArrayUnsigned>(alloc);
     m_data->set_parent(&parent, index);
     refresh(writable);
 }
@@ -39,11 +39,14 @@ void StringCompressor::refresh(bool writable)
     // String interners in 'dead' mode should never instantiate a string compressor.
     if (m_data->get_ref_from_parent() == 0) {
         REALM_ASSERT(writable);
-        m_data->create(NodeHeader::type_Normal, false, 0, 0);
+        m_data->create(0, 65535);
         m_data->update_parent();
     }
     else {
-        m_data->update_from_parent();
+        if (m_data->is_attached())
+            m_data->update_from_parent();
+        else
+            m_data->init_from_ref(m_data->get_ref_from_parent());
     }
     rebuild_internal();
 }
