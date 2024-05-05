@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/array_string.hpp>
+#include <realm/impl/array_writer.hpp>
 #include <realm/spec.hpp>
 #include <realm/mixed.hpp>
 
@@ -546,7 +547,7 @@ ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interne
     for (size_t i = 0; i < sz; ++i) {
         interned.set(i, interner->intern(get(i)));
     }
-    auto retval = interned.write(out, false, false, false);
+    auto retval = interned.write(out, false, false, out.compress);
     interned.destroy();
     return retval;
     // return m_arr->write(out, true, false, false);
