@@ -6092,8 +6092,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dictionary{local_realm, obj, col};
                 auto ndictionary = dictionary.get_dictionary("<Setup>");
                 ndictionary.insert("Key", other_obj.get_link());
-                CHECK(other_obj.get_backlink_count() ==
-                      2); // this check is wrong, wait for https://github.com/realm/realm-core/pull/7677
+                CHECK(other_obj.get_backlink_count() == 1);
 
                 auto link = ndictionary.get_any("Key");
                 CHECK(other_obj.get_key() == link.get_link().get_obj_key());
@@ -6130,7 +6129,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dictionary{remote_realm, obj, col};
                 auto ndictionary = dictionary.get_dictionary("<Setup>");
                 ndictionary.insert("Key", other_obj.get_link());
-                CHECK(other_obj.get_backlink_count() == 2);
+                CHECK(other_obj.get_backlink_count() == 1);
 
                 auto link = ndictionary.get_any("Key");
                 CHECK(other_obj.get_key() == link.get_link().get_obj_key());
@@ -6141,7 +6140,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 for (size_t i = 0; i < list.size(); ++i) {
                     CHECK(list_linked.get_any(i).get_int() == list.get_any(i).get_int());
                 }
-                CHECK(other_obj.get_backlink_count() == 2);
+                CHECK(other_obj.get_backlink_count() == 1);
                 CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@type == 'list'").count() == 1);
                 CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed.@size == 3").count() == 1);
                 CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[0] == 1").count() == 1);
