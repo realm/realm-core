@@ -587,10 +587,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     ObjLink old_link;
     if (old_entry) {
         Mixed old_value = m_values->get(ndx);
+        if (old_value.is_type(type_TypedLink)) {
+            old_link = old_value.get<ObjLink>();
+        }
         if (!value.is_same_type(old_value) || value != old_value) {
-            if (old_value.is_type(type_TypedLink)) {
-                old_link = old_value.get<ObjLink>();
-            }
             m_values->set(ndx, value);
         }
         else {
