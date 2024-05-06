@@ -59,10 +59,12 @@ private:
     // collection in mixed.
     void handle_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list) const;
     void handle_dictionary_in_mixed(Dictionary& src_dict, Dictionary& dst_dict) const;
-    void copy_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx, CollectionType type) const;
-    void copy_dictionary_in_mixed(const Dictionary& src_list, Dictionary& dst_list, StringData ndx,
+    void copy_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src, size_t ndx_dst,
+                            CollectionType type) const;
+    void copy_dictionary_in_mixed(const Dictionary& src_list, Dictionary& dst_list, StringData key,
                                   CollectionType type) const;
-    bool check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx, CollectionType type) const;
+    bool check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src, size_t ndx_dst,
+                             CollectionType type) const;
     bool check_matching_dictionary(const Dictionary& src_list, const Dictionary& dst_list, StringData key,
                                    CollectionType type) const;
     bool is_collection(Mixed) const;
