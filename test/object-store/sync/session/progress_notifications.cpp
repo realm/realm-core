@@ -39,6 +39,106 @@ using namespace Catch::Matchers;
 using namespace realm;
 using NotifierType = SyncSession::ProgressDirection;
 
+struct ProgressEntry {
+    uint64_t transferred = 0;
+    uint64_t transferrable = 0;
+    double estimate = 0.0;
+
+    inline bool operator==(const ProgressEntry& other) const noexcept
+    {
+        return transferred == other.transferred && transferrable == other.transferrable && estimate == other.estimate;
+    }
+};
+
+static std::string estimate_to_string(double est)
+{
+    std::ostringstream ss;
+    ss << std::setprecision(4) << est;
+    return ss.str();
+}
+
+static std::ostream& operator<<(std::ostream& os, const ProgressEntry& value)
+{
+    return os << util::format("{ transferred: %1, transferrable: %2, estimate: %3 }", value.transferred,
+                              value.transferrable, estimate_to_string(value.estimate));
+}
+
+
+struct WaitableProgress : public util::AtomicRefCountBase {
+    WaitableProgress(const std::shared_ptr<util::Logger>& base_logger, std::string context)
+        : logger(std::move(context), base_logger)
+    {
+    }
+
+    std::function<SyncSession::ProgressNotifierCallback> make_cb()
+    {
+        auto self = util::bind_ptr(this);
+        return [self](uint64_t transferred, uint64_t transferrable, double estimate) {
+            self->logger.trace("Progress callback called xferred: %1, xferrable: %2, estimate: %3", transferred,
+                               transferrable, estimate_to_string(estimate));
+            std::lock_guard lk(self->mutex);
+            self->entries.push_back(ProgressEntry{transferred, transferrable, estimate});
+            self->cv.notify_one();
+        };
+    }
+
+    bool empty()
+    {
+        std::lock_guard lk(mutex);
+        return entries.empty();
+    }
+
+    std::vector<ProgressEntry> wait_for_full_sync()
+    {
+        std::unique_lock lk(mutex);
+        if (!cv.wait_for(lk, std::chrono::seconds(30), [&] {
+                return !entries.empty() && entries.back().transferred >= entries.back().transferrable &&
+                       entries.back().estimate >= 1.0;
+            })) {
+            CAPTURE(entries);
+            FAIL("Failed while waiting for progress to complete");
+            return {};
+        }
+
+        std::vector<ProgressEntry> ret;
+        std::swap(ret, entries);
+        return ret;
+    }
+
+    util::PrefixLogger logger;
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::vector<ProgressEntry> entries;
+};
+
+struct TestInputValue {
+    struct IsRegistration {};
+    explicit TestInputValue(IsRegistration)
+        : is_registration(true)
+    {
+    }
+
+    TestInputValue(int64_t query_version, double cur_estimate, uint64_t transferred, uint64_t transferrable)
+        : query_version(query_version)
+        , cur_estimate(cur_estimate)
+        , transferred(transferred)
+        , transferrable(transferrable)
+    {
+    }
+
+    int64_t query_version = 0;
+    double cur_estimate = 0;
+    uint64_t transferred = 0;
+    uint64_t transferrable = 0;
+    bool is_registration = false;
+};
+
+struct TestValues {
+    std::vector<TestInputValue> input_values;
+    std::vector<ProgressEntry> expected_values;
+    int64_t registered_at_query_version;
+};
+
 TEST_CASE("progress notification", "[sync][session][progress]") {
     using NotifierType = SyncSession::ProgressDirection;
     _impl::SyncProgressNotifier progress;
@@ -823,5 +923,155 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             CHECK(!callback_was_called);
         }
     }
-}
 
+    SECTION("flx streaming notifiers") {
+        // clang-format off
+        TestValues test_values = GENERATE(
+            // resgisters at the begining and should see all entries.
+            TestValues{{
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{0, 0, 0, 0},
+                TestInputValue{0, 1, 200, 200},
+                TestInputValue{1, 0.2, 300, 600},
+                TestInputValue{1, 0.4, 400, 600},
+                TestInputValue{1, 0.8, 600, 700},
+                TestInputValue{1, 1, 700, 700},
+                TestInputValue{2, 0.3, 800, 1000},
+                TestInputValue{2, 0.6, 900, 1000},
+                TestInputValue{2, 1, 1000, 1000},
+            }, {
+                ProgressEntry{0, 0, 0},
+                ProgressEntry{200, 200, 1},
+                ProgressEntry{300, 600, 0.2},
+                ProgressEntry{400, 600, 0.4},
+                ProgressEntry{600, 700, 0.8},
+                ProgressEntry{700, 700, 1},
+                ProgressEntry{800, 1000, 0.3},
+                ProgressEntry{900, 1000, 0.6},
+                ProgressEntry{1000, 1000, 1},
+            }, 1},
+            TestValues{{
+                TestInputValue{1, 0.2, 300, 600},
+                TestInputValue{1, 0.4, 400, 600},
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{1, 0.8, 600, 700},
+                TestInputValue{1, 1, 700, 700},
+            }, {
+                ProgressEntry{400, 600, 0.4},
+                ProgressEntry{600, 700, 0.8},
+                ProgressEntry{700, 700, 1.0},
+            }, 1},
+            // registers for a query version that's already up-to-date - should get an immediate update
+            // with a progress estimate of 1 and whatever the current transferred/transferrable numbers are
+            TestValues{{
+                TestInputValue{2, 0.5, 800, 900},
+                TestInputValue{2, 1, 900, 900},
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{2, 1, 1000, 1000}
+            }, {
+                ProgressEntry{900, 900, 1},
+                ProgressEntry{1000, 1000, 1},
+            }, 1}
+        );
+        // clang-format on
+
+        auto logger = util::Logger::get_default_logger();
+        auto progress_output = util::make_bind<WaitableProgress>(logger, "flx non-streaming download");
+
+        uint64_t snapshot = 1;
+        for (const auto& input_val : test_values.input_values) {
+            if (input_val.is_registration) {
+                progress.register_callback(progress_output->make_cb(), NotifierType::download, true,
+                                           test_values.registered_at_query_version);
+                continue;
+            }
+            progress.update(input_val.transferred, input_val.transferrable, 0, 0, ++snapshot, input_val.cur_estimate,
+                            0.0, input_val.query_version);
+        }
+
+        const auto output_values = progress_output->wait_for_full_sync();
+
+        REQUIRE_THAT(output_values, Catch::Matchers::Equals(test_values.expected_values));
+    }
+
+    SECTION("flx non-streaming notifiers") {
+        // clang-format off
+        TestValues test_values = GENERATE(
+            // registers for query version 1 on an empty realm - should see the full progression
+            // of query version 1 and nothing else.
+            TestValues{{
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{0, 0, 0, 0},
+                TestInputValue{0, 1, 200, 200},
+                TestInputValue{1, 0.2, 300, 600},
+                TestInputValue{1, 0.4, 400, 600},
+                TestInputValue{1, 0.8, 600, 700},
+                TestInputValue{1, 1, 700, 700},
+                TestInputValue{2, 0.3, 800, 1000},
+                TestInputValue{2, 0.6, 900, 1000},
+                TestInputValue{2, 1, 1000, 1000},
+            }, {
+                ProgressEntry{300, 600, 0.2},
+                ProgressEntry{400, 600, 0.4},
+                ProgressEntry{600, 600, 0.8},
+                ProgressEntry{700, 600, 1.0},
+            }, 1},
+            // registers a notifier in the middle of syncing the target query version
+            TestValues{{
+                TestInputValue{1, 0.2, 300, 600},
+                TestInputValue{1, 0.4, 400, 600},
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{1, 0.8, 600, 700},
+                TestInputValue{1, 1, 700, 700},
+                // There's also a progress notification for a regular steady state
+                // download message that gets ignored because we're already up-to-date
+                TestInputValue{1, 1, 800, 800},
+            }, {
+                ProgressEntry{400, 600, 0.4},
+                ProgressEntry{600, 600, 0.8},
+                ProgressEntry{700, 600, 1.0},
+            }, 1},
+            // registers for a notifier for a later query version - should only see notifications
+            // for downloads greater than the requested query version
+            TestValues{{
+
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{1, 0.8, 700, 700},
+                TestInputValue{1, 1, 700, 700},
+                TestInputValue{3, 0.5, 800, 900},
+                TestInputValue{3, 1, 900, 900},
+            }, {
+                ProgressEntry{800, 900, 0.5},
+                ProgressEntry{900, 900, 1},
+            }, 2},
+            // registers for a query version that's already up-to-date - should get an immediate update
+            // with a progress estimate of 1 and whatever the current transferred/transferrable numbers are
+            TestValues{{
+                TestInputValue{2, 0.5, 800, 900},
+                TestInputValue{2, 1, 900, 900},
+                TestInputValue{TestInputValue::IsRegistration{}},
+            }, {
+                ProgressEntry{900, 900, 1},
+            }, 1}
+        );
+        // clang-format on
+
+        auto logger = util::Logger::get_default_logger();
+        auto progress_output = util::make_bind<WaitableProgress>(logger, "flx non-streaming download");
+
+        uint64_t snapshot = 1;
+        for (const auto& input_val : test_values.input_values) {
+            if (input_val.is_registration) {
+                progress.register_callback(progress_output->make_cb(), NotifierType::download, false,
+                                           test_values.registered_at_query_version);
+                continue;
+            }
+            progress.update(input_val.transferred, input_val.transferrable, 0, 0, ++snapshot, input_val.cur_estimate,
+                            0.0, input_val.query_version);
+        }
+
+        const auto output_values = progress_output->wait_for_full_sync();
+
+        REQUIRE_THAT(output_values, Catch::Matchers::Equals(test_values.expected_values));
+    }
+}
