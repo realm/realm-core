@@ -189,7 +189,6 @@ TEST(ClientReset_NoLocalChanges)
                 Session::Config::ClientReset client_reset_config;
                 client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-                client_reset_config.recovery_is_allowed = true;
                 client_reset_config.fresh_copy = std::move(sg_fresh);
                 session_config.client_reset_config = std::move(client_reset_config);
             }
@@ -261,7 +260,6 @@ TEST(ClientReset_InitialLocalChanges)
         Session::Config::ClientReset client_reset_config;
         client_reset_config.mode = ClientResyncMode::DiscardLocal;
         client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-        client_reset_config.recovery_is_allowed = true;
         client_reset_config.fresh_copy = std::move(sg_fresh);
         session_config_2.client_reset_config = std::move(client_reset_config);
     }
@@ -379,8 +377,8 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
     Session::Config session_config_3;
     session_config_3.client_reset_config = Session::Config::ClientReset{};
     session_config_3.client_reset_config->mode = recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal;
-    session_config_3.client_reset_config->action = sync::ProtocolErrorInfo::Action::ClientReset;
-    session_config_3.client_reset_config->recovery_is_allowed = recover;
+    session_config_3.client_reset_config->action = recover ? sync::ProtocolErrorInfo::Action::ClientReset
+                                                           : sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
     session_config_3.client_reset_config->fresh_copy = std::move(sg_fresh1);
     Session session_3 = fixture.make_session(sg, server_path, std::move(session_config_3));
     session_3.bind();
@@ -627,7 +625,6 @@ TEST(ClientReset_ThreeClients)
                 Session::Config::ClientReset client_reset_config;
                 client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-                client_reset_config.recovery_is_allowed = true;
                 client_reset_config.fresh_copy = std::move(sg_fresh1);
                 session_config_1.client_reset_config = std::move(client_reset_config);
             }
@@ -636,7 +633,6 @@ TEST(ClientReset_ThreeClients)
                 Session::Config::ClientReset client_reset_config;
                 client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-                client_reset_config.recovery_is_allowed = true;
                 client_reset_config.fresh_copy = std::move(sg_fresh2);
                 session_config_2.client_reset_config = std::move(client_reset_config);
             }
@@ -757,7 +753,6 @@ TEST(ClientReset_DoNotRecoverSchema)
             Session::Config::ClientReset client_reset_config;
             client_reset_config.mode = ClientResyncMode::DiscardLocal;
             client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-            client_reset_config.recovery_is_allowed = true;
             client_reset_config.fresh_copy = std::move(sg_fresh1);
             session_config.client_reset_config = std::move(client_reset_config);
         }
@@ -846,7 +841,6 @@ TEST(ClientReset_PinnedVersion)
             session_config.client_reset_config = Session::Config::ClientReset{};
             session_config.client_reset_config->mode = ClientResyncMode::DiscardLocal;
             session_config.client_reset_config->action = sync::ProtocolErrorInfo::Action::ClientReset;
-            session_config.client_reset_config->recovery_is_allowed = true;
             session_config.client_reset_config->fresh_copy = std::move(sg_fresh);
         }
 
@@ -878,9 +872,9 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
     auto fresh_path = fresh.get_path();
     sync::ClientReset cr_config;
     cr_config.mode = mode;
-    cr_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
+    cr_config.action = allow_recovery ? sync::ProtocolErrorInfo::Action::ClientReset
+                                      : sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
     cr_config.fresh_copy = fresh.shared_from_this();
-    cr_config.recovery_is_allowed = allow_recovery;
     cr_config.notify_before_client_reset = nullptr;
     cr_config.notify_after_client_reset = nullptr;
 
@@ -920,7 +914,6 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
     cr_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
     cr_config.error = error;
     cr_config.fresh_copy = fresh.shared_from_this();
-    cr_config.recovery_is_allowed = true;
     cr_config.notify_before_client_reset = nullptr;
     cr_config.notify_after_client_reset = nullptr;
 
@@ -970,28 +963,34 @@ std::pair<DBRef, DBRef> prepare_db(const std::string& path, const std::string& c
 
 TEST(ClientReset_ConvertResyncMode)
 {
-    CHECK(_impl::client_reset::to_resync_mode(0) == ClientResyncMode::DiscardLocal);
-    CHECK(_impl::client_reset::to_resync_mode(1) == ClientResyncMode::Recover);
-    CHECK_THROW(_impl::client_reset::to_resync_mode(2), _impl::client_reset::ClientResetFailed);
+    CHECK_THROW(_impl::client_reset::to_resync_mode(0), _impl::client_reset::ClientResetFailed);
+    CHECK(_impl::client_reset::to_resync_mode(1) == ClientResyncMode::DiscardLocal);
+    CHECK(_impl::client_reset::to_resync_mode(2) == ClientResyncMode::RecoverOrDiscard);
+    CHECK(_impl::client_reset::to_resync_mode(3) == ClientResyncMode::Recover);
+    CHECK_THROW(_impl::client_reset::to_resync_mode(4), _impl::client_reset::ClientResetFailed);
 
-    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::Recover) == 1);
-    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::RecoverOrDiscard) == 1);
-    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::DiscardLocal) == 0);
+    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::DiscardLocal) == 1);
+    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::RecoverOrDiscard) == 2);
+    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::Recover) == 3);
     CHECK_THROW(_impl::client_reset::from_resync_mode(ClientResyncMode::Manual),
                 _impl::client_reset::ClientResetFailed);
 }
 
 TEST(ClientReset_ConvertResetAction)
 {
-    CHECK(_impl::client_reset::to_reset_action(1) == sync::ProtocolErrorInfo::Action::MigrateToFLX);
-    CHECK(_impl::client_reset::to_reset_action(2) == sync::ProtocolErrorInfo::Action::RevertToPBS);
-    CHECK(_impl::client_reset::to_reset_action(0) == sync::ProtocolErrorInfo::Action::ClientReset);
-    CHECK(_impl::client_reset::to_reset_action(3) == sync::ProtocolErrorInfo::Action::ClientReset);
+    CHECK(_impl::client_reset::to_reset_action(0) == sync::ProtocolErrorInfo::Action::NoAction);
+    CHECK(_impl::client_reset::to_reset_action(1) == sync::ProtocolErrorInfo::Action::ClientReset);
+    CHECK(_impl::client_reset::to_reset_action(2) == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery);
+    CHECK(_impl::client_reset::to_reset_action(3) == sync::ProtocolErrorInfo::Action::MigrateToFLX);
+    CHECK(_impl::client_reset::to_reset_action(4) == sync::ProtocolErrorInfo::Action::RevertToPBS);
+    CHECK(_impl::client_reset::to_reset_action(5) == sync::ProtocolErrorInfo::Action::NoAction);
 
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateToFLX) == 1);
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::RevertToPBS) == 2);
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::ClientReset) == 0);
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateSchema) == 0);
+    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::ClientReset) == 1);
+    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) == 2);
+    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateToFLX) == 3);
+    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::RevertToPBS) == 4);
+    CHECK_THROW(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateSchema),
+                _impl::client_reset::ClientResetFailed);
 }
 
 DBRef setup_metadata_table_v1(test_util::unit_test::TestContext& test_context, std::string path, Timestamp ts,
@@ -1042,7 +1041,7 @@ TEST(ClientReset_TrackReset_V1_EntryExists)
     {
         auto wt = db->start_write();
         // Should throw an exception, since the table isn't empty
-        CHECK_THROW(_impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal, true,
+        CHECK_THROW(_impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal,
                                                      sync::ProtocolErrorInfo::Action::RevertToPBS, error),
                     _impl::client_reset::ClientResetFailed);
     }
@@ -1060,13 +1059,12 @@ TEST(ClientReset_TrackReset_Existing_empty_V1_table)
         TableRef table = wt->get_table("client_reset_metadata");
         table->clear();
         wt->commit_and_continue_writing();
-        _impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal, false,
+        _impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal,
                                          sync::ProtocolErrorInfo::Action::RevertToPBS, error);
     }
     auto wt = db->start_read();
     auto reset = _impl::client_reset::has_pending_reset(*wt);
     CHECK(reset->mode == ClientResyncMode::DiscardLocal);
-    CHECK(reset->recovery_allowed == false);
     CHECK(reset->action == sync::ProtocolErrorInfo::Action::RevertToPBS);
     CHECK(reset->error == error);
     timestamp = Timestamp(std::chrono::system_clock::now());
@@ -1074,22 +1072,27 @@ TEST(ClientReset_TrackReset_Existing_empty_V1_table)
     CHECK(abs(reset->time.get_seconds() - timestamp.get_seconds()) < 5);
 }
 
-TEST_TYPES(ClientReset_TrackReset_v2, std::true_type, std::false_type)
+TEST_TYPES(
+    ClientReset_TrackReset_v2,
+    std::integral_constant<sync::ProtocolErrorInfo::Action, sync::ProtocolErrorInfo::Action::ClientReset>,
+    std::integral_constant<sync::ProtocolErrorInfo::Action, sync::ProtocolErrorInfo::Action::ClientResetNoRecovery>,
+    std::integral_constant<sync::ProtocolErrorInfo::Action, sync::ProtocolErrorInfo::Action::RevertToPBS>,
+    std::integral_constant<sync::ProtocolErrorInfo::Action, sync::ProtocolErrorInfo::Action::MigrateToFLX>)
 {
+
+
     SHARED_GROUP_TEST_PATH(test_path);
     DBRef db = DB::create(make_client_replication(), test_path);
     Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
-    bool recovery_allowed = TEST_TYPE::value;
+    sync::ProtocolErrorInfo::Action reset_action = TEST_TYPE::value;
     {
         auto wt = db->start_write();
-        _impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal, recovery_allowed,
-                                         sync::ProtocolErrorInfo::Action::RevertToPBS, error);
+        _impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal, reset_action, error);
     }
     auto wt = db->start_read();
     auto reset = _impl::client_reset::has_pending_reset(*wt);
     CHECK(reset->mode == ClientResyncMode::DiscardLocal);
-    CHECK(reset->recovery_allowed == recovery_allowed);
-    CHECK(reset->action == sync::ProtocolErrorInfo::Action::RevertToPBS);
+    CHECK(reset->action == reset_action);
     CHECK(reset->error == error);
     auto timestamp = Timestamp(std::chrono::system_clock::now());
     // Verify timestamp is at least close to current time
@@ -1111,7 +1114,6 @@ TEST(ClientReset_UninitializedFile)
     cr_config.mode = ClientResyncMode::Recover;
     cr_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
     cr_config.fresh_copy = db_fresh;
-    cr_config.recovery_is_allowed = true;
     cr_config.notify_before_client_reset = nullptr;
     cr_config.notify_after_client_reset = nullptr;
 
@@ -1283,9 +1285,8 @@ TEST(ClientReset_Recover_RecoveryDisabled)
     });
     sync::ClientReset cr_config;
     cr_config.mode = ClientResyncMode::Recover;
-    cr_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
+    cr_config.action = sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
     cr_config.fresh_copy = dbs.second;
-    cr_config.recovery_is_allowed = false;
     cr_config.notify_before_client_reset = nullptr;
     cr_config.notify_after_client_reset = nullptr;
 

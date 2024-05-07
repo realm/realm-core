@@ -432,8 +432,6 @@ struct FakeLocalClientReset : public TestClientReset {
             sync::ClientReset reset_config;
             reset_config.fresh_copy = TestHelper::get_db(remote_realm);
             reset_config.mode = m_mode;
-            reset_config.recovery_is_allowed =
-                m_mode == ClientResyncMode::Recover || m_mode == ClientResyncMode::RecoverOrDiscard;
             reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
             reset_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
 

@@ -432,10 +432,8 @@ void SyncSession::download_fresh_realm(const sync::SessionErrorInfo& error_info)
         auto mode = config(&SyncConfig::client_resync_mode);
         if (mode == ClientResyncMode::Recover) {
             handle_fresh_realm_downloaded(
-                nullptr,
-                {ErrorCodes::RuntimeError,
-                 "A client reset is required but the server does not permit recovery for this client"},
-                error_info);
+                nullptr, {ErrorCodes::RuntimeError,
+                          "A client reset is required but the server does not permit recovery for this client"});
             return;
         }
     }
@@ -472,7 +470,7 @@ void SyncSession::download_fresh_realm(const sync::SessionErrorInfo& error_info)
     catch (...) {
         // Failed to open the fresh path after attempting to delete it, so we
         // just can't do automatic recovery.
-        handle_fresh_realm_downloaded(nullptr, exception_to_status(), error_info);
+        handle_fresh_realm_downloaded(nullptr, exception_to_status());
         return;
     }
 
@@ -500,6 +498,7 @@ void SyncSession::download_fresh_realm(const sync::SessionErrorInfo& error_info)
     history.set_write_validator_factory({});
 
     fresh_sync_session->assert_mutex_unlocked();
+    m_client_reset_error = error_info;
     // The fresh realm uses flexible sync.
     if (auto fresh_sub_store = fresh_sync_session->get_flx_subscription_store()) {
         auto fresh_sub = fresh_sub_store->get_latest();
@@ -513,7 +512,8 @@ void SyncSession::download_fresh_realm(const sync::SessionErrorInfo& error_info)
         auto self = shared_from_this();
         using SubscriptionState = sync::SubscriptionSet::State;
         fresh_sub.get_state_change_notification(SubscriptionState::Complete)
-            .then([=](SubscriptionState) -> util::Future<sync::SubscriptionSet> {
+            .then([self, error_info, fresh_sync_session, fresh_sub_store,
+                   fresh_sub](SubscriptionState) -> util::Future<sync::SubscriptionSet> {
                 if (error_info.server_requests_action != sync::ProtocolErrorInfo::Action::MigrateToFLX) {
                     return fresh_sub;
                 }
@@ -530,40 +530,42 @@ void SyncSession::download_fresh_realm(const sync::SessionErrorInfo& error_info)
                 fresh_sync_session->m_migration_store->create_subscriptions(*fresh_sub_store, *query_string);
                 return fresh_sub_store->get_latest()
                     .get_state_change_notification(SubscriptionState::Complete)
-                    .then([=](SubscriptionState) {
+                    .then([fresh_sub_store](SubscriptionState) {
                         return fresh_sub_store->get_latest();
                     });
             })
-            .get_async([=](StatusWith<sync::SubscriptionSet>&& subs) {
+            .get_async([self, fresh_sync_session, db](StatusWith<sync::SubscriptionSet>&& subs) {
                 // Keep the sync session alive while it's downloading, but then close
                 // it immediately
                 fresh_sync_session->force_close();
                 if (subs.is_ok()) {
-                    self->handle_fresh_realm_downloaded(db, Status::OK(), error_info, std::move(subs.get_value()));
+                    self->handle_fresh_realm_downloaded(db, Status::OK(), std::move(subs.get_value()));
                 }
                 else {
-                    self->handle_fresh_realm_downloaded(nullptr, subs.get_status(), error_info);
+                    self->handle_fresh_realm_downloaded(nullptr, subs.get_status());
                 }
             });
     }
     else { // pbs
-        fresh_sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](Status s) {
-            // Keep the sync session alive while it's downloading, but then close
-            // it immediately
-            fresh_sync_session->force_close();
-            if (auto strong_self = weak_self.lock()) {
-                strong_self->handle_fresh_realm_downloaded(db, s, error_info);
-            }
-        });
+        fresh_sync_session->wait_for_download_completion(
+            [fresh_sync_session, db, weak_self = weak_from_this()](Status status) {
+                // Keep the sync session alive while it's downloading, but then close
+                // it immediately
+                fresh_sync_session->force_close();
+                if (auto strong_self = weak_self.lock()) {
+                    strong_self->handle_fresh_realm_downloaded(db, status);
+                }
+            });
     }
     fresh_sync_session->revive_if_needed();
 }
 
-void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status, const sync::SessionErrorInfo& error_info,
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
                                                 std::optional<sync::SubscriptionSet> new_subs)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     if (m_state != State::Active) {
+        m_client_reset_error.reset();
         return;
     }
     // The download can fail for many reasons. For example:
@@ -571,6 +573,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status, const s
     // - during download of the fresh copy, the fresh copy itself is reset
     // - in FLX mode there was a problem fulfilling the previously active subscription
     if (!status.is_ok()) {
+        m_client_reset_error.reset();
         if (status == ErrorCodes::OperationAborted) {
             return;
         }
@@ -578,7 +581,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status, const s
 
         sync::SessionErrorInfo synthetic(
             Status{ErrorCodes::AutoClientResetFailed,
-                   util::format("A fatal error occurred during client reset: '%1'", status.reason())},
+                   util::format("A fatal error occurred during client reset: '%1'", status)},
             sync::IsFatal{true});
         handle_error(synthetic);
         return;
@@ -594,8 +597,6 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status, const s
     // that moving to the inactive state doesn't clear them - they will be
     // re-registered when the session becomes active again.
     {
-        m_client_reset_error = error_info.status;
-        m_server_requests_action = error_info.server_requests_action;
         m_client_reset_fresh_copy = db;
         CompletionCallbacks callbacks;
         std::swap(m_completion_callbacks, callbacks);
@@ -609,11 +610,14 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status, const s
         });
         // Do not cancel the notifications on subscriptions.
         bool cancel_subscription_notifications = false;
+        bool is_migration =
+            m_client_reset_error &&
+            (m_client_reset_error->server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
+             m_client_reset_error->server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS);
         become_inactive(std::move(lock), Status::OK(), cancel_subscription_notifications); // unlocks the lock
 
         // Once the session is inactive, update sync config and subscription store after migration.
-        if (error_info.server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
-            error_info.server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS) {
+        if (is_migration) {
             apply_sync_config_after_migration_or_rollback();
             auto flx_sync_requested = config(&SyncConfig::flx_sync_requested);
             update_subscription_store(flx_sync_requested, std::move(new_subs));
@@ -829,20 +833,15 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 static sync::Session::Config::ClientReset
 make_client_reset_config(const RealmConfig& base_config, const std::shared_ptr<SyncConfig>& sync_config,
-                         DBRef&& fresh_copy, sync::ProtocolErrorInfo::Action action, std::optional<Status> error,
-                         bool schema_migration_detected)
+                         DBRef&& fresh_copy, sync::SessionErrorInfo&& error_info, bool schema_migration_detected)
 {
     REALM_ASSERT(sync_config->client_resync_mode != ClientResyncMode::Manual);
 
     sync::Session::Config::ClientReset config;
     config.mode = sync_config->client_resync_mode;
     config.fresh_copy = std::move(fresh_copy);
-    config.action = action;
-    config.error = std::move(error);
-    // Migrations are allowed to recover local data.
-    config.recovery_is_allowed = action == sync::ProtocolErrorInfo::Action::ClientReset ||
-                                 action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
-                                 action == sync::ProtocolErrorInfo::Action::RevertToPBS;
+    config.action = error_info.server_requests_action;
+    config.error = std::move(error_info.status);
 
     // The conditions here are asymmetric because if we have *either* a before
     // or after callback we need to make sure to initialize the local schema
@@ -946,13 +945,13 @@ void SyncSession::create_sync_session()
     }
     session_config.custom_http_headers = sync_config.custom_http_headers;
 
-    if (m_server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
+    if (m_client_reset_error &&
+        m_client_reset_error->server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
         // Use the original sync config, not the updated one from the migration store
-        session_config.client_reset_config = make_client_reset_config(
-            m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy), m_server_requests_action,
-            std::move(m_client_reset_error), m_previous_schema_version.has_value());
+        session_config.client_reset_config =
+            make_client_reset_config(m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy),
+                                     std::move(*m_client_reset_error), m_previous_schema_version.has_value());
         session_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
-        m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
         m_client_reset_error.reset();
     }
 

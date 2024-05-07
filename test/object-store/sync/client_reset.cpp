@@ -1640,7 +1640,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 auto db = TestHelper::get_db(realm);
                 auto wt = db->start_write();
                 Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
-                _impl::client_reset::track_reset(*wt, mode, true, action, error);
+                _impl::client_reset::track_reset(*wt, mode, action, error);
                 wt->commit();
             };
         };

@@ -62,23 +62,23 @@ void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger
                     bool allow_schema_additions);
 
 struct PendingReset {
-    // Metadata version
-    int version = 0;
-    // Metadata v1 (or later) fields
     ClientResyncMode mode;
     Timestamp time;
-    // Metadata v2 fields
     using Action = sync::ProtocolErrorInfo::Action;
-    bool recovery_allowed;
-    Action action = Action::ClientReset;
+    Action action = Action::NoAction;
     std::optional<Status> error;
 
-    std::string to_string() const;
+    bool empty() const noexcept
+    {
+        return time.is_null() && action == Action::NoAction;
+    }
 };
+
+std::ostream& operator<<(std::ostream& os, const PendingReset& pr);
 
 void remove_pending_client_resets(Transaction& wt);
 util::Optional<PendingReset> has_pending_reset(const Transaction& rt);
-void track_reset(Transaction& wt, ClientResyncMode mode, bool recovery_allowed, PendingReset::Action action,
+void track_reset(Transaction& wt, ClientResyncMode mode, PendingReset::Action action,
                  const std::optional<Status>& error);
 
 // Exposed for testing only
@@ -86,9 +86,8 @@ int64_t from_reset_action(PendingReset::Action action);
 PendingReset::Action to_reset_action(int64_t action);
 ClientResyncMode to_resync_mode(int64_t mode);
 int64_t from_resync_mode(ClientResyncMode mode);
-ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, bool recovery_allowed,
-                                      sync::ProtocolErrorInfo::Action action, const std::optional<Status>& error,
-                                      util::Logger& logger);
+ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, sync::ProtocolErrorInfo::Action action,
+                                      const std::optional<Status>& error, util::Logger& logger);
 
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_fresh' as the source of truth.

@@ -65,20 +65,21 @@ std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
 
 namespace realm::_impl::client_reset {
 
-std::string PendingReset::to_string() const
+std::ostream& operator<<(std::ostream& os, const PendingReset& pr)
 {
-    // PendingReset structure is empty
-    if (REALM_UNLIKELY(version == 0)) {
-        return "empty client reset structure";
+    if (pr.action == ProtocolErrorInfo::Action::NoAction || pr.time.is_null()) {
+        os << "empty pending client reset";
     }
-    // Has only V1 metadata info
-    if (REALM_UNLIKELY(version == 1)) {
-        return util::format("client reset of type: '%1' at: %2", mode, time);
+    else if (pr.action != ProtocolErrorInfo::Action::ClientReset) {
+        os << "pending '" << pr.action << "' client reset of type: '" << pr.mode << "' at: " << pr.time;
     }
-    // V2 metadata info
-    REALM_ASSERT(version == 2);
-    return util::format("%1 client reset of type: '%2' for '%3' at: %4",
-                        recovery_allowed ? "recoverable" : "non-recoverable", mode, action, time);
+    else {
+        os << "pending client reset of type: '" << pr.mode << "' at: " << pr.time;
+    }
+    if (pr.error) {
+        os << " for error: " << *pr.error;
+    }
+    return os;
 }
 
 static inline bool should_skip_table(const Transaction& group, TableKey key)
@@ -449,14 +450,16 @@ void remove_pending_client_resets(Transaction& wt)
 int64_t from_reset_action(PendingReset::Action action)
 {
     switch (action) {
-        case PendingReset::Action::MigrateToFLX:
-            return 1;
-        case PendingReset::Action::RevertToPBS:
-            return 2;
         case PendingReset::Action::ClientReset:
-            [[fallthrough]];
+            return 1;
+        case PendingReset::Action::ClientResetNoRecovery:
+            return 2;
+        case PendingReset::Action::MigrateToFLX:
+            return 3;
+        case PendingReset::Action::RevertToPBS:
+            return 4;
         default:
-            return 0;
+            throw ClientResetFailed(util::format("Unsupported client reset action: %1 for pending reset", action));
     }
 }
 
@@ -464,41 +467,42 @@ PendingReset::Action to_reset_action(int64_t action)
 {
     switch (action) {
         case 1:
-            return PendingReset::Action::MigrateToFLX;
-        case 2:
-            return PendingReset::Action::RevertToPBS;
-        case 0:
-            [[fallthrough]];
-        default:
             return PendingReset::Action::ClientReset;
+        case 2:
+            return PendingReset::Action::ClientResetNoRecovery;
+        case 3:
+            return PendingReset::Action::MigrateToFLX;
+        case 4:
+            return PendingReset::Action::RevertToPBS;
+        default:
+            return PendingReset::Action::NoAction;
     }
 }
 
 ClientResyncMode to_resync_mode(int64_t mode)
 {
-    if (mode == 0) {
-        return ClientResyncMode::DiscardLocal;
-    }
-    else if (mode == 1) {
-        return ClientResyncMode::Recover;
-    }
-    else {
-        throw ClientResetFailed(util::format("Unsupported client reset metadata mode: %1 for pending reset", mode));
+    // RecoverOrDiscard is treated as Recover and is not stored
+    switch (mode) {
+        case 0: // DiscardLocal
+            return ClientResyncMode::DiscardLocal;
+        case 1: // Recover
+            return ClientResyncMode::Recover;
+        default:
+            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
     }
 }
 
 int64_t from_resync_mode(ClientResyncMode mode)
 {
     switch (mode) {
-        case ClientResyncMode::Recover:
-            [[fallthrough]];
-        case ClientResyncMode::RecoverOrDiscard:
-            return 1; // Recover
         case ClientResyncMode::DiscardLocal:
-            return 0; // Discard
+            return 0; // DiscardLocal
+        case ClientResyncMode::RecoverOrDiscard:
+            [[fallthrough]]; // RecoverOrDiscard is treated as Recover
+        case ClientResyncMode::Recover:
+            return 1; // Recover
         default:
-            throw ClientResetFailed(
-                util::format("Unsupported client reset metadata mode: %1 for pending reset", mode));
+            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
     }
 }
 
@@ -520,18 +524,18 @@ util::Optional<PendingReset> has_pending_reset(const Transaction& rt)
     REALM_ASSERT(first);
     PendingReset pending;
     REALM_ASSERT(version_col);
-    pending.version = static_cast<int>(first.get<int64_t>(version_col));
+    auto version = static_cast<int>(first.get<int64_t>(version_col));
     // Version 1 columns
     REALM_ASSERT(timestamp_col);
     REALM_ASSERT(mode_col);
     pending.time = first.get<Timestamp>(timestamp_col);
     pending.mode = to_resync_mode(first.get<int64_t>(mode_col));
-    if (pending.version == 0 || pending.version > s_metadata_version) {
-        throw ClientResetFailed(util::format("Unsupported client reset metadata version: %1 vs %2, from %3",
-                                             pending.version, s_metadata_version, pending.time));
+    if (version == 0 || version > s_metadata_version) {
+        throw ClientResetFailed(util::format("Unsupported client reset metadata version: %1 vs %2, from %3", version,
+                                             s_metadata_version, pending.time));
     }
     // Version 2 columns
-    if (pending.version >= 2) {
+    if (version >= 2) {
         ColKey recovery_col = table->get_column_key(s_reset_recovery_col_name);
         ColKey action_col = table->get_column_key(s_reset_action_col_name);
         ColKey code_col = table->get_column_key(s_reset_error_code_col_name);
@@ -540,7 +544,6 @@ util::Optional<PendingReset> has_pending_reset(const Transaction& rt)
         REALM_ASSERT(action_col);
         REALM_ASSERT(code_col);
         REALM_ASSERT(msg_col);
-        pending.recovery_allowed = first.get<bool>(recovery_col);
         pending.action = to_reset_action(first.get<int64_t>(action_col));
         auto code = first.get<int64_t>(code_col);
         if (code > 0) {
@@ -549,7 +552,6 @@ util::Optional<PendingReset> has_pending_reset(const Transaction& rt)
     }
     else {
         // Provide default action and recovery values if table version is 1
-        pending.recovery_allowed = true;
         pending.action = PendingReset::Action::ClientReset;
     }
     return pending;
@@ -573,7 +575,7 @@ static TableRef get_or_create_client_reset_table(Transaction& wt)
     return table;
 }
 
-void track_reset(Transaction& wt, ClientResyncMode mode, bool recovery_allowed, PendingReset::Action action,
+void track_reset(Transaction& wt, ClientResyncMode mode, PendingReset::Action action,
                  const std::optional<Status>& error)
 {
     REALM_ASSERT(mode != ClientResyncMode::Manual);
@@ -589,14 +591,13 @@ void track_reset(Transaction& wt, ClientResyncMode mode, bool recovery_allowed, 
     ColKey version_col = table->get_column_key(s_version_column_name);
     ColKey timestamp_col = table->get_column_key(s_timestamp_col_name);
     ColKey mode_col = table->get_column_key(s_reset_mode_col_name);
-    ColKey recovery_col = table->get_column_key(s_reset_recovery_col_name);
     ColKey action_col = table->get_column_key(s_reset_action_col_name);
     ColKey code_col = table->get_column_key(s_reset_error_code_col_name);
     ColKey msg_col = table->get_column_key(s_reset_error_msg_col_name);
     // If the table is missing any columns, remove it and start over
-    if (!(timestamp_col && mode_col && recovery_col && action_col && code_col && msg_col && version_col)) {
+    if (!(timestamp_col && mode_col && action_col && code_col && msg_col && version_col)) {
         wt.remove_table(s_meta_reset_table_name);
-        track_reset(wt, mode, recovery_allowed, action, error); // try again
+        track_reset(wt, mode, action, error); // try again
         return;
     }
     auto obj = table->create_object_with_primary_key(ObjectId::gen(),
@@ -604,7 +605,6 @@ void track_reset(Transaction& wt, ClientResyncMode mode, bool recovery_allowed, 
                                                          {version_col, s_metadata_version},
                                                          {timestamp_col, Timestamp(std::chrono::system_clock::now())},
                                                          {mode_col, from_resync_mode(mode)},
-                                                         {recovery_col, recovery_allowed},
                                                          {action_col, from_reset_action(action)},
                                                      });
     if (error) {
@@ -616,15 +616,11 @@ void track_reset(Transaction& wt, ClientResyncMode mode, bool recovery_allowed, 
     wt.commit_and_continue_writing();
 }
 
-ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, bool recovery_is_allowed,
-                                      PendingReset::Action action, const std::optional<Status>& error,
-                                      util::Logger& logger)
+ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, PendingReset::Action action,
+                                      const std::optional<Status>& error, util::Logger& logger)
 {
     if (auto previous_reset = has_pending_reset(wt)) {
-        logger.info(util::LogCategory::reset, "Found a previous %1", previous_reset->to_string());
-        if (previous_reset->error) {
-            logger.info(util::LogCategory::reset, "Originating client reset error: %1", *previous_reset->error);
-        }
+        logger.info(util::LogCategory::reset, "Found a previous %1", previous_reset.value());
         switch (previous_reset->mode) {
             case ClientResyncMode::Manual:
                 REALM_UNREACHABLE();
@@ -659,7 +655,7 @@ ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, bo
                                                      previous_reset->mode, previous_reset->time, mode));
         }
     }
-    if (!recovery_is_allowed) {
+    if (action == PendingReset::Action::ClientResetNoRecovery) {
         if (mode == ClientResyncMode::Recover) {
             throw ClientResetFailed(
                 "Client reset mode is set to 'Recover' but the server does not allow recovery for this client");
@@ -671,7 +667,7 @@ ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, bo
             mode = ClientResyncMode::DiscardLocal;
         }
     }
-    track_reset(wt, mode, recovery_is_allowed, action, error);
+    track_reset(wt, mode, action, error);
     return mode;
 }
 
@@ -681,22 +677,17 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
 {
     DB& db_remote = *reset_config.fresh_copy;
     auto wt_local = db_local.start_write();
-    auto actual_mode = reset_precheck_guard(*wt_local, reset_config.mode, reset_config.recovery_is_allowed,
-                                            reset_config.action, reset_config.error, logger);
+    auto actual_mode =
+        reset_precheck_guard(*wt_local, reset_config.mode, reset_config.action, reset_config.error, logger);
     bool recover_local_changes =
         actual_mode == ClientResyncMode::Recover || actual_mode == ClientResyncMode::RecoverOrDiscard;
 
     logger.info(util::LogCategory::reset,
-                "Client reset: path_local = %1, "
-                "client_file_ident = (ident: %2, salt: %3), "
-                "remote_path = %4, requested_mode = %5, recovery_is_allowed = %6, "
-                "action = %7, actual_mode = %8, will_recover = %9",
+                "Client reset: path_local = %1, client_file_ident = (ident: %2, salt: %3), "
+                "remote_path = %4, requested_mode = %5, action = %6, actual_mode = %7, will_recover = %8, "
+                "originating_error = %9",
                 db_local.get_path(), client_file_ident.ident, client_file_ident.salt, db_remote.get_path(),
-                reset_config.mode, reset_config.recovery_is_allowed, reset_config.action, actual_mode,
-                recover_local_changes);
-    if (reset_config.error) {
-        logger.info(util::LogCategory::reset, "Client reset: originating error = %1", *reset_config.error);
-    }
+                reset_config.mode, reset_config.action, actual_mode, recover_local_changes, *reset_config.error);
 
     auto& repl_local = dynamic_cast<ClientReplication&>(*db_local.get_replication());
     auto& history_local = repl_local.get_history();
