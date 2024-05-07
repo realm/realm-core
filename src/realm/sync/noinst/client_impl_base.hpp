@@ -1133,10 +1133,6 @@ private:
     // the detection of download completion.
     request_ident_type m_last_triggering_download_mark = 0;
 
-    // Keep track of the DownloadBatchState for the last download message to help
-    // determine if the current LastInBatch came after a message with MoreToCome.
-    DownloadBatchState m_last_download_batch_state = DownloadBatchState::SteadyState;
-
     SessionWrapper& m_wrapper;
 
     request_ident_type m_last_pending_test_command_ident = 0;
@@ -1201,8 +1197,8 @@ private:
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
-    bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version,
-                                          bool same_remote_versions);
+    DownloadBatchState derive_download_batch_state(const DownloadMessage& download_message,
+                                                   bool same_remote_versions);
 
     void init_progress_handler();
     void enable_progress_notifications();

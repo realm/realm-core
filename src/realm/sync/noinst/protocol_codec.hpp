@@ -403,6 +403,7 @@ public:
 
     struct DownloadMessage {
         SyncProgress progress;
+        // If the connection is an FLX sync connection then query_version and last_in_batch shall
         std::optional<int64_t> query_version;
         std::optional<bool> last_in_batch;
         union {

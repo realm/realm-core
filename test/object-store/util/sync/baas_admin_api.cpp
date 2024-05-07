@@ -1001,6 +1001,12 @@ nlohmann::json AdminAPISession::get_app_settings(const std::string& app_id) cons
     return settings_endpoint.get_json();
 }
 
+void AdminAPISession::patch_app_settings(const std::string& app_id, nlohmann::json&& json) const
+{
+    auto settings_endpoint = apps(APIFamily::Private)[app_id]["settings"];
+    settings_endpoint.patch_json(std::move(json));
+}
+
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
     if (config.mode == AdminAPISession::ServiceConfig::SyncMode::Flexible) {
