@@ -168,7 +168,7 @@ public:
     bool is_attached() const noexcept;
 
     static bool needs_file_format_upgrade(const std::string& file,
-                                          const std::optional<util::EncryptionKeyType>& encryption_key);
+                                          const std::optional<util::EncryptionKey>& encryption_key);
 
     Allocator& get_alloc()
     {
@@ -199,7 +199,7 @@ public:
         return m_db_path;
     }
 
-    const std::optional<util::EncryptionKeyType>& get_encryption_key() const noexcept
+    const std::optional<util::EncryptionKey>& get_encryption_key() const noexcept
     {
         return m_alloc.m_file.get_encryption_key();
     }
@@ -332,7 +332,7 @@ public:
     /// the file to the new 64 byte key.
     ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
-    bool compact(bool bump_version_number, const std::optional<util::EncryptionKeyType>& output_encryption_key)
+    bool compact(bool bump_version_number, const std::optional<util::EncryptionKey>& output_encryption_key)
         REQUIRES(!m_mutex);
 
     // Like above, but always uses the encryption key the file was created with
@@ -341,7 +341,7 @@ public:
         return compact(bump_version_number, get_encryption_key());
     }
 
-    void write_copy(StringData path, const std::optional<util::EncryptionKeyType>& output_encryption_key)
+    void write_copy(StringData path, const std::optional<util::EncryptionKey>& output_encryption_key)
         REQUIRES(!m_mutex);
 
 #ifdef REALM_DEBUG

@@ -637,7 +637,7 @@ TEST(Shared_EncryptedRemap)
 TEST(Shared_Initial)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::optional<EncryptionKeyType> key;
+    std::optional<EncryptionKey> key;
 
     CHECK_NOT(DB::needs_file_format_upgrade(path, key)); // File not created yet
 
@@ -2217,8 +2217,8 @@ TEST(Shared_EncryptionKeyCheck_2)
 TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto first_key = File::EncryptionKeyType({0});
-    auto second_key = File::EncryptionKeyType({1});
+    auto first_key = EncryptionKey({0});
+    auto second_key = EncryptionKey({1});
     DBRef sg = DB::create(path, DBOptions(first_key));
     CHECK_THROW(DB::create(path, DBOptions(second_key)), InvalidDatabase);
     DBRef sg3 = DB::create(path, DBOptions(first_key));
@@ -3487,7 +3487,7 @@ TEST(Shared_OpenAfterClose)
     // REALM_MAX_BPNODE_SIZE is 4
     // ----------------------------------------------------------------------
     SHARED_GROUP_TEST_PATH(path);
-    std::optional<File::EncryptionKeyType> key = std::nullopt;
+    std::optional<EncryptionKey> key = std::nullopt;
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef db_w = DB::create(*hist_w, path, DBOptions(key));
     auto wt = db_w->start_write();

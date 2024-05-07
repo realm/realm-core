@@ -37,13 +37,13 @@ struct DBOptions {
     };
 
     explicit DBOptions(Durability level = Durability::Full,
-                       const std::optional<util::File::EncryptionKeyType>& key = std::nullopt)
+                       const std::optional<util::EncryptionKey>& key = std::nullopt)
         : durability(level)
         , encryption_key(key)
     {
     }
 
-    explicit DBOptions(const std::optional<util::File::EncryptionKeyType>& key)
+    explicit DBOptions(const std::optional<util::EncryptionKey>& key)
         : encryption_key(key)
     {
     }
@@ -52,7 +52,7 @@ struct DBOptions {
     Durability durability = Durability::Full;
 
     /// The key to encrypt and decrypt the Realm file with.
-    std::optional<util::File::EncryptionKeyType> encryption_key;
+    std::optional<util::EncryptionKey> encryption_key;
 
     /// If \a allow_file_format_upgrade is set to `true`, this function will
     /// automatically upgrade the file format used in the specified Realm file

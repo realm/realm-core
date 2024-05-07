@@ -1619,7 +1619,7 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
 // Unmapping (during close()) while transactions are live, is not considered an error. There
 // is a potential race between unmapping during close() and any operation carried out by a live
 // transaction. The user must ensure that this race never happens if she uses DB::close().
-bool DB::compact(bool bump_version_number, const std::optional<util::File::EncryptionKeyType>& output_encryption_key)
+bool DB::compact(bool bump_version_number, const std::optional<util::EncryptionKey>& output_encryption_key)
     NO_THREAD_SAFETY_ANALYSIS // this would work except for a known limitation: "No alias analysis" where clang cannot
                               // tell that tr->db->m_mutex is the same thing as m_mutex
 {
@@ -1726,7 +1726,7 @@ bool DB::compact(bool bump_version_number, const std::optional<util::File::Encry
     return true;
 }
 
-void DB::write_copy(StringData path, const std::optional<util::File::EncryptionKeyType>& output_encryption_key)
+void DB::write_copy(StringData path, const std::optional<util::EncryptionKey>& output_encryption_key)
 {
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
@@ -2183,8 +2183,7 @@ void DB::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
-bool DB::needs_file_format_upgrade(const std::string& file,
-                                   const std::optional<util::EncryptionKeyType>& encryption_key)
+bool DB::needs_file_format_upgrade(const std::string& file, const std::optional<util::EncryptionKey>& encryption_key)
 {
     SlabAlloc alloc;
     SlabAlloc::Config cfg;

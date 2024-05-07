@@ -440,7 +440,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         }
     }
 
-    std::optional<util::File::EncryptionKeyType> encryption_key;
+    std::optional<util::EncryptionKey> encryption_key;
     {
         util::CheckedLockGuard lock(m_config_mutex);
         encryption_key = m_config.encryption_key;

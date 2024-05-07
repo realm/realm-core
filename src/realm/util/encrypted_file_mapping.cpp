@@ -56,7 +56,7 @@
 #endif
 
 namespace realm::util {
-SharedFileInfo::SharedFileInfo(const File::EncryptionKeyType& key)
+SharedFileInfo::SharedFileInfo(const EncryptionKey& key)
     : cryptor(key)
 {
 }
@@ -167,7 +167,7 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 static_assert(c_min_encrypted_file_size == 2 * block_size,
               "chaging the block size breaks encrypted file portability");
 
-AESCryptor::AESCryptor(const File::EncryptionKeyType& key)
+AESCryptor::AESCryptor(const EncryptionKey& key)
     : m_rw_buffer(new char[block_size])
     , m_dst_buffer(new char[block_size])
 {
@@ -219,7 +219,7 @@ AESCryptor::~AESCryptor() noexcept
 #endif
 }
 
-void AESCryptor::check_key(const File::EncryptionKeyType& key)
+void AESCryptor::check_key(const EncryptionKey& key)
 {
     auto raw_key = key.data();
     auto raw_aes = m_aesKey.data();

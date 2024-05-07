@@ -184,7 +184,7 @@ std::ostream& operator<<(std::ostream&, const Exception&);
 class Realm;
 /// Open a Realm at a given path, creating its files.
 bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out = nullptr);
-util::File::EncryptionKeyType make_test_encryption_key(const char start = 0);
+util::EncryptionKey make_test_encryption_key(const char start = 0);
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
                                           util::FunctionRef<void()> func);
 

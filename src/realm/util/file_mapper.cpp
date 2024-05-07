@@ -610,7 +610,7 @@ void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t o
 }
 
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const std::optional<File::EncryptionKeyType>& enc_key, EncryptedFileMapping* encrypted_mapping)
+                 const std::optional<EncryptionKey>& enc_key, EncryptedFileMapping* encrypted_mapping)
 {
     REALM_ASSERT(!enc_key.has_value() ==
                  (encrypted_mapping == nullptr)); // Mapping must already have been set if encryption is used
@@ -668,7 +668,7 @@ void* mmap_anon(size_t size)
 }
 
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const std::optional<File::EncryptionKeyType>& enc_key)
+                 const std::optional<EncryptionKey>& enc_key)
 {
     _impl::SimulatedFailure::trigger_mmap(size);
     static_cast<void>(enc_key); // FIXME: Consider removing this parameter

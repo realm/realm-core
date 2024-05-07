@@ -30,7 +30,7 @@ public:
     /// cache object before the first invocation of Slot::access() on an
     /// associated file file slot.
     ServerFileAccessCache(long max_open_files, util::Logger&, ServerHistory::Context&,
-                          std::optional<util::File::EncryptionKeyType> encryption_key);
+                          std::optional<util::EncryptionKey> encryption_key);
 
     ~ServerFileAccessCache() noexcept;
 
@@ -48,7 +48,7 @@ private:
     long m_num_open_files = 0;
 
     const long m_max_open_files;
-    const std::optional<util::File::EncryptionKeyType> m_encryption_key;
+    const std::optional<util::EncryptionKey> m_encryption_key;
     // The ServerFileAccessCache is tied to the lifetime of the Server, so no shared_ptr needed
     util::Logger& m_logger;
     ServerHistory::Context& m_history_context;
@@ -131,7 +131,7 @@ private:
 
 inline ServerFileAccessCache::ServerFileAccessCache(long max_open_files, util::Logger& logger,
                                                     ServerHistory::Context& history_context,
-                                                    std::optional<util::File::EncryptionKeyType> encryption_key)
+                                                    std::optional<util::EncryptionKey> encryption_key)
     : m_max_open_files{max_open_files}
     , m_encryption_key{encryption_key}
     , m_logger{logger}

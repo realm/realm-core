@@ -32,12 +32,12 @@
 namespace realm::keychain {
 
 // Get the stored encryption key for the metadata realm if one exists.
-std::optional<util::EncryptionKeyType> get_existing_metadata_realm_key(std::string_view app_id,
-                                                                       std::string_view access_group);
+std::optional<util::EncryptionKey> get_existing_metadata_realm_key(std::string_view app_id,
+                                                                   std::string_view access_group);
 // Create a new encryption key and store it in the keychain. Returns none if
 // the key could not be stored.
-std::optional<util::EncryptionKeyType> create_new_metadata_realm_key(std::string_view app_id,
-                                                                     std::string_view access_group);
+std::optional<util::EncryptionKey> create_new_metadata_realm_key(std::string_view app_id,
+                                                                 std::string_view access_group);
 
 // Delete the encryption key for the metadata realm from the keychain.
 void delete_metadata_realm_encryption_key(std::string_view app_id, std::string_view access_group);
@@ -45,9 +45,9 @@ void delete_metadata_realm_encryption_key(std::string_view app_id, std::string_v
 namespace impl {
 
 bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
-             std::optional<util::EncryptionKeyType>& result, bool result_on_error = true);
+             std::optional<util::EncryptionKey>& result, bool result_on_error = true);
 
-bool set_key(std::optional<util::EncryptionKeyType>& key, CFStringRef account, CFStringRef service,
+bool set_key(std::optional<util::EncryptionKey>& key, CFStringRef account, CFStringRef service,
              std::string_view group = {});
 
 } // namespace impl

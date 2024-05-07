@@ -95,13 +95,13 @@ bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
     }
 }
 
-util::File::EncryptionKeyType make_test_encryption_key(const char start)
+util::EncryptionKey make_test_encryption_key(const char start)
 {
     std::array<uint8_t, 64> ret;
     for (int i = 0; i < 64; i++) {
         ret[i] = (start + i) % 128;
     }
-    return util::File::EncryptionKeyType(ret);
+    return util::EncryptionKey(ret);
 }
 
 // FIXME: Catch2 limitation on old compilers (currently our android CI)

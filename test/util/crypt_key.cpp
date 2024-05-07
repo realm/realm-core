@@ -32,14 +32,14 @@ bool g_always_encrypt = false;
 namespace realm {
 namespace test_util {
 
-std::optional<util::File::EncryptionKeyType> crypt_key(const char* raw_value, bool always)
+std::optional<util::EncryptionKey> crypt_key(const char* raw_value, bool always)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (raw_value != nullptr && (always || g_always_encrypt)) {
         std::array<uint8_t, 64> raw_key;
         REALM_ASSERT(strlen(raw_value) == raw_key.size());
         std::copy(raw_value, raw_value + 64, raw_key.begin());
-        return util::File::EncryptionKeyType(raw_key);
+        return util::EncryptionKey(raw_key);
     }
 #else
     static_cast<void>(always);

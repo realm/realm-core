@@ -97,7 +97,7 @@ struct RealmConfig {
     std::string path;
     BinaryData realm_data;
     // User-supplied encryption key. Must be either empty or 64 bytes.
-    std::optional<util::File::EncryptionKeyType> encryption_key;
+    std::optional<util::EncryptionKey> encryption_key;
 
     // Core and Object Store will in some cases need to create named pipes alongside the Realm file.
     // But on some filesystems this can be a problem (e.g. external storage on Android that uses FAT32).

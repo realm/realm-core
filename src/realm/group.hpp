@@ -117,8 +117,7 @@ public:
     /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    explicit Group(const std::string& file,
-                   const std::optional<util::File::EncryptionKeyType>& encryption_key = std::nullopt);
+    explicit Group(const std::string& file, const std::optional<util::EncryptionKey>& encryption_key = std::nullopt);
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -365,8 +364,7 @@ public:
     /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& path,
-               const std::optional<util::File::EncryptionKeyType>& encryption_key = std::nullopt,
+    void write(const std::string& path, const std::optional<util::EncryptionKey>& encryption_key = std::nullopt,
                uint64_t version = 0, bool write_history = true) const;
 
     /// Write this database to a memory buffer.
@@ -674,7 +672,7 @@ private:
 
     void mark_all_table_accessors() noexcept;
 
-    void write(util::File& file, const std::optional<util::File::EncryptionKeyType>& encryption_key,
+    void write(util::File& file, const std::optional<util::EncryptionKey>& encryption_key,
                uint_fast64_t version_number, TableWriter& writer) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer, TableWriter& writer) const;
 

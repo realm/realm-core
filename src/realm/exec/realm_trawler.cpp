@@ -522,7 +522,7 @@ private:
 
 class RealmFile {
 public:
-    RealmFile(const std::string& file_path, const std::optional<realm::util::File::EncryptionKeyType>& encryption_key,
+    RealmFile(const std::string& file_path, const std::optional<realm::util::EncryptionKey>& encryption_key,
               uint64_t top_ref = 0);
     // Walk the file and check that it consists of valid nodes
     void node_scan();
@@ -775,8 +775,8 @@ std::vector<FreeListEntry> Group::get_free_list() const
     return list;
 }
 
-RealmFile::RealmFile(const std::string& file_path,
-                     const std::optional<realm::util::File::EncryptionKeyType>& encryption_key, uint64_t top_ref)
+RealmFile::RealmFile(const std::string& file_path, const std::optional<realm::util::EncryptionKey>& encryption_key,
+                     uint64_t top_ref)
 {
     realm::SlabAlloc::Config config;
     config.encryption_key = encryption_key;
@@ -1135,7 +1135,7 @@ int main(int argc, const char* argv[])
                 }
                 else {
                     std::cout << "File name: " << argv[curr_arg] << std::endl;
-                    RealmFile rf(argv[curr_arg], realm::util::File::EncryptionKeyType(key), alternate_top);
+                    RealmFile rf(argv[curr_arg], realm::util::EncryptionKey(key), alternate_top);
                     if (free_list_info) {
                         rf.free_list_info();
                     }

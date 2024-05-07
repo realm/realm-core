@@ -30,7 +30,7 @@ using namespace realm;
 using util::adoptCF;
 using util::CFPtr;
 using util::string_view_to_cfstring;
-using util::EncryptionKeyType;
+using util::EncryptionKey;
 using util::EncryptionKeyStorageType;
 using util::EncryptionKeySize;
 
@@ -81,8 +81,8 @@ static CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account
 }
 
 /// Get the encryption key for a given service, returning true if it either exists or the keychain is not usable.
-bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
-             std::optional<EncryptionKeyType>& result, bool result_on_error)
+bool get_key(CFStringRef account, CFStringRef service, std::string_view group, std::optional<EncryptionKey>& result,
+             bool result_on_error)
 {
     auto search_dictionary = build_search_dictionary(account, service, string_view_to_cfstring(group).get());
     CFDataRef retained_key_data;
@@ -117,7 +117,7 @@ bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
     }
 }
 
-bool set_key(std::optional<EncryptionKeyType>& key, CFStringRef account, CFStringRef service, std::string_view group)
+bool set_key(std::optional<EncryptionKey>& key, CFStringRef account, CFStringRef service, std::string_view group)
 {
     // key may be nullopt here if the keychain was inaccessible
     if (!key)
@@ -177,11 +177,10 @@ using namespace impl;
 const CFStringRef s_legacy_account = CFSTR("metadata");
 const CFStringRef s_service = CFSTR("io.realm.sync.keychain");
 
-std::optional<EncryptionKeyType> get_existing_metadata_realm_key(std::string_view app_id,
-                                                                 std::string_view access_group)
+std::optional<EncryptionKey> get_existing_metadata_realm_key(std::string_view app_id, std::string_view access_group)
 {
     auto cf_app_id = string_view_to_cfstring(app_id);
-    std::optional<EncryptionKeyType> key;
+    std::optional<EncryptionKey> key;
 
     // If we have a security access groups then keys are stored the same way
     // everywhere and we don't have any legacy storage methods to handle, so
@@ -247,12 +246,12 @@ std::optional<EncryptionKeyType> get_existing_metadata_realm_key(std::string_vie
     return key;
 }
 
-std::optional<EncryptionKeyType> create_new_metadata_realm_key(std::string_view app_id, std::string_view access_group)
+std::optional<EncryptionKey> create_new_metadata_realm_key(std::string_view app_id, std::string_view access_group)
 {
     auto cf_app_id = string_view_to_cfstring(app_id);
     EncryptionKeyStorageType key_buffer;
     arc4random_buf(key_buffer.data(), EncryptionKeySize);
-    std::optional<EncryptionKeyType> key(std::move(key_buffer));
+    std::optional<EncryptionKey> key(std::move(key_buffer));
 
     // See above for why macOS is different
 #if TARGET_OS_OSX

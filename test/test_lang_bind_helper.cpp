@@ -5690,7 +5690,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
 TEST(LangBindHelper_EnumColumnAddZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::optional<File::EncryptionKeyType> key = std::nullopt;
+    std::optional<EncryptionKey> key = std::nullopt;
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(key));
     auto g = sg->start_write();

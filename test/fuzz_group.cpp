@@ -246,8 +246,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, std:
     // const bool use_encryption = false;
     const bool use_encryption = get_next(s) % 2 == 0;
     const char* encryption_key_string = use_encryption ? get_encryption_key() : nullptr;
-    std::optional<util::File::EncryptionKeyType> encryption_key =
-        test_util::crypt_key(encryption_key_string, use_encryption);
+    std::optional<util::EncryptionKey> encryption_key = test_util::crypt_key(encryption_key_string, use_encryption);
 
     if (log) {
         *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
@@ -263,7 +262,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, std:
 
         *log << "SHARED_GROUP_TEST_PATH(path);\n";
 
-        *log << "std::optional<util::File::EncryptionKeyType> key = " << printable_key << ";\n";
+        *log << "std::optional<util::EncryptionKey> key = " << printable_key << ";\n";
         *log << "std::unique_ptr<Replication> hist(make_in_realm_history());\n";
 
         *log << "DBRef db = DB::create(*hist, path, DBOptions(key));\n";

@@ -1256,7 +1256,7 @@ bool RealmCoordinator::compact()
     return m_db->compact();
 }
 
-void RealmCoordinator::write_copy(StringData path, const std::optional<util::File::EncryptionKeyType>& key)
+void RealmCoordinator::write_copy(StringData path, const std::optional<util::EncryptionKey>& key)
 {
     m_db->write_copy(path, key);
 }

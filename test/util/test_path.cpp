@@ -321,7 +321,7 @@ std::string TestDirNameGenerator::next()
     return m_path + "/" + std::to_string(m_counter++);
 }
 
-std::shared_ptr<DB> get_test_db(const std::string& path, const std::optional<File::EncryptionKeyType>& crypt_key)
+std::shared_ptr<DB> get_test_db(const std::string& path, const std::optional<EncryptionKey>& crypt_key)
 {
     const char* str = getenv("UNITTEST_LOG_LEVEL");
     realm::util::Logger::Level core_log_level = realm::util::Logger::Level::off;

@@ -181,7 +181,7 @@ private:
 };
 
 std::shared_ptr<DB> get_test_db(const std::string& path,
-                                const std::optional<util::File::EncryptionKeyType>& crypt_key = std::nullopt);
+                                const std::optional<util::EncryptionKey>& crypt_key = std::nullopt);
 
 } // namespace test_util
 } // namespace realm

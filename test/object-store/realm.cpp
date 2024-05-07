@@ -3435,7 +3435,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
                           "Specifying both memory buffer and path is invalid");
 
         config3.path = "";
-        config3.encryption_key = util::File::EncryptionKeyType({'a'});
+        config3.encryption_key = util::EncryptionKey({'a'});
         REQUIRE_EXCEPTION(Realm::get_shared_realm(config3), IllegalCombination,
                           "Memory buffers do not support encryption");
     }

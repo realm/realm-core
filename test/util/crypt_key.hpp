@@ -32,9 +32,9 @@ namespace test_util {
 ///
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of always_encrypt().
-std::optional<util::File::EncryptionKeyType> crypt_key(const char* raw_value, bool always = false);
+std::optional<util::EncryptionKey> crypt_key(const char* raw_value, bool always = false);
 
-inline std::optional<util::File::EncryptionKeyType> crypt_key(bool always = false)
+inline std::optional<util::EncryptionKey> crypt_key(bool always = false)
 {
     return crypt_key("1234567890123456789012345678901123456789012345678901234567890123", always);
 }

@@ -2233,12 +2233,12 @@ int main(int argc, char* argv[])
 
     std::unique_ptr<CursorFactory> factory = std::make_unique<NullCursorFactory>(); // Throws
 
-    std::optional<util::File::EncryptionKeyType> encryption_key_2;
+    std::optional<util::EncryptionKey> encryption_key_2;
     if (!encryption_key.empty()) {
         std::array<uint8_t, 64> encryption_key_3;
         std::string key_file_contents = util::load_file(encryption_key); // Throws
         std::copy_n(key_file_contents.data(), encryption_key.size(), encryption_key.begin());
-        encryption_key_2 = util::File::EncryptionKeyType(encryption_key_3);
+        encryption_key_2 = util::EncryptionKey(encryption_key_3);
     }
     Group group{realm_path, encryption_key_2}; // Throws
     using gf = _impl::GroupFriend;

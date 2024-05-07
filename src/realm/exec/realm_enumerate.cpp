@@ -79,14 +79,14 @@ int main(int argc, const char* argv[])
 {
     if (argc > 1) {
         try {
-            std::optional<realm::util::File::EncryptionKeyType> key;
+            std::optional<realm::util::EncryptionKey> key;
             double threshold = 0; // by default don't convert, just compact
             for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
                 if (strcmp(argv[curr_arg], "--key") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
                     std::array<uint8_t, 64> key_buffer;
                     key_file.read(reinterpret_cast<char*>(key_buffer.data()), key_buffer.size());
-                    key = realm::util::File::EncryptionKeyType(key_buffer);
+                    key = realm::util::EncryptionKey(key_buffer);
                     curr_arg++;
                 }
                 else if (strcmp(argv[curr_arg], "--threshold") == 0) {

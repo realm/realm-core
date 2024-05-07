@@ -75,11 +75,11 @@ bool can_access_keychain()
     return can_access_keychain;
 }
 
-std::optional<util::EncryptionKeyType> generate_key()
+std::optional<util::EncryptionKey> generate_key()
 {
     util::EncryptionKeyStorageType key;
     arc4random_buf(key.data(), key.size());
-    return util::EncryptionKeyType(std::move(key));
+    return util::EncryptionKey(std::move(key));
 }
 #endif
 

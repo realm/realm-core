@@ -115,7 +115,7 @@ public:
     /// If the file being opened is not a valid Realm file (possibly due to a
     /// decryption failure), reinitialize it as if clear_file was set.
     struct Config {
-        std::optional<util::File::EncryptionKeyType> encryption_key = std::nullopt;
+        std::optional<util::EncryptionKey> encryption_key = std::nullopt;
         bool is_shared = false;
         bool read_only = false;
         bool no_create = false;

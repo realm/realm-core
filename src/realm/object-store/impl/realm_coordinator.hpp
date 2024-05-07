@@ -104,7 +104,7 @@ public:
     {
         return m_config.path;
     }
-    const std::optional<util::File::EncryptionKeyType>& get_encryption_key() const noexcept
+    const std::optional<util::EncryptionKey>& get_encryption_key() const noexcept
     {
         return m_config.encryption_key;
     }
@@ -200,7 +200,7 @@ public:
 
     void close();
     bool compact();
-    void write_copy(StringData path, const std::optional<util::File::EncryptionKeyType>& key);
+    void write_copy(StringData path, const std::optional<util::EncryptionKey>& key);
 
     // Close the DB, delete the file, and then reopen it. This operation is *not*
     // implemented in a safe manner and will only work in fairly specific circumstances

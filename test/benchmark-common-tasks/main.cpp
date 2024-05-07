@@ -105,7 +105,7 @@ struct Benchmark {
     }
     virtual void operator()(DBRef) = 0;
     DBOptions::Durability m_durability = DBOptions::Durability::Full;
-    std::optional<util::File::EncryptionKeyType> m_encryption_key = std::nullopt;
+    std::optional<util::EncryptionKey> m_encryption_key = std::nullopt;
     std::vector<ObjKey> m_keys;
     ColKey m_col;
     std::unique_ptr<WriteTransaction> m_tr;
@@ -2555,7 +2555,7 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
 template <typename B>
 void run_benchmark(BenchmarkResults& results, bool force_full = false)
 {
-    typedef std::pair<DBOptions::Durability, std::optional<util::File::EncryptionKeyType>> config_pair;
+    typedef std::pair<DBOptions::Durability, std::optional<util::EncryptionKey>> config_pair;
     std::vector<config_pair> configs;
 
     if (force_full) {
@@ -2572,7 +2572,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
         DBOptions::Durability level = it->first;
-        std::optional<util::File::EncryptionKeyType> key = it->second;
+        std::optional<util::EncryptionKey> key = it->second;
 
         B benchmark;
         if (should_filter_benchmark(benchmark.name()))

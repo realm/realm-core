@@ -302,7 +302,7 @@ TEST(File_SetEncryptionKey)
 {
     TEST_PATH(path);
     File f(path, File::mode_Write);
-    auto key = File::EncryptionKeyType({0});
+    auto key = EncryptionKey({0});
 
 #if REALM_ENABLE_ENCRYPTION
     f.set_encryption_key(key); // should not throw

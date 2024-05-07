@@ -99,7 +99,7 @@ struct AppConfig {
         InMemory,     // Do not persist metadata
     };
     MetadataMode metadata_mode = MetadataMode::Encryption;
-    std::optional<util::File::EncryptionKeyType> custom_encryption_key;
+    std::optional<util::EncryptionKey> custom_encryption_key;
     // If non-empty, mode is Encryption, and no key is explicitly set, the
     // automatically generated key is stored in the keychain using this access
     // group. Must be set when the metadata Realm is stored in an access group

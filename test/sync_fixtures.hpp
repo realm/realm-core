@@ -457,7 +457,7 @@ public:
         std::string server_public_key_path = test_server_key_path();
 
         // Must be empty (encryption disabled) or contain 64 bytes.
-        std::optional<util::File::EncryptionKeyType> server_encryption_key;
+        std::optional<util::EncryptionKey> server_encryption_key;
 
         int server_max_protocol_version = 0;
 

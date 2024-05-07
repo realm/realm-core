@@ -41,7 +41,7 @@ void FuzzConfigurator::setup_realm_config()
         if (key) {
             std::array<uint8_t, 64> key_buffer;
             std::copy_n(key, key_buffer.size(), key_buffer.begin());
-            m_config.encryption_key = realm::util::File::EncryptionKeyType(key_buffer);
+            m_config.encryption_key = realm::util::EncryptionKey(key_buffer);
         }
     }
 }

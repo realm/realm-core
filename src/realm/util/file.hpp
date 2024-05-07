@@ -37,10 +37,10 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/encryption_key.hpp>
 #include <realm/util/features.h>
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/sensitive_buffer.hpp>
 #include <realm/utilities.hpp>
 
 #if defined(_MSVC_LANG) // compiling with MSVC
@@ -121,15 +121,6 @@ struct OnlyForTestingPageSizeChange {
     ~OnlyForTestingPageSizeChange();
 };
 
-typedef SensitiveBuffer<std::array<uint8_t, 64>> EncryptionKeyType;
-
-typedef EncryptionKeyType::element_type EncryptionKeyStorageType;
-static_assert(std::is_pod<EncryptionKeyStorageType>::value); // for the use with the reinterpret_cast
-static_assert(std::is_pod<std::decay<decltype(*EncryptionKeyType().data())>::type>::value);
-
-constexpr size_t EncryptionKeySize = std::tuple_size<decltype(EncryptionKeyStorageType())>::value;
-static_assert(EncryptionKeySize == 64);
-
 /// This class provides a RAII abstraction over the concept of a file
 /// descriptor (or file handle).
 ///
@@ -153,8 +144,6 @@ static_assert(EncryptionKeySize == 64);
 /// \endcode
 class File {
 public:
-    using EncryptionKeyType = util::EncryptionKeyType;
-
     enum Mode {
         mode_Read,   ///< access_ReadOnly,  create_Never             (fopen: rb)
         mode_Update, ///< access_ReadWrite, create_Never             (fopen: rb+)
@@ -405,11 +394,11 @@ public:
     /// mappings are created or any data is read from or written to the file.
     ///
     /// \param key A 64-byte encryption key, or null to disable encryption.
-    void set_encryption_key(std::optional<util::EncryptionKeyType> key);
+    void set_encryption_key(std::optional<util::EncryptionKey> key);
 
     /// Get the encryption key set by set_encryption_key(),
     /// null_ptr if no key set.
-    const std::optional<util::EncryptionKeyType>& get_encryption_key() const;
+    const std::optional<util::EncryptionKey>& get_encryption_key() const;
 
     /// Set the path used for emulating file locks. If not set explicitly,
     /// the emulation will use the path of the file itself suffixed by ".fifo"
@@ -661,7 +650,7 @@ private:
     std::string m_fifo_path;
 #endif
 #endif
-    std::optional<util::EncryptionKeyType> m_encryption_key;
+    std::optional<util::EncryptionKey> m_encryption_key;
     std::string m_path;
     std::optional<UniqueID> m_cached_unique_id;
 

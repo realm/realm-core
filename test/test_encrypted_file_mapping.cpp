@@ -65,7 +65,7 @@ using namespace realm::util;
 using realm::FileDesc;
 
 namespace {
-static File::EncryptionKeyType test_key = *realm::test_util::crypt_key(true);
+static EncryptionKey test_key = *realm::test_util::crypt_key(true);
 }
 
 TEST(EncryptedFile_CryptorBasic)
@@ -321,7 +321,7 @@ TEST(EncryptedFile_IVRefreshing)
     verify_page_states(states, read_data_pos, {page_needing_refresh});
 }
 
-static void check_attach_and_read(const std::optional<EncryptionKeyType>& key, const std::string& path,
+static void check_attach_and_read(const std::optional<EncryptionKey>& key, const std::string& path,
                                   size_t num_entries)
 {
     try {

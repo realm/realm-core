@@ -68,7 +68,7 @@ enum class IVRefreshState { UpToDate, RequiresRefresh };
 
 class AESCryptor {
 public:
-    AESCryptor(const File::EncryptionKeyType& key);
+    AESCryptor(const EncryptionKey& key);
     ~AESCryptor() noexcept;
 
     void set_file_size(off_t new_size);
@@ -79,7 +79,7 @@ public:
     util::FlatMap<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected,
                                                       size_t end_page_ndx_in_file);
 
-    void check_key(const File::EncryptionKeyType& key);
+    void check_key(const EncryptionKey& key);
 
 private:
     enum EncryptionMode {
@@ -135,7 +135,7 @@ struct SharedFileInfo {
     size_t progress_index = 0;
     std::vector<ReaderInfo> readers;
 
-    SharedFileInfo(const File::EncryptionKeyType& key);
+    SharedFileInfo(const EncryptionKey& key);
 };
 } // namespace realm::util
 
