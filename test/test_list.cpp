@@ -936,6 +936,9 @@ TEST(List_NestedCollection_Links)
 
     create_links();
     tr->promote_to_write();
+    // Removing the top object should remove all backlinks.
+    // This includes the links contained in the collections
+    // held by the any (dictionary) and any1 (list) properties.
     o.remove();
     CHECK_EQUAL(target_obj1.get_backlink_count(), 0);
     CHECK_EQUAL(target_obj2.get_backlink_count(), 0);
