@@ -1284,7 +1284,7 @@ TEMPLATE_TEST_CASE("progress notifications fire immediately when fully caught up
         pbs_setup.add_objects(realm, 5);
 
         auto token = realm->sync_session()->register_progress_notifier(initial_progress->make_cb(),
-                                                                       NotifierType::upload, true);
+                                                                       NotifierType::upload, false);
         auto initial_entries = initial_progress->wait_for_full_sync();
         REQUIRE(!initial_entries.empty());
         REQUIRE_THAT(initial_entries, ProgressIncreasesMatcher{});
