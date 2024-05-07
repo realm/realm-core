@@ -562,7 +562,7 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
         // We generate the key handle and then throw it away because it stores the actual key in plaintext
         const auto& raw_aes_key = m_aesKey.data();
         i = BCryptGenerateSymmetricKey(m_aes_alg_handle, &aes_key_handle, nullptr, 0, (PBYTE)raw_aes_key->data(),
-                                       raw_aes_key->size(), 0);
+                                       (ULONG)raw_aes_key->size(), 0);
         REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptGenerateSymmetricKey()", i);
     }
 

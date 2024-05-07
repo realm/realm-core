@@ -229,6 +229,7 @@ set(REALM_INSTALL_HEADERS
     util/checked_mutex.hpp
     util/compression.hpp
     util/encrypted_file_mapping.hpp
+    util/encryption_key.hpp
     util/errno.hpp
     util/features.h
     util/flat_map.hpp

@@ -112,6 +112,7 @@ public:
         {
             SensitiveBufferBase::secure_erase(&m_value, sizeof(T));
         }
+
     private:
         friend struct SensitiveBuffer<T>;
         T m_value;
