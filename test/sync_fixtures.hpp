@@ -408,8 +408,6 @@ private:
 
 class MultiClientServerFixture {
 public:
-    enum class ClusterTopology { separate_nodes, two_tiers, one_node_per_tier };
-
     struct Config {
         Config() {}
 
@@ -433,11 +431,6 @@ public:
         bool disable_download_compaction = false;
         bool disable_upload_compaction = false;
 
-        bool disable_history_compaction = false;
-        std::chrono::seconds history_ttl = std::chrono::seconds::max();
-        std::chrono::seconds history_compaction_interval = std::chrono::seconds{3600};
-        const Clock* history_compaction_clock = nullptr;
-
         size_t max_download_size = 0x1000000; // 16 MB as in Server::Config
 
 #if REALM_DISABLE_SYNC_MULTIPLEXING
@@ -448,8 +441,6 @@ public:
 
         bool disable_upload_activation_delay = false;
 
-        ClusterTopology cluster_topology = ClusterTopology::separate_nodes;
-
         std::string authorization_header_name = "Authorization";
 
         // Run servers without public key if `server_public_key_path` is the
@@ -458,12 +449,6 @@ public:
 
         // Must be empty (encryption disabled) or contain 64 bytes.
         std::string server_encryption_key;
-
-        int server_max_protocol_version = 0;
-
-        std::set<file_ident_type> server_disable_download_for;
-
-        std::function<Server::SessionBootstrapCallback> server_session_bootstrap_callback;
 
         std::shared_ptr<BindingCallbackThreadObserver> socket_provider_observer;
     };
@@ -530,9 +515,6 @@ public:
             config_2.tcp_no_delay = true;
             config_2.authorization_header_name = config.authorization_header_name;
             config_2.encryption_key = make_crypt_key(config.server_encryption_key);
-            config_2.max_protocol_version = config.server_max_protocol_version;
-            config_2.disable_download_for = std::move(config.server_disable_download_for);
-            config_2.session_bootstrap_callback = std::move(config.server_session_bootstrap_callback);
             m_servers[i] = std::make_unique<Server>(std::move(dir), std::move(public_key), std::move(config_2));
             m_servers[i]->start(listen_address, listen_port);
             m_server_ports[i] = m_servers[i]->listen_endpoint().port();
