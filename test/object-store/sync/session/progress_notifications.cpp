@@ -36,6 +36,8 @@ using namespace realm::app;
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 using namespace Catch::Matchers;
 
+#include <iomanip>
+
 using namespace realm;
 using NotifierType = SyncSession::ProgressDirection;
 
