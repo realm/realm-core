@@ -1268,7 +1268,6 @@ uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierC
                                                  ProgressDirection direction, bool is_streaming)
 {
     int64_t pending_query_version = 0;
-    assert_mutex_unlocked();
     if (auto sub_store = get_flx_subscription_store()) {
         pending_query_version = sub_store->get_version_info().latest;
     }
@@ -1600,7 +1599,7 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
             return [] {};
 
         // If this is a non-streaming download progress update and this notifier was
-        // created for a later query version (i.e. we're currently downloading
+        // created for a later query version (e.g. we're currently downloading
         // subscription set version zero, but subscription set version 1 existed
         // when the notifier was registered), then we want to skip this callback.
         if (is_download && current_progress.query_version < pending_query_version) {

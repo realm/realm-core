@@ -174,7 +174,7 @@ public:
     // Note that bindings should dispatch the callback onto a separate thread or queue
     // in order to avoid blocking the sync client.
     uint64_t register_progress_notifier(std::function<ProgressNotifierCallback>&&, ProgressDirection,
-                                        bool is_streaming);
+                                        bool is_streaming) REQUIRES(!m_state_mutex);
 
     // Unregister a previously registered notifier. If the token is invalid,
     // this method does nothing.
