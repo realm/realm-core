@@ -74,7 +74,7 @@ struct WaitableProgress : public util::AtomicRefCountBase {
     {
         auto self = util::bind_ptr(this);
         return [self](uint64_t transferred, uint64_t transferrable, double estimate) {
-            self->logger.trace("Progress callback called xferred: %1, xferrable: %2, estimate: %3", transferred,
+            self->logger.debug("Progress callback called xferred: %1, xferrable: %2, estimate: %3", transferred,
                                transferrable, estimate_to_string(estimate));
             std::lock_guard lk(self->mutex);
             self->entries.push_back(ProgressEntry{transferred, transferrable, estimate});
@@ -1075,3 +1075,266 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
         REQUIRE_THAT(output_values, Catch::Matchers::Equals(test_values.expected_values));
     }
 }
+
+#if REALM_ENABLE_AUTH_TESTS
+
+struct TestSetup {
+    TableRef get_table(const SharedRealm& r)
+    {
+        return r->read_group().get_table("class_" + table_name);
+    }
+
+    size_t add_objects(SharedRealm& r, int num)
+    {
+        CppContext ctx(r);
+        for (int i = 0; i < num; ++i) {
+            // use specifically separate transactions for a bit of history
+            r->begin_transaction();
+            Object::create(ctx, r, StringData(table_name), std::any(make_one(i)));
+            r->commit_transaction();
+        }
+        return get_table(r)->size();
+    }
+
+    virtual SyncTestFile make_config() = 0;
+    virtual AnyDict make_one(int64_t idx) = 0;
+
+    std::string table_name;
+};
+
+struct PBS : TestSetup {
+    PBS()
+    {
+        table_name = "Dog";
+    }
+
+    SyncTestFile make_config() override
+    {
+        return SyncTestFile(session.app()->current_user(), partition, get_default_schema());
+    }
+
+    AnyDict make_one(int64_t /* idx */) override
+    {
+        return AnyDict{{"_id", std::any(ObjectId::gen())},
+                       {"breed", std::string("bulldog")},
+                       {"name", random_string(1024 * 1024)}};
+    }
+
+    TestAppSession session;
+    const std::string partition = random_string(100);
+};
+
+struct FLX : TestSetup {
+    FLX(const std::string& app_id = "flx_sync_progress")
+        : harness(app_id)
+    {
+        table_name = harness.schema().begin()->name;
+    }
+
+    SyncTestFile make_config() override
+    {
+        auto config = harness.make_test_file();
+        add_subscription(*config.sync_config);
+        return config;
+    }
+
+    void add_subscription(SyncConfig& config)
+    {
+        config.rerun_init_subscription_on_open = true;
+        config.subscription_initializer = [&](SharedRealm&& realm) {
+            add_subscription(realm);
+        };
+    }
+
+    void add_subscription(SharedRealm& realm)
+    {
+        auto sub = realm->get_latest_subscription_set().make_mutable_copy();
+        sub.insert_or_assign(Query(get_table(realm)));
+        sub.commit();
+    }
+
+    AnyDict make_one(int64_t idx) override
+    {
+        return AnyDict{{"_id", ObjectId::gen()},
+                       {"queryable_int_field", idx},
+                       {"queryable_str_field", random_string(1024 * 1024)}};
+    }
+
+    FLXSyncTestHarness harness;
+};
+
+struct ProgressIncreasesMatcher : Catch::Matchers::MatcherGenericBase {
+    enum MatchMode { ByteCountOnly, All };
+    ProgressIncreasesMatcher() = default;
+    explicit ProgressIncreasesMatcher(MatchMode mode)
+        : m_mode(mode)
+    {
+    }
+
+    bool match(std::vector<ProgressEntry> const& entries) const
+    {
+        if (entries.size() < 1) {
+            return false;
+        }
+
+        auto last = std::ref(entries.front());
+        for (size_t i = 1; i < entries.size(); ++i) {
+            ProgressEntry const& cur = entries[i];
+            if (cur.transferred < last.get().transferred) {
+                return false;
+            }
+            if (m_mode == All && cur.estimate < last.get().estimate) {
+                return false;
+            }
+            last = cur;
+        }
+        return true;
+    }
+
+    std::string describe() const override
+    {
+        return "progress notifications all increase";
+    }
+
+private:
+    MatchMode m_mode = All;
+};
+
+TEMPLATE_TEST_CASE("progress notifications fire immediately when fully caught up", "[baas][progress][sync]", PBS, FLX)
+{
+    TestType pbs_setup;
+    auto logger = util::Logger::get_default_logger();
+
+    auto validate_noop_entry = [&](const std::vector<ProgressEntry>& entries, std::string context) {
+        UNSCOPED_INFO("validating noop non-streaming entry " << context);
+        REQUIRE(entries.size() == 1);
+        const auto& entry = entries.front();
+        REQUIRE(entry.transferred >= entry.transferrable);
+        REQUIRE(entry.estimate >= 1.0);
+    };
+
+    SECTION("empty async open results in progress notification") {
+        auto config = pbs_setup.make_config();
+        auto async_open_task = Realm::get_synchronized_realm(config);
+        auto async_open_progress = util::make_bind<WaitableProgress>(logger, "async open non-streaming progress ");
+        async_open_task->register_download_progress_notifier(async_open_progress->make_cb());
+        auto [promise, future] = util::make_promise_future<ThreadSafeReference>();
+        async_open_task->start(
+            [promise = std::move(promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
+                if (ouch) {
+                    try {
+                        std::rethrow_exception(ouch);
+                    }
+                    catch (...) {
+                        promise.set_error(exception_to_status());
+                    }
+                }
+                else {
+                    promise.emplace_value(std::move(ref));
+                }
+            });
+
+        auto realm = Realm::get_shared_realm(std::move(future).get());
+        auto noop_download_progress = util::make_bind<WaitableProgress>(logger, "non-streaming download ");
+        auto noop_token = realm->sync_session()->register_progress_notifier(
+            noop_download_progress->make_cb(), SyncSession::ProgressDirection::download, false);
+        // The registration token for a non-streaming notifier that was expired at registration time
+        // is zero because it's invoked immediately and never registered for further notifications.
+        CHECK(noop_token == 0);
+
+        auto async_open_entries = async_open_progress->wait_for_full_sync();
+        REQUIRE_THAT(async_open_entries, ProgressIncreasesMatcher{});
+        validate_noop_entry(noop_download_progress->wait_for_full_sync(), "noop_download_progress");
+    }
+
+    SECTION("synchronous open then waiting for download then noop notification") {
+        {
+            auto fill_data_config = pbs_setup.make_config();
+            auto fill_data_realm = Realm::get_shared_realm(fill_data_config);
+            pbs_setup.add_objects(fill_data_realm, 5);
+            wait_for_upload(*fill_data_realm);
+        }
+
+        auto config = pbs_setup.make_config();
+        auto realm = Realm::get_shared_realm(config);
+        auto initial_progress = util::make_bind<WaitableProgress>(logger, "streaming initial progress ");
+        realm->sync_session()->register_progress_notifier(initial_progress->make_cb(), NotifierType::download, true);
+
+        auto initial_entries = initial_progress->wait_for_full_sync();
+        REQUIRE(!initial_entries.empty());
+        REQUIRE_THAT(initial_entries, ProgressIncreasesMatcher{});
+
+        auto noop_download_progress = util::make_bind<WaitableProgress>(logger, "non-streaming noop download ");
+        auto noop_token = realm->sync_session()->register_progress_notifier(
+            noop_download_progress->make_cb(), SyncSession::ProgressDirection::download, false);
+        // The registration token for a non-streaming notifier that was expired at registration time
+        // is zero because it's invoked immediately and never registered for further notifications.
+        CHECK(noop_token == 0);
+
+        validate_noop_entry(noop_download_progress->wait_for_full_sync(), "noop_download_progress");
+    }
+
+    SECTION("uploads") {
+        auto config = pbs_setup.make_config();
+        auto realm = Realm::get_shared_realm(config);
+        auto initial_progress = util::make_bind<WaitableProgress>(logger, "non-streaming initial progress ");
+
+        pbs_setup.add_objects(realm, 5);
+
+        auto token = realm->sync_session()->register_progress_notifier(initial_progress->make_cb(),
+                                                                       NotifierType::upload, true);
+        auto initial_entries = initial_progress->wait_for_full_sync();
+        REQUIRE(!initial_entries.empty());
+        REQUIRE_THAT(initial_entries, ProgressIncreasesMatcher{});
+        realm->sync_session()->unregister_progress_notifier(token);
+
+        auto noop_upload_progress = util::make_bind<WaitableProgress>(logger, "non-streaming upload ");
+        auto noop_token = realm->sync_session()->register_progress_notifier(
+            noop_upload_progress->make_cb(), SyncSession::ProgressDirection::upload, false);
+        // The registration token for a non-streaming notifier that was expired at registration time
+        // is zero because it's invoked immediately and never registered for further notifications.
+        CHECK(noop_token == 0);
+
+        validate_noop_entry(noop_upload_progress->wait_for_full_sync(), "noop_upload_progress");
+    }
+}
+
+
+TEMPLATE_TEST_CASE("sync progress: upload progress", "[sync][baas][progress]", PBS, FLX)
+{
+    TestType setup;
+
+    auto realm = Realm::get_shared_realm(setup.make_config());
+    auto sync_session = realm->sync_session();
+    auto logger = util::Logger::get_default_logger();
+    auto non_streaming_progress = util::make_bind<WaitableProgress>(logger, "non-streaming upload ");
+    auto streaming_progress = util::make_bind<WaitableProgress>(logger, "streaming upload ");
+
+    // There is a race between creating the objects and registering the non-streaming notifier
+    // since
+    sync_session->pause();
+
+    setup.add_objects(realm, 10);
+    sync_session->register_progress_notifier(non_streaming_progress->make_cb(), NotifierType::upload, false);
+    sync_session->register_progress_notifier(streaming_progress->make_cb(), NotifierType::upload, true);
+
+    sync_session->resume();
+    wait_for_upload(*realm);
+
+    auto streaming_entries = streaming_progress->wait_for_full_sync();
+    auto non_streaming_entries = non_streaming_progress->wait_for_full_sync();
+
+    REQUIRE(!streaming_entries.empty());
+    REQUIRE(!non_streaming_entries.empty());
+    REQUIRE_THAT(non_streaming_entries, ProgressIncreasesMatcher{});
+    REQUIRE_THAT(streaming_entries, ProgressIncreasesMatcher{ProgressIncreasesMatcher::ByteCountOnly});
+
+    setup.add_objects(realm, 5);
+    wait_for_upload(*realm);
+
+    streaming_entries = streaming_progress->wait_for_full_sync();
+    REQUIRE_THAT(streaming_entries, ProgressIncreasesMatcher{ProgressIncreasesMatcher::ByteCountOnly});
+    REQUIRE(non_streaming_progress->empty());
+}
+
+#endif
