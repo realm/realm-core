@@ -59,6 +59,38 @@ static size_t symbol_pair_hash(CompressionSymbol a, CompressionSymbol b)
     return (tmp ^ (tmp >> 16)) & 0xFFFF;
 }
 
+void StringCompressor::add_expansion(SymbolDef def)
+{
+    // compute expansion size:
+    size_t exp_size = 0;
+    if (def.expansion_a < 256)
+        exp_size = 1;
+    else
+        exp_size = m_symbols[def.expansion_a - 256].expansion.size();
+    if (def.expansion_b < 256)
+        exp_size += 1;
+    else
+        exp_size += m_symbols[def.expansion_b - 256].expansion.size();
+    // make sure there is room in active storage chunk:
+    if (m_expansion_storage.size() == 0 || m_expansion_storage.back().size() + exp_size + 1 >= storage_chunk_size) {
+        m_expansion_storage.push_back({});
+        m_expansion_storage.back().reserve(storage_chunk_size);
+    }
+    // construct expansion at end of chunk:
+    auto& chunk = m_expansion_storage.back();
+    auto start_index = (uint32_t)chunk.size();
+    if (def.expansion_a < 256)
+        chunk.push_back(def.expansion_a);
+    else
+        chunk.append(m_symbols[def.expansion_a - 256].expansion);
+    if (def.expansion_b < 256)
+        chunk.push_back(def.expansion_b);
+    else
+        chunk.append(m_symbols[def.expansion_b - 256].expansion);
+    std::string_view expansion(chunk.data() + start_index, exp_size);
+    m_symbols.push_back({def, expansion, (uint32_t)m_expansion_storage.size() - 1, start_index});
+}
+
 void StringCompressor::rebuild_internal()
 {
     auto num_symbols = m_data->size();
@@ -67,10 +99,14 @@ void StringCompressor::rebuild_internal()
     if (num_symbols < m_symbols.size()) {
         // fewer symbols (likely a rollback) -- remove last ones added
         while (num_symbols < m_symbols.size()) {
-            auto& def = m_symbols.back();
-            auto hash = symbol_pair_hash(def.expansion_a, def.expansion_b);
-            REALM_ASSERT(m_compression_map[hash].id == def.id);
+            auto& symbol = m_symbols.back();
+            auto hash = symbol_pair_hash(symbol.def.expansion_a, symbol.def.expansion_b);
+            REALM_ASSERT(m_compression_map[hash].id == symbol.def.id);
             m_compression_map[hash] = {0, 0, 0};
+            if (symbol.storage_index < m_expansion_storage.size() - 1) {
+                m_expansion_storage.resize(symbol.storage_index + 1);
+            }
+            m_expansion_storage[symbol.storage_index].resize(symbol.storage_offset);
             m_symbols.pop_back();
         }
         return;
@@ -85,7 +121,7 @@ void StringCompressor::rebuild_internal()
         auto hash = symbol_pair_hash(def.expansion_a, def.expansion_b);
         REALM_ASSERT_DEBUG(m_compression_map[hash].id == 0);
         m_compression_map[hash] = def;
-        m_symbols.push_back(def);
+        add_expansion(def);
     }
 }
 
@@ -132,8 +168,9 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
                     REALM_ASSERT_DEBUG(m_symbols.size() == m_data->size());
                     REALM_ASSERT_DEBUG(m_data->is_attached());
                     CompressionSymbol id = 256 + m_symbols.size();
-                    m_symbols.push_back({id, from[0], from[1]});
-                    m_compression_map[hash] = {id, from[0], from[1]};
+                    SymbolDef def{id, from[0], from[1]};
+                    m_compression_map[hash] = def;
+                    add_expansion(def);
                     m_data->add(((uint64_t)from[0]) << 16 | from[1]);
                     // std::cerr << id << " = {" << from[0] << ", " << from[1] << "}" << std::endl;
                     *to++ = id;
@@ -161,25 +198,52 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
 
 std::string StringCompressor::decompress(CompressedString& c_str)
 {
-    std::string result;
-    auto decompress = [&](CompressionSymbol symbol, auto& decompress) -> void {
-        if (symbol < 256) {
-            result.push_back(symbol);
-        }
-        else {
-            auto& def = m_symbols[symbol - 256];
-            decompress(def.expansion_a, decompress);
-            decompress(def.expansion_b, decompress);
-        }
-    };
-
     CompressionSymbol* ptr = c_str.data();
     CompressionSymbol* limit = ptr + c_str.size();
+    // compute size of decompressed string first to avoid allocations as string grows
+    size_t result_size = 0;
     while (ptr < limit) {
-        decompress(*ptr, decompress);
+        if (*ptr < 256)
+            result_size += 1;
+        else
+            result_size += m_symbols[*ptr - 256].expansion.size();
         ++ptr;
     }
-    return result;
+    std::string result2;
+    result2.reserve(result_size);
+    // generate result
+    ptr = c_str.data();
+    while (ptr < limit) {
+        if (*ptr < 256)
+            result2.push_back(*ptr);
+        else
+            result2.append(m_symbols[*ptr - 256].expansion);
+        ptr++;
+    }
+#ifdef REALM_DEBUG
+    std::string result;
+    {
+        auto decompress = [&](CompressionSymbol symbol, auto& decompress) -> void {
+            if (symbol < 256) {
+                result.push_back(symbol);
+            }
+            else {
+                auto& s = m_symbols[symbol - 256];
+                decompress(s.def.expansion_a, decompress);
+                decompress(s.def.expansion_b, decompress);
+            }
+        };
+
+        CompressionSymbol* ptr = c_str.data();
+        CompressionSymbol* limit = ptr + c_str.size();
+        while (ptr < limit) {
+            decompress(*ptr, decompress);
+            ++ptr;
+        }
+    }
+    REALM_ASSERT_DEBUG(result == result2);
+#endif
+    return result2;
 }
 
 int StringCompressor::compare(CompressedString& A, CompressedString& B)

@@ -44,18 +44,29 @@ public:
     std::string decompress(CompressedString& c_str);
 
 private:
-    void rebuild_internal();
-
     struct SymbolDef {
         CompressionSymbol id;
         CompressionSymbol expansion_a;
         CompressionSymbol expansion_b;
     };
 
-    std::vector<SymbolDef> m_symbols;         // map from symbol -> symbolpair, 2 elements pr entry
+    struct ExpandedSymbolDef {
+        SymbolDef def;
+        std::string_view expansion;
+        // ^ points into storage managed by m_expansion_storage
+        // we need the following 2 values to facilitate rollback of allocated storage
+        uint32_t storage_index;  // index into m_expansion_storage
+        uint32_t storage_offset; // offset into block.
+    };
+
+    void rebuild_internal();
+    void add_expansion(SymbolDef def);
+    std::vector<ExpandedSymbolDef> m_symbols; // map from symbol -> symbolpair, 2 elements pr entry
     std::vector<SymbolDef> m_compression_map; // perfect hash from symbolpair to its symbol
 
     std::unique_ptr<ArrayUnsigned> m_data;
+    constexpr static size_t storage_chunk_size = 4096;
+    std::vector<std::string> m_expansion_storage;
 };
 
 } // namespace realm
