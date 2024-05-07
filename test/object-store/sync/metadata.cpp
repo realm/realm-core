@@ -55,11 +55,10 @@ std::shared_ptr<Realm> get_metadata_realm()
     return Realm::get_shared_realm(std::move(realm_config));
 }
 
-#if REALM_PLATFORM_APPLE
+#if REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE
 using realm::util::adoptCF;
 using realm::util::CFPtr;
 
-#if REALM_ENABLE_ENCRYPTION
 constexpr const char* access_group = "";
 bool can_access_keychain()
 {
@@ -75,50 +74,15 @@ bool can_access_keychain()
     }();
     return can_access_keychain;
 }
-#endif
 
-CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service)
-{
-    auto d = adoptCF(
-        CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
-    CFDictionaryAddValue(d.get(), kSecClass, kSecClassGenericPassword);
-    CFDictionaryAddValue(d.get(), kSecReturnData, kCFBooleanTrue);
-    CFDictionaryAddValue(d.get(), kSecAttrAccount, account);
-    CFDictionaryAddValue(d.get(), kSecAttrService, service);
-    return d;
-}
-
-OSStatus get_key(CFStringRef account, CFStringRef service, util::EncryptionKeyType& result)
-{
-    auto search_dictionary = build_search_dictionary(account, service);
-    CFDataRef retained_key_data;
-    OSStatus status = SecItemCopyMatching(search_dictionary.get(), (CFTypeRef*)&retained_key_data);
-    if (status == errSecSuccess) {
-        CFPtr<CFDataRef> key_data = adoptCF(retained_key_data);
-        auto key_bytes = reinterpret_cast<const util::EncryptionKeyStorageType*>(CFDataGetBytePtr(key_data.get()));
-        result = util::EncryptionKeyType(*key_bytes);
-    }
-    return status;
-}
-
-OSStatus set_key(const util::EncryptionKeyType& key, CFStringRef account, CFStringRef service)
-{
-    auto search_dictionary = build_search_dictionary(account, service);
-    CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_scoped_storage = key.data();
-    auto key_ptr = reinterpret_cast<const UInt8*>(key_scoped_storage->data());
-    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, key_ptr, util::EncryptionKeySize, kCFAllocatorNull));
-    CFDictionaryAddValue(search_dictionary.get(), kSecValueData, key_data.get());
-    return SecItemAdd(search_dictionary.get(), nullptr);
-}
-
-util::EncryptionKeyType generate_key()
+std::optional<util::EncryptionKeyType> generate_key()
 {
     util::EncryptionKeyStorageType key;
     arc4random_buf(key.data(), key.size());
     return util::EncryptionKeyType(std::move(key));
 }
-#endif // REALM_PLATFORM_APPLE
+#endif
+
 } // anonymous namespace
 
 namespace realm::app {
@@ -966,16 +930,16 @@ TEST_CASE("keychain", "[sync][metadata]") {
                 break;
         }
 
-        set_key(key, account, service);
+        keychain::impl::set_key(key, account, service);
         auto key_2 = keychain::get_existing_metadata_realm_key(app_id, {});
         REQUIRE(key_2 == key);
 
         // Key should have been copied to the preferred location
-        REQUIRE(get_key(CFSTR("app id"), bundle_service.get(), key) == errSecSuccess);
+        REQUIRE(keychain::impl::get_key(CFSTR("app id"), bundle_service.get(), {}, key, false));
         REQUIRE(key_2 == key);
 
         // Key should not have been deleted from the original location
-        REQUIRE(get_key(account, service, key) == errSecSuccess);
+        REQUIRE(keychain::impl::get_key(account, service, {}, key, false));
         REQUIRE(key_2 == key);
     }
 }

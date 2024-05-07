@@ -23,6 +23,8 @@
 
 #if REALM_PLATFORM_APPLE
 
+#include <realm/util/cf_str.hpp>
+
 #include <realm/util/file.hpp>
 #include <optional>
 #include <string_view>
@@ -39,6 +41,16 @@ std::optional<util::EncryptionKeyType> create_new_metadata_realm_key(std::string
 
 // Delete the encryption key for the metadata realm from the keychain.
 void delete_metadata_realm_encryption_key(std::string_view app_id, std::string_view access_group);
+
+namespace impl {
+
+bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
+             std::optional<util::EncryptionKeyType>& result, bool result_on_error = true);
+
+bool set_key(std::optional<util::EncryptionKeyType>& key, CFStringRef account, CFStringRef service,
+             std::string_view group = {});
+
+} // namespace impl
 
 } // namespace realm::keychain
 
