@@ -162,9 +162,14 @@ void StringInterner::rebuild_internal()
         }
         m_compressed_strings.push_back(cpr);
         m_compressed_string_map[cpr] = id + 1;
-        auto decompressed = m_compressor->decompress(cpr);
-        m_decompressed_strings.push_back(std::make_unique<std::string>(decompressed));
+        m_decompressed_strings.push_back(CachedString());
         internal_size = m_compressed_strings.size();
+    }
+    // release old decompressed strings
+    for (auto& e : m_decompressed_strings) {
+        e.m_weight >>= 1;
+        if (e.m_weight == 0 && e.m_decompressed)
+            e.m_decompressed.reset();
     }
 }
 
@@ -185,7 +190,7 @@ StringID StringInterner::intern(StringData sd)
     }
     // it's a new string!
     m_compressed_strings.push_back(c_str);
-    m_decompressed_strings.push_back(std::make_unique<std::string>(sd));
+    m_decompressed_strings.push_back({64, std::make_unique<std::string>(sd)});
     auto id = m_compressed_strings.size();
     m_compressed_string_map[c_str] = id;
     size_t index = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
@@ -270,10 +275,18 @@ StringData StringInterner::get(StringID id)
         return StringData{nullptr};
     REALM_ASSERT_DEBUG(id <= m_compressed_strings.size());
     REALM_ASSERT_DEBUG(id <= m_decompressed_strings.size());
-    std::string str = m_compressor->decompress(m_compressed_strings[id - 1]);
-    std::string* ref_str = m_decompressed_strings[id - 1].get();
-    REALM_ASSERT(str == *ref_str);
-    return {ref_str->c_str(), ref_str->size()};
+    CachedString& cs = m_decompressed_strings[id - 1];
+    if (cs.m_decompressed) {
+        std::string* ref_str = cs.m_decompressed.get();
+        std::string str = m_compressor->decompress(m_compressed_strings[id - 1]);
+        REALM_ASSERT(str == *ref_str);
+        if (cs.m_weight < 128)
+            cs.m_weight += 64;
+        return {ref_str->c_str(), ref_str->size()};
+    }
+    cs.m_weight = 64;
+    cs.m_decompressed = std::make_unique<std::string>(m_compressor->decompress(m_compressed_strings[id - 1]));
+    return {cs.m_decompressed->c_str(), cs.m_decompressed->size()};
 }
 
 } // namespace realm

@@ -49,6 +49,10 @@ using StringID = size_t;
 class Array;
 class ArrayUnsigned;
 class Allocator;
+struct CachedString {
+    uint8_t m_weight = 0;
+    std::unique_ptr<std::string> m_decompressed;
+};
 
 class StringInterner {
 public:
@@ -81,7 +85,7 @@ private:
     // Further: access need to be lock free, so we can not decompress on demand,
     // but must do so when the interner is created or updated_from_parent.
     // This is also not a viable long term solution.
-    std::vector<std::unique_ptr<std::string>> m_decompressed_strings;
+    std::vector<CachedString> m_decompressed_strings;
 };
 } // namespace realm
 
