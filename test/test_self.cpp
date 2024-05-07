@@ -61,9 +61,7 @@ namespace {
 
 TestList zero_tests_list, zero_checks_list;
 
-TEST_EX(ZeroChecks, zero_checks_list, true, true)
-{
-}
+TEST_EX(ZeroChecks, zero_checks_list, true, true) {}
 
 
 TestList one_check_success_list, one_check_failure_list;
@@ -171,9 +169,7 @@ TEST_EX(Mixed_2_Y, mixed_list, true, true)
     CHECK_GREATER(1, 0);
 }
 
-TEST_EX(Mixed_3_X, mixed_list, true, true)
-{
-}
+TEST_EX(Mixed_3_X, mixed_list, true, true) {}
 
 TEST_EX(Mixed_4_Y, mixed_list, true, true)
 {
@@ -190,9 +186,7 @@ TEST_EX(Mixed_5_X, mixed_list, true, true)
     CHECK_GREATER(1, 0);
 }
 
-TEST_EX(Mixed_6_Y, mixed_list, true, true)
-{
-}
+TEST_EX(Mixed_6_Y, mixed_list, true, true) {}
 
 TEST_EX(Mixed_7_Y, mixed_list, true, true)
 {
@@ -469,8 +463,7 @@ TEST_EX(Failure_Pointer, failure_list, true, true) // Test #5, accum checks = 93
     CHECK_GREATER_EQUAL(p_1, p_2);
 }
 
-struct FooException {
-};
+struct FooException {};
 
 struct BarException : std::exception {
     const char* what() const noexcept override
@@ -489,9 +482,7 @@ void throw_bar()
     throw BarException();
 }
 
-void throw_nothing()
-{
-}
+void throw_nothing() {}
 
 TEST_EX(Success_Exception, success_list, true, true) // Test #6, accum checks = 85 + 2 = 87
 {

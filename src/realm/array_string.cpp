@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/array_string.hpp>
+#include <realm/impl/array_writer.hpp>
 #include <realm/spec.hpp>
 #include <realm/mixed.hpp>
 
@@ -57,7 +58,7 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
             if (arr->get_context_flag_from_header(arr->get_header())) {
                 // init for new interned strings (replacing old enum strings)
                 m_type = Type::interned_strings;
-                REALM_ASSERT_DEBUG(m_string_interner);
+                // consider if we want this invariant: REALM_ASSERT_DEBUG(m_string_interner);
             }
             else {
                 // init for old enum strings
@@ -535,6 +536,7 @@ void ArrayString::verify() const
 
 ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interner)
 {
+    REALM_ASSERT(interner);
     // we have to write out all, modified or not, to match the total cleanup
     Array interned(Allocator::get_default());
     auto sz = size();
@@ -542,7 +544,7 @@ ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interne
     for (size_t i = 0; i < sz; ++i) {
         interned.set(i, interner->intern(get(i)));
     }
-    auto retval = interned.write(out, false, false, false);
+    auto retval = interned.write(out, false, false, out.compress);
     interned.destroy();
     return retval;
     // return m_arr->write(out, true, false, false);

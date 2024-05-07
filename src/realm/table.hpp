@@ -203,6 +203,7 @@ public:
 
     CollectionType get_collection_type(ColKey col_key) const;
 
+    void remove_columns();
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
@@ -594,7 +595,11 @@ public:
     {
         return Query(m_own_ref, list);
     }
-    Query where(const DictionaryLinkValues& dictionary_of_links) const;
+    Query where(const Dictionary& dict) const;
+    Query where(LinkCollectionPtr&& list) const
+    {
+        return Query(m_own_ref, std::move(list));
+    }
 
     Query query(const std::string& query_string,
                 const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments = {}) const;
@@ -690,6 +695,8 @@ public:
         Replication* const* m_repl;
     };
 
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const;
+
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,
@@ -733,6 +740,7 @@ private:
     Array m_index_refs;                        // 5th slot in m_top
     Array m_opposite_table;                    // 7th slot in m_top
     Array m_opposite_column;                   // 8th slot in m_top
+    Array m_interner_data;                     // 14th slot in m_top
     std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
@@ -844,8 +852,9 @@ private:
 
     /// Refresh the part of the accessor tree that is rooted at this
     /// table.
-    void refresh_accessor_tree();
+    void refresh_accessor_tree(bool writable);
     void refresh_index_accessors();
+    void refresh_string_interners(bool writable);
     void refresh_content_version();
     void flush_for_commit();
 
@@ -857,8 +866,7 @@ private:
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
     std::vector<size_t> m_leaf_ndx2spec_ndx;
-    mutable std::vector<StringInterner*> m_string_interners;
-    mutable std::mutex m_string_interners_mutex; // we should be able to make access lock-free, but not yet.
+    mutable std::vector<std::unique_ptr<StringInterner>> m_string_interners;
     Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
     AtomicLifeCycleCookie m_cookie;
@@ -878,7 +886,8 @@ private:
     static constexpr int top_position_for_flags = 12;
     // flags contents: bit 0-1 - table type
     static constexpr int top_position_for_tombstones = 13;
-    static constexpr int top_array_size = 14;
+    static constexpr int top_position_for_interners = 14;
+    static constexpr int top_array_size = 15;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 

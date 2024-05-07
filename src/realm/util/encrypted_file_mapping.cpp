@@ -20,6 +20,8 @@
 
 #include <realm/util/file_mapper.hpp>
 
+#include <sstream>
+
 #if REALM_ENABLE_ENCRYPTION
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/errno.hpp>
@@ -81,6 +83,13 @@ SharedFileInfo::SharedFileInfo(const uint8_t* key)
 // the ciphertext, we can still determine that we should use the old IV, since
 // the ciphertext's hash will match the old ciphertext.
 
+// This produces a file on disk with the following layout:
+// 4k block of metadata   (up to 64 iv_table instances stored here)
+// 64 * 4k blocks of data (up to 262144 bytes of data are stored here)
+// 4k block of metadata
+// 64 * 4k blocks of data
+// ...
+
 struct iv_table {
     uint32_t iv1 = 0;
     std::array<uint8_t, 28> hmac1 = {};
@@ -102,6 +111,8 @@ const size_t block_size = 4096;
 
 const size_t metadata_size = sizeof(iv_table);
 const size_t blocks_per_metadata_block = block_size / metadata_size;
+static_assert(metadata_size == 64,
+              "changing the size of the metadata breaks compatibility with existing Realm files");
 
 // map an offset in the data to the actual location in the file
 template <typename Int>
@@ -151,6 +162,10 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 }
 
 } // anonymous namespace
+
+// first block is iv data, second page is data
+static_assert(c_min_encrypted_file_size == 2 * block_size,
+              "chaging the block size breaks encrypted file portability");
 
 AESCryptor::AESCryptor(const uint8_t* key)
     : m_rw_buffer(new char[block_size])
@@ -683,7 +698,9 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
                 memset(addr + actual, 0x55, size - actual);
             }
             else {
-                throw DecryptionFailed();
+                size_t fs = to_size_t(File::get_size_static(m_file.fd));
+                throw DecryptionFailed(
+                    util::format("failed to decrypt block %1 in file of size %2", local_page_ndx + m_first_page, fs));
             }
         }
     }
@@ -1025,7 +1042,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
 
 void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
 {
-    REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
+    REALM_ASSERT_EX(new_size % page_size() == 0, new_size, page_size());
     size_t num_pages = new_size >> m_page_shift;
     m_page_state.resize(num_pages, PageState::Clean);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
@@ -1084,3 +1101,13 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 }
 } // namespace realm::util
 #endif // REALM_ENABLE_ENCRYPTION
+
+namespace realm::util {
+std::string DecryptionFailed::get_message_with_bt(std::string_view msg)
+{
+    auto bt = Backtrace::capture();
+    std::stringstream ss;
+    bt.print(ss);
+    return util::format("Decryption failed: %1\n%2\n", msg, ss.str());
+}
+} // namespace realm::util

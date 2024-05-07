@@ -188,7 +188,6 @@ void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_st
 }
 
 
-
 void ArrayBigBlobs::verify() const
 {
 #ifdef REALM_DEBUG
@@ -204,4 +203,3 @@ void ArrayBigBlobs::verify() const
     }
 #endif
 }
-

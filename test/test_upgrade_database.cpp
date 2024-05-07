@@ -83,12 +83,13 @@ TEST_IF(Upgrade_DatabaseWithCallback, REALM_MAX_BPNODE_SIZE == 1000)
 
     bool did_upgrade = false;
     DBOptions options;
+    options.no_create = true;
     options.upgrade_callback = [&](int old_version, int new_version) {
         did_upgrade = true;
         CHECK_EQUAL(old_version, 20);
         CHECK_EQUAL(new_version, Group::get_current_file_format_version());
     };
-    DB::create(temp_copy, true, options);
+    DB::create(temp_copy, options);
     CHECK(did_upgrade);
 }
 
@@ -102,10 +103,11 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 1000
 
     // Callback that throws should revert the upgrade
     DBOptions options;
+    options.no_create = true;
     options.upgrade_callback = [&](int, int) {
         throw 123;
     };
-    CHECK_THROW(DB::create(temp_copy, true, options), int);
+    CHECK_THROW(DB::create(temp_copy, options), int);
 
     // Callback should be triggered here because the file still needs to be upgraded
     bool did_upgrade = false;
@@ -114,12 +116,12 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 1000
         CHECK_EQUAL(old_version, 20);
         CHECK_EQUAL(new_version, Group::get_current_file_format_version());
     };
-    DB::create(temp_copy, true, options);
+    DB::create(temp_copy, options);
     CHECK(did_upgrade);
 
     // Callback should not be triggered here because the file is already upgraded
     did_upgrade = false;
-    DB::create(temp_copy, true, options);
+    DB::create(temp_copy, options);
     CHECK_NOT(did_upgrade);
 }
 

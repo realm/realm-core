@@ -18,7 +18,6 @@
 
 #include <realm/array_unsigned.hpp>
 #include <realm/array_direct.hpp>
-#include <realm/array_flex.hpp>
 #include <algorithm>
 
 namespace realm {

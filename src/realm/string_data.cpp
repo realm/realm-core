@@ -25,8 +25,8 @@ using namespace realm;
 namespace {
 
 template <bool has_alternate_pattern>
-REALM_FORCEINLINE
-bool matchlike(const StringData& text, const StringData& pattern, const StringData* alternate_pattern=nullptr) noexcept
+REALM_FORCEINLINE bool matchlike(const StringData& text, const StringData& pattern,
+                                 const StringData* alternate_pattern = nullptr) noexcept
 {
     // If alternate_pattern is provided, it is assumed to differ from `pattern` only in case.
     REALM_ASSERT_DEBUG(has_alternate_pattern == bool(alternate_pattern));

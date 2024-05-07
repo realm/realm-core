@@ -633,6 +633,41 @@ TEST(List_AggOps)
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
 }
 
+TEST(Test_Write_List_Nested_In_Mixed)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string message;
+    DBOptions options;
+    options.logger = test_context.logger;
+    DBRef db = DB::create(make_in_realm_history(), path, options);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto col_any = table->add_column(type_Mixed, "something");
+
+    Obj obj = table->create_object();
+    obj.set_any(col_any, Mixed{20});
+    tr->verify();
+    tr->commit_and_continue_writing(); // commit simple mixed
+    tr->verify();
+
+    obj.set_collection(col_any, CollectionType::List);
+    auto list = obj.get_list_ptr<Mixed>(col_any);
+    list->add(Mixed{10});
+    list->add(Mixed{11});
+    tr->verify();
+    tr->commit_and_continue_writing(); // commit nested list in mixed
+    tr->verify();
+
+    // spicy it up a little bit...
+    list->insert_collection(2, CollectionType::List);
+    list->insert_collection(3, CollectionType::List);
+    list->get_list(2)->add(Mixed{20});
+    list->get_list(3)->add(Mixed{21});
+    tr->commit_and_continue_writing();
+    tr->verify();
+    tr->close();
+}
+
 TEST(List_Nested_InMixed)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -763,6 +798,7 @@ TEST(List_Nested_InMixed)
     dict2 = list2->get_dictionary(2);
     dict2->insert("Hello", "World");
     dict2->insert("Date", Timestamp(std::chrono::system_clock::now()));
+    list2->set_collection(0, CollectionType::Dictionary); // Idempotent
     {
         std::stringstream ss;
         tr->to_json(ss, JSONOutputMode::output_mode_xjson_plus);
@@ -823,6 +859,10 @@ TEST(List_Nested_InMixed)
                  "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]");
     CHECK_EQUAL(obj.get_list_ptr<Mixed>(col_any)->size(), 3);
     // tr->to_json(std::cout);
+    tr->commit();
+    db->compact();
+    tr = db->start_write();
+    tr->verify();
 }
 
 
@@ -1000,6 +1040,9 @@ TEST(List_NestedList_Path)
         CHECK_EQUAL(path.path_from_top[0], col_child);
         CHECK_EQUAL(path.path_from_top[1], "Any");
         CHECK_EQUAL(path.path_from_top[2], "Foo");
+        std::string message;
+        CHECK_THROW_ANY_GET_MESSAGE(list_int->set(7, 0), message);
+        CHECK(message.find("Any['Foo']") != std::string::npos);
     }
 
     // Collections contained in Mixed
@@ -1135,8 +1178,7 @@ TEST(List_UpdateIfNeeded)
     auto list_4_1 = list_4->get_list(1);
     auto list_4_2 = list_4->get_list(1);
     list_4_1->add(Mixed());
-    // FIXME: this should be NoChange
-    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::NoChange);
     CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
 
     // Update the row index of the parent object, forcing it to update

@@ -929,7 +929,7 @@ TEST(Transform_EraseSelectedLinkView)
         LnkLst link_list = (origin->begin() + 1)->get_linklist("ll");
         auto target_table = link_list.get_target_table();
         link_list.set(0, target_table->get_object(2).get_key()); // Select the link list of the 2nd row
-        origin->remove_object(origin->begin() + 0);     // Move that link list
+        origin->remove_object(origin->begin() + 0);              // Move that link list
         if (link_list.size() > 1) {
             link_list.set(1, target_table->get_object(3).get_key()); // Now modify it again
         }
@@ -1486,7 +1486,6 @@ TEST(Transform_ArrayInsert_EraseObject)
 
     client_2.get()->integrate_next_changeset_from(*server);
 }
-
 
 TEST(Transform_ArrayClearVsArrayClear_TimestampBased)
 {
@@ -2081,7 +2080,9 @@ TEST(Transform_Dictionary)
             auto& tr = *c.group;
             auto table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
             table->add_column_dictionary(type_Mixed, "dict");
-            table->create_object_with_primary_key(0);
+            auto obj0 = table->create_object_with_primary_key(0);
+            auto dict = obj0.get_dictionary("dict");
+            dict.insert("key", 42);
             table->create_object_with_primary_key(1);
         });
 
@@ -2096,6 +2097,7 @@ TEST(Transform_Dictionary)
             auto dict0 = obj0.get_dictionary("dict");
             auto dict1 = obj1.get_dictionary("dict");
 
+            dict0.erase("key");
             dict0.insert("a", 123);
             dict0.insert("b", "Hello");
             dict0.insert("c", 45.0);
@@ -2112,6 +2114,7 @@ TEST(Transform_Dictionary)
             auto dict0 = obj0.get_dictionary("dict");
             auto dict1 = obj1.get_dictionary("dict");
 
+            dict0.erase("key");
             dict0.insert("b", "Hello, World!");
             dict0.insert("d", true);
 
@@ -2198,6 +2201,48 @@ TEST(Transform_Set)
         CHECK_NOT_EQUAL(set.find(456.f), realm::npos);
         CHECK_EQUAL(set.find(999), realm::npos);
     });
+}
+
+TEST(Transform_SetEraseVsSetErase)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Baseline: insert one element in the set ('set' property)
+    client_1->create_schema([](WriteTransaction& tr) {
+        auto t = tr.get_group().add_table_with_primary_key("class_A", type_Int, "pk");
+        t->add_column_set(type_Int, "set");
+        auto obj = t->create_object_with_primary_key(1);
+        auto ss = obj.get_set<Int>("set");
+        ss.insert(42);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    // Client 1 removes the element from the set
+    client_1->transaction([](Peer& p) {
+        auto ss = p.table("class_A")->begin()->get_set<Int>("set");
+        ss.erase(42);
+    });
+
+    // Client 2 removes the element from the set
+    client_2->transaction([](Peer& p) {
+        auto ss = p.table("class_A")->begin()->get_set<Int>("set");
+        ss.erase(42);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    // Result: the set is empty
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_A");
+    CHECK(table->begin()->get_set<Int>("set").is_empty());
 }
 
 TEST(Transform_ArrayEraseVsArrayErase)
@@ -3009,6 +3054,69 @@ TEST(Transform_ClearArrayVsUpdateInt)
     auto table = read_server.get_table("class_Table");
     auto col_any = table->get_column_key("any");
     CHECK_EQUAL(table->get_object_with_primary_key(1).get_any(col_any), 42);
+}
+
+TEST(Transform_SetNullDefaultVsSetDefault)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Baseline: no data
+    client_1->transaction([](Peer& c) {
+        auto& tr = *c.group;
+        TableRef table = tr.add_table_with_primary_key("class_Table", type_Int, "id", true);
+        bool is_default = true;
+        table->add_column(type_Mixed, "mixed", is_default);
+        table->add_column(type_Int, "int");
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    client_1->history.set_time(1);
+    client_2->history.set_time(2);
+
+    // Client 1 creates object with primary key '1' and sets property 'mixed' to a default value of 'null' and
+    // property 'int' to '42'
+    // {id: 1, mixed: null, int: 42}
+    client_1->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->create_object_with_primary_key(1);
+        auto col_mixed = p.table("class_Table")->get_column_key("mixed");
+        auto col_int = p.table("class_Table")->get_column_key("int");
+        bool is_default = true;
+        obj.set_null(col_mixed, is_default);
+        obj.set(col_int, 42, is_default);
+    });
+
+    // Client 2 creates object with primary key '1' and sets property 'mixed' to a default value of '-6' and property
+    // 'int' to '6'
+    // {id: 1, mixed: -6, int: 6}
+    client_2->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->create_object_with_primary_key(1);
+        auto col_mixed = p.table("class_Table")->get_column_key("mixed");
+        auto col_int = p.table("class_Table")->get_column_key("int");
+        bool is_default = true;
+        obj.set(col_mixed, Mixed(-6), is_default);
+        obj.set(col_int, 6, is_default);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    // Result: Client 2's changes win because they happen after Client 1's changes (and is_default is true for all
+    // instructions)
+    // {id: 1, mixed: -6, int: 6}
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_Table");
+    auto col_mixed = table->get_column_key("mixed");
+    auto col_int = table->get_column_key("int");
+    auto obj = table->get_object_with_primary_key(1);
+    CHECK_EQUAL(obj.get_any(col_mixed), Mixed(-6));
+    CHECK_EQUAL(obj.get_any(col_int), Mixed(6));
 }
 
 } // unnamed namespace

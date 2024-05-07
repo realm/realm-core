@@ -53,8 +53,7 @@ constexpr static bool is_future<Future<T>> = true;
 
 // FakeVoid is a helper type for futures for callbacks or values that return/are void but need to be represented
 // as a value. It should not be visible to callers outside of future_details.
-struct FakeVoid {
-};
+struct FakeVoid {};
 
 template <typename T>
 using VoidToFakeVoid = std::conditional_t<std::is_void_v<T>, FakeVoid, T>;
@@ -492,24 +491,24 @@ public:
 
     void set_from_status_with(StatusWith<T> sw) noexcept
     {
-        set_impl([&] {
-            m_shared_state->set_from(std::move(sw));
+        set_impl([&](auto& shared_state) {
+            shared_state.set_from(std::move(sw));
         });
     }
 
     template <typename... Args>
     void emplace_value(Args&&... args) noexcept
     {
-        set_impl([&] {
-            m_shared_state->emplace_value(std::forward<Args>(args)...);
+        set_impl([&](auto& shared_state) {
+            shared_state.emplace_value(std::forward<Args>(args)...);
         });
     }
 
     void set_error(Status status) noexcept
     {
         REALM_ASSERT_DEBUG(!status.is_ok());
-        set_impl([&] {
-            m_shared_state->set_status(std::move(status));
+        set_impl([&](auto& shared_state) {
+            shared_state.set_status(std::move(status));
         });
     }
 
@@ -547,8 +546,10 @@ private:
     void set_impl(Func&& do_set) noexcept
     {
         REALM_ASSERT(m_shared_state);
-        do_set();
-        m_shared_state.reset();
+        // Update m_shared_state before fulfilling the promise so that anything
+        // waiting on the future will see `m_shared_state = nullptr`.
+        auto shared_state = std::move(m_shared_state);
+        do_set(*shared_state);
     }
 
     util::bind_ptr<SharedState<T>> m_shared_state = make_intrusive<SharedState<T>>();
@@ -1270,8 +1271,8 @@ inline Future<T> Promise<T>::get_future() noexcept
 template <typename T>
 inline void Promise<T>::set_from(Future<T>&& future) noexcept
 {
-    set_impl([&] {
-        std::move(future).propagate_result_to(m_shared_state.get());
+    set_impl([&](auto& shared_state) {
+        std::move(future).propagate_result_to(&shared_state);
     });
 }
 

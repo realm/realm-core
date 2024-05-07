@@ -851,10 +851,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
         // We don't want to replicate the individual column removals along the
         // way as they're covered by the table removal
         Table::DisableReplication dr(*table);
-        for (size_t i = table->get_column_count(); i > 0; --i) {
-            ColKey col_key = table->spec_ndx2colkey(i - 1);
-            table->remove_column(col_key);
-        }
+        table->remove_columns();
     }
 
     size_t prior_num_tables = m_tables.size();
@@ -940,16 +937,15 @@ void Group::validate(ObjLink link) const
     }
 }
 
-ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool only_modified, bool compress) const
+ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out) const
 {
     ref_type ref = m_top.get_as_ref(1);
-    if (only_modified && m_alloc.is_read_only(ref))
+    if (out.only_modified && m_alloc.is_read_only(ref))
         return ref;
     Array a(m_alloc);
     a.init_from_ref(ref);
-    REALM_ASSERT(a.has_refs());
-    Array dest(Allocator::get_default());
-    dest.create(NodeHeader::type_HasRefs, false, a.size());
+    REALM_ASSERT_DEBUG(a.has_refs());
+    TempArray dest(a.size());
     for (unsigned j = 0; j < a.size(); ++j) {
         RefOrTagged rot = a.get_as_ref_or_tagged(j);
         if (rot.is_tagged()) {
@@ -957,13 +953,11 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool 
         }
         else {
             auto table = do_get_table(j);
-            REALM_ASSERT(table);
-            dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out, deep, only_modified, compress));
+            REALM_ASSERT_DEBUG(table);
+            dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out));
         }
     }
-    ref = dest.write(out, false, false, false);
-    dest.destroy();
-    return ref;
+    return dest.write(out);
 }
 void Group::table_typed_print(std::string prefix, ref_type ref) const
 {
@@ -1017,18 +1011,18 @@ ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 }
 ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
 {
-    bool deep = true;              // Deep
-    bool only_if_modified = false; // Always
-    bool compress = false;         // true;
+    // bool deep = true;              // Deep
+    // bool only_if_modified = false; // Always
+    // bool compress = false;         // true;
     // return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
-    return m_group->typed_write_tables(out, deep, only_if_modified, compress);
+    return m_group->typed_write_tables(out);
 }
 
 auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> HistoryInfo
 {
     bool deep = true;              // Deep
     bool only_if_modified = false; // Always
-    bool compress = false;         // true;
+    bool compress = false;
     ref_type history_ref = _impl::GroupFriend::get_history_ref(*m_group);
     HistoryInfo info;
     if (history_ref) {
@@ -1079,7 +1073,7 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     // The aim is that the buffer size should be at least 1/256 of needed size but less than 64 Mb
     constexpr size_t upper_bound = 64 * 1024 * 1024;
     size_t min_space = std::min(get_used_space() >> 8, upper_bound);
-    size_t buffer_size = 4096;
+    size_t buffer_size = page_size();
     while (buffer_size < min_space) {
         buffer_size <<= 1;
     }
@@ -1125,6 +1119,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
                   bool pad_for_encryption, uint_fast64_t version_number)
 {
     _impl::OutputStream out_2(out);
+    out_2.only_modified = false;
 
     // Write the file header
     SlabAlloc::Header streaming_header;
@@ -1381,7 +1376,7 @@ void Group::flush_accessors_for_commit()
             acc->flush_for_commit();
 }
 
-void Group::refresh_dirty_accessors()
+void Group::refresh_dirty_accessors(bool writable)
 {
     if (!m_tables.is_attached()) {
         m_table_accessors.clear();
@@ -1411,7 +1406,7 @@ void Group::refresh_dirty_accessors()
                     same_table = true;
             }
             if (same_table) {
-                table_accessor->refresh_accessor_tree();
+                table_accessor->refresh_accessor_tree(writable);
             }
             else {
                 table_accessor->detach(Table::cookie_removed);
@@ -1469,7 +1464,7 @@ void Group::advance_transact(ref_type new_top_ref, util::InputStream* in, bool w
     m_top.detach();                                           // Soft detach
     bool create_group_when_missing = false;                   // See Group::attach_shared().
     attach(new_top_ref, writable, create_group_when_missing); // Throws
-    refresh_dirty_accessors();                                // Throws
+    refresh_dirty_accessors(writable);                        // Throws
 
     if (schema_changed)
         send_schema_change_notification();

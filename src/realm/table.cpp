@@ -357,6 +357,7 @@ Table::Table(Allocator& alloc)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
+    , m_interner_data(m_alloc)
     , m_repl(&g_dummy_replication)
     , m_own_ref(this, alloc.get_instance_version())
 {
@@ -364,7 +365,7 @@ Table::Table(Allocator& alloc)
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
     m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
     m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
-
+    m_interner_data.set_parent(&m_top, top_position_for_interners);
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
@@ -379,6 +380,7 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
+    , m_interner_data(m_alloc)
     , m_repl(repl)
     , m_own_ref(this, alloc.get_instance_version())
 {
@@ -386,6 +388,8 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
     m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
     m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_interner_data.set_parent(&m_top, top_position_for_interners);
     m_cookie = cookie_created;
 }
 
@@ -512,6 +516,14 @@ CollectionType Table::get_collection_type(ColKey col_key) const
     return CollectionType::Dictionary;
 }
 
+void Table::remove_columns()
+{
+    for (size_t i = get_column_count(); i > 0; --i) {
+        ColKey col_key = spec_ndx2colkey(i - 1);
+        remove_column(col_key);
+    }
+}
+
 void Table::remove_column(ColKey col_key)
 {
     check_column(col_key);
@@ -528,6 +540,9 @@ void Table::remove_column(ColKey col_key)
 
     erase_root_column(col_key); // Throws
     m_has_any_embedded_objects.reset();
+    auto i = col_key.get_index().val;
+    if (i < m_string_interners.size() && m_string_interners[i])
+        m_string_interners[i].reset();
 }
 
 
@@ -646,7 +661,14 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     else {
         m_tombstones = nullptr;
     }
-    m_string_interners.clear();
+    if (m_top.size() > top_position_for_interners && m_top.get_as_ref(top_position_for_interners)) {
+        // Interner data exist
+        m_interner_data.init_from_parent();
+    }
+    else {
+        REALM_ASSERT_DEBUG(!m_interner_data.is_attached());
+    }
+    refresh_string_interners(is_writable);
     m_cookie = cookie_initialized;
 }
 
@@ -1048,7 +1070,19 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     if (m_tombstones) {
         m_tombstones->insert_column(col_key);
     }
-
+    // create string interners internal rep as well as data area
+    REALM_ASSERT_DEBUG(m_interner_data.is_attached());
+    while (col_ndx >= m_string_interners.size()) {
+        m_string_interners.push_back({});
+    }
+    while (col_ndx >= m_interner_data.size()) {
+        m_interner_data.add(0);
+    }
+    REALM_ASSERT(!m_string_interners[col_ndx]);
+    // FIXME: Limit creation of interners to EXACTLY the columns, where they can be
+    // relevant.
+    // if (col_key.get_type() == col_type_String)
+    m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, true);
     bump_storage_version();
 
     return col_key;
@@ -1080,29 +1114,24 @@ void Table::do_erase_root_column(ColKey col_key)
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.pop_back();
     }
-    // clean up any string interner on the column
-    {
-        // reassses if this is really needed
-        std::lock_guard lock(m_string_interners_mutex);
-        if (m_string_interners[col_ndx]) {
-            Group* g = get_parent_group();
-            Transaction* t = nullptr;
-            if (g) {
-                t = dynamic_cast<Transaction*>(g);
-            }
-            if (!t) {
-                delete m_string_interners[col_ndx];
-            }
-            m_string_interners[col_ndx] = nullptr;
-        }
+    REALM_ASSERT_DEBUG(col_ndx < m_string_interners.size());
+    if (m_string_interners[col_ndx]) {
+        REALM_ASSERT_DEBUG(m_interner_data.is_attached());
+        REALM_ASSERT_DEBUG(col_ndx < m_interner_data.size());
+        auto data_ref = m_interner_data.get_as_ref(col_ndx);
+        if (data_ref)
+            Array::destroy_deep(data_ref, m_alloc);
+        m_interner_data.set(col_ndx, 0);
+        // m_string_interners[col_ndx]->update_from_parent(true);
+        m_string_interners[col_ndx].reset();
     }
     bump_content_version();
     bump_storage_version();
 }
 
-Query Table::where(const DictionaryLinkValues& dictionary_of_links) const
+Query Table::where(const Dictionary& dict) const
 {
-    return Query(m_own_ref, dictionary_of_links);
+    return Query(m_own_ref, dict.clone_as_obj_list());
 }
 
 void Table::set_table_type(Type table_type, bool handle_backlinks)
@@ -1249,18 +1278,9 @@ void Table::detach(LifeCycleCookie cookie) noexcept
 {
     m_cookie = cookie;
     m_alloc.bump_instance_version();
-    // release string interners (if not shared and hosted by DB)
-    Group* g = get_parent_group();
-    Transaction* t = nullptr;
-    if (g) {
-        t = dynamic_cast<Transaction*>(g);
-    }
-    if (!t) {
-        // we have our own local string interners - delete them
-        for (auto ptr : m_string_interners)
-            delete ptr;
-    }
+    // release string interners
     m_string_interners.clear();
+    m_interner_data.detach();
 }
 
 void Table::fully_detach() noexcept
@@ -1488,6 +1508,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // pk col key
     top.add(0); // flags
     top.add(0); // tombstones
+    top.add(0); // string interners
 
     REALM_ASSERT(top.size() == top_array_size);
 
@@ -2009,6 +2030,13 @@ void Table::update_from_parent() noexcept
 
         refresh_content_version();
         m_has_any_embedded_objects.reset();
+        if (m_top.size() > top_position_for_interners) {
+            if (m_top.get_as_ref(top_position_for_interners))
+                m_interner_data.update_from_parent();
+            else
+                m_interner_data.detach();
+        }
+        refresh_string_interners(false);
     }
     m_alloc.bump_storage_version();
 }
@@ -2137,7 +2165,7 @@ void Table::refresh_content_version()
 
 // Called when Group is moved to another version - either a rollback or an advance.
 // The content of the table is potentially different, so make no assumptions.
-void Table::refresh_accessor_tree()
+void Table::refresh_accessor_tree(bool writable)
 {
     REALM_ASSERT(m_cookie == cookie_initialized);
     REALM_ASSERT(m_top.is_attached());
@@ -2167,10 +2195,76 @@ void Table::refresh_accessor_tree()
     else {
         m_tombstones = nullptr;
     }
+    if (writable) {
+        while (m_top.size() < top_position_for_interners)
+            m_top.add(0);
+    }
+    if (m_top.size() > top_position_for_interners) {
+        if (m_top.get_as_ref(top_position_for_interners))
+            m_interner_data.init_from_parent();
+        else
+            m_interner_data.detach();
+    }
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
+    refresh_string_interners(writable);
     refresh_index_accessors();
+}
+
+void Table::refresh_string_interners(bool writable)
+{
+    if (writable) {
+        // if we're in a write transaction, make sure interner arrays are created which will allow
+        // string interners to expand with their own data when "learning"
+        while (m_top.size() <= top_position_for_interners) {
+            m_top.add(0);
+        }
+    }
+    if (m_top.size() > top_position_for_interners && m_top.get_as_ref(top_position_for_interners))
+        m_interner_data.update_from_parent();
+    else
+        m_interner_data.detach();
+    if (writable) {
+        if (!m_interner_data.is_attached()) {
+            m_interner_data.create(NodeHeader::type_HasRefs);
+            m_interner_data.update_parent();
+        }
+    }
+    // bring string interners in line with underlying data.
+    // Precondition: we rely on the col keys in m_leaf_ndx2colkey[] being up to date.
+    for (size_t idx = 0; idx < m_leaf_ndx2colkey.size(); ++idx) {
+        auto col_key = m_leaf_ndx2colkey[idx];
+        if (col_key == ColKey()) {
+            // deleted column, we really don't want a string interner for this
+            if (idx < m_string_interners.size() && m_string_interners[idx])
+                m_string_interners[idx].reset();
+            continue;
+        }
+        REALM_ASSERT_DEBUG(col_key.get_index().val == idx);
+        // maintain sufficient size of interner arrays to cover all columns
+        while (idx >= m_string_interners.size()) {
+            m_string_interners.push_back({});
+        }
+        while (writable && idx >= m_interner_data.size()) { // m_interner_data.is_attached() per above
+            m_interner_data.add(0);
+        }
+        if (m_string_interners[idx]) {
+            // existing interner
+            m_string_interners[idx]->update_from_parent(writable);
+        }
+        else {
+            // new interner. Note: if not in a writable state, the interner will not have a valid
+            // underlying data array. The interner will be set in a state, where it cannot "learn",
+            // and searches will not find any matching interned strings.
+            m_string_interners[idx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, writable);
+        }
+    }
+    if (m_string_interners.size() > m_leaf_ndx2colkey.size()) {
+        // remove any string interners which are no longer reachable,
+        // e.g. after a rollback
+        m_string_interners.resize(m_leaf_ndx2colkey.size());
+    }
 }
 
 void Table::refresh_index_accessors()
@@ -3368,15 +3462,14 @@ ColKey Table::find_opposite_column(ColKey col_key) const
     return ColKey();
 }
 
-ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
-                            bool compress) const
+ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
 {
     REALM_ASSERT(ref == m_top.get_mem().get_ref());
-    if (only_modified && m_alloc.is_read_only(ref))
+    if (out.only_modified && m_alloc.is_read_only(ref))
         return ref;
+    out.table = this;
     // ignore ref from here, just use Tables own accessors
-    Array dest(Allocator::get_default());
-    dest.create(NodeHeader::type_HasRefs, false, m_top.size());
+    TempArray dest(m_top.size());
     for (unsigned j = 0; j < m_top.size(); ++j) {
         RefOrTagged rot = m_top.get_as_ref_or_tagged(j);
         if (rot.is_tagged() || (rot.is_ref() && rot.get_as_ref() == 0)) {
@@ -3386,20 +3479,18 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep
             ref_type new_ref;
             if (j == 2) {
                 // only do type driven write for clustertree
-                new_ref = m_clusters.typed_write(rot.get_as_ref(), out, *this, deep, only_modified, compress);
+                new_ref = m_clusters.typed_write(rot.get_as_ref(), out);
             }
             else {
                 // rest is handled using untyped approach
                 Array a(m_alloc);
                 a.init_from_ref(rot.get_as_ref());
-                new_ref = a.write(out, deep, only_modified, false);
+                new_ref = a.write(out, true, out.only_modified, false);
             }
             dest.set_as_ref(j, new_ref);
         }
     }
-    ref = dest.write(out, false, false, false);
-    dest.destroy();
-    return ref;
+    return dest.write(out);
 }
 
 void Table::typed_print(std::string prefix, ref_type ref) const
@@ -3415,7 +3506,7 @@ void Table::typed_print(std::string prefix, ref_type ref) const
                 m_spec.typed_print(pref);
             }
             else if (j == 2) {
-                m_clusters.typed_print(pref, *this);
+                m_clusters.typed_print(pref);
             }
             else {
                 Array a(m_alloc);
@@ -3430,32 +3521,9 @@ void Table::typed_print(std::string prefix, ref_type ref) const
 
 StringInterner* Table::get_string_interner(ColKey col_key) const
 {
-    ColKey::Idx idx = col_key.get_index();
-    // TODO: This method likely needs to be lock-free
-    std::lock_guard lock(m_string_interners_mutex);
-    size_t j = idx.val;
-    while (j >= m_string_interners.size()) {
-        m_string_interners.push_back((StringInterner*)nullptr);
-    }
-    auto interner = m_string_interners[j];
-    if (interner)
-        return interner;
-    // if we're in a transactional scenario, we need to obtain the interner from DB
-    auto group = get_parent_group();
-    DBRef db;
-    if (group) {
-        auto transaction = dynamic_cast<Transaction*>(group);
-        if (transaction)
-            db = transaction->get_db();
-    }
-    if (db) {
-        // obtain interner from DB
-        interner = db->get_string_interner(get_key(), col_key);
-    }
-    else {
-        // create a local interner instead
-        interner = new StringInterner;
-    }
-    m_string_interners[j] = interner;
+    auto idx = col_key.get_index().val;
+    REALM_ASSERT(idx < m_string_interners.size());
+    auto interner = m_string_interners[idx].get();
+    REALM_ASSERT(interner);
     return interner;
 }

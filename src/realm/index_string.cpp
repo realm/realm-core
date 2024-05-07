@@ -414,7 +414,8 @@ uint32_t replicate_4_lsb_x8(uint32_t i)
     return i;
 }
 
-int32_t select_from_mask(int32_t a, int32_t b, int32_t mask) {
+int32_t select_from_mask(int32_t a, int32_t b, int32_t mask)
+{
     return a ^ ((a ^ b) & mask);
 }
 

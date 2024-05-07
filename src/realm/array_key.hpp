@@ -128,6 +128,6 @@ class ArrayKeyNonNullable : public ArrayKeyBase<0> {
 public:
     using ArrayKeyBase::ArrayKeyBase;
 };
-}
+} // namespace realm
 
 #endif /* SRC_REALM_ARRAY_KEY_HPP_ */

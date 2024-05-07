@@ -25,8 +25,6 @@
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
 #include <realm/impl/array_writer.hpp>
-#include <realm/array_flex.hpp>
-#include <realm/array_packed.hpp>
 
 #include <array>
 #include <cstring> // std::memcpy
@@ -232,13 +230,13 @@ struct Array::VTableForEncodedArray {
     struct PopulatedVTableEncoded : Array::VTable {
         PopulatedVTableEncoded()
         {
-            getter = &Array::get_encoded;
-            setter = &Array::set_encoded;
-            chunk_getter = &Array::get_chunk_encoded;
-            finder[cond_Equal] = &Array::find_encoded<Equal>;
-            finder[cond_NotEqual] = &Array::find_encoded<NotEqual>;
-            finder[cond_Greater] = &Array::find_encoded<Greater>;
-            finder[cond_Less] = &Array::find_encoded<Less>;
+            getter = &Array::get_from_compressed_array;
+            setter = &Array::set_compressed_array;
+            chunk_getter = &Array::get_chunk_compressed_array;
+            finder[cond_Equal] = &Array::find_compressed_array<Equal>;
+            finder[cond_NotEqual] = &Array::find_compressed_array<NotEqual>;
+            finder[cond_Greater] = &Array::find_compressed_array<Greater>;
+            finder[cond_Less] = &Array::find_compressed_array<Less>;
         }
     };
     static const PopulatedVTableEncoded vtable;
@@ -247,8 +245,6 @@ struct Array::VTableForEncodedArray {
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 const typename Array::VTableForEncodedArray::PopulatedVTableEncoded Array::VTableForEncodedArray::vtable;
-
-
 void Array::init_from_mem(MemRef mem) noexcept
 {
     // Header is the type of header that has been allocated, in case we are decompressing,
@@ -259,7 +255,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     char* header = mem.get_addr();
     const auto old_header = !NodeHeader::wtype_is_extended(header);
     // Cache all the header info as long as this array is alive and encoded.
-    m_encoder.init(header);
+    m_integer_compressor.init(header);
     if (!old_header) {
         REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Flex ||
                            NodeHeader::get_encoding(header) == Encoding::Packed);
@@ -268,10 +264,10 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_data = get_data_from_header(header);
         // encoder knows which format we are compressed into, width and size are read accordingly with the format of
         // the header
-        m_size = m_encoder.size();
-        m_width = static_cast<uint_least8_t>(m_encoder.width());
-        m_lbound = -m_encoder.width_mask();
-        m_ubound = m_encoder.width_mask() - 1;
+        m_size = m_integer_compressor.size();
+        m_width = static_cast<uint_least8_t>(m_integer_compressor.width());
+        m_lbound = -m_integer_compressor.width_mask();
+        m_ubound = m_integer_compressor.width_mask() - 1;
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
@@ -305,7 +301,7 @@ void Array::update_from_parent() noexcept
 
 void Array::set_type(Type type)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
 
     copy_on_write(); // Throws
 
@@ -349,97 +345,26 @@ void Array::destroy_children(size_t offset, bool ro_only) noexcept
     }
 }
 
-size_t Array::get_byte_size() const noexcept
-{
-    const auto header = get_header();
-    auto num_bytes = get_byte_size_from_header(header);
-    auto read_only = m_alloc.is_read_only(m_ref) == true;
-    auto capacity = get_capacity_from_header(header);
-    auto bytes_ok = num_bytes <= capacity;
-    REALM_ASSERT(read_only || bytes_ok);
-    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-    return num_bytes;
-}
-
-ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
-{
-    REALM_ASSERT(is_attached());
-    // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
-    if (only_if_modified && m_alloc.is_read_only(m_ref))
-        return m_ref;
-
-    if (!deep || !m_has_refs) {
-        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
-        // it only works by accident, because the whole slab area is reinitialized after commit.
-        // We should have: Array encoded_array{Allocator::get_default()};
-        Array encoded_array{Allocator::get_default()};
-        if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
-#ifdef REALM_DEBUG
-            const auto encoding = encoded_array.m_encoder.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
-                               encoding == Encoding::AofP || encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(size() == encoded_array.size());
-            for (size_t i = 0; i < encoded_array.size(); ++i) {
-                REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
-            }
-#endif
-            auto ref = encoded_array.do_write_shallow(out);
-            encoded_array.destroy();
-            return ref;
-        }
-        return do_write_shallow(out); // Throws
-    }
-
-    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
-}
-
-ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
-                      bool compress_in_flight)
-{
-    // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT(!only_if_modified || &alloc != &Allocator::get_default());
-    if (only_if_modified && alloc.is_read_only(ref))
-        return ref;
-
-    Array array(alloc);
-    array.init_from_ref(ref);
-    REALM_ASSERT_DEBUG(array.is_attached());
-
-    if (!array.m_has_refs) {
-        Array encoded_array{Allocator::get_default()};
-        if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
-#ifdef REALM_DEBUG
-            const auto encoding = encoded_array.m_encoder.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
-                               encoding == Encoding::AofP || encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
-            for (size_t i = 0; i < encoded_array.size(); ++i) {
-                REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
-            }
-#endif
-            auto ref = encoded_array.do_write_shallow(out);
-            encoded_array.destroy();
-            return ref;
-        }
-        else {
-            return array.do_write_shallow(out); // Throws
-        }
-    }
-    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
-}
-
+// size_t Array::get_byte_size() const noexcept
+//{
+//     const auto header = get_header();
+//     auto num_bytes = get_byte_size_from_header(header);
+//     auto read_only = m_alloc.is_read_only(m_ref) == true;
+//     auto capacity = get_capacity_from_header(header);
+//     auto bytes_ok = num_bytes <= capacity;
+//     REALM_ASSERT(read_only || bytes_ok);
+//     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+//     return num_bytes;
+// }
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
     // here we might want to compress the array and write down.
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
-    const auto encoded = is_encoded();
-    uint32_t dummy_checksum =
-        encoded ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
-    uint32_t dummy_checksum_bytes =
-        encoded ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
+    const auto compressed = is_compressed();
+    uint32_t dummy_checksum = compressed ? 0x42424242UL : 0x41414141UL; //
+    uint32_t dummy_checksum_bytes = compressed ? 2 : 4; // AAAA / BB (only 2 bytes for extended arrays)
     ref_type new_ref = out.write_array(header, byte_size, dummy_checksum, dummy_checksum_bytes); // Throws
     REALM_ASSERT_3(new_ref % 8, ==, 0);                                                          // 8-byte alignment
     return new_ref;
@@ -477,7 +402,6 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     REALM_ASSERT_3(dest_begin, <=, m_size);
     REALM_ASSERT_3(end - begin, <=, m_size - dest_begin);
     REALM_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
-
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -584,7 +508,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-    decode_array(*this);
+    decompress_array(*this);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -634,13 +558,13 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::copy_on_write()
 {
-    if (is_read_only() && !decode_array(*this))
+    if (is_read_only() && !decompress_array(*this))
         Node::copy_on_write();
 }
 
 void Array::copy_on_write(size_t min_size)
 {
-    if (is_read_only() && !decode_array(*this))
+    if (is_read_only() && !decompress_array(*this))
         Node::copy_on_write(min_size);
 }
 
@@ -722,387 +646,42 @@ size_t Array::size() const noexcept
     return m_size;
 }
 
-bool Array::encode_array(Array& arr) const
+bool Array::compress_array(Array& arr) const
 {
-    if (!is_encoded() && m_encoder.get_encoding() == NodeHeader::Encoding::WTypBits) {
-        return m_encoder.encode(*this, arr);
+    if (!is_compressed() && m_integer_compressor.get_encoding() == NodeHeader::Encoding::WTypBits) {
+        return m_integer_compressor.compress(*this, arr);
     }
     return false;
 }
 
-bool Array::decode_array(Array& arr) const
+bool Array::decompress_array(Array& arr) const
 {
-    return arr.is_encoded() ? m_encoder.decode(arr) : false;
+    return arr.is_compressed() ? m_integer_compressor.decompress(arr) : false;
 }
 
-bool Array::try_encode(Array& arr) const
+bool Array::try_compress(Array& arr) const
 {
-    return encode_array(arr);
+    return compress_array(arr);
 }
 
-bool Array::try_decode()
+bool Array::try_decompress()
 {
-    return decode_array(*this);
+    return decompress_array(*this);
 }
 
-int64_t Array::get_encoded(size_t ndx) const noexcept
+int64_t Array::get_from_compressed_array(size_t ndx) const noexcept
 {
-    return m_encoder.get(*this, ndx);
+    return m_integer_compressor.get(ndx);
 }
 
-void Array::set_encoded(size_t ndx, int64_t val)
+void Array::set_compressed_array(size_t ndx, int64_t val)
 {
-    m_encoder.set_direct(*this, ndx, val);
+    m_integer_compressor.set_direct(ndx, val);
 }
 
-int64_t Array::sum(size_t start, size_t end) const
+void Array::get_chunk_compressed_array(size_t ndx, int64_t res[8]) const noexcept
 {
-    REALM_TEMPEX(return sum, m_width, (start, end));
-}
-
-template <size_t w>
-int64_t Array::sum(size_t start, size_t end) const
-{
-    if (end == size_t(-1))
-        end = m_size;
-
-    REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
-
-    if (is_encoded())
-        return m_encoder.sum(*this, start, end);
-
-    if (start == end)
-        return 0;
-
-    int64_t s = 0;
-
-    // Sum manually until 128 bit aligned
-    for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % 128 != 0); start++) {
-        s += get<w>(start);
-    }
-
-    if (w == 1 || w == 2 || w == 4) {
-        // Sum of bitwidths less than a byte (which are always positive)
-        // uses a divide and conquer algorithm that is a variation of popolation count:
-        // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-
-        // static values needed for fast sums
-        const uint64_t m2 = 0x3333333333333333ULL;
-        const uint64_t m4 = 0x0f0f0f0f0f0f0f0fULL;
-        const uint64_t h01 = 0x0101010101010101ULL;
-
-        int64_t* data = reinterpret_cast<int64_t*>(m_data + start * w / 8);
-        size_t chunks = (end - start) * w / 8 / sizeof(int64_t);
-
-        for (size_t t = 0; t < chunks; t++) {
-            if (w == 1) {
-#if 0
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
-                s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
-                s += __builtin_popcountll(data[t]);
-#else
-                uint64_t a = data[t];
-                const uint64_t m1  = 0x5555555555555555ULL;
-                a -= (a >> 1) & m1;
-                a = (a & m2) + ((a >> 2) & m2);
-                a = (a + (a >> 4)) & m4;
-                a = (a * h01) >> 56;
-                s += a;
-#endif
-#endif
-                s += fast_popcount64(data[t]);
-            }
-            else if (w == 2) {
-                uint64_t a = data[t];
-                a = (a & m2) + ((a >> 2) & m2);
-                a = (a + (a >> 4)) & m4;
-                a = (a * h01) >> 56;
-
-                s += a;
-            }
-            else if (w == 4) {
-                uint64_t a = data[t];
-                a = (a & m4) + ((a >> 4) & m4);
-                a = (a * h01) >> 56;
-                s += a;
-            }
-        }
-        start += sizeof(int64_t) * 8 / no0(w) * chunks;
-    }
-
-#ifdef REALM_COMPILER_SSE
-    if (sseavx<42>()) {
-        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
-        // Naive, templated get<>: 391 371 374
-        // SSE:                     97 148 282
-
-        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
-            __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
-            __m128i sum_result = {0};
-            __m128i sum2;
-
-            size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
-
-            for (size_t t = 0; t < chunks; t++) {
-                if (w == 8) {
-                    /*
-                    // 469 ms AND disadvantage of handling max 64k elements before overflow
-                    __m128i vl = _mm_cvtepi8_epi16(data[t]);
-                    __m128i vh = data[t];
-                    vh.m128i_i64[0] = vh.m128i_i64[1];
-                    vh = _mm_cvtepi8_epi16(vh);
-                    sum_result = _mm_add_epi16(sum_result, vl);
-                    sum_result = _mm_add_epi16(sum_result, vh);
-                    */
-
-                    /*
-                    // 424 ms
-                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
-                    __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
-                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
-                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
-                    */
-
-                    __m128i vl = _mm_cvtepi8_epi16(data[t]); // sign extend lower words 8->16
-                    __m128i vh = data[t];
-                    vh = _mm_srli_si128(vh, 8); // v >>= 64
-                    vh = _mm_cvtepi8_epi16(vh); // sign extend lower words 8->16
-                    __m128i sum1 = _mm_add_epi16(vl, vh);
-                    __m128i sumH = _mm_cvtepi16_epi32(sum1);
-                    __m128i sumL = _mm_srli_si128(sum1, 8); // v >>= 64
-                    sumL = _mm_cvtepi16_epi32(sumL);
-                    sum_result = _mm_add_epi32(sum_result, sumL);
-                    sum_result = _mm_add_epi32(sum_result, sumH);
-                }
-                else if (w == 16) {
-                    // todo, can overflow for array size > 2^32
-                    __m128i vl = _mm_cvtepi16_epi32(data[t]); // sign extend lower words 16->32
-                    __m128i vh = data[t];
-                    vh = _mm_srli_si128(vh, 8);  // v >>= 64
-                    vh = _mm_cvtepi16_epi32(vh); // sign extend lower words 16->32
-                    sum_result = _mm_add_epi32(sum_result, vl);
-                    sum_result = _mm_add_epi32(sum_result, vh);
-                }
-                else if (w == 32) {
-                    __m128i v = data[t];
-                    __m128i v0 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
-                    v = _mm_srli_si128(v, 8);           // v >>= 64
-                    __m128i v1 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
-                    sum_result = _mm_add_epi64(sum_result, v0);
-                    sum_result = _mm_add_epi64(sum_result, v1);
-
-                    /*
-                    __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need
-                    underflow test).
-                    __m128i mm = _mm_and_si128(data[t], m);
-                    zz = _mm_or_si128(mm, zz);
-                    sum_result = _mm_add_epi32(sum_result, data[t]);
-                    */
-                }
-            }
-            start += sizeof(__m128i) * 8 / no0(w) * chunks;
-
-            // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop
-            // (vc2010/gcc4.6)
-            sum2 = sum_result;
-
-            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
-            char sum3[sizeof sum2];
-            memcpy(&sum3, &sum2, sizeof sum2);
-
-            // Sum elements of sum
-            for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-                int64_t v = get_universal < (w == 8 || w == 16) ? 32 : 64 > (reinterpret_cast<char*>(&sum3), t);
-                s += v;
-            }
-        }
-    }
-#endif
-
-    // Sum remaining elements
-    for (; start < end; ++start)
-        s += get<w>(start);
-
-    return s;
-}
-
-size_t Array::count(int64_t value) const noexcept
-{
-    // This is not used anywhere in the code, I believe we can delete this
-    // since the query logic does not use this
-    const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
-    size_t value_count = 0;
-    const size_t end = m_size;
-    size_t i = 0;
-
-    // static values needed for fast population count
-    const uint64_t m1 = 0x5555555555555555ULL;
-    const uint64_t m2 = 0x3333333333333333ULL;
-    const uint64_t m4 = 0x0f0f0f0f0f0f0f0fULL;
-    const uint64_t h01 = 0x0101010101010101ULL;
-
-    if (m_width == 0) {
-        if (value == 0)
-            return m_size;
-        return 0;
-    }
-    if (m_width == 1) {
-        if (uint64_t(value) > 1)
-            return 0;
-
-        const size_t chunkvals = 64;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            if (value == 0)
-                a = ~a; // reverse
-
-            a -= (a >> 1) & m1;
-            a = (a & m2) + ((a >> 2) & m2);
-            a = (a + (a >> 4)) & m4;
-            a = (a * h01) >> 56;
-
-            // Could use intrinsic instead:
-            // a = __builtin_popcountll(a); // gcc intrinsic
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 2) {
-        if (uint64_t(value) > 3)
-            return 0;
-
-        const uint64_t v = ~0ULL / 0x3 * value;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0x3 * 0x1;
-
-        const size_t chunkvals = 32;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a &= m1;            // isolate single bit in each segment
-            a ^= m1;            // reverse isolated bits
-            // if (!a) continue;
-
-            // Population count
-            a = (a & m2) + ((a >> 2) & m2);
-            a = (a + (a >> 4)) & m4;
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 4) {
-        if (uint64_t(value) > 15)
-            return 0;
-
-        const uint64_t v = ~0ULL / 0xF * value;
-        const uint64_t m = ~0ULL / 0xF * 0x1;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0xF * 0x7;
-        const uint64_t c2 = ~0ULL / 0xF * 0x3;
-
-        const size_t chunkvals = 16;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a |= (a >> 2) & c2;
-            a &= m; // isolate single bit in each segment
-            a ^= m; // reverse isolated bits
-
-            // Population count
-            a = (a + (a >> 4)) & m4;
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 8) {
-        if (value > 0x7FLL || value < -0x80LL)
-            return 0; // by casting?
-
-        const uint64_t v = ~0ULL / 0xFF * value;
-        const uint64_t m = ~0ULL / 0xFF * 0x1;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0xFF * 0x7F;
-        const uint64_t c2 = ~0ULL / 0xFF * 0x3F;
-        const uint64_t c3 = ~0ULL / 0xFF * 0x0F;
-
-        const size_t chunkvals = 8;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a |= (a >> 2) & c2;
-            a |= (a >> 4) & c3;
-            a &= m; // isolate single bit in each segment
-            a ^= m; // reverse isolated bits
-
-            // Population count
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 16) {
-        if (value > 0x7FFFLL || value < -0x8000LL)
-            return 0; // by casting?
-
-        const uint64_t v = ~0ULL / 0xFFFF * value;
-        const uint64_t m = ~0ULL / 0xFFFF * 0x1;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0xFFFF * 0x7FFF;
-        const uint64_t c2 = ~0ULL / 0xFFFF * 0x3FFF;
-        const uint64_t c3 = ~0ULL / 0xFFFF * 0x0FFF;
-        const uint64_t c4 = ~0ULL / 0xFFFF * 0x00FF;
-
-        const size_t chunkvals = 4;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a |= (a >> 2) & c2;
-            a |= (a >> 4) & c3;
-            a |= (a >> 8) & c4;
-            a &= m; // isolate single bit in each segment
-            a ^= m; // reverse isolated bits
-
-            // Population count
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 32) {
-        int32_t v = int32_t(value);
-        const int32_t* d = reinterpret_cast<int32_t*>(m_data);
-        for (; i < end; ++i) {
-            if (d[i] == v)
-                ++value_count;
-        }
-        return value_count;
-    }
-    else if (m_width == 64) {
-        const int64_t* d = reinterpret_cast<int64_t*>(m_data);
-        for (; i < end; ++i) {
-            if (d[i] == value)
-                ++value_count;
-        }
-        return value_count;
-    }
-
-    // Check remaining elements
-    for (; i < end; ++i)
-        if (value == get(i))
-            ++value_count;
-
-    return value_count;
+    m_integer_compressor.get_chunk(ndx, res);
 }
 
 size_t Array::calc_aligned_byte_size(size_t size, int width)
@@ -1200,54 +779,18 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
-    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
-    REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
-
-    uint8_t flags = 0;
-    Encoding encoding = Encoding::WTypBits;
-    if (width_type == wtype_Bits)
-        encoding = Encoding::WTypBits;
-    else if (width_type == wtype_Multiply)
-        encoding = Encoding::WTypMult;
-    else if (width_type == wtype_Ignore)
-        encoding = Encoding::WTypIgn;
-    else {
-        REALM_ASSERT(false && "Wrong width type for encoding");
-    }
-
-    switch (type) {
-        case type_Normal:
-            break;
-        case type_InnerBptreeNode:
-            flags |= (uint8_t)Flags::HasRefs | (uint8_t)Flags::InnerBPTree;
-
-            break;
-        case type_HasRefs:
-            flags |= (uint8_t)Flags::HasRefs;
-            break;
-    }
-    if (context_flag)
-        flags |= (uint8_t)Flags::Context;
+    REALM_ASSERT_DEBUG(value == 0 || width_type == wtype_Bits);
+    REALM_ASSERT_DEBUG(size == 0 || width_type != wtype_Ignore);
     int width = 0;
-    size_t byte_size_0 = header_size;
+    if (value != 0)
+        width = static_cast<int>(bit_width(value));
+    auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
     if (value != 0) {
-        width = int(bit_width(value));
-        byte_size_0 = calc_aligned_byte_size(size, width); // Throws
-    }
-    // Adding zero to Array::initial_capacity to avoid taking the
-    // address of that member
-    size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
-    MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = mem.get_addr();
-
-    init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, mem.get_addr());
-    if (value != 0) {
-        char* data = get_data_from_header(mem.get_addr());
+        const auto header = mem.get_addr();
+        char* data = get_data_from_header(header);
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
-
     return mem;
 }
 
@@ -1259,9 +802,10 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
 }
 
 template <class cond>
-bool Array::find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool Array::find_compressed_array(int64_t value, size_t start, size_t end, size_t baseindex,
+                                  QueryStateBase* state) const
 {
-    return m_encoder.find_all<cond>(*this, value, start, end, baseindex, state);
+    return m_integer_compressor.find_all<cond>(*this, value, start, end, baseindex, state);
 }
 
 void Array::update_width_cache_from_header() noexcept
@@ -1336,11 +880,6 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
         REALM_ASSERT(res[j] == expected);
     }
 #endif
-}
-
-void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
-{
-    m_encoder.get_chunk(*this, ndx, res);
 }
 
 template <>
@@ -1480,34 +1019,38 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded())
-        return lower_bound_int_encoded(value);
+    if (is_compressed())
+        return lower_bound_int_compressed(value);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded())
-        return upper_bound_int_encoded(value);
+    if (is_compressed())
+        return upper_bound_int_compressed(value);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
-size_t Array::lower_bound_int_encoded(int64_t value) const noexcept
+size_t Array::lower_bound_int_compressed(int64_t value) const noexcept
 {
-    return lower_bound(m_data, m_size, value, m_encoder);
+    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    encoder.ptr = &m_integer_compressor;
+    return lower_bound(m_data, m_size, value, encoder);
 }
 
-size_t Array::upper_bound_int_encoded(int64_t value) const noexcept
+size_t Array::upper_bound_int_compressed(int64_t value) const noexcept
 {
-    return upper_bound(m_data, m_size, value, m_encoder);
+    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    encoder.ptr = &m_integer_compressor;
+    return upper_bound(m_data, m_size, value, encoder);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     if (wtype_is_extended(header)) {
-        static ArrayEncode encoder;
-        encoder.init(header);
-        return encoder.get(NodeHeader::get_data_from_header(header), ndx);
+        static IntegerCompressor compressor;
+        compressor.init(header);
+        return compressor.get(ndx);
     }
 
     auto sz = get_size_from_header(header);
@@ -1617,11 +1160,14 @@ void Array::typed_print(std::string prefix) const
     }
     else {
         std::cout << " Leaf of unknown type }" << std::endl;
-        /*
-        for (unsigned n = 0; n < size(); ++n) {
-            auto pref = prefix + to_string(n) + ":\t";
-            std::cout << pref << get(n) << std::endl;
-        }
-        */
     }
+}
+
+ref_type ArrayPayload::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+{
+    Array arr(alloc);
+    arr.init_from_ref(ref);
+    // By default we are not compressing
+    constexpr bool compress = false;
+    return arr.write(out, true, out.only_modified, compress);
 }

@@ -22,10 +22,14 @@
 #include <realm/alloc.hpp>
 
 namespace realm {
+class Table;
 namespace _impl {
 
 class ArrayWriterBase {
 public:
+    bool only_modified = true;
+    bool compress = true;
+    const Table* table;
     virtual ~ArrayWriterBase()
     {
     }
@@ -38,7 +42,7 @@ public:
     virtual ref_type write_array(const char* data, size_t size, uint32_t checksum, uint32_t checksum_bytes) = 0;
 };
 
-} // namespace impl_
+} // namespace _impl
 } // namespace realm
 
 #endif // REALM_ARRAY_WRITER_HPP

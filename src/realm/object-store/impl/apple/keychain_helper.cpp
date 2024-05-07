@@ -18,8 +18,8 @@
 
 #include <realm/object-store/impl/apple/keychain_helper.hpp>
 
-#include <realm/util/cf_ptr.hpp>
-#include <realm/util/optional.hpp>
+#include <realm/exceptions.hpp>
+#include <realm/util/cf_str.hpp>
 
 #include <Security/Security.h>
 
@@ -28,33 +28,36 @@
 using namespace realm;
 using util::adoptCF;
 using util::CFPtr;
-using util::retainCF;
+using util::string_view_to_cfstring;
 
 namespace {
 
-std::runtime_error keychain_access_exception(int32_t error_code)
+REALM_NORETURN
+REALM_COLD
+void keychain_access_exception(int32_t error_code)
 {
-    return std::runtime_error(util::format("Keychain returned unexpected status code: %1", error_code));
+    if (auto message = adoptCF(SecCopyErrorMessageString(error_code, nullptr))) {
+        if (auto msg = CFStringGetCStringPtr(message.get(), kCFStringEncodingUTF8)) {
+            throw RuntimeError(ErrorCodes::RuntimeError,
+                               util::format("Keychain returned unexpected status code: %1 (%2)", msg, error_code));
+        }
+        auto length = CFStringGetMaximumSizeForEncoding(CFStringGetLength(message.get()), kCFStringEncodingUTF8) + 1;
+        auto buffer = std::make_unique<char[]>(length);
+        if (CFStringGetCString(message.get(), buffer.get(), length, kCFStringEncodingUTF8)) {
+            throw RuntimeError(
+                ErrorCodes::RuntimeError,
+                util::format("Keychain returned unexpected status code: %1 (%2)", buffer.get(), error_code));
+        }
+    }
+    throw RuntimeError(ErrorCodes::RuntimeError,
+                       util::format("Keychain returned unexpected status code: %1", error_code));
 }
 
 constexpr size_t key_size = 64;
-const CFStringRef s_account = CFSTR("metadata");
-const CFStringRef s_legacy_service = CFSTR("io.realm.sync.keychain");
+const CFStringRef s_legacy_account = CFSTR("metadata");
+const CFStringRef s_service = CFSTR("io.realm.sync.keychain");
 
-#if !TARGET_IPHONE_SIMULATOR
-CFPtr<CFStringRef> convert_string(const std::string& string)
-{
-    auto result = adoptCF(CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8*>(string.data()),
-                                                  string.size(), kCFStringEncodingASCII, false));
-    if (!result) {
-        throw std::bad_alloc();
-    }
-    return result;
-}
-#endif
-
-CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service,
-                                                      __unused util::Optional<std::string> group)
+CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service, CFStringRef group)
 {
     auto d = adoptCF(
         CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
@@ -65,17 +68,20 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStr
     CFDictionaryAddValue(d.get(), kSecReturnData, kCFBooleanTrue);
     CFDictionaryAddValue(d.get(), kSecAttrAccount, account);
     CFDictionaryAddValue(d.get(), kSecAttrService, service);
-#if !TARGET_IPHONE_SIMULATOR
-    if (group)
-        CFDictionaryAddValue(d.get(), kSecAttrAccessGroup, convert_string(*group).get());
-#endif
+    if (group) {
+        CFDictionaryAddValue(d.get(), kSecAttrAccessGroup, group);
+        if (__builtin_available(macOS 10.15, iOS 13.0, *)) {
+            CFDictionaryAddValue(d.get(), kSecUseDataProtectionKeychain, kCFBooleanTrue);
+        }
+    }
     return d;
 }
 
 /// Get the encryption key for a given service, returning true if it either exists or the keychain is not usable.
-bool get_key(CFStringRef account, CFStringRef service, util::Optional<std::vector<char>>& result)
+bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
+             std::optional<std::vector<char>>& result, bool result_on_error = true)
 {
-    auto search_dictionary = build_search_dictionary(account, service, none);
+    auto search_dictionary = build_search_dictionary(account, service, string_view_to_cfstring(group).get());
     CFDataRef retained_key_data;
     switch (OSStatus status = SecItemCopyMatching(search_dictionary.get(), (CFTypeRef*)&retained_key_data)) {
         case errSecSuccess: {
@@ -94,111 +100,183 @@ bool get_key(CFStringRef account, CFStringRef service, util::Optional<std::vecto
             // Keychain is locked, and user did not enter the password to unlock it.
         case errSecInvalidKeychain:
             // The keychain is corrupted and cannot be used.
+        case errSecNotAvailable:
+            // There are no keychain files.
         case errSecInteractionNotAllowed:
             // We asked for it to not prompt the user and a prompt was needed
-            return true;
+            return result_on_error;
+        case errSecMissingEntitlement:
+            throw InvalidArgument(util::format("Invalid access group '%1'. Make sure that you have added the access "
+                                               "group to your app's Keychain Access Groups Entitlement.",
+                                               group));
         default:
-            throw keychain_access_exception(status);
+            keychain_access_exception(status);
     }
 }
 
-void set_key(util::Optional<std::vector<char>>& key, CFStringRef account, CFStringRef service)
+bool set_key(std::optional<std::vector<char>>& key, CFStringRef account, CFStringRef service, std::string_view group)
 {
+    // key may be nullopt here if the keychain was inaccessible
     if (!key)
-        return;
+        return false;
 
-    auto search_dictionary = build_search_dictionary(account, service, none);
+    auto search_dictionary = build_search_dictionary(account, service, string_view_to_cfstring(group).get());
     CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(key->data()), key_size));
+    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, reinterpret_cast<const UInt8*>(key->data()),
+                                                        key_size, kCFAllocatorNull));
     if (!key_data)
         throw std::bad_alloc();
 
     CFDictionaryAddValue(search_dictionary.get(), kSecValueData, key_data.get());
     switch (OSStatus status = SecItemAdd(search_dictionary.get(), nullptr)) {
         case errSecSuccess:
-            return;
+            return true;
         case errSecDuplicateItem:
-            // A keychain item already exists but we didn't fine it in get_key(),
-            // meaning that we didn't have permission to access it.
+            // A keychain item already exists but we didn't find it in get_key().
+            // Either someone else created it between when we last checked and
+            // now or we don't have permission to read it. Try to reread the key
+            // and discard the one we just created in case it's the former
+            if (get_key(account, service, group, key, false))
+                return true;
         case errSecMissingEntitlement:
         case errSecUserCanceled:
         case errSecInteractionNotAllowed:
         case errSecInvalidKeychain:
+        case errSecNotAvailable:
             // We were unable to save the key for "expected" reasons, so proceed unencrypted
-            key = none;
-            return;
+            return false;
         default:
             // Unexpected keychain failure happened
-            throw keychain_access_exception(status);
+            keychain_access_exception(status);
     }
 }
 
-void delete_key(CFStringRef account, CFStringRef service)
+void delete_key(CFStringRef account, CFStringRef service, CFStringRef group)
 {
-    auto search_dictionary = build_search_dictionary(account, service, none);
+    auto search_dictionary = build_search_dictionary(account, service, group);
     auto status = SecItemDelete(search_dictionary.get());
     REALM_ASSERT(status == errSecSuccess || status == errSecItemNotFound);
 }
 
-CFPtr<CFStringRef> get_service_name(bool& have_bundle_id)
+CFPtr<CFStringRef> bundle_service()
 {
-    CFPtr<CFStringRef> service;
     if (CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle())) {
-        service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
-        have_bundle_id = true;
+        return adoptCF(CFStringCreateWithFormat(nullptr, nullptr, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
     }
-    else {
-        service = retainCF(s_legacy_service);
-        have_bundle_id = false;
-    }
-    return service;
+    return CFPtr<CFStringRef>{};
 }
 
 } // anonymous namespace
 
 namespace realm::keychain {
 
-util::Optional<std::vector<char>> get_existing_metadata_realm_key()
+std::optional<std::vector<char>> get_existing_metadata_realm_key(std::string_view app_id,
+                                                                 std::string_view access_group)
 {
-    bool have_bundle_id = false;
-    CFPtr<CFStringRef> service = get_service_name(have_bundle_id);
+    auto cf_app_id = string_view_to_cfstring(app_id);
+    std::optional<std::vector<char>> key;
 
-    // Try retrieving the existing key.
-    util::Optional<std::vector<char>> key;
-    if (get_key(s_account, service.get(), key)) {
+    // If we have a security access groups then keys are stored the same way
+    // everywhere and we don't have any legacy storage methods to handle, so
+    // we just either have a key or we don't.
+    if (access_group.size()) {
+        get_key(cf_app_id.get(), s_service, access_group, key);
         return key;
     }
 
-    if (have_bundle_id) {
-        // See if there's a key stored using the legacy shared keychain item.
-        if (get_key(s_account, s_legacy_service, key)) {
-            // If so, copy it to the per-app keychain item before returning it.
-            set_key(key, s_account, service.get());
+    // When we don't have an access group we check a whole bunch of things because
+    // there's been a variety of ways that we've stored metadata keys over the years.
+    // If we find a key stored in a non-preferred way we copy it to the preferred
+    // location before returning it.
+    //
+    // The original location was (account: "metadata", service: "io.realm.sync.keychain").
+    // For processes with a bundle ID, we then switched to (account: "metadata",
+    // service: "$bundleId - Realm Sync Metadata Key")
+    // The current preferred location on non-macOS (account: appId, service: "io.realm.sync.keychain"),
+    // and on macOS is (account: appId, service: "$bundleId - Realm Sync Metadata Key").
+    //
+    // On everything but macOS the keychain is scoped to the app, so there's no
+    // need to include the bundle ID. On macOS it's user-wide, and we want each
+    // application using Realm to have separate state. Using multiple server apps
+    // in one client is unusual, but when it's done we want each metadata realm to
+    // have a separate key.
+
+#if TARGET_OS_MAC
+    if (auto service = bundle_service()) {
+        if (get_key(cf_app_id.get(), service.get(), {}, key))
+            return key;
+        if (get_key(s_legacy_account, service.get(), {}, key)) {
+            set_key(key, cf_app_id.get(), service.get(), {});
+            return key;
+        }
+        if (get_key(s_legacy_account, s_service, {}, key)) {
+            set_key(key, cf_app_id.get(), service.get(), {});
             return key;
         }
     }
-    return util::none;
-}
+    else {
+        if (get_key(cf_app_id.get(), s_service, {}, key))
+            return key;
+        if (get_key(s_legacy_account, s_service, {}, key)) {
+            set_key(key, cf_app_id.get(), s_service, {});
+            return key;
+        }
+    }
+#else
+    if (get_key(cf_app_id, s_service, {}, key))
+        return key;
+    if (auto service = bundle_service()) {
+        if (get_key(cf_app_id, service, {}, key)) {
+            set_key(key, cf_app_id, s_service, {});
+            return key;
+        }
+    }
+    if (get_key(s_legacy_account, s_service, {}, key)) {
+        set_key(key, cf_app_id, s_service, {});
+        return key;
+    }
+#endif
 
-util::Optional<std::vector<char>> create_new_metadata_realm_key()
-{
-    bool have_bundle_id = false;
-    CFPtr<CFStringRef> service = get_service_name(have_bundle_id);
-
-    util::Optional<std::vector<char>> key;
-    key.emplace(key_size);
-    arc4random_buf(key->data(), key_size);
-    set_key(key, s_account, service.get());
     return key;
 }
 
-void delete_metadata_realm_encryption_key()
+std::optional<std::vector<char>> create_new_metadata_realm_key(std::string_view app_id, std::string_view access_group)
 {
-    delete_key(s_account, s_legacy_service);
-    if (CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle())) {
-        auto service =
-            adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
-        delete_key(s_account, service.get());
+    auto cf_app_id = string_view_to_cfstring(app_id);
+    std::optional<std::vector<char>> key;
+    key.emplace(key_size);
+    arc4random_buf(key->data(), key_size);
+
+    // See above for why macOS is different
+#if TARGET_OS_OSX
+    if (!access_group.size()) {
+        if (auto service = bundle_service()) {
+            if (!set_key(key, cf_app_id.get(), service.get(), {}))
+                key.reset();
+            return key;
+        }
+    }
+#endif
+
+    // If we're unable to save the newly created key, clear it and proceed unencrypted
+    if (!set_key(key, cf_app_id.get(), s_service, access_group))
+        key.reset();
+    return key;
+}
+
+void delete_metadata_realm_encryption_key(std::string_view app_id, std::string_view access_group)
+{
+    auto cf_app_id = string_view_to_cfstring(app_id);
+    if (access_group.size()) {
+        delete_key(cf_app_id.get(), s_service, string_view_to_cfstring(access_group).get());
+        return;
+    }
+
+    delete_key(cf_app_id.get(), s_service, {});
+    delete_key(s_legacy_account, s_service, {});
+    if (auto service = bundle_service()) {
+        delete_key(cf_app_id.get(), service.get(), {});
+        delete_key(s_legacy_account, service.get(), {});
     }
 }
 

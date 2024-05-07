@@ -35,20 +35,17 @@ static_assert(realm_log_level_e(Logger::Level::off) == RLM_LOG_LEVEL_OFF);
 
 class CLogger : public realm::util::Logger {
 public:
-    CLogger(UserdataPtr userdata, realm_log_func_t log_callback, Logger::Level level)
+    CLogger(UserdataPtr userdata, realm_log_func_t log_callback)
         : Logger()
         , m_userdata(std::move(userdata))
         , m_log_callback(log_callback)
     {
-        set_level_threshold(level);
     }
 
 protected:
-    void do_log(const util::LogCategory&, Logger::Level level, const std::string& message) final
+    void do_log(const util::LogCategory& category, Logger::Level level, const std::string& message) final
     {
-
-        // FIXME use category
-        m_log_callback(m_userdata.get(), realm_log_level_e(level), message.c_str());
+        m_log_callback(m_userdata.get(), category.get_name().c_str(), realm_log_level_e(level), message.c_str());
     }
 
 private:
@@ -57,13 +54,12 @@ private:
 };
 } // namespace
 
-RLM_API void realm_set_log_callback(realm_log_func_t callback, realm_log_level_e level, realm_userdata_t userdata,
+RLM_API void realm_set_log_callback(realm_log_func_t callback, realm_userdata_t userdata,
                                     realm_free_userdata_func_t userdata_free) noexcept
 {
     std::shared_ptr<util::Logger> logger;
     if (callback) {
-        logger = std::make_shared<CLogger>(UserdataPtr{userdata, userdata_free}, callback,
-                                           realm::util::Logger::Level(level));
+        logger = std::make_shared<CLogger>(UserdataPtr{userdata, userdata_free}, callback);
     }
     util::Logger::set_default_logger(std::move(logger));
 }

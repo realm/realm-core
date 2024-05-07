@@ -93,10 +93,9 @@ public:
     static bool get_name(std::string& name) noexcept;
 
 private:
-
 #ifdef _WIN32
     std::thread m_std_thread;
-#else    
+#else
     pthread_t m_id;
 #endif
     bool m_joinable;
@@ -118,8 +117,7 @@ public:
     Mutex();
     ~Mutex() noexcept;
 
-    struct process_shared_tag {
-    };
+    struct process_shared_tag {};
     /// Initialize this mutex for use across multiple processes. When
     /// constructed this way, the instance may be placed in memory
     /// shared by multiple processes, as well as in a memory mapped
@@ -150,11 +148,8 @@ protected:
     pthread_mutex_t m_impl = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
-    struct no_init_tag {
-    };
-    Mutex(no_init_tag)
-    {
-    }
+    struct no_init_tag {};
+    Mutex(no_init_tag) {}
 
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
@@ -183,8 +178,7 @@ private:
 
 
 /// See UniqueLock.
-struct defer_lock_tag {
-};
+struct defer_lock_tag {};
 
 /// A general-purpose mutex ownership wrapper supporting deferred
 /// locking as well as repeated unlocking and relocking.
@@ -340,8 +334,7 @@ public:
     CondVar();
     ~CondVar() noexcept;
 
-    struct process_shared_tag {
-    };
+    struct process_shared_tag {};
 
     /// Initialize this condition variable for use across multiple
     /// processes. When constructed this way, the instance may be
@@ -629,9 +622,7 @@ inline RobustMutex::RobustMutex()
     init_as_process_shared(robust_if_available);
 }
 
-inline RobustMutex::~RobustMutex() noexcept
-{
-}
+inline RobustMutex::~RobustMutex() noexcept {}
 
 template <class Func>
 inline void RobustMutex::lock(Func recover_func)
@@ -661,7 +652,8 @@ template <class Func>
 inline bool RobustMutex::try_lock(Func recover_func)
 {
     int lock_result = try_low_level_lock(); // Throws
-    if (lock_result == 0) return false;
+    if (lock_result == 0)
+        return false;
     bool no_thread_has_died = lock_result == 1;
     if (REALM_LIKELY(no_thread_has_died))
         return true;
@@ -740,7 +732,8 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
             r = GetLastError();
             if (r == ERROR_TIMEOUT)
                 return;
-        } else {
+        }
+        else {
             r = 0;
         }
 #else

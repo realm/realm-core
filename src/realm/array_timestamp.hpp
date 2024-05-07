@@ -109,6 +109,7 @@ public:
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
 
     void verify() const;
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
 
 private:
     ArrayIntNull m_seconds;
@@ -133,6 +134,6 @@ inline size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t e
     return find_first<Equal>(value, begin, end);
 }
 
-}
+} // namespace realm
 
 #endif /* SRC_REALM_ARRAY_BINARY_HPP_ */

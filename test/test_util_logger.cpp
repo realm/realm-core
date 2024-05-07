@@ -61,7 +61,7 @@ namespace {
 
 TEST(Util_Logger_LevelToFromString)
 {
-    auto check = [& test_context = test_context](util::Logger::Level level, const char* name) {
+    auto check = [&test_context = test_context](util::Logger::Level level, const char* name) {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out << level;
@@ -93,7 +93,7 @@ TEST(Util_Logger_LevelThreshold)
     auto threadsafe_logger = std::make_shared<ThreadSafeLogger>(base_logger);
     auto prefix_logger =
         PrefixLogger(util::LogCategory::realm, "test", threadsafe_logger); // created using Logger shared_ptr
-    auto prefix_logger2 = PrefixLogger("test2", prefix_logger);   // created using PrefixLogger
+    auto prefix_logger2 = PrefixLogger("test2", prefix_logger);            // created using PrefixLogger
 
     auto default_log_level = util::LogCategory::realm.get_default_level_threshold();
     CHECK(base_logger->get_level_threshold() == default_log_level);
@@ -353,7 +353,9 @@ TEST(Util_Logger_ThreadSafe)
     const int num_threads = 8;
     std::unique_ptr<test_util::ThreadWrapper[]> threads(new test_util::ThreadWrapper[num_threads]);
     for (int i = 0; i < num_threads; ++i)
-        threads[i].start([&func, i] { func(i); });
+        threads[i].start([&func, i] {
+            func(i);
+        });
     for (int i = 0; i < num_threads; ++i)
         CHECK_NOT(threads[i].join());
 

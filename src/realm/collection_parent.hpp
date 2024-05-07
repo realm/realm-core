@@ -95,10 +95,13 @@ public:
     virtual size_t find_index(const Index& ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
+    // Reread the content version from the allocator. Called when a child makes
+    // a write to mark the already up-to-date parent as still being up-to-date.
+    virtual void update_content_version() const noexcept = 0;
 
-    static LstBasePtr get_listbase_ptr(ColKey col_key, size_t level);
-    static SetBasePtr get_setbase_ptr(ColKey col_key, size_t level);
-    static CollectionBasePtr get_collection_ptr(ColKey col_key, size_t level);
+    static LstBasePtr get_listbase_ptr(ColKey col_key, uint8_t level);
+    static SetBasePtr get_setbase_ptr(ColKey col_key, uint8_t level);
+    static CollectionBasePtr get_collection_ptr(ColKey col_key, uint8_t level);
 
     static int64_t generate_key(size_t sz);
     static void set_key(BPlusTreeMixed& tree, size_t index);
@@ -109,11 +112,7 @@ protected:
     friend class CollectionBaseImpl;
     friend class CollectionList;
 
-#ifdef REALM_DEBUG
-    static constexpr size_t s_max_level = 4;
-#else
     static constexpr size_t s_max_level = 100;
-#endif
     uint8_t m_level = 0;
 
     constexpr CollectionParent(uint8_t level = 0)

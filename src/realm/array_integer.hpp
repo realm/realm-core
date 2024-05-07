@@ -64,6 +64,14 @@ public:
     }
     template <class cond>
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state) const;
+
+    template <class T>
+    static ref_type typed_write(ref_type ref, T& out, Allocator& alloc)
+    {
+        Array arr(alloc);
+        arr.init_from_ref(ref);
+        return arr.write(out, false, out.only_modified, out.compress);
+    }
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {
@@ -132,6 +140,14 @@ public:
 
 
     size_t find_first(value_type value, size_t begin = 0, size_t end = npos) const;
+
+    template <class T>
+    static ref_type typed_write(ref_type ref, T& out, Allocator& alloc)
+    {
+        Array arr(alloc);
+        arr.init_from_ref(ref);
+        return arr.write(out, false, out.only_modified, out.compress);
+    }
 
 protected:
     void avoid_null_collision(int64_t value);

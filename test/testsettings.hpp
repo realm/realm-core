@@ -21,9 +21,9 @@
 
 #ifndef TEST_DURATION
 #define TEST_DURATION 0 // Only brief unit tests. < 1 sec
-//#  define TEST_DURATION 1  // All unit tests, plus monkey tests. ~1 minute
-//#  define TEST_DURATION 2  // Same as 2, but longer monkey tests. 8 minutes
-//#  define TEST_DURATION 3
+// #  define TEST_DURATION 1  // All unit tests, plus monkey tests. ~1 minute
+// #  define TEST_DURATION 2  // Same as 2, but longer monkey tests. 8 minutes
+// #  define TEST_DURATION 3
 #endif
 
 // Some threading robustness tests are not enable by default, because
@@ -32,7 +32,7 @@
 
 // Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by
 // #including pthread_test.h. Works both in debug and release mode.
-//#define REALM_PTHREADS_TEST
+// #define REALM_PTHREADS_TEST
 
 #define TEST_BASIC_UTILS
 #define TEST_BPLUS_TREE
@@ -98,7 +98,7 @@
 
 // Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this
 // test could perhaps be modified to trigger it (unless it's a language binding problem).
-//#define JAVA_MANY_COLUMNS_CRASH
+// #define JAVA_MANY_COLUMNS_CRASH
 
 // Temporarily disable async testing until use of sleep() in the async tests have
 // been replaced with a better solution.

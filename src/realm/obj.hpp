@@ -370,7 +370,6 @@ private:
     bool ensure_writeable();
     void sync(Node& arr);
     int_fast64_t bump_content_version();
-    void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
 
@@ -479,6 +478,10 @@ private:
     {
         Obj::set_collection_ref(index, ref, type);
     }
+    void update_content_version() const noexcept override
+    {
+        // not applicable to Obj
+    }
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
@@ -543,6 +546,12 @@ inline Obj& Obj::set(ColKey col_key, char* str, bool is_default)
 
 template <>
 inline Obj& Obj::set(ColKey col_key, std::string str, bool is_default)
+{
+    return set(col_key, StringData(str), is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, std::string_view str, bool is_default)
 {
     return set(col_key, StringData(str), is_default);
 }
@@ -654,13 +663,6 @@ inline int_fast64_t Obj::bump_content_version()
 {
     Allocator& alloc = get_alloc();
     return alloc.bump_content_version();
-}
-
-inline void Obj::bump_both_versions()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-    alloc.bump_storage_version();
 }
 
 } // namespace realm

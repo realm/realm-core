@@ -32,7 +32,6 @@
 #include <realm/object-store/util/scheduler.hpp>
 
 #if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -133,6 +132,10 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             throw InvalidArgument(ErrorCodes::IllegalCombination,
                                   "Cannot specify a partition value when flexible sync is enabled");
         }
+        if (!config.sync_config->user) {
+            throw InvalidArgument(ErrorCodes::IllegalCombination,
+                                  "A user must be provided to open a synchronized Realm.");
+        }
     }
 #endif
 
@@ -188,7 +191,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
                     ErrorCodes::MismatchedConfig,
                     util::format("Realm at path '%1' already opened with different sync user.", config.path));
             }
-
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
                 throw LogicError(
                     ErrorCodes::MismatchedConfig,
@@ -433,10 +435,13 @@ bool RealmCoordinator::open_db()
 
 #if REALM_ENABLE_SYNC
     if (m_config.sync_config) {
+        REALM_ASSERT(m_config.sync_config->user);
         // If we previously opened this Realm, we may have a lingering sync
         // session which outlived its RealmCoordinator. If that happens we
         // want to reuse it instead of creating a new DB.
-        m_sync_session = m_config.sync_config->user->sync_manager()->get_existing_session(m_config.path);
+        if (auto sync_manager = m_config.sync_config->user->sync_manager()) {
+            m_sync_session = sync_manager->get_existing_session(m_config.path);
+        }
         if (m_sync_session) {
             m_db = SyncSession::Internal::get_db(*m_sync_session);
             init_external_helpers();
@@ -479,6 +484,7 @@ bool RealmCoordinator::open_db()
         }
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
+        options.clear_on_invalid_file = m_config.clear_on_invalid_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
 #ifdef __EMSCRIPTEN__
@@ -496,7 +502,8 @@ bool RealmCoordinator::open_db()
 #endif
         }
         else {
-            m_db = DB::create(m_config.path, true, options);
+            options.no_create = true;
+            m_db = DB::create(m_config.path, options);
         }
     }
     catch (realm::FileFormatUpgradeRequired const&) {
@@ -538,8 +545,17 @@ void RealmCoordinator::init_external_helpers()
 #if REALM_ENABLE_SYNC
     // We may have reused an existing sync session that outlived its original
     // RealmCoordinator. If not, we need to create a new one now.
-    if (m_config.sync_config && !m_sync_session)
-        m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, m_config);
+    if (m_config.sync_config && !m_sync_session) {
+        if (!m_config.sync_config->user || m_config.sync_config->user->state() == SyncUser::State::Removed) {
+            throw app::AppError(
+                ErrorCodes::ClientUserNotFound,
+                util::format("Cannot start a sync session for user '%1' because this user has been removed.",
+                             m_config.sync_config->user->user_id()));
+        }
+        if (auto sync_manager = m_config.sync_config->user->sync_manager()) {
+            m_sync_session = sync_manager->get_session(m_db, m_config);
+        }
+    }
 #endif
 
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {

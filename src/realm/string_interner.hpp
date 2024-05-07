@@ -21,7 +21,11 @@
 
 #include <realm/utilities.hpp>
 #include <realm/string_compressor.hpp>
+#include <realm/keys.hpp>
 
+#include <unordered_map>
+#include <vector>
+#include <deque>
 
 template <>
 struct std::hash<CompressedString> {
@@ -42,10 +46,22 @@ namespace realm {
 
 using StringID = size_t;
 
+class Array;
+class ArrayUnsigned;
+class Allocator;
+struct CachedString {
+    uint8_t m_weight = 0;
+    std::unique_ptr<std::string> m_decompressed;
+};
+
 class StringInterner {
 public:
-    StringInterner();
+    // To be used exclusively from Table
+    StringInterner(Allocator& alloc, Array& parent, ColKey col_key, bool writable);
+    void update_from_parent(bool writable);
     ~StringInterner();
+
+    // To be used from Obj and for searching
     StringID intern(StringData);
     std::optional<StringID> lookup(StringData);
     int compare(StringID A, StringID B);
@@ -53,12 +69,24 @@ public:
     StringData get(StringID);
 
 private:
-    StringCompressor compressor;
+    Array& m_parent; // need to be able to check if this is attached or not
+    std::unique_ptr<Array> m_top;
+    std::unique_ptr<Array> m_data;
+    std::unique_ptr<ArrayUnsigned> m_current_leaf;
+    void rebuild_internal();
+
+    ColKey m_col_key;
+    std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
     std::unordered_map<CompressedString, size_t> m_compressed_string_map;
-    // for reference/debugging (to be removed)
-    std::vector<std::string> m_strings;
     bool null_seen = false;
+    // At the moment we need to keep decompressed strings around if they've been
+    // returned to the caller, since we're handing
+    // out StringData references to their storage. This is a temporary solution.
+    // Further: access need to be lock free, so we can not decompress on demand,
+    // but must do so when the interner is created or updated_from_parent.
+    // This is also not a viable long term solution.
+    std::vector<CachedString> m_decompressed_strings;
 };
 } // namespace realm
 
