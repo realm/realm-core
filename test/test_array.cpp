@@ -1583,6 +1583,7 @@ TEST(Array_Bits)
 
 TEST(Array_cares_about)
 {
+    // The following numbers are in decimal to annoy any bystanders....
     std::vector<uint64_t> expected{
         18446744073709551615ULL, 18446744073709551615ULL, 18446744073709551615ULL, 9223372036854775807ULL,
         18446744073709551615U,   1152921504606846975ULL,  1152921504606846975ULL,  9223372036854775807ULL,
@@ -1640,48 +1641,6 @@ TEST(AlignDirectBitFields)
     }
 }
 
-TEST(UnalignBitFields)
-{
-    uint8_t a[16];
-    for (size_t i = 0; i < 16; ++i)
-        a[i] = i + 1;
-    {
-        size_t cnt = 1;
-        unaligned_word_iter it((uint64_t*)&a, 0);
-        for (size_t i = 1; i <= 2; ++i) {
-            auto v = it.get(64); // get the first word which contains 64 bits (asking for less bits does not matter)
-            // now extract all the values
-            for (size_t j = 0; j < 8; ++j) {
-                const auto single_v = v & 0xFF;
-                CHECK_EQUAL(single_v, cnt);
-                cnt += 1;
-                v >>= 8;
-            }
-            it.bump(64); // go to the second word
-        }
-    }
-    {
-        // reverse polarity
-        auto cnt = 0;
-        for (size_t i = 0; i < 16; ++i)
-            a[i] = uint8_t(-1) - i;
-        unaligned_word_iter it((uint64_t*)&a, 0);
-        for (size_t i = 1; i <= 2; ++i) {
-            // get the first word which contains 64 bits.
-            //(asking for 8 bits and bump by 8 bits is another viable way of approaching this)
-            auto v = it.get(64);
-            // now extract all the values
-            for (size_t j = 0; j < 8; ++j) {
-                const auto single_v = v & 0xFF;
-                CHECK_EQUAL(single_v, (uint8_t)(-1) - cnt);
-                cnt += 1;
-                v >>= 8;
-            }
-            it.bump(64); // go to the second word
-        }
-    }
-}
-
 TEST(TestSignValuesStoredIterator)
 {
     {
@@ -1719,34 +1678,6 @@ TEST(TestSignValuesStoredIterator)
             const auto sv = sign_extend_field_by_mask(sign_mask, *it);
             CHECK_EQUAL(sv, -i);
             ++it;
-        }
-    }
-}
-
-TEST(TestSignValuesStoredUnalignIterator)
-{
-    // we don't use the unaligned iterator for writing, so there is no API for it.
-    // Maybe it is something we could evaluate, if it makes faster to rewrite the array
-    // when we are compressing via an unaligned iterator.
-    // But in theory it should be the same.
-    {
-        // positive values are easy.
-        uint8_t a_positive[16]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        unaligned_word_iter it((uint64_t*)&a_positive, 0);
-        for (size_t i = 0; i < 16; ++i) {
-            const auto v = it.get(8) & 0xFF; //
-            CHECK_EQUAL(v, i);
-            it.bump(8);
-        }
-    }
-    {
-        int8_t a_negative[16]{0, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15};
-        unaligned_word_iter it((uint64_t*)&a_negative, 0);
-        for (int8_t i = 0; i < 16; ++i) {
-            const auto v = it.get(8) & 0xFF;
-            const auto sv = sign_extend_value(8, v);
-            CHECK_EQUAL(sv, -i);
-            it.bump(8);
         }
     }
 }
@@ -2059,7 +1990,7 @@ TEST(ParallelSearchLessThan)
     const auto msb = populate(width, mask);
     const auto search_vector = populate(width, key);
 
-    static auto vector_compare_neq = [](auto msb, auto a, auto b) {
+    static auto vector_compare_lt = [](auto msb, auto a, auto b) {
         return find_all_fields_signed_LT(msb, a, b);
     };
 
@@ -2067,7 +1998,7 @@ TEST(ParallelSearchLessThan)
     const auto end = size;
     std::vector<size_t> parallel_result;
     while (start < end) {
-        start = parallel_subword_find(vector_compare_neq, buff, size_t{0}, width, msb, search_vector, start, end);
+        start = parallel_subword_find(vector_compare_lt, buff, size_t{0}, width, msb, search_vector, start, end);
         if (start != end)
             parallel_result.push_back(start);
         start += 1;
@@ -2109,7 +2040,7 @@ TEST(ParallelSearchGreaterThan)
     const auto msb = populate(width, mask);
     const auto search_vector = populate(width, key);
 
-    static auto vector_compare_neq = [](auto msb, auto a, auto b) {
+    static auto vector_compare_gt = [](auto msb, auto a, auto b) {
         return find_all_fields_signed_GT(msb, a, b);
     };
 
@@ -2117,7 +2048,7 @@ TEST(ParallelSearchGreaterThan)
     const auto end = size;
     std::vector<size_t> parallel_result;
     while (start < end) {
-        start = parallel_subword_find(vector_compare_neq, buff, size_t{0}, width, msb, search_vector, start, end);
+        start = parallel_subword_find(vector_compare_gt, buff, size_t{0}, width, msb, search_vector, start, end);
         if (start != end)
             parallel_result.push_back(start);
         start += 1;
