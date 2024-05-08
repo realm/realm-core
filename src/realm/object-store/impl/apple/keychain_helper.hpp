@@ -23,9 +23,8 @@
 
 #if REALM_PLATFORM_APPLE
 
-#include <realm/util/cf_str.hpp>
+#include <realm/util/encryption_key.hpp>
 
-#include <realm/util/file.hpp>
 #include <optional>
 #include <string_view>
 
@@ -44,10 +43,10 @@ void delete_metadata_realm_encryption_key(std::string_view app_id, std::string_v
 
 namespace impl {
 
-bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
+bool get_key(std::string_view account, std::string_view service, std::string_view group,
              std::optional<util::EncryptionKey>& result, bool result_on_error = true);
 
-bool set_key(std::optional<util::EncryptionKey>& key, CFStringRef account, CFStringRef service,
+bool set_key(std::optional<util::EncryptionKey>& key, std::string_view account, std::string_view service,
              std::string_view group = {});
 
 } // namespace impl

@@ -20,6 +20,7 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/util/cf_ptr.hpp>
+#include <realm/util/cf_str.hpp>
 #include <realm/util/file.hpp>
 
 #include <Security/Security.h>
@@ -81,8 +82,8 @@ static CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account
 }
 
 /// Get the encryption key for a given service, returning true if it either exists or the keychain is not usable.
-bool get_key(CFStringRef account, CFStringRef service, std::string_view group, std::optional<EncryptionKey>& result,
-             bool result_on_error)
+static bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
+                    std::optional<EncryptionKey>& result, bool result_on_error = true)
 {
     auto search_dictionary = build_search_dictionary(account, service, string_view_to_cfstring(group).get());
     CFDataRef retained_key_data;
@@ -117,7 +118,15 @@ bool get_key(CFStringRef account, CFStringRef service, std::string_view group, s
     }
 }
 
-bool set_key(std::optional<EncryptionKey>& key, CFStringRef account, CFStringRef service, std::string_view group)
+bool get_key(std::string_view account, std::string_view service, std::string_view group,
+             std::optional<EncryptionKey>& result, bool result_on_error)
+{
+    return get_key(string_view_to_cfstring(account).get(), string_view_to_cfstring(service).get(), group, result,
+                   result_on_error);
+}
+
+static bool set_key(std::optional<EncryptionKey>& key, CFStringRef account, CFStringRef service,
+                    std::string_view group)
 {
     // key may be nullopt here if the keychain was inaccessible
     if (!key)
@@ -153,6 +162,13 @@ bool set_key(std::optional<EncryptionKey>& key, CFStringRef account, CFStringRef
             // Unexpected keychain failure happened
             keychain_access_exception(status);
     }
+}
+
+
+bool set_key(std::optional<EncryptionKey>& key, std::string_view account, std::string_view service,
+             std::string_view group)
+{
+    return set_key(key, string_view_to_cfstring(account).get(), string_view_to_cfstring(service).get(), group);
 }
 
 static void delete_key(CFStringRef account, CFStringRef service, CFStringRef group)

@@ -903,18 +903,19 @@ TEST_CASE("keychain", "[sync][metadata]") {
 
     SECTION("legacy key migration") {
         auto key = generate_key();
-        const auto legacy_account = CFSTR("metadata");
-        const auto service_name = CFSTR("io.realm.sync.keychain");
+        const std::string legacy_account = "metadata";
+        const std::string service_name = "io.realm.sync.keychain";
         const auto bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle());
         // Could be either ObjectStoreTests or CombinedTests but must be set
         REQUIRE(bundle_id);
+        std::unique_ptr<char[]> bundle_id_buffer;
         const auto bundle_service =
-            adoptCF(CFStringCreateWithFormat(nullptr, nullptr, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
+            util::format("%1 - Realm Sync Metadata Key", util::cfstring_to_cstring(bundle_id, bundle_id_buffer));
 
         enum class Location { Original, Bundle, BundleAndAppId };
         auto location = GENERATE(Location::Original, Location::Bundle, Location::BundleAndAppId);
         CAPTURE(location);
-        CFStringRef account, service;
+        std::string_view account, service;
         switch (location) {
             case Location::Original:
                 account = legacy_account;
@@ -922,11 +923,11 @@ TEST_CASE("keychain", "[sync][metadata]") {
                 break;
             case Location::Bundle:
                 account = legacy_account;
-                service = bundle_service.get();
+                service = bundle_service;
                 break;
             case Location::BundleAndAppId:
-                account = CFSTR("app id");
-                service = bundle_service.get();
+                account = "app id";
+                service = bundle_service;
                 break;
         }
 
@@ -935,7 +936,7 @@ TEST_CASE("keychain", "[sync][metadata]") {
         REQUIRE(key_2 == key);
 
         // Key should have been copied to the preferred location
-        REQUIRE(keychain::impl::get_key(CFSTR("app id"), bundle_service.get(), {}, key, false));
+        REQUIRE(keychain::impl::get_key("app id", bundle_service, {}, key, false));
         REQUIRE(key_2 == key);
 
         // Key should not have been deleted from the original location
