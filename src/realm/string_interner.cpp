@@ -39,24 +39,6 @@ StringInterner::StringInterner(Allocator& alloc, Array& parent, ColKey col_key, 
     m_current_leaf = std::make_unique<ArrayUnsigned>(alloc);
     m_col_key = col_key;
     update_from_parent(writable);
-#if 0
-    if (parent.get_as_ref(index)) {
-        m_top->init_from_parent();
-        REALM_ASSERT_DEBUG(col_key.value == m_top->get_as_ref_or_tagged(Pos_ColKey).get_as_int());
-        m_data = std::make_unique<Array>(alloc);
-        m_data->set_parent(m_top.get(), Pos_Data);
-        m_data->init_from_parent();
-    }
-    else {
-        // FIXME: Creating subarrays is only valid in a writable setting, but this constructor may
-        // be called in settings which are not writable.
-        m_top->create(NodeHeader::type_HasRefs, false, Top_Size, 0);
-        m_data->update_parent();
-        m_top->update_parent();
-    }
-    m_compressor = std::make_unique<StringCompressor>(alloc, *m_top, Pos_Compressor);
-    rebuild_internal();
-#endif
 }
 
 void StringInterner::update_from_parent(bool writable)
@@ -92,6 +74,17 @@ void StringInterner::update_from_parent(bool writable)
         m_compressor.reset();
         return;
     }
+    // validate we're accessing data for the correct column. A combination of column erase
+    // and insert could lead to an interner being paired with wrong data in the file.
+    // If so, we clear internal data forcing rebuild_internal() to rebuild from scratch.
+    int64_t data_colkey = m_top->get_as_ref_or_tagged(Pos_ColKey).get_as_int();
+    if (m_col_key.value != data_colkey) {
+        // new column, new data
+        m_compressor.reset();
+        m_compressed_strings.clear();
+        m_compressed_string_map.clear();
+        m_decompressed_strings.clear();
+    }
     if (!m_compressor)
         m_compressor = std::make_unique<StringCompressor>(m_top->get_alloc(), *m_top, Pos_Compressor, writable);
     else
@@ -103,10 +96,9 @@ void StringInterner::update_from_parent(bool writable)
 
 void StringInterner::rebuild_internal()
 {
-    // TODO Check for changed col key?
-    // m_compressed_strings.clear();
-    // m_compressed_string_map.clear();
-    // m_decompressed_strings.clear();
+    // This method is never used in a multithreaded scenario, so no locking here
+    // even though we touch data which is protected by mx in later methods.
+
     size_t target_size = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     if (target_size == m_compressed_strings.size()) {
         return;
@@ -178,6 +170,7 @@ StringInterner::~StringInterner() {}
 StringID StringInterner::intern(StringData sd)
 {
     REALM_ASSERT(m_top->is_attached());
+    std::lock_guard lock(m_mutex);
     // special case for null string
     if (sd.data() == nullptr)
         return 0;
@@ -225,6 +218,7 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
         // "dead" mode
         return {};
     }
+    std::lock_guard lock(m_mutex);
     if (sd.data() == nullptr)
         return 0;
     bool dont_learn = false;
@@ -238,6 +232,7 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
 
 int StringInterner::compare(StringID A, StringID B)
 {
+    std::lock_guard lock(m_mutex);
     REALM_ASSERT_DEBUG(A < m_compressed_strings.size());
     REALM_ASSERT_DEBUG(B < m_compressed_strings.size());
     // comparisons against null
@@ -254,6 +249,7 @@ int StringInterner::compare(StringID A, StringID B)
 
 int StringInterner::compare(StringData s, StringID A)
 {
+    std::lock_guard lock(m_mutex);
     REALM_ASSERT_DEBUG(A < m_compressed_strings.size());
     // comparisons against null
     if (s.data() == nullptr && A == 0)
@@ -271,6 +267,7 @@ int StringInterner::compare(StringData s, StringID A)
 StringData StringInterner::get(StringID id)
 {
     REALM_ASSERT(m_compressor);
+    std::lock_guard lock(m_mutex);
     if (id == 0)
         return StringData{nullptr};
     REALM_ASSERT_DEBUG(id <= m_compressed_strings.size());

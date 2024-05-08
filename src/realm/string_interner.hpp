@@ -25,7 +25,7 @@
 
 #include <unordered_map>
 #include <vector>
-#include <deque>
+#include <mutex>
 
 template <>
 struct std::hash<CompressedString> {
@@ -75,7 +75,7 @@ private:
     std::unique_ptr<ArrayUnsigned> m_current_leaf;
     void rebuild_internal();
 
-    ColKey m_col_key;
+    ColKey m_col_key; // for validation
     std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
     std::unordered_map<CompressedString, size_t> m_compressed_string_map;
@@ -86,6 +86,9 @@ private:
     // but must do so when the interner is created or updated_from_parent.
     // This is also not a viable long term solution.
     std::vector<CachedString> m_decompressed_strings;
+    // Mutual exclusion is needed for frozen transactions only. Live objects are
+    // only used in single threaded contexts. For now, just use it always.
+    std::mutex m_mutex;
 };
 } // namespace realm
 
