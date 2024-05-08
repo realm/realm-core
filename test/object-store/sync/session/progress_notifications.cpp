@@ -1290,6 +1290,12 @@ TEMPLATE_TEST_CASE("progress notifications fire immediately when fully caught up
         REQUIRE_THAT(initial_entries, ProgressIncreasesMatcher{});
         realm->sync_session()->unregister_progress_notifier(token);
 
+        // it's possible that we've reached full synchronization in the progress notifier, but because
+        // of the way non-streaming notifiers work, the transferable may be higher for the next
+        // non-streaming notifier than for the one that just finished. So we explicitly wait for
+        // all uploads to complete to check that registering a noop notifier here is actually a noop.
+        wait_for_upload(*realm);
+
         auto noop_upload_progress = util::make_bind<WaitableProgress>(logger, "non-streaming upload ");
         auto noop_token = realm->sync_session()->register_progress_notifier(
             noop_upload_progress->make_cb(), SyncSession::ProgressDirection::upload, false);
