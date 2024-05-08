@@ -185,9 +185,9 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
 }
 
 // An iterator for getting a 64 bit word from any (byte-address+bit-offset) address.
-class unaligned_word_iter {
+class UnalignedWordIter {
 public:
-    unaligned_word_iter(const uint64_t* data, size_t bit_offset)
+    UnalignedWordIter(const uint64_t* data, size_t bit_offset)
         : m_word_ptr(data + (bit_offset >> 6))
         , m_in_word_offset(bit_offset & 0x3F)
     {
@@ -240,23 +240,14 @@ private:
 //   value of the bitfield.
 // iterator useful for scanning arrays faster than by indexing each element
 // supports arrays of pairs by differentiating field size and step size.
-class bf_ref;
-class bf_iterator {
-    uint64_t* data_area = nullptr;
-    uint64_t* first_word_ptr = nullptr;
-    size_t field_position = 0;
-    uint8_t field_size = 0;
-    uint8_t step_size = 0; // may be different than field_size if used for arrays of pairs
-    size_t offset = 0;
-    uint64_t mask = 0;
-
+class BfIterator {
 public:
-    bf_iterator() = default;
-    bf_iterator(const bf_iterator&) = default;
-    bf_iterator(bf_iterator&&) = default;
-    bf_iterator& operator=(const bf_iterator&) = default;
-    bf_iterator& operator=(bf_iterator&&) = default;
-    bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
+    BfIterator() = default;
+    BfIterator(const BfIterator&) = default;
+    BfIterator(BfIterator&&) = default;
+    BfIterator& operator=(const BfIterator&) = default;
+    BfIterator& operator=(BfIterator&&) = default;
+    BfIterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
         : data_area(data_area)
         , field_size(static_cast<uint8_t>(field_size))
         , step_size(static_cast<uint8_t>(step_size))
@@ -317,6 +308,7 @@ public:
         // note: above shifts in zeroes above the bitfield
         return result;
     }
+
     void set_value(uint64_t value) const
     {
         const auto in_word_position = field_position & 0x3F;
@@ -366,44 +358,33 @@ public:
         return get_value();
     }
 
-    friend bool operator<(const bf_iterator&, const bf_iterator&);
+private:
+    friend bool operator<(const BfIterator&, const BfIterator&);
+    uint64_t* data_area = nullptr;
+    uint64_t* first_word_ptr = nullptr;
+    size_t field_position = 0;
+    uint8_t field_size = 0;
+    uint8_t step_size = 0; // may be different than field_size if used for arrays of pairs
+    size_t offset = 0;
+    uint64_t mask = 0;
 };
 
 
-inline bool operator<(const bf_iterator& a, const bf_iterator& b)
+inline bool operator<(const BfIterator& a, const BfIterator& b)
 {
     REALM_ASSERT(a.data_area == b.data_area);
     return a.field_position < b.field_position;
 }
 
-class bf_ref {
-    bf_iterator it;
-
-public:
-    inline bf_ref(bf_iterator& it)
-        : it(it)
-    {
-    }
-    inline operator uint64_t() const
-    {
-        return it.get_value();
-    }
-    uint64_t operator=(uint64_t value)
-    {
-        it.set_value(value);
-        return value;
-    }
-};
-
 inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t width)
 {
-    bf_iterator it(data_area, field_position, width, width, 0);
+    BfIterator it(data_area, field_position, width, width, 0);
     return *it;
 }
 
 inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t width, uint64_t value)
 {
-    bf_iterator it(data_area, field_position, width, width, 0);
+    BfIterator it(data_area, field_position, width, width, 0);
     it.set_value(value);
 }
 
@@ -720,8 +701,8 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
     const size_t fast_scan_limit = 4 * bit_count_pr_iteration;
     // use signed to make it easier to ascertain correctness of loop condition below
     auto total_bit_count_left = (end - start) * width;
-    REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
-    unaligned_word_iter it(data, offset + start * width);
+    REALM_ASSERT_DEBUG(end >= start);
+    UnalignedWordIter it(data, offset + start * width);
     uint64_t found_vector = 0;
     while (total_bit_count_left >= fast_scan_limit) {
         // unrolling 2x

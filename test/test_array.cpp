@@ -1583,25 +1583,20 @@ TEST(Array_Bits)
 
 TEST(Array_cares_about)
 {
-    // The following numbers are in decimal to annoy any bystanders....
     std::vector<uint64_t> expected{
-        18446744073709551615ULL, 18446744073709551615ULL, 18446744073709551615ULL, 9223372036854775807ULL,
-        18446744073709551615U,   1152921504606846975ULL,  1152921504606846975ULL,  9223372036854775807ULL,
-        18446744073709551615ULL, 9223372036854775807ULL,  1152921504606846975ULL,  36028797018963967ULL,
-        1152921504606846975ULL,  4503599627370495ULL,     72057594037927935ULL,    1152921504606846975ULL,
-        18446744073709551615ULL, 2251799813685247ULL,     18014398509481983ULL,    144115188075855871ULL,
-        1152921504606846975ULL,  9223372036854775807ULL,  17592186044415ULL,       70368744177663ULL,
-        281474976710655ULL,      1125899906842623ULL,     4503599627370495ULL,     18014398509481983ULL,
-        72057594037927935ULL,    288230376151711743ULL,   1152921504606846975ULL,  18446744073709551615ULL,
-        18446744073709551615ULL, 8589934591ULL,           17179869183ULL,          34359738367ULL,
-        68719476735ULL,          137438953471ULL,         274877906943ULL,         549755813887ULL,
-        1099511627775ULL,        2199023255551ULL,        4398046511103ULL,        8796093022207ULL,
-        17592186044415ULL,       35184372088831ULL,       70368744177663ULL,       140737488355327ULL,
-        281474976710655ULL,      562949953421311ULL,      1125899906842623ULL,     2251799813685247ULL,
-        4503599627370495ULL,     9007199254740991ULL,     18014398509481983ULL,    36028797018963967ULL,
-        72057594037927935ULL,    144115188075855871ULL,   288230376151711743ULL,   576460752303423487ULL,
-        1152921504606846975ULL,  2305843009213693951ULL,  4611686018427387903ULL,  9223372036854775807ULL,
-        18446744073709551615ULL};
+        0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff,
+        0xfffffffffffffff,  0xfffffffffffffff,  0x7fffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff,
+        0xfffffffffffffff,  0x7fffffffffffff,   0xfffffffffffffff,  0xfffffffffffff,    0xffffffffffffff,
+        0xfffffffffffffff,  0xffffffffffffffff, 0x7ffffffffffff,    0x3fffffffffffff,   0x1ffffffffffffff,
+        0xfffffffffffffff,  0x7fffffffffffffff, 0xfffffffffff,      0x3fffffffffff,     0xffffffffffff,
+        0x3ffffffffffff,    0xfffffffffffff,    0x3fffffffffffff,   0xffffffffffffff,   0x3ffffffffffffff,
+        0xfffffffffffffff,  0xffffffffffffffff, 0xffffffffffffffff, 0x1ffffffff,        0x3ffffffff,
+        0x7ffffffff,        0xfffffffff,        0x1fffffffff,       0x3fffffffff,       0x7fffffffff,
+        0xffffffffff,       0x1ffffffffff,      0x3ffffffffff,      0x7ffffffffff,      0xfffffffffff,
+        0x1fffffffffff,     0x3fffffffffff,     0x7fffffffffff,     0xffffffffffff,     0x1ffffffffffff,
+        0x3ffffffffffff,    0x7ffffffffffff,    0xfffffffffffff,    0x1fffffffffffff,   0x3fffffffffffff,
+        0x7fffffffffffff,   0xffffffffffffff,   0x1ffffffffffffff,  0x3ffffffffffffff,  0x7ffffffffffffff,
+        0xfffffffffffffff,  0x1fffffffffffffff, 0x3fffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff};
     std::vector<uint64_t> res;
     for (size_t i = 0; i <= 64; i++) {
         res.push_back(cares_about(i));
@@ -1614,7 +1609,7 @@ TEST(AlignDirectBitFields)
     uint64_t a[2];
     a[0] = a[1] = 0;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 0);
         auto it2(it);
         ++it2;
@@ -1628,7 +1623,7 @@ TEST(AlignDirectBitFields)
     // reverse polarity
     a[0] = a[1] = -1ULL;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 127);
         auto it2(it);
         ++it2;
@@ -1646,7 +1641,7 @@ TEST(TestSignValuesStoredIterator)
     {
         // positive values are easy.
         uint64_t a[2];
-        bf_iterator it(a, 0, 8, 8, 0);
+        BfIterator it(a, 0, 8, 8, 0);
         for (size_t i = 0; i < 16; ++i) {
             it.set_value(i);
             ++it;
@@ -1661,7 +1656,7 @@ TEST(TestSignValuesStoredIterator)
     {
         // negative values require a bit more work
         uint64_t a[2];
-        bf_iterator it(a, 0, 8, 8, 0);
+        BfIterator it(a, 0, 8, 8, 0);
         for (size_t i = 0; i < 16; ++i) {
             it.set_value(-i);
             ++it;
@@ -1685,7 +1680,7 @@ TEST(TestSignValuesStoredIterator)
 TEST(VerifyIterationAcrossWords)
 {
     uint64_t a[4]{0, 0, 0, 0}; // 4 64 bit words, let's store N elements of 5bits each
-    bf_iterator it(a, 0, 5, 5, 0);
+    BfIterator it(a, 0, 5, 5, 0);
     // 51 is the max amount of values we can fit in 4 words. Writting beyond this point is likely going
     // to crash. Writing beyond the 4 words is not possible in practice because the Array has boundery checks
     // and enough memory is reserved during compression.
@@ -1713,7 +1708,7 @@ TEST(VerifyIterationAcrossWords)
 
     {
         // unaligned iterator
-        unaligned_word_iter u_it(a, 0);
+        UnalignedWordIter u_it(a, 0);
         for (size_t i = 0; i < 51; ++i) {
             const auto v = sign_extend_value(5, u_it.get(5) & 0x1F);
             CHECK_EQUAL(v, values[i]);
@@ -1735,7 +1730,7 @@ TEST(LowerBoundCorrectness)
 
     // now simulate the compression of a in less bits
     uint64_t buff[2] = {0, 0};
-    bf_iterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
+    BfIterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
     for (size_t i = 0; i < 16; ++i) {
         it.set_value(i);
         CHECK_EQUAL(*it, a[i]);
@@ -1745,7 +1740,7 @@ TEST(LowerBoundCorrectness)
         uint64_t* _data;
         int64_t get(size_t ndx) const
         {
-            bf_iterator it(_data, 0, 5, 5, ndx);
+            BfIterator it(_data, 0, 5, 5, ndx);
             return sign_extend_value(5, *it);
         }
     };
@@ -1782,7 +1777,7 @@ TEST(UpperBoundCorrectness)
 
     // now simulate the compression of a in less bits
     uint64_t buff[2] = {0, 0};
-    bf_iterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
+    BfIterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
     for (size_t i = 0; i < size; ++i) {
         it.set_value(i);
         CHECK_EQUAL(*it, a[i]);
@@ -1792,7 +1787,7 @@ TEST(UpperBoundCorrectness)
         uint64_t* _data;
         int64_t get(size_t ndx) const
         {
-            bf_iterator it(_data, 0, 5, 5, ndx);
+            BfIterator it(_data, 0, 5, 5, ndx);
             return sign_extend_value(5, *it);
         }
     };
@@ -1823,7 +1818,7 @@ TEST(ParallelSearchEqualMatch)
     constexpr size_t width = 1;
     constexpr size_t size = 128;
     constexpr int64_t key = -1;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(1); // this is equivalent to set it to -1
         ++it;
@@ -1874,7 +1869,7 @@ TEST(ParallelSearchEqualNoMatch)
     constexpr size_t width = 2;
     constexpr size_t size = 64;
     constexpr int64_t key = 2;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(1);
         ++it;
@@ -1924,7 +1919,7 @@ TEST(ParallelSearchNotEqual)
     constexpr size_t width = 2;
     constexpr size_t size = 64;
     constexpr int64_t key = 2;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(1);
         ++it;
@@ -1975,7 +1970,7 @@ TEST(ParallelSearchLessThan)
     constexpr size_t width = 4;
     constexpr size_t size = 32;
     constexpr int64_t key = 3;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(2);
         ++it;
@@ -2025,7 +2020,7 @@ TEST(ParallelSearchGreaterThan)
     constexpr size_t width = 4;
     constexpr size_t size = 32;
     constexpr int64_t key = 2;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(3);
         ++it;
