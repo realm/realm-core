@@ -148,7 +148,9 @@ void SensitiveBufferBase::secure_erase(void* buffer, size_t size)
     SecureZeroMemory(buffer, size);
 #elif defined(__STDC_LIB_EXT1__) || __APPLE__
     memset_s(buffer, size, 0, size);
+#elif defined(__GNU_LIBRARY__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 25
+    explicit_bzero(buffer, size);
 #else
-#warning "Platforms lacks memset_s"
+#error "Platforms lacks memset_s"
 #endif
 }
