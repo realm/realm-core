@@ -51,6 +51,7 @@ struct InterRealmValueConverter {
     int cmp_src_to_dst(Mixed src, Mixed dst, ConversionResult* converted_src_out = nullptr,
                        bool* did_update_out = nullptr) const;
     void copy_value(const Obj& src_obj, Obj& dst_obj, bool* update_out);
+    void copy_list(const LstBase& src_list, LstBase& dst_list) const;
 
 private:
     void copy_list(const LstBase& src_obj, LstBase& dst_obj, bool* update_out) const;
@@ -63,10 +64,8 @@ private:
                             CollectionType type) const;
     void copy_dictionary_in_mixed(const Dictionary& src_list, Dictionary& dst_list, StringData key,
                                   CollectionType type) const;
-    bool check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src, size_t ndx_dst,
-                             CollectionType type) const;
-    bool check_matching_dictionary(const Dictionary& src_list, const Dictionary& dst_list, StringData key,
-                                   CollectionType type) const;
+    bool check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src, size_t ndx_dst) const;
+    bool check_matching_dictionary(const Dictionary& src_list, const Dictionary& dst_list, StringData key) const;
     bool is_collection(Mixed) const;
     CollectionType to_collection_type(Mixed) const;
 
