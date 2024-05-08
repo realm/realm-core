@@ -542,63 +542,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             CHECK(!callback_was_called);
         }
 
-// The functionality of this test was moved out of the object-store and into the sync client.
-#if 0
-        SECTION("download notifications are not sent until a DOWNLOAD message has been received") {
-            _impl::SyncProgressNotifier progress;
-
-            progress.register_callback(
-                [&](auto xferred, auto xferable, double ep) {
-                    transferred = xferred;
-                    transferrable = xferable;
-                    download_estimate = ep;
-                    callback_was_called = true;
-                },
-                NotifierType::download, false, 0);
-
-            current_transferred = 100;
-            current_transferrable = 100;
-            double current_estimate = 1.0;
-            // Last time we ran we downloaded everything, so sync will send us an
-            // update reporting that
-            progress.update(current_transferred, current_transferrable, 0, 0, 1, current_estimate, 1.0, 0);
-            REQUIRE_FALSE(callback_was_called);
-
-            current_transferred = 100;
-            current_transferrable = 200;
-            current_estimate = current_transferred / double(current_transferrable);
-            // Next we get a DOWNLOAD message telling us there's more to download
-            progress.update(current_transferred, current_transferrable, 0, 0, 1, current_estimate, 1.0, 0);
-            REQUIRE(callback_was_called);
-            REQUIRE(current_transferrable == transferrable);
-            REQUIRE(current_transferred == transferred);
-            REQUIRE(current_estimate == download_estimate);
-
-            current_transferred = 200;
-            current_estimate = current_transferred / double(current_transferrable);
-            progress.update(current_transferred, current_transferrable, 0, 0, 1, current_estimate, 1.0, 0);
-
-            // After the download has completed, new notifications complete immediately
-            transferred = 0;
-            transferrable = 0;
-            callback_was_called = false;
-
-            progress.register_callback(
-                [&](auto xferred, auto xferable, double ep) {
-                    transferred = xferred;
-                    transferrable = xferable;
-                    download_estimate = ep;
-                    callback_was_called = true;
-                },
-                NotifierType::download, false, 0);
-
-            REQUIRE(callback_was_called);
-            REQUIRE(current_transferrable == transferrable);
-            REQUIRE(current_transferred == transferred);
-            REQUIRE(current_estimate == download_estimate);
-        }
-#endif
-
         SECTION("token unregistration works") {
             // Prime the progress updater
             current_transferred = 60;
