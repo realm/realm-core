@@ -5408,7 +5408,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto obj = table->get_object(0);
                 auto col = table->get_column_key("any_mixed");
                 if (test_mode == ClientResyncMode::DiscardLocal) {
-                    // db must be equal to remote
+                    // list must be equal to remote
                     List list{local_realm, obj, col};
                     REQUIRE(list.size() == 1);
                     auto nlist = list.get_list(0);
@@ -5424,7 +5424,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(nlist.get_any(8).get_int() == 7);
                 }
                 else {
-                    // db must be equal to local
+                    // list must be equal to local
                     List list{local_realm, obj, col};
                     REQUIRE(list.size() == 1);
                     auto nlist = list.get_list(0);
@@ -6857,7 +6857,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.add(Mixed{2});
             })
             ->make_local_changes([&](SharedRealm local_realm) {
-                // Local client: {"_id": <id>, "any_mixed": {{"key1": [1, [2], [3]]}}}
+                // Local client: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 3, [4]]}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6865,19 +6865,23 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto col = table->get_column_key("any_mixed");
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1"});
                 REQUIRE(nlist->size() == 2);
-                nlist->insert_collection(2, CollectionType::List);
-                nlist = nlist->get_list(2);
-                nlist->add(Mixed{3});
+                // Insert element and then immediatelly after update it.
+                nlist->add(Mixed{42});
+                nlist->set_any(2, Mixed{3});
+                // Insert nested list.
+                nlist->insert_collection(3, CollectionType::List);
+                nlist = nlist->get_list(3);
+                nlist->add(Mixed{4});
             })
             ->make_remote_changes([&](SharedRealm remote_realm) {
-                // Remote client: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 4]}}}
+                // Remote client: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 5]}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
                 auto obj = table->get_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1"});
-                nlist->add(Mixed{4});
+                nlist->add(Mixed{5});
             })
             ->on_post_reset([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -6889,25 +6893,26 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
 
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     // list must be equal to remote
-                    // Result: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 4]}}}
+                    // Result: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 5]}}}
                     REQUIRE(nlist->size() == 3);
                     REQUIRE(nlist->get_any(0).get_int() == 1);
                     auto nlist2 = nlist->get_list(1);
                     REQUIRE(nlist2->size() == 1);
                     REQUIRE(nlist2->get_any(0).get_int() == 2);
-                    REQUIRE(nlist->get_any(2).get_int() == 4);
+                    REQUIRE(nlist->get_any(2).get_int() == 5);
                 }
                 else {
-                    // Result: {"_id": <id>, "any_mixed": {{"key1": [1, [2], [3], 4]}}}
-                    REQUIRE(nlist->size() == 4);
+                    // Result: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 3, [4], 5]}}}
+                    REQUIRE(nlist->size() == 5);
                     REQUIRE(nlist->get_any(0).get_int() == 1);
                     auto nlist2 = nlist->get_list(1);
                     REQUIRE(nlist2->size() == 1);
                     REQUIRE(nlist2->get_any(0).get_int() == 2);
-                    nlist2 = nlist->get_list(2);
+                    REQUIRE(nlist->get_any(2).get_int() == 3);
+                    nlist2 = nlist->get_list(3);
                     REQUIRE(nlist2->size() == 1);
-                    REQUIRE(nlist2->get_any(0).get_int() == 3);
-                    REQUIRE(nlist->get_any(3).get_int() == 4);
+                    REQUIRE(nlist2->get_any(0).get_int() == 4);
+                    REQUIRE(nlist->get_any(4).get_int() == 5);
                 }
             })
             ->run();
@@ -7214,7 +7219,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist->add(Mixed{3});
             })
             ->make_remote_changes([&](SharedRealm remote_realm) {
-                // Remote client: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}, {"key2": 43}}}
+                // Remote client: {"_id": <id>, "any_mixed": {{"key1": ["value", [2]]}, {"key2": 43}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7222,6 +7227,8 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto col = table->get_column_key("any_mixed");
                 auto dict = obj.get_dictionary(col);
                 dict.insert("key2", Mixed{43});
+                auto nlist = obj.get_list_ptr<Mixed>({col, "key1"});
+                nlist->set_any(0, Mixed{"value"});
             })
             ->on_post_reset([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -7235,9 +7242,9 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = dict.get_list("key1");
 
                 if (test_mode == ClientResyncMode::DiscardLocal) {
-                    // Result: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}, {"key2": 43}}}
+                    // Result: {"_id": <id>, "any_mixed": {{"key1": ["value", [2]]}, {"key2": 43}}}
                     REQUIRE(nlist.size() == 2);
-                    REQUIRE(nlist.get_any(0).get_int() == 1);
+                    REQUIRE(nlist.get_any(0).get_string() == "value");
                     nlist = nlist.get_list(1);
                     REQUIRE(nlist.size() == 1);
                     REQUIRE(nlist.get_any(0).get_int() == 2);
@@ -7250,6 +7257,60 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(nlist.size() == 2);
                     REQUIRE(nlist.get_any(0).get_int() == 2);
                     REQUIRE(nlist.get_any(1).get_int() == 3);
+                }
+            })
+            ->run();
+    }
+    SECTION("List copy for list three levels deep") {
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(oas.app()->current_user(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                // Baseline: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [1]}}}}
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::Dictionary);
+                object_store::Dictionary dict{realm, obj, col};
+                dict.insert_collection("key1", CollectionType::Dictionary);
+                auto ndict = dict.get_dictionary("key1");
+                ndict.insert_collection("key2", CollectionType::List);
+                auto nlist = ndict.get_list("key2");
+                nlist.add(Mixed{1});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                // Local client: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [42]}}}}
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                // this set operation triggers the list copy because the index becomes ambiguous
+                auto nlist = obj.get_list_ptr<Mixed>({col, "key1", "key2"});
+                nlist->set_any(0, Mixed{42});
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                object_store::Dictionary dict{local_realm, obj, col};
+                REQUIRE(dict.size() == 1);
+                auto ndict = dict.get_dictionary("key1");
+                REQUIRE(ndict.size() == 1);
+                auto nlist = ndict.get_list("key2");
+                REQUIRE(nlist.size() == 1);
+
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // Result: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [1]}}}}
+                    REQUIRE(nlist.get_any(0).get_int() == 1);
+                }
+                else {
+                    // Result: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [42]}}}}
+                    REQUIRE(nlist.get_any(0).get_int() == 42);
                 }
             })
             ->run();
@@ -7320,6 +7381,116 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     // Result: {"_id": <id>, "any_mixed": {}}
                     auto ndict = obj.get_dictionary(col);
                     REQUIRE(ndict.size() == 0);
+                }
+            })
+            ->run();
+    }
+    SECTION("List marked to be copied but it was changed to string locally") {
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(oas.app()->current_user(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                // Baseline: {"_id": <id>, "any_mixed": [42]}
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::List);
+                List list{realm, obj, col};
+                list.add(Mixed{42});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                // Local client: {"_id": <id>, "any_mixed": "value"}
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                List list{local_realm, obj, col};
+                // this set operation triggers the list copy because the index becomes ambiguous
+                list.set_any(0, Mixed{43});
+                // change list to string
+                obj.set_any(col, Mixed{"value"});
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // Result: {"_id": <id>, "any_mixed": [42]}
+                    List list{local_realm, obj, col};
+                    REQUIRE(list.size() == 1);
+                    REQUIRE(list.get_any(0).get_int() == 42);
+                }
+                else {
+                    // list changed into string
+                    // Result: {"_id": <id>, "any_mixed": "value"}
+                    REQUIRE(obj.get_any(col).get_string() == "value");
+                }
+            })
+            ->run();
+    }
+    SECTION("Nested list marked to be copied but it was changed to int locally") {
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(oas.app()->current_user(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                // Baseline: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}}}
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::Dictionary);
+                object_store::Dictionary dictionary{realm, obj, col};
+                dictionary.insert_collection("key1", CollectionType::List);
+                auto nlist = dictionary.get_list("key1");
+                nlist.add(Mixed{1});
+                nlist.insert_collection(1, CollectionType::List);
+                nlist = nlist.get_list(1);
+                nlist.add(Mixed{2});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                // Local client: {"_id": <id>, "any_mixed": {{"key1": 42}}}
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                // this insert operation triggers the list copy because the index becomes ambiguous
+                auto nlist = obj.get_list_ptr<Mixed>({col, "key1", 1});
+                nlist->add(Mixed{3});
+                // Change list at 'key1' into integer so path above becomes invalid.
+                auto ndict = obj.get_dictionary(col);
+                ndict.insert("key1", Mixed{42});
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // list must be equal to remote
+                    // Result: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}}}
+                    auto nlist = obj.get_list_ptr<Mixed>({col, "key1"});
+                    REQUIRE(nlist->size() == 2);
+                    REQUIRE(nlist->get_any(0).get_int() == 1);
+                    nlist = nlist->get_list(1);
+                    REQUIRE(nlist->size() == 1);
+                    REQUIRE(nlist->get_any(0).get_int() == 2);
+                }
+                else {
+                    // list changed into integer
+                    // Result: {"_id": <id>, "any_mixed": {{"key1": 42}}}
+                    auto ndict = obj.get_dictionary(col);
+                    REQUIRE(ndict.size() == 1);
+                    REQUIRE(ndict.get("key1").get_int() == 42);
                 }
             })
             ->run();
@@ -7439,6 +7610,60 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     List list{local_realm, obj, col};
                     REQUIRE(list.size() == 1);
                     REQUIRE(list.get_any(0).get_int() == 2);
+                }
+            })
+            ->run();
+    }
+    SECTION("Clear list within dictionary") {
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(oas.app()->current_user(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                // Baseline: {"_id": <id>, "any_mixed": {{"key": [42]}}}
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::Dictionary);
+                object_store::Dictionary dict{realm, obj, col};
+                dict.insert_collection("key", CollectionType::List);
+                auto nlist = dict.get_list("key");
+                nlist.add(Mixed{42});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                // Local client: {"_id": <id>, "any_mixed": {{"key": ["value"]}}}
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                auto nlist = obj.get_list_ptr<Mixed>({col, "key"});
+                REQUIRE(nlist->size() == 1);
+                nlist->clear();
+                nlist->add(Mixed{"value"});
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                object_store::Dictionary dict{local_realm, obj, col};
+
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // Result: {"_id": <id>, "any_mixed": {{"key": [42]}}}
+                    REQUIRE(dict.size() == 1);
+                    auto nlist = dict.get_list("key");
+                    REQUIRE(nlist.size() == 1);
+                    REQUIRE(nlist.get_any(0).get_int() == 42);
+                }
+                else {
+                    // Result: {"_id": <id>, "any_mixed": {{"key": ["value"]}}}
+                    REQUIRE(dict.size() == 1);
+                    auto nlist = dict.get_list("key");
+                    REQUIRE(nlist.size() == 1);
+                    REQUIRE(nlist.get_any(0).get_string() == "value");
                 }
             })
             ->run();
