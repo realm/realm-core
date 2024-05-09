@@ -21,6 +21,7 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/transaction.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -53,7 +54,7 @@ bool is_fresh_path(const std::string& path)
 
 bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& reset_config,
                           sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
-                          util::FunctionRef<void(int64_t)> on_flx_version)
+                          sync::PendingResetStore* reset_store, util::FunctionRef<void(int64_t)> on_flx_version)
 {
     REALM_ASSERT(reset_config.mode != ClientResyncMode::Manual);
     REALM_ASSERT(reset_config.error);
@@ -98,7 +99,7 @@ bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& rese
         previous_state = db.start_frozen(frozen_before_state_version);
     }
     bool did_recover = client_reset::perform_client_reset_diff(db, reset_config, new_file_ident, logger, sub_store,
-                                                               on_flx_version); // throws
+                                                               reset_store, on_flx_version); // throws
 
     if (reset_config.notify_after_client_reset) {
         reset_config.notify_after_client_reset(previous_state->get_version_of_current_transaction(), did_recover);

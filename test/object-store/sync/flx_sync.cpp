@@ -973,8 +973,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             REQUIRE(count_of_valid_array_data == expected_added_objects);
 
             // The attempted client reset should have been recorded so that we
-            // don't attempt it again
-            REQUIRE(local_realm->read_transaction_version().version == expected_version.version + 1);
+            // don't attempt it again - (plus an additonal one for the schema metadata versions)
+            REQUIRE(local_realm->read_transaction_version().version == expected_version.version + 2);
         };
 
         SECTION("Recover: unsuccessful recovery leads to a manual reset") {

@@ -3,6 +3,7 @@
 #include <realm/object_converter.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/random.hpp>
@@ -789,9 +790,10 @@ TEST(ClientReset_DoNotRecoverSchema)
         CHECK(!compare_groups(rt_1, rt_2));
 
         const Group& group = rt_1.get_group();
-        CHECK_EQUAL(group.size(), 2);
+        CHECK_EQUAL(group.size(), 3);
         CHECK(group.get_table("class_table1"));
         CHECK(group.get_table("client_reset_metadata"));
+        CHECK(group.get_table("sync_internal_schemas"));
         CHECK_NOT(group.get_table("class_table2"));
         const Group& group2 = rt_2.get_group();
         CHECK_EQUAL(group2.size(), 1);
@@ -878,85 +880,62 @@ void mark_as_synchronized(DB& db)
     history.set_client_file_ident({1, 0}, false);
 }
 
-void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, ClientResyncMode mode,
-                  bool allow_recovery = true)
+void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fresh, ClientResyncMode mode,
+                  SubscriptionStore* sub_store = nullptr, bool allow_recovery = true)
 {
-    auto db_version = target.get_version_of_latest_snapshot();
-    auto fresh_path = fresh.get_path();
+    CHECK(target);
+    CHECK(fresh);
+    auto reset_store = sync::PendingResetStore::create(target);
+    // Ensure the schema is initialized before starting the test
+    reset_store->clear_pending_reset();
+
+    auto db_version = target->get_version_of_latest_snapshot();
+    auto fresh_path = fresh->get_path();
+    Status error{ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
+    auto action = allow_recovery ? sync::ProtocolErrorInfo::Action::ClientReset
+                                 : sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
+    // Pending reset store doesn't save RecoverOrDiscard
+    auto expected_mode = [](ClientResyncMode mode, bool allow_recovery) {
+        if (mode != ClientResyncMode::RecoverOrDiscard)
+            return mode;
+        if (allow_recovery)
+            return ClientResyncMode::Recover;
+        return ClientResyncMode::DiscardLocal;
+    }(mode, allow_recovery);
+
     sync::ClientReset cr_config;
     cr_config.mode = mode;
-    cr_config.action = allow_recovery ? sync::ProtocolErrorInfo::Action::ClientReset
-                                      : sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
-    cr_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
-    cr_config.fresh_copy = fresh.shared_from_this();
-    cr_config.notify_before_client_reset = nullptr;
-    cr_config.notify_after_client_reset = nullptr;
-
-    bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, target, std::move(cr_config),
-                                                               {100, 200}, nullptr, [](int64_t) {});
-    CHECK(did_reset);
-
-    // Should have closed and deleted the fresh realm
-    CHECK_NOT(fresh.is_attached());
-    CHECK_NOT(util::File::exists(fresh_path));
-
-    // Should have performed exactly two writes on the target DB: one to track
-    // that we're attempting recovery, and one with the actual reset
-    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
-
-    // Should have set the client file ident
-    CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
-
-    // Client resets aren't marked as complete until the server has acknowledged
-    // sync completion to avoid reset cycles
-    {
-        auto wt = target.start_write();
-        _impl::client_reset::remove_pending_client_resets(*wt);
-        wt->commit();
-    }
-}
-
-void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, ClientResyncMode mode,
-                  SubscriptionStore* sub_store)
-{
-    auto db_version = target.get_version_of_latest_snapshot();
-    auto fresh_path = fresh.get_path();
-    Status error{ErrorCodes::WrongSyncType,
-                 "Server migrated to flexible sync - migrating client to use flexible sync"};
-    sync::ClientReset cr_config;
-    cr_config.mode = mode;
-    cr_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
+    cr_config.action = action;
     cr_config.error = error;
-    cr_config.fresh_copy = fresh.shared_from_this();
+    cr_config.fresh_copy = fresh->shared_from_this();
     cr_config.notify_before_client_reset = nullptr;
     cr_config.notify_after_client_reset = nullptr;
 
-    bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, target, std::move(cr_config),
-                                                               {100, 200}, sub_store, [](int64_t) {});
+    bool did_reset =
+        _impl::client_reset::perform_client_reset(*test_context.logger, *target, std::move(cr_config), {100, 200},
+                                                  sub_store, reset_store.get(), [](int64_t) {});
     CHECK(did_reset);
 
     // Should have closed and deleted the fresh realm
-    CHECK_NOT(fresh.is_attached());
+    CHECK_NOT(fresh->is_attached());
     CHECK_NOT(util::File::exists(fresh_path));
 
     // Should have performed exactly two writes on the target DB: one to track
     // that we're attempting recovery, and one with the actual reset
-    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
+    CHECK_EQUAL(target->get_version_of_latest_snapshot(), db_version + 2);
 
     // Should have set the client file ident
-    CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
+    CHECK_EQUAL(target->start_read()->get_sync_file_id(), 100);
 
     // Client resets aren't marked as complete until the server has acknowledged
     // sync completion to avoid reset cycles
     {
-        auto wt = target.start_write();
-        auto pending_reset = _impl::client_reset::has_pending_reset(*wt);
+        auto pending_reset = reset_store->has_pending_reset();
         CHECK(pending_reset);
-        CHECK(pending_reset->action == sync::ProtocolErrorInfo::Action::ClientReset);
-        CHECK(pending_reset->mode == mode);
+        CHECK(pending_reset->action == action);
+        CHECK(pending_reset->mode == expected_mode);
         CHECK(pending_reset->error == error);
-        _impl::client_reset::remove_pending_client_resets(*wt);
-        wt->commit();
+        reset_store->clear_pending_reset();
     }
 }
 
@@ -977,32 +956,31 @@ std::pair<DBRef, DBRef> prepare_db(const std::string& path, const std::string& c
 
 TEST(ClientReset_ConvertResyncMode)
 {
-    CHECK(_impl::client_reset::to_resync_mode(0) == ClientResyncMode::DiscardLocal);
-    CHECK(_impl::client_reset::to_resync_mode(1) == ClientResyncMode::Recover);
-    CHECK_THROW(_impl::client_reset::to_resync_mode(2), _impl::client_reset::ClientResetFailed);
+    CHECK(PendingResetStore::to_resync_mode(0) == ClientResyncMode::DiscardLocal);
+    CHECK(PendingResetStore::to_resync_mode(1) == ClientResyncMode::Recover);
+    CHECK_THROW(PendingResetStore::to_resync_mode(2), sync::ClientResetFailed);
 
-    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::DiscardLocal) == 0);
-    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::RecoverOrDiscard) == 1);
-    CHECK(_impl::client_reset::from_resync_mode(ClientResyncMode::Recover) == 1);
-    CHECK_THROW(_impl::client_reset::from_resync_mode(ClientResyncMode::Manual),
-                _impl::client_reset::ClientResetFailed);
+    CHECK(PendingResetStore::from_resync_mode(ClientResyncMode::DiscardLocal) == 0);
+    CHECK(PendingResetStore::from_resync_mode(ClientResyncMode::RecoverOrDiscard) == 1);
+    CHECK(PendingResetStore::from_resync_mode(ClientResyncMode::Recover) == 1);
+    CHECK_THROW(PendingResetStore::from_resync_mode(ClientResyncMode::Manual), sync::ClientResetFailed);
 }
 
 TEST(ClientReset_ConvertResetAction)
 {
-    CHECK(_impl::client_reset::to_reset_action(0) == sync::ProtocolErrorInfo::Action::NoAction);
-    CHECK(_impl::client_reset::to_reset_action(1) == sync::ProtocolErrorInfo::Action::ClientReset);
-    CHECK(_impl::client_reset::to_reset_action(2) == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery);
-    CHECK(_impl::client_reset::to_reset_action(3) == sync::ProtocolErrorInfo::Action::MigrateToFLX);
-    CHECK(_impl::client_reset::to_reset_action(4) == sync::ProtocolErrorInfo::Action::RevertToPBS);
-    CHECK(_impl::client_reset::to_reset_action(5) == sync::ProtocolErrorInfo::Action::NoAction);
+    CHECK(PendingResetStore::to_reset_action(0) == sync::ProtocolErrorInfo::Action::NoAction);
+    CHECK(PendingResetStore::to_reset_action(1) == sync::ProtocolErrorInfo::Action::ClientReset);
+    CHECK(PendingResetStore::to_reset_action(2) == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery);
+    CHECK(PendingResetStore::to_reset_action(3) == sync::ProtocolErrorInfo::Action::MigrateToFLX);
+    CHECK(PendingResetStore::to_reset_action(4) == sync::ProtocolErrorInfo::Action::RevertToPBS);
+    CHECK(PendingResetStore::to_reset_action(5) == sync::ProtocolErrorInfo::Action::NoAction);
 
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::ClientReset) == 1);
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) == 2);
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateToFLX) == 3);
-    CHECK(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::RevertToPBS) == 4);
-    CHECK_THROW(_impl::client_reset::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateSchema),
-                _impl::client_reset::ClientResetFailed);
+    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::ClientReset) == 1);
+    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) == 2);
+    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateToFLX) == 3);
+    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::RevertToPBS) == 4);
+    CHECK_THROW(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateSchema),
+                sync::ClientResetFailed);
 }
 
 DBRef setup_metadata_table_v1(test_util::unit_test::TestContext& test_context, std::string path, Timestamp ts,
@@ -1029,33 +1007,38 @@ DBRef setup_metadata_table_v1(test_util::unit_test::TestContext& test_context, s
     return db;
 }
 
-TEST(ClientReset_V1Table)
+TEST_TYPES(ClientReset_V1Table, std::integral_constant<ClientResyncMode, ClientResyncMode::DiscardLocal>,
+           std::integral_constant<ClientResyncMode, ClientResyncMode::Recover>)
 {
     SHARED_GROUP_TEST_PATH(path_v1);
     auto timestamp = Timestamp(std::chrono::system_clock::now());
-    auto reset_type = _impl::client_reset::from_resync_mode(ClientResyncMode::Recover);
+    auto reset_type = PendingResetStore::from_resync_mode(TEST_TYPE::value);
     DBRef db = setup_metadata_table_v1(test_context, path_v1, timestamp, reset_type);
-    auto wt = db->start_read();
-    auto reset = _impl::client_reset::has_pending_reset(*wt);
+    auto reset_store = PendingResetStore::create(db);
+    auto reset = reset_store->has_pending_reset();
     CHECK(reset->time == timestamp);
-    CHECK(reset->mode == _impl::client_reset::to_resync_mode(reset_type));
-    CHECK(reset->action == sync::ProtocolErrorInfo::Action::ClientReset);
+    CHECK(reset->mode == TEST_TYPE::value);
+    if (TEST_TYPE::value == ClientResyncMode::DiscardLocal) {
+        CHECK(reset->action == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery);
+    }
+    else {
+        CHECK(reset->action == sync::ProtocolErrorInfo::Action::ClientReset);
+    }
 }
 
 TEST(ClientReset_TrackReset_V1_EntryExists)
 {
     SHARED_GROUP_TEST_PATH(path_v1);
     auto timestamp = Timestamp(std::chrono::system_clock::now());
-    auto reset_type = _impl::client_reset::from_resync_mode(ClientResyncMode::Recover);
-    Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
+    auto reset_type = PendingResetStore::from_resync_mode(ClientResyncMode::Recover);
     // Create a previous v1 entry
     DBRef db = setup_metadata_table_v1(test_context, path_v1, timestamp, reset_type);
     {
-        auto wt = db->start_write();
+        auto reset_store = sync::PendingResetStore::create(db);
         // Should throw an exception, since the table isn't empty
-        CHECK_THROW(_impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal,
-                                                     sync::ProtocolErrorInfo::Action::RevertToPBS, error),
-                    _impl::client_reset::ClientResetFailed);
+        CHECK_THROW(
+            reset_store->track_reset(ClientResyncMode::DiscardLocal, sync::ProtocolErrorInfo::Action::RevertToPBS),
+            sync::ClientResetFailed);
     }
 }
 
@@ -1063,19 +1046,13 @@ TEST(ClientReset_TrackReset_Existing_empty_V1_table)
 {
     SHARED_GROUP_TEST_PATH(path_v1);
     auto timestamp = Timestamp(std::chrono::system_clock::now());
-    auto reset_type = _impl::client_reset::from_resync_mode(ClientResyncMode::Recover);
+    auto reset_type = PendingResetStore::from_resync_mode(ClientResyncMode::Recover);
     Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
     DBRef db = setup_metadata_table_v1(test_context, path_v1, timestamp, reset_type);
-    {
-        auto wt = db->start_write();
-        TableRef table = wt->get_table("client_reset_metadata");
-        table->clear();
-        wt->commit_and_continue_writing();
-        _impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal,
-                                         sync::ProtocolErrorInfo::Action::RevertToPBS, error);
-    }
-    auto wt = db->start_read();
-    auto reset = _impl::client_reset::has_pending_reset(*wt);
+    auto reset_store = sync::PendingResetStore::create(db);
+    reset_store->clear_pending_reset();
+    reset_store->track_reset(ClientResyncMode::DiscardLocal, sync::ProtocolErrorInfo::Action::RevertToPBS, error);
+    auto reset = reset_store->has_pending_reset();
     CHECK(reset->mode == ClientResyncMode::DiscardLocal);
     CHECK(reset->action == sync::ProtocolErrorInfo::Action::RevertToPBS);
     CHECK(reset->error == error);
@@ -1091,18 +1068,14 @@ TEST_TYPES(
     std::integral_constant<sync::ProtocolErrorInfo::Action, sync::ProtocolErrorInfo::Action::RevertToPBS>,
     std::integral_constant<sync::ProtocolErrorInfo::Action, sync::ProtocolErrorInfo::Action::MigrateToFLX>)
 {
-
-
     SHARED_GROUP_TEST_PATH(test_path);
     DBRef db = DB::create(make_client_replication(), test_path);
     Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
     sync::ProtocolErrorInfo::Action reset_action = TEST_TYPE::value;
-    {
-        auto wt = db->start_write();
-        _impl::client_reset::track_reset(*wt, ClientResyncMode::DiscardLocal, reset_action, error);
-    }
-    auto wt = db->start_read();
-    auto reset = _impl::client_reset::has_pending_reset(*wt);
+    auto reset_store = PendingResetStore::create(db);
+    reset_store->track_reset(ClientResyncMode::DiscardLocal, reset_action, error);
+
+    auto reset = reset_store->has_pending_reset();
     CHECK(reset->mode == ClientResyncMode::DiscardLocal);
     CHECK(reset->action == reset_action);
     CHECK(reset->error == error);
@@ -1122,6 +1095,7 @@ TEST(ClientReset_UninitializedFile)
     });
 
     auto db_empty = DB::create(make_client_replication(), path_3);
+    auto reset_store = PendingResetStore::create(db);
     sync::ClientReset cr_config;
     cr_config.mode = ClientResyncMode::Recover;
     cr_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
@@ -1132,9 +1106,11 @@ TEST(ClientReset_UninitializedFile)
 
     // Should not perform a client reset because the target file has never been
     // written to
-    bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *db_empty, std::move(cr_config),
-                                                               {100, 200}, nullptr, [](int64_t) {});
+    bool did_reset =
+        _impl::client_reset::perform_client_reset(*test_context.logger, *db_empty, std::move(cr_config), {100, 200},
+                                                  nullptr, reset_store.get(), [](int64_t) {});
     CHECK_NOT(did_reset);
+    CHECK_NOT(reset_store->has_pending_reset());
 
     // Should still have closed and deleted the fresh realm
     CHECK_NOT(db_fresh->is_attached());
@@ -1171,7 +1147,8 @@ TEST(ClientReset_NoChanges)
         // Perform a reset with a fresh Realm that exactly matches the current
         // one, which shouldn't result in any changes regardless of mode
         db->write_copy(path_fresh, nullptr);
-        expect_reset(test_context, *db, *DB::create(make_client_replication(), path_fresh), mode);
+        auto db_fresh = DB::create(make_client_replication(), path_fresh);
+        expect_reset(test_context, db, db_fresh, mode);
 
         // End state should exactly match the pre-reset state
         CHECK_OR_RETURN(compare_groups(*db->start_read(), *backup_db->start_read()));
@@ -1213,7 +1190,7 @@ TEST(ClientReset_SimpleNonconflictingChanges)
             wt->commit();
         }
 
-        expect_reset(test_context, *db, *db_fresh, mode, allow_recovery);
+        expect_reset(test_context, db, db_fresh, mode, nullptr, allow_recovery);
 
         if (allow_recovery) {
             // Should have both the objects created locally and from the reset realm
@@ -1270,7 +1247,7 @@ TEST(ClientReset_SimpleConflictingWrites)
             wt->commit();
         }
 
-        expect_reset(test_context, *db, *db_fresh, mode, allow_recovery);
+        expect_reset(test_context, db, db_fresh, mode, nullptr, allow_recovery);
 
         auto tr = db->start_read();
         auto table = tr->get_table("class_table");
@@ -1296,6 +1273,7 @@ TEST(ClientReset_Recover_RecoveryDisabled)
     auto dbs = prepare_db(path_1, path_2, [](Transaction& tr) {
         tr.add_table_with_primary_key("class_table", type_Int, "pk");
     });
+    auto reset_store = PendingResetStore::create(dbs.first);
     sync::ClientReset cr_config;
     cr_config.mode = ClientResyncMode::Recover;
     cr_config.action = sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
@@ -1305,9 +1283,9 @@ TEST(ClientReset_Recover_RecoveryDisabled)
     cr_config.notify_after_client_reset = nullptr;
 
     CHECK_THROW((_impl::client_reset::perform_client_reset(*test_context.logger, *dbs.first, std::move(cr_config),
-                                                           {100, 200}, nullptr, [](int64_t) {})),
-                _impl::client_reset::ClientResetFailed);
-    CHECK_NOT(_impl::client_reset::has_pending_reset(*dbs.first->start_read()));
+                                                           {100, 200}, nullptr, reset_store.get(), [](int64_t) {})),
+                sync::ClientResetFailed);
+    CHECK_NOT(reset_store->has_pending_reset());
 }
 
 TEST(ClientReset_Recover_ModificationsOnDeletedObject)
@@ -1340,7 +1318,7 @@ TEST(ClientReset_Recover_ModificationsOnDeletedObject)
         wt->commit();
     }
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover);
 
     auto tr = db->start_read();
     auto table = tr->get_table("class_table");
@@ -1380,7 +1358,7 @@ TEST(ClientReset_DiscardLocal_DiscardsPendingSubscriptions)
         pending_sets.push_back(std::move(set));
     }
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::DiscardLocal, sub_store.get());
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::DiscardLocal, sub_store.get());
 
     CHECK(sub_store->get_pending_subscriptions().empty());
     auto subs = sub_store->get_latest();
@@ -1414,7 +1392,7 @@ TEST_TYPES(ClientReset_DiscardLocal_MakesAwaitingMarkActiveSubscriptionsComplete
     auto set = add_subscription(*sub_store, "complete", query, SubscriptionSet::State::AwaitingMark);
     auto future = set.get_state_change_notification(SubscriptionSet::State::Complete);
 
-    expect_reset(test_context, *db, *db_fresh, TEST_TYPE::value, sub_store.get());
+    expect_reset(test_context, db, db_fresh, TEST_TYPE::value, sub_store.get());
 
     CHECK_EQUAL(future.get(), SubscriptionSet::State::Complete);
     CHECK_EQUAL(set.state(), SubscriptionSet::State::AwaitingMark);
@@ -1442,7 +1420,7 @@ TEST(ClientReset_Recover_DoesNotCompletePendingSubscriptions)
         futures.push_back(subs.get_state_change_notification(SubscriptionSet::State::Complete));
     }
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, sub_store.get());
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, sub_store.get());
 
     for (auto& fut : futures) {
         CHECK_NOT(fut.is_ready());
@@ -1493,7 +1471,7 @@ TEST(ClientReset_Recover_UpdatesRemoteServerVersions)
         history.set_sync_progress(progress, nullptr, info_out);
     }
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
 
     auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
     history.ensure_updated(db->get_version_of_latest_snapshot());
@@ -1553,7 +1531,7 @@ TEST(ClientReset_Recover_UploadableBytes)
     history.get_upload_download_bytes(db.get(), unused, unused, unused, pre_reset_uploadable_bytes, unused);
     CHECK_GREATER(pre_reset_uploadable_bytes, 0);
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
 
     uint_fast64_t post_reset_uploadable_bytes;
     history.get_upload_download_bytes(db.get(), unused, unused, unused, post_reset_uploadable_bytes, unused);
@@ -1599,7 +1577,7 @@ TEST(ClientReset_Recover_ListsAreOnlyCopiedOnce)
         wt->commit();
     }
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
 
     // List should match the pre-reset local state
     auto rt = db->start_read();
@@ -1656,7 +1634,7 @@ TEST(ClientReset_Recover_RecoverableChangesOnListsAfterUnrecoverableAreNotDuplic
         wt->commit();
     }
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, sub_store.get());
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, sub_store.get());
 
     // List should match the pre-reset local state
     auto rt = db->start_read();
@@ -1752,7 +1730,7 @@ TEST(ClientReset_Recover_ReciprocalListChanges)
     // shouldn't modify the group. However, if it reapplied the original changesets
     // and not the reciprocal history, it'd result in the list being
     // [0, 1, 2, 11, 10, 21, 12, 31, 20, 41, 22, 30, 32, 40, 42]
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
 
     auto rt = db->start_read();
     auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
@@ -1811,7 +1789,7 @@ TEST(ClientReset_Recover_UpdatesReciprocalHistory)
 
     // client reset will discard the recovered array insertion as the object
     // doesn't exist, but keep the object creation
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
 
     // Recreate the object and add a different value to the list
     {

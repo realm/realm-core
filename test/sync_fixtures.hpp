@@ -10,6 +10,7 @@
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/server.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
@@ -702,7 +703,8 @@ public:
         config.server_port = m_server_ports[server_index];
         config.server_address = "localhost";
 
-        Session session{*m_clients[client_index], std::move(db), nullptr, nullptr, std::move(config)};
+        auto reset_store = sync::PendingResetStore::create(db);
+        Session session{*m_clients[client_index], std::move(db), nullptr, nullptr, reset_store, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }

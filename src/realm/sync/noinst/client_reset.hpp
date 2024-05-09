@@ -32,9 +32,7 @@ std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
 
 namespace sync {
 class SubscriptionStore;
-}
-
-namespace _impl::client_reset {
+class PendingResetStore;
 
 // The reset fails if there seems to be conflict between the
 // instructions and state.
@@ -50,6 +48,10 @@ struct ClientResetFailed : public std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
+} // namespace sync
+
+namespace _impl::client_reset {
+
 // transfer_group() transfers all tables, columns, objects and values from the src
 // group to the dst group and deletes everything in the dst group that is absent in
 // the src group. An update is only performed when a comparison shows that a
@@ -61,33 +63,9 @@ struct ClientResetFailed : public std::runtime_error {
 void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger,
                     bool allow_schema_additions);
 
-struct PendingReset {
-    ClientResyncMode mode;
-    Timestamp time;
-    using Action = sync::ProtocolErrorInfo::Action;
-    Action action = Action::NoAction;
-    std::optional<Status> error;
-
-    bool empty() const noexcept
-    {
-        return time.is_null() && action == Action::NoAction;
-    }
-};
-
-std::ostream& operator<<(std::ostream& os, const PendingReset& pr);
-
-void remove_pending_client_resets(Transaction& wt);
-util::Optional<PendingReset> has_pending_reset(const Transaction& rt);
-void track_reset(Transaction& wt, ClientResyncMode mode, PendingReset::Action action,
-                 const std::optional<Status>& error);
-
-// Exposed for testing only
-int64_t from_reset_action(PendingReset::Action action);
-PendingReset::Action to_reset_action(int64_t action);
-ClientResyncMode to_resync_mode(int64_t mode);
-int64_t from_resync_mode(ClientResyncMode mode);
-ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, sync::ProtocolErrorInfo::Action action,
-                                      const std::optional<Status>& error, util::Logger& logger);
+ClientResyncMode reset_precheck_guard(sync::PendingResetStore* reset_store, ClientResyncMode mode,
+                                      sync::ProtocolErrorInfo::Action action, const std::optional<Status>& error,
+                                      util::Logger& logger);
 
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_fresh' as the source of truth.
@@ -98,6 +76,7 @@ ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, sy
 // 'client_file_ident'
 bool perform_client_reset_diff(DB& db, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
                                util::Logger& logger, sync::SubscriptionStore* sub_store,
+                               sync::PendingResetStore* reset_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete);
 
 } // namespace _impl::client_reset

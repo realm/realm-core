@@ -37,6 +37,7 @@
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/network/websocket.hpp>
 
 #include <realm/util/flat_map.hpp>
@@ -1624,13 +1625,15 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     } // end discard local section
 
     SECTION("cycle detection") {
-        auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<_impl::client_reset::PendingReset> {
+        auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<sync::PendingReset> {
             auto db = TestHelper::get_db(realm);
-            auto rt = db->start_read();
-            return _impl::client_reset::has_pending_reset(*rt);
+            auto reset_store = sync::PendingResetStore::create(db);
+            return reset_store->has_pending_reset();
         };
+        auto logger = util::Logger::get_default_logger();
         ThreadSafeSyncError err;
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            logger->error("Detected cycle detection error: %1", error.status);
             err = error;
         };
         auto make_fake_previous_reset = [&local_config](ClientResyncMode mode,
@@ -1638,10 +1641,9 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                                             sync::ProtocolErrorInfo::Action::ClientReset) {
             local_config.sync_config->notify_before_client_reset = [mode, action](SharedRealm realm) {
                 auto db = TestHelper::get_db(realm);
-                auto wt = db->start_write();
-                Status error{ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
-                _impl::client_reset::track_reset(*wt, mode, action, error);
-                wt->commit();
+                auto reset_store = sync::PendingResetStore::create(db);
+                reset_store->track_reset(mode, action,
+                                         {{ErrorCodes::SyncClientResetRequired, "Bad client file ident"}});
             };
         };
         SECTION("a normal reset adds and removes a cycle detection flag") {

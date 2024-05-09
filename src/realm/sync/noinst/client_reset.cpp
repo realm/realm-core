@@ -28,6 +28,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/compression.hpp>
@@ -61,26 +62,7 @@ std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
     return os;
 }
 
-} // namespace realm
-
-namespace realm::_impl::client_reset {
-
-std::ostream& operator<<(std::ostream& os, const PendingReset& pr)
-{
-    if (pr.action == ProtocolErrorInfo::Action::NoAction || pr.time.is_null()) {
-        os << "empty pending client reset";
-    }
-    else if (pr.action != ProtocolErrorInfo::Action::ClientReset) {
-        os << "pending '" << pr.action << "' client reset of type: '" << pr.mode << "' at: " << pr.time;
-    }
-    else {
-        os << "pending client reset of type: '" << pr.mode << "' at: " << pr.time;
-    }
-    if (pr.error) {
-        os << " for error: " << *pr.error;
-    }
-    return os;
-}
+namespace _impl::client_reset {
 
 static inline bool should_skip_table(const Transaction& group, TableKey key)
 {
@@ -428,199 +410,13 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     }
 }
 
-// A table without a "class_" prefix will not generate sync instructions.
-constexpr static std::string_view s_meta_reset_table_name("client_reset_metadata");
-constexpr static std::string_view s_pk_col_name("id");
-constexpr static std::string_view s_version_column_name("version");
-constexpr static std::string_view s_timestamp_col_name("event_time");
-constexpr static std::string_view s_reset_mode_col_name("type_of_reset");
-constexpr static std::string_view s_reset_recovery_col_name("reset_recovery_allowed");
-constexpr static std::string_view s_reset_action_col_name("reset_action");
-constexpr static std::string_view s_reset_error_code_col_name("reset_error_code");
-constexpr static std::string_view s_reset_error_msg_col_name("reset_error_msg");
-constexpr int64_t s_metadata_version = 2;
-
-void remove_pending_client_resets(Transaction& wt)
+ClientResyncMode reset_precheck_guard(PendingResetStore* reset_store, ClientResyncMode mode,
+                                      PendingReset::Action action, const std::optional<Status>& error,
+                                      util::Logger& logger)
 {
-    if (auto table = wt.get_table(s_meta_reset_table_name); table && !table->is_empty()) {
-        table->clear();
-    }
-}
-
-int64_t from_reset_action(PendingReset::Action action)
-{
-    switch (action) {
-        case PendingReset::Action::ClientReset:
-            return 1;
-        case PendingReset::Action::ClientResetNoRecovery:
-            return 2;
-        case PendingReset::Action::MigrateToFLX:
-            return 3;
-        case PendingReset::Action::RevertToPBS:
-            return 4;
-        default:
-            throw ClientResetFailed(util::format("Unsupported client reset action: %1 for pending reset", action));
-    }
-}
-
-PendingReset::Action to_reset_action(int64_t action)
-{
-    switch (action) {
-        case 1:
-            return PendingReset::Action::ClientReset;
-        case 2:
-            return PendingReset::Action::ClientResetNoRecovery;
-        case 3:
-            return PendingReset::Action::MigrateToFLX;
-        case 4:
-            return PendingReset::Action::RevertToPBS;
-        default:
-            return PendingReset::Action::NoAction;
-    }
-}
-
-ClientResyncMode to_resync_mode(int64_t mode)
-{
-    // RecoverOrDiscard is treated as Recover and is not stored
-    switch (mode) {
-        case 0: // DiscardLocal
-            return ClientResyncMode::DiscardLocal;
-        case 1: // Recover
-            return ClientResyncMode::Recover;
-        default:
-            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
-    }
-}
-
-int64_t from_resync_mode(ClientResyncMode mode)
-{
-    switch (mode) {
-        case ClientResyncMode::DiscardLocal:
-            return 0; // DiscardLocal
-        case ClientResyncMode::RecoverOrDiscard:
-            [[fallthrough]]; // RecoverOrDiscard is treated as Recover
-        case ClientResyncMode::Recover:
-            return 1; // Recover
-        default:
-            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
-    }
-}
-
-util::Optional<PendingReset> has_pending_reset(const Transaction& rt)
-{
-    ConstTableRef table = rt.get_table(s_meta_reset_table_name);
-    if (!table || table->size() == 0) {
-        return util::none;
-    }
-    if (table->size() > 1) {
-        // this may happen if a future version of this code changes the format and expectations around reset metadata.
-        throw ClientResetFailed(
-            util::format("Previous client resets detected (%1) but only one is expected.", table->size()));
-    }
-    ColKey version_col = table->get_column_key(s_version_column_name);
-    ColKey timestamp_col = table->get_column_key(s_timestamp_col_name);
-    ColKey mode_col = table->get_column_key(s_reset_mode_col_name);
-    Obj first = *table->begin();
-    REALM_ASSERT(first);
-    PendingReset pending;
-    REALM_ASSERT(version_col);
-    auto version = static_cast<int>(first.get<int64_t>(version_col));
-    // Version 1 columns
-    REALM_ASSERT(timestamp_col);
-    REALM_ASSERT(mode_col);
-    pending.time = first.get<Timestamp>(timestamp_col);
-    pending.mode = to_resync_mode(first.get<int64_t>(mode_col));
-    if (version == 0 || version > s_metadata_version) {
-        throw ClientResetFailed(util::format("Unsupported client reset metadata version: %1 vs %2, from %3", version,
-                                             s_metadata_version, pending.time));
-    }
-    // Version 2 columns
-    if (version >= 2) {
-        ColKey recovery_col = table->get_column_key(s_reset_recovery_col_name);
-        ColKey action_col = table->get_column_key(s_reset_action_col_name);
-        ColKey code_col = table->get_column_key(s_reset_error_code_col_name);
-        ColKey msg_col = table->get_column_key(s_reset_error_msg_col_name);
-        REALM_ASSERT(recovery_col);
-        REALM_ASSERT(action_col);
-        REALM_ASSERT(code_col);
-        REALM_ASSERT(msg_col);
-        pending.action = to_reset_action(first.get<int64_t>(action_col));
-        auto code = first.get<int64_t>(code_col);
-        if (code > 0) {
-            pending.error = Status(static_cast<ErrorCodes::Error>(code), first.get<StringData>(msg_col));
-        }
-    }
-    else {
-        // Provide default action and recovery values if table version is 1
-        pending.action = PendingReset::Action::ClientReset;
-    }
-    return pending;
-}
-
-static TableRef get_or_create_client_reset_table(Transaction& wt)
-{
-    TableRef table = wt.get_table(s_meta_reset_table_name);
-    if (!table) {
-        // Creating new table
-        table = wt.add_table_with_primary_key(s_meta_reset_table_name, type_ObjectId, s_pk_col_name);
-        REALM_ASSERT(table);
-        table->add_column(type_Int, s_version_column_name);
-        table->add_column(type_Timestamp, s_timestamp_col_name);
-        table->add_column(type_Int, s_reset_mode_col_name);
-        table->add_column(type_Bool, s_reset_recovery_col_name);
-        table->add_column(type_Int, s_reset_action_col_name);
-        table->add_column(type_Int, s_reset_error_code_col_name);
-        table->add_column(type_String, s_reset_error_msg_col_name);
-    }
-    return table;
-}
-
-void track_reset(Transaction& wt, ClientResyncMode mode, PendingReset::Action action,
-                 const std::optional<Status>& error)
-{
-    REALM_ASSERT(mode != ClientResyncMode::Manual);
-    TableRef table = get_or_create_client_reset_table(wt);
-    REALM_ASSERT(table);
-    // Even if the table is being updated to V2, an existing entry will still throw an exception
-    size_t table_size = table->size();
-    if (table_size > 0) {
-        // this may happen if a future version of this code changes the format and expectations around reset metadata.
-        throw ClientResetFailed(
-            util::format("Previous client resets detected (%1) but only one is expected.", table->size()));
-    }
-    ColKey version_col = table->get_column_key(s_version_column_name);
-    ColKey timestamp_col = table->get_column_key(s_timestamp_col_name);
-    ColKey mode_col = table->get_column_key(s_reset_mode_col_name);
-    ColKey action_col = table->get_column_key(s_reset_action_col_name);
-    ColKey code_col = table->get_column_key(s_reset_error_code_col_name);
-    ColKey msg_col = table->get_column_key(s_reset_error_msg_col_name);
-    // If the table is missing any columns, remove it and start over
-    if (!(timestamp_col && mode_col && action_col && code_col && msg_col && version_col)) {
-        wt.remove_table(s_meta_reset_table_name);
-        track_reset(wt, mode, action, error); // try again
-        return;
-    }
-    auto obj = table->create_object_with_primary_key(ObjectId::gen(),
-                                                     {
-                                                         {version_col, s_metadata_version},
-                                                         {timestamp_col, Timestamp(std::chrono::system_clock::now())},
-                                                         {mode_col, from_resync_mode(mode)},
-                                                         {action_col, from_reset_action(action)},
-                                                     });
-    if (error) {
-        obj.set(code_col, static_cast<int64_t>(error->code()));
-        obj.set(msg_col, error->reason());
-    }
-    // Ensure we save the tracker object even if we encounter an error and roll
-    // back the client reset later
-    wt.commit_and_continue_writing();
-}
-
-ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, PendingReset::Action action,
-                                      const std::optional<Status>& error, util::Logger& logger)
-{
-    if (auto previous_reset = has_pending_reset(wt)) {
-        logger.info(util::LogCategory::reset, "Found a previous %1", previous_reset.value());
+    REALM_ASSERT(reset_store);
+    if (auto previous_reset = reset_store->has_pending_reset()) {
+        logger.info(util::LogCategory::reset, "Found a previous %1", *previous_reset);
         switch (previous_reset->mode) {
             case ClientResyncMode::Manual:
                 REALM_UNREACHABLE();
@@ -639,10 +435,10 @@ ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, Pe
                         logger.info(util::LogCategory::reset,
                                     "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
                                     previous_reset->mode, previous_reset->time, mode);
-                        remove_pending_client_resets(wt);
+                        reset_store->clear_pending_reset();
                         break;
                     case ClientResyncMode::DiscardLocal:
-                        remove_pending_client_resets(wt);
+                        reset_store->clear_pending_reset();
                         // previous mode Recover and this mode is Discard, this is not a cycle yet
                         break;
                     case ClientResyncMode::Manual:
@@ -667,18 +463,19 @@ ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, Pe
             mode = ClientResyncMode::DiscardLocal;
         }
     }
-    track_reset(wt, mode, action, error);
+    reset_store->track_reset(mode, action, error);
     return mode;
 }
 
 bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
                                util::Logger& logger, sync::SubscriptionStore* sub_store,
+                               sync::PendingResetStore* reset_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete)
 {
+    REALM_ASSERT(reset_store);
     DB& db_remote = *reset_config.fresh_copy;
-    auto wt_local = db_local.start_write();
     auto actual_mode =
-        reset_precheck_guard(*wt_local, reset_config.mode, reset_config.action, reset_config.error, logger);
+        reset_precheck_guard(reset_store, reset_config.mode, reset_config.action, reset_config.error, logger);
     bool recover_local_changes =
         actual_mode == ClientResyncMode::Recover || actual_mode == ClientResyncMode::RecoverOrDiscard;
 
@@ -691,6 +488,7 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
 
     auto& repl_local = dynamic_cast<ClientReplication&>(*db_local.get_replication());
     auto& history_local = repl_local.get_history();
+    auto wt_local = db_local.start_write();
     history_local.ensure_updated(wt_local->get_version());
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
 
@@ -751,4 +549,5 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
     return recover_local_changes;
 }
 
-} // namespace realm::_impl::client_reset
+} // namespace _impl::client_reset
+} // namespace realm

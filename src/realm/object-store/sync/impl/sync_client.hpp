@@ -123,10 +123,12 @@ struct SyncClient {
     std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,
                                                 std::shared_ptr<sync::SubscriptionStore> flx_sub_store,
                                                 std::shared_ptr<sync::MigrationStore> migration_store,
+                                                std::shared_ptr<sync::PendingResetStore> pending_reset_store,
                                                 sync::Session::Config config)
     {
         return std::make_unique<sync::Session>(m_client, std::move(db), std::move(flx_sub_store),
-                                               std::move(migration_store), std::move(config));
+                                               std::move(migration_store), std::move(pending_reset_store),
+                                               std::move(config));
     }
 
     bool decompose_server_url(const std::string& url, sync::ProtocolEnvelope& protocol, std::string& address,

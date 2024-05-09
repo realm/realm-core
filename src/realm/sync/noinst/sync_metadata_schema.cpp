@@ -175,7 +175,10 @@ SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const Transac
          {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
-    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
+    // Since this is read only, then Frozen is also allowed
+    REALM_ASSERT_EX(
+        (tr->get_transact_stage() == DB::transact_Reading || tr->get_transact_stage() == DB::transact_Frozen),
+        tr->get_transact_stage());
     // If the legacy_meta_table exists, then this table hasn't been converted and
     // the metadata schema versions information has not been upgraded/not accurate
     if (tr->has_table(c_flx_metadata_table)) {
@@ -221,7 +224,9 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
          {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
-    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
+    REALM_ASSERT_EX(
+        (tr->get_transact_stage() == DB::transact_Reading || tr->get_transact_stage() == DB::transact_Frozen),
+        tr->get_transact_stage());
     // If the versions table exists, then m_table would have been initialized by the reader constructor
     // If the versions table doesn't exist, then initialize it now
     if (!m_table) {

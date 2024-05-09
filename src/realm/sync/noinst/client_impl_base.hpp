@@ -10,7 +10,7 @@
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
-#include <realm/sync/noinst/migration_store.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
@@ -822,6 +822,9 @@ public:
 
     /// \brief Gets the migration store associated with this Session.
     MigrationStore* get_migration_store();
+
+    /// \brief Gets the pending client reset cycle tracker store associated with this Session.
+    PendingResetStore* get_pending_reset_store();
 
     /// Update internal client state when a flx subscription becomes complete outside
     /// of the normal sync process. This can happen during client reset.

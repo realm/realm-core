@@ -42,6 +42,7 @@ class SyncUser;
 namespace sync {
 class Session;
 class MigrationStore;
+class PendingResetStore;
 } // namespace sync
 
 namespace _impl {
@@ -502,6 +503,7 @@ private:
     const std::shared_ptr<SyncConfig> m_original_sync_config; // does not change after construction
     std::shared_ptr<SyncConfig> m_migrated_sync_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<sync::MigrationStore> m_migration_store;
+    const std::shared_ptr<sync::PendingResetStore> m_pending_reset_store;
     std::optional<int64_t> m_migration_sentinel_query_version GUARDED_BY(m_state_mutex);
     std::optional<sync::SessionErrorInfo> m_client_reset_error GUARDED_BY(m_state_mutex);
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);

@@ -12,6 +12,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/pending_bootstrap_store.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/circular_buffer.hpp>
@@ -84,7 +85,7 @@ using ProxyConfig                     = SyncConfig::ProxyConfig;
 class SessionWrapper final : public util::AtomicRefCountBase, DB::CommitListener {
 public:
     SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
-                   Session::Config);
+                   std::shared_ptr<PendingResetStore>, Session::Config);
     ~SessionWrapper() noexcept;
 
     ClientReplication& get_replication() noexcept;
@@ -95,6 +96,7 @@ public:
     PendingBootstrapStore* get_flx_pending_bootstrap_store();
 
     MigrationStore* get_migration_store();
+    PendingResetStore* get_pending_reset_store();
 
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
@@ -198,6 +200,7 @@ private:
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
 
     std::shared_ptr<MigrationStore> m_migration_store;
+    std::shared_ptr<PendingResetStore> m_pending_reset_store;
 
     bool m_initiated = false;
 
@@ -1021,6 +1024,13 @@ MigrationStore* SessionImpl::get_migration_store()
     return m_wrapper.get_migration_store();
 }
 
+PendingResetStore* SessionImpl::get_pending_reset_store()
+{
+    // Should never be called if session is not active
+    REALM_ASSERT_EX(m_state == State::Active, m_state);
+    return m_wrapper.get_pending_reset_store();
+}
+
 void SessionImpl::on_flx_sync_version_complete(int64_t version)
 {
     // Ignore the call if the session is not active
@@ -1203,7 +1213,8 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 // provides a link to the ClientImpl::Session that creates and receives messages with the server with
 // the ClientImpl::Connection that owns the ClientImpl::Session.
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
-                               std::shared_ptr<MigrationStore> migration_store, Session::Config config)
+                               std::shared_ptr<MigrationStore> migration_store,
+                               std::shared_ptr<PendingResetStore> pending_reset_store, Session::Config config)
     : m_client{client}
     , m_db(std::move(db))
     , m_replication(m_db->get_replication())
@@ -1230,6 +1241,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))
+    , m_pending_reset_store(std::move(pending_reset_store))
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
@@ -1336,6 +1348,12 @@ MigrationStore* SessionWrapper::get_migration_store()
 {
     REALM_ASSERT(!m_finalized);
     return m_migration_store.get();
+}
+
+PendingResetStore* SessionWrapper::get_pending_reset_store()
+{
+    REALM_ASSERT(!m_finalized);
+    return m_pending_reset_store.get();
 }
 
 inline void SessionWrapper::mark_initiated()
@@ -1981,8 +1999,12 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    auto pending_reset = _impl::client_reset::has_pending_reset(*m_db->start_frozen());
-    REALM_ASSERT(pending_reset);
+    std::optional<PendingReset> pending_reset;
+    {
+        pending_reset = get_pending_reset_store()->has_pending_reset();
+        if (!pending_reset)
+            return; // nothing to do
+    }
     m_sess->logger.info(util::LogCategory::reset, "Tracking %1", *pending_reset);
 
     // Now that the client reset merge is complete, wait for the changes to synchronize with the server
@@ -1998,21 +2020,18 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 
         logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
 
-        auto wt = self->m_db->start_write();
-        auto cur_pending_reset = _impl::client_reset::has_pending_reset(*wt);
+        auto cur_pending_reset = self->get_pending_reset_store()->has_pending_reset();
         if (!cur_pending_reset) {
             logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
             return;
         }
-        if (cur_pending_reset->mode != pending_reset.mode || cur_pending_reset->action != pending_reset.action ||
-            cur_pending_reset->time != pending_reset.time) {
-            logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
-        }
-        else {
+        if (*cur_pending_reset == pending_reset) {
             logger.debug(util::LogCategory::reset, "Removing client reset cycle detection tracker.");
         }
-        _impl::client_reset::remove_pending_client_resets(*wt);
-        wt->commit();
+        else {
+            logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
+        }
+        self->get_pending_reset_store()->clear_pending_reset();
     });
 }
 
@@ -2213,11 +2232,12 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 
 
 Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
-                 std::shared_ptr<MigrationStore> migration_store, Config&& config)
+                 std::shared_ptr<MigrationStore> migration_store,
+                 std::shared_ptr<PendingResetStore> pending_reset_store, Config&& config)
 {
     util::bind_ptr<SessionWrapper> sess;
     sess.reset(new SessionWrapper{*client.m_impl, std::move(db), std::move(flx_sub_store), std::move(migration_store),
-                                  std::move(config)}); // Throws
+                                  std::move(pending_reset_store), std::move(config)}); // Throws
     // The reference count passed back to the application is implicitly
     // owned by a naked pointer. This is done to avoid exposing
     // implementation details through the header file (that is, through the
