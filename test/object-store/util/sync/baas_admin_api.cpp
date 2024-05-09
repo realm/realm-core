@@ -277,7 +277,7 @@ std::string_view getenv_sv(const char* name) noexcept
     return {};
 }
 
-const static std::string g_baas_coid_header_name("X-Appservices-Request-Id");
+const static std::string g_baas_coid_header_name("x-appservices-request-id");
 
 } // namespace
 
@@ -531,9 +531,12 @@ private:
         request.headers.insert_or_assign("apiKey", m_api_key);
         request.headers.insert_or_assign("Content-Type", "application/json");
         auto response = do_http_request(request);
-        REALM_ASSERT_EX(response.http_status_code >= 200 && response.http_status_code < 300,
-                        util::format("Baasaas api response code: %1 Response body: %2", response.http_status_code,
-                                     response.body));
+        if (response.http_status_code < 200 || response.http_status_code >= 300) {
+            throw RuntimeError(ErrorCodes::HTTPError,
+                               util::format("Baasaas api response code: %1 Response body: %2, Baas coid: %3",
+                                            response.http_status_code, response.body,
+                                            baas_coid_from_response(response)));
+        }
         try {
             return {nlohmann::json::parse(response.body), baas_coid_from_response(response)};
         }
