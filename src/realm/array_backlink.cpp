@@ -220,7 +220,20 @@ void ArrayBacklink::verify() const
                     REALM_ASSERT(src_obj.get_collection_ptr(src_col_key)->find_any(target_link) != npos);
                 }
                 else {
-                    REALM_ASSERT(src_obj.get<Mixed>(src_col_key).get_link() == target_link);
+                    auto val = src_obj.get<Mixed>(src_col_key);
+                    if (val.is_type(type_TypedLink)) {
+                        REALM_ASSERT(src_obj.get<Mixed>(src_col_key).get_link() == target_link);
+                    }
+                    else if (val.is_type(type_List)) {
+                        DummyParent parent(src_table, val.get_ref());
+                        Lst<Mixed> list(parent, 0);
+                        REALM_ASSERT(list.find_any(target_link) != npos);
+                    }
+                    else if (val.is_type(type_Dictionary)) {
+                        DummyParent parent(src_table, val.get_ref());
+                        Dictionary dict(parent, 0);
+                        REALM_ASSERT(dict.find_any(target_link) != npos);
+                    }
                 }
                 continue;
             }
