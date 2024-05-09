@@ -412,6 +412,12 @@ public:
                     resp.dump(), baas_coid));
         }
         m_container_id = resp["id"].get<std::string>();
+        if (m_container_id.empty()) {
+            throw RuntimeError(
+                ErrorCodes::InvalidArgument,
+                util::format("Failed to start baas container, got response with empty container ID (baas coid: %1)",
+                             baas_coid));
+        }
         logger->info("Baasaas container started with id \"%1\"", m_container_id);
         auto lock_file = util::File(std::string{s_baasaas_lock_file_name}, util::File::mode_Write);
         lock_file.write(m_container_id);
@@ -543,8 +549,8 @@ private:
         catch (const nlohmann::json::exception& e) {
             throw RuntimeError(
                 ErrorCodes::MalformedJson,
-                util::format("Error making baasaas request to %1 (baas coid %4): Invalid json returned \"%2\" (%3)",
-                             request.url, response.body, e.what(), baas_coid_from_response(response)));
+                util::format("Error making baasaas request to %1 (baas coid %2): Invalid json returned \"%3\" (%4)",
+                             request.url, baas_coid_from_response(response), response.body, e.what()));
         }
     }
 
@@ -553,7 +559,7 @@ private:
         if (auto it = resp.headers.find(g_baas_coid_header_name); it != resp.headers.end()) {
             return it->second;
         }
-        return {};
+        return "<not found>";
     }
 
     static std::string get_baasaas_base_url()
