@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* (bindgen) Exposing a `app_user_as_sync_user` to cast the opposite way as `sync_user_as_app_user`. ([PR #7684](https://github.com/realm/realm-core/pull/7684) as a follow-up to [PR #7634](https://github.com/realm/realm-core/pull/7634))
 
 ----------------------------------------------
 
