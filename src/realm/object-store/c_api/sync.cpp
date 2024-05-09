@@ -40,19 +40,7 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
-realm_sync_user_subscription_token::~realm_sync_user_subscription_token()
-{
-    user->unsubscribe(token);
-}
-
 namespace realm::c_api {
-
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::Encryption) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoMetadata) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
 
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL);
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
@@ -125,6 +113,10 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Su
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
               RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
 
+static_assert(realm_sync_file_action(SyncFileAction::DeleteRealm) == RLM_SYNC_FILE_ACTION_DELETE_REALM);
+static_assert(realm_sync_file_action(SyncFileAction::BackUpThenDeleteRealm) ==
+              RLM_SYNC_FILE_ACTION_BACK_UP_THEN_DELETE_REALM);
+
 } // namespace
 
 
@@ -139,24 +131,6 @@ static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrde
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
 {
     return new realm_sync_client_config_t;
-}
-
-RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t* config,
-                                                         const char* path) noexcept
-{
-    config->base_file_path = path;
-}
-
-RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t* config,
-                                                        realm_sync_client_metadata_mode_e mode) noexcept
-{
-    config->metadata_mode = SyncClientConfig::MetadataMode(mode);
-}
-
-RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t* config,
-                                                                  const uint8_t key[64]) noexcept
-{
-    config->custom_encryption_key = std::vector<char>(key, key + 64);
 }
 
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,
@@ -730,9 +704,9 @@ realm_async_open_task_register_download_progress_notifier(realm_async_open_task_
                                                           realm_userdata_t userdata,
                                                           realm_free_userdata_func_t userdata_free) noexcept
 {
-    auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
-                                                                                           uint64_t transferrable) {
-        notifier(userdata.get(), transferred, transferrable);
+    auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+                  uint64_t transferred, uint64_t transferrable, double progress_estimate) {
+        notifier(userdata.get(), transferred, transferrable, progress_estimate);
     };
     auto token = (*task)->register_download_progress_notifier(std::move(cb));
     return new realm_async_open_task_progress_notification_token_t{(*task), token};
@@ -790,15 +764,6 @@ RLM_API void realm_sync_session_get_file_ident(realm_sync_session_t* session, re
     out->salt = file_ident.salt;
 }
 
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
-                                                     bool* did_run) noexcept
-{
-    return wrap_err([&]() {
-        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
-        return true;
-    });
-}
-
 RLM_API realm_sync_session_connection_state_notification_token_t*
 realm_sync_session_register_connection_state_change_callback(realm_sync_session_t* session,
                                                              realm_sync_connection_state_changed_func_t callback,
@@ -819,9 +784,9 @@ RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_ses
     bool is_streaming, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ProgressNotifierCallback> cb =
-        [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
-                                                                                     uint64_t transferrable) {
-            notifier(userdata.get(), transferred, transferrable);
+        [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+            uint64_t transferred, uint64_t transferrable, double progress_estimate) {
+            notifier(userdata.get(), transferred, transferrable, progress_estimate);
         };
     auto token = (*session)->register_progress_notifier(std::move(cb), SyncSession::ProgressDirection(direction),
                                                         is_streaming);

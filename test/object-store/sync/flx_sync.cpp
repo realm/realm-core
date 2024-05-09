@@ -27,10 +27,12 @@
 
 #include <realm/object_id.hpp>
 #include <realm/query_expression.hpp>
+#include <realm/list.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/list.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -2581,7 +2583,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
 TEST_CASE("flx: verify websocket protocol number and prefixes", "[sync][protocol]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
-    REQUIRE(11 == sync::get_current_protocol_version());
+    REQUIRE(12 == sync::get_current_protocol_version());
     // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
@@ -2613,7 +2615,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][baa
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][baas]") {
     auto server_app_config = minimal_app_config("flx_connect_as_pbs", g_minimal_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), bson::Bson{}, g_minimal_schema);
+    SyncTestFile config(session.app()->current_user(), bson::Bson{}, g_minimal_schema);
 
     auto realm = Realm::get_shared_realm(config);
     CHECK(!wait_for_download(*realm));
@@ -2627,7 +2629,7 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][baas]")
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("connect_to_flx_as_pbs");
-    SyncTestFile config(harness.app(), bson::Bson{}, harness.schema());
+    SyncTestFile config(harness.app()->current_user(), bson::Bson{}, harness.schema());
     std::mutex sync_error_mutex;
     util::Optional<SyncError> sync_error;
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
@@ -2678,17 +2680,19 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][
 }
 
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][token][baas]") {
-    auto transport = std::make_shared<HookedTransport>();
+    auto transport = std::make_shared<HookedTransport<>>();
     FLXSyncTestHarness harness("flx_wait_access_token2", FLXSyncTestHarness::default_server_schema(), transport);
     auto app = harness.app();
-    std::shared_ptr<SyncUser> user = app->current_user();
+    std::shared_ptr<User> user = app->current_user();
     REQUIRE(user);
     REQUIRE(!user->access_token_refresh_required());
     // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     using namespace std::chrono_literals;
     auto expires = std::chrono::system_clock::to_time_t(now - 30s);
-    user->update_access_token(encode_fake_jwt("fake_access_token", expires));
+    user->update_data_for_testing([&](UserData& data) {
+        data.access_token = RealmJWT(encode_fake_jwt("fake_access_token", expires));
+    });
     REQUIRE(user->access_token_refresh_required());
 
     bool seen_waiting_for_access_token = false;
@@ -2697,7 +2701,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     transport->request_hook = [&](const Request&) {
         auto user = app->current_user();
         REQUIRE(user);
-        for (auto& session : user->all_sessions()) {
+        for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
             if (session->state() == SyncSession::State::WaitingForAccessToken) {
                 REQUIRE(!seen_waiting_for_access_token);
                 seen_waiting_for_access_token = true;
@@ -3426,7 +3430,7 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
              }},
         };
 
-        SyncTestFile config(harness->app(), Bson{}, schema);
+        SyncTestFile config(harness->app()->current_user(), Bson{}, schema);
         REQUIRE_EXCEPTION(
             Realm::get_shared_realm(config), SchemaValidationFailed,
             Catch::Matchers::ContainsSubstring("Asymmetric table 'Asymmetric2' not allowed in partition based sync"));
@@ -3517,8 +3521,9 @@ TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
-
-            auto docs = harness.session().get_documents(*realm->config().sync_config->user, "Asymmetric", 2);
+            User* user = dynamic_cast<User*>(realm->config().sync_config->user.get());
+            REALM_ASSERT(user);
+            auto docs = harness.session().get_documents(*user, "Asymmetric", 2);
             check_document(docs, foo_obj_id, {{"location", "foo"}});
             check_document(docs, bar_obj_id, {{"location", "bar"}});
         },
@@ -4786,6 +4791,140 @@ TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx]
     auto active_sub_set = realm->sync_session()->get_flx_subscription_store()->get_active();
     REQUIRE(active_sub_set.version() == 0);
     REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
+}
+
+TEST_CASE("flx: collections in mixed - merge lists", "[sync][flx][baas]") {
+    Schema schema{{"TopLevel",
+                   {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                    {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                    {"any", PropertyType::Mixed | PropertyType::Nullable}}}};
+
+    FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}};
+    FLXSyncTestHarness harness("flx_collections_in_mixed", server_schema);
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    auto set_list_and_insert_element = [](Obj& obj, ColKey col_any, Mixed value) {
+        obj.set_collection(col_any, CollectionType::List);
+        auto list = obj.get_list_ptr<Mixed>(col_any);
+        list->add(value);
+    };
+
+    // Client 1 creates an object and sets property 'any' to an integer value.
+    auto foo_obj_id = ObjectId::gen();
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", foo_obj_id}, {"queryable_str_field", "foo"s}, {"any", 42}}));
+    });
+
+    // Client 2 opens the realm and downloads schema and object created by Client 1.
+    auto realm = Realm::get_shared_realm(config);
+    subscribe_to_all_and_bootstrap(*realm);
+    realm->sync_session()->pause();
+
+    // Client 3 sets property 'any' to List and inserts two integers in the list.
+    harness.load_initial_data([&](SharedRealm realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+        auto col_any = table->get_column_key("any");
+        set_list_and_insert_element(obj, col_any, 1);
+        set_list_and_insert_element(obj, col_any, 2);
+    });
+
+    // While its session is paused, Client 2 sets property 'any' to List and inserts two integers in the list.
+    CppContext c(realm);
+    realm->begin_transaction();
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+    auto col_any = table->get_column_key("any");
+    set_list_and_insert_element(obj, col_any, 3);
+    set_list_and_insert_element(obj, col_any, 4);
+    realm->commit_transaction();
+
+    realm->sync_session()->resume();
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+    wait_for_advance(*realm);
+
+    // Client 2 ends up with four integers in the list (in the correct order).
+    auto list = obj.get_list_ptr<Mixed>(col_any);
+    CHECK(list->size() == 4);
+    CHECK(list->get(0) == 1);
+    CHECK(list->get(1) == 2);
+    CHECK(list->get(2) == 3);
+    CHECK(list->get(3) == 4);
+}
+
+TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
+    Schema schema{{"TopLevel",
+                   {{"_id", PropertyType::Int, Property::IsPrimary{true}},
+                    {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                    {"any", PropertyType::Mixed | PropertyType::Nullable}}}};
+
+    FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}};
+    FLXSyncTestHarness harness("flx_collections_in_mixed", server_schema);
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    // Client 1: {_id: 1, any: ["abc", [42]]}
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        auto obj = Object::create(c, realm, "TopLevel",
+                                  std::any(AnyDict{{"_id", INT64_C(1)}, {"queryable_str_field", "foo"s}}));
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto col_any = table->get_column_key("any");
+        obj.get_obj().set_collection(col_any, CollectionType::List);
+        List list(obj, obj.get_object_schema().property_for_name("any"));
+        list.insert_any(0, "abc");
+        list.insert_collection(1, CollectionType::List);
+        auto list2 = list.get_list(1);
+        list2.insert_any(0, 42);
+    });
+
+    // Client 2 opens the realm and downloads schema and object created by Client 1.
+    // {_id: 1, any: ["abc", [42]]}
+    auto realm = Realm::get_shared_realm(config);
+    subscribe_to_all_and_bootstrap(*realm);
+    realm->sync_session()->pause();
+
+    // Client 3 adds a dictionary with an element to list 'any'
+    // {_id: 1, any: [{{"key": 6}}, "abc", [42]]}
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(INT64_C(1)));
+        List list(obj, obj.get_object_schema().property_for_name("any"));
+        list.insert_collection(PathElement(0), CollectionType::Dictionary);
+        auto dict = list.get_dictionary(PathElement(0));
+        dict.insert_any("key", INT64_C(6));
+    });
+
+    // While its session is paused, Client 2 makes a change to a nested list
+    // {_id: 1, any: ["abc", [42, "foo"]]}
+    CppContext c(realm);
+    realm->begin_transaction();
+    auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(INT64_C(1)));
+    List list(obj, obj.get_object_schema().property_for_name("any"));
+    List list2 = list.get_list(PathElement(1));
+    list2.insert_any(list2.size(), "foo");
+    realm->commit_transaction();
+
+    realm->sync_session()->resume();
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+    wait_for_advance(*realm);
+
+    // Client 2 after the session is resumed
+    // {_id: 1, any: [{{"key": 6}}, "abc", [42, "foo"]]}
+    CHECK(list.size() == 3);
+    auto nested_dict = list.get_dictionary(0);
+    CHECK(nested_dict.size() == 1);
+    CHECK(nested_dict.get<Int>("key") == 6);
+
+    CHECK(list.get_any(1) == "abc");
+
+    auto nested_list = list.get_list(2);
+    CHECK(nested_list.size() == 2);
+    CHECK(nested_list.get_any(0) == 42);
+    CHECK(nested_list.get_any(1) == "foo");
 }
 
 } // namespace realm::app

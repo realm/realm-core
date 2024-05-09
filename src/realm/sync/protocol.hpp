@@ -53,6 +53,10 @@ namespace sync {
 //      Update JSON_ERROR message to read the previous schema version sent by
 //      the server
 //
+//   12 Support for estimated progress in DOWNLOAD message for FLX
+//      Server replaces 'downloadable_bytes' (which was always zero prior this version)
+//      with an estimated progress value (double from 0.0 to 1.0) for flx sessions
+//
 //  XX Changes:
 //     - TBD
 //
@@ -60,7 +64,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 11;
+    return 12;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept

@@ -74,7 +74,8 @@ public:
     /// \{ Behavior is undefined if the size of the specified buffer exceeds
     /// PTRDIFF_MAX.
     void set_buffer(const char* begin, const char* end) noexcept;
-    template <size_t N> void set_buffer(const char (&buffer)[N]) noexcept;
+    template <size_t N>
+    void set_buffer(const char (&buffer)[N]) noexcept;
     void set_string(const std::string&) noexcept;
     void set_c_string(const char* c_str) noexcept;
     /// \}
@@ -92,7 +93,8 @@ public:
     /// \{ Behavior is undefined if the size of the specified buffer exceeds
     /// PTRDIFF_MAX.
     void set_buffer(char* begin, char* end) noexcept;
-    template <size_t N> void set_buffer(char (&buffer)[N]) noexcept;
+    template <size_t N>
+    void set_buffer(char (&buffer)[N]) noexcept;
     /// \}
 
     /// Returns the amount of data written to the underlying buffer.
@@ -112,9 +114,7 @@ inline MemoryInputStreambuf::MemoryInputStreambuf()
 {
 }
 
-inline MemoryInputStreambuf::~MemoryInputStreambuf() noexcept
-{
-}
+inline MemoryInputStreambuf::~MemoryInputStreambuf() noexcept {}
 
 inline void MemoryInputStreambuf::set_buffer(const char* b, const char* e) noexcept
 {
@@ -124,13 +124,9 @@ inline void MemoryInputStreambuf::set_buffer(const char* b, const char* e) noexc
 }
 
 
-inline MemoryOutputStreambuf::MemoryOutputStreambuf()
-{
-}
+inline MemoryOutputStreambuf::MemoryOutputStreambuf() {}
 
-inline MemoryOutputStreambuf::~MemoryOutputStreambuf() noexcept
-{
-}
+inline MemoryOutputStreambuf::~MemoryOutputStreambuf() noexcept {}
 
 inline void MemoryOutputStreambuf::set_buffer(char* b, char* e) noexcept
 {
@@ -148,9 +144,7 @@ inline MemoryInputStream::MemoryInputStream()
 {
 }
 
-inline MemoryInputStream::~MemoryInputStream() noexcept
-{
-}
+inline MemoryInputStream::~MemoryInputStream() noexcept {}
 
 inline void MemoryInputStream::set_buffer(const char* b, const char* e) noexcept
 {
@@ -158,7 +152,8 @@ inline void MemoryInputStream::set_buffer(const char* b, const char* e) noexcept
     clear();
 }
 
-template <size_t N> inline void MemoryInputStream::set_buffer(const char (&buffer)[N]) noexcept
+template <size_t N>
+inline void MemoryInputStream::set_buffer(const char (&buffer)[N]) noexcept
 {
     const char* b = buffer;
     const char* e = b + N;
@@ -185,9 +180,7 @@ inline MemoryOutputStream::MemoryOutputStream()
 {
 }
 
-inline MemoryOutputStream::~MemoryOutputStream() noexcept
-{
-}
+inline MemoryOutputStream::~MemoryOutputStream() noexcept {}
 
 inline void MemoryOutputStream::set_buffer(char* b, char* e) noexcept
 {

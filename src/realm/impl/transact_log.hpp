@@ -772,18 +772,18 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_DictionarySet: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            read_string(m_string_buffer);               // skip key
-            size_t dict_ndx = read_int<size_t>();       // Throws
-            if (!handler.collection_set(dict_ndx))      // Throws
+            read_string(m_string_buffer);          // skip key
+            size_t dict_ndx = read_int<size_t>();  // Throws
+            if (!handler.collection_set(dict_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_DictionaryErase: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            read_string(m_string_buffer);                 // skip key
-            size_t dict_ndx = read_int<size_t>();         // Throws
-            if (!handler.collection_erase(dict_ndx))      // Throws
+            read_string(m_string_buffer);            // skip key
+            size_t dict_ndx = read_int<size_t>();    // Throws
+            if (!handler.collection_erase(dict_ndx)) // Throws
                 parser_error();
             return;
         }

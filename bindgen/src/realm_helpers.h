@@ -30,6 +30,8 @@
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
+#include <realm/object-store/sync/app_user.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/util/functional.hpp>
 #include <string_view>
 #include <system_error>
@@ -282,6 +284,11 @@ struct Helpers {
     static bool needs_file_format_upgrade(const RealmConfig& config)
     {
         return config.needs_file_format_upgrade();
+    }
+
+    static std::shared_ptr<app::User> sync_user_as_app_user(std::shared_ptr<SyncUser> sync_user)
+    {
+        return std::dynamic_pointer_cast<app::User>(sync_user);
     }
 };
 

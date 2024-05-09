@@ -9,8 +9,11 @@
       "$dictionary": {
         "key1": {
           "$embedded": {
-            "int2": {
-              "$numberLong": "111"
+            "table": "table2",
+            "value": {
+              "int2": {
+                "$numberLong": "111"
+              }
             }
           }
         }
@@ -24,8 +27,11 @@
     },
     "embedded": {
       "$embedded": {
-        "int2": {
-          "$numberLong": "123"
+        "table": "table2",
+        "value": {
+          "int2": {
+            "$numberLong": "123"
+          }
         }
       }
     },
@@ -43,15 +49,21 @@
       "$dictionary": {
         "key2": {
           "$embedded": {
-            "int2": {
-              "$numberLong": "222"
+            "table": "table2",
+            "value": {
+                "int2": {
+                "$numberLong": "222"
+              }
             }
           }
         },
         "key3": {
           "$embedded": {
-            "int2": {
-              "$numberLong": "333"
+            "table": "table2",
+            "value": {
+                "int2": {
+                "$numberLong": "333"
+              }
             }
           }
         }

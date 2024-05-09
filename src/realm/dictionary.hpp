@@ -51,7 +51,7 @@ public:
         : Base(parent, index)
     {
     }
-    Dictionary(ColKey col_key, size_t level = 1);
+    Dictionary(ColKey col_key, uint8_t level = 1);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
         , CollectionParent(other.get_level())
@@ -277,6 +277,8 @@ private:
     void get_key_type();
 
     UpdateStatus do_update_if_needed(bool allow_create) const;
+    template <class T>
+    std::shared_ptr<T> do_get_collection(const PathElement& path_elem);
 };
 
 class Dictionary::Iterator {

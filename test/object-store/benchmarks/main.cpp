@@ -45,9 +45,15 @@ int main(int argc, char** argv)
     SetCurrentDirectoryA(path);
 #else
     char executable[PATH_MAX];
-    (void)realpath(argv[0], executable);
+    if (!realpath(argv[0], executable)) {
+        fprintf(stderr, "Failed to resolve path: '%s'", executable);
+        return 1;
+    }
     const char* directory = dirname(executable);
-    chdir(directory);
+    if (chdir(directory)) {
+        fprintf(stderr, "Failed to change directory");
+        return 1;
+    }
 #endif
 
 #if TEST_SCHEDULER_UV

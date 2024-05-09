@@ -89,6 +89,7 @@ std::pair<SharedRealm, std::exception_ptr> async_open_realm(const Realm::Config&
 std::vector<ObjectSchema> get_schema_v0()
 {
     return {
+        {"Embedded", ObjectSchema::ObjectType::Embedded, {{"str_field", PropertyType::String}}},
         {"TopLevel",
          {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
           {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
@@ -101,7 +102,10 @@ std::vector<ObjectSchema> get_schema_v0()
           {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
           {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
         {"TopLevel3",
-         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}}, {"queryable_int_field", PropertyType::Int}}},
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_int_field", PropertyType::Int},
+          {"link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "Embedded"}}},
     };
 }
 
@@ -135,12 +139,16 @@ auto get_subscription_initializer_callback_for_schema_v0()
 std::vector<ObjectSchema> get_schema_v1()
 {
     return {
+        {"Embedded", ObjectSchema::ObjectType::Embedded, {{"str_field", PropertyType::String}}},
         {"TopLevel",
          {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
           {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
           {"non_queryable_field", PropertyType::String},
           {"non_queryable_field2", PropertyType::String | PropertyType::Nullable}}},
-        {"TopLevel3", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}}}},
+        {"TopLevel3",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "Embedded"}}},
     };
 }
 
@@ -165,12 +173,16 @@ auto get_subscription_initializer_callback_for_schema_v1()
 std::vector<ObjectSchema> get_schema_v2()
 {
     return {
+        {"Embedded", ObjectSchema::ObjectType::Embedded, {{"str_field", PropertyType::String}}},
         {"TopLevel",
          {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
           {"queryable_int_field", PropertyType::Int},
           {"non_queryable_field", PropertyType::String},
           {"non_queryable_field2", PropertyType::String | PropertyType::Nullable}}},
-        {"TopLevel3", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}}}},
+        {"TopLevel3",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "Embedded"}}},
     };
 }
 
@@ -262,7 +274,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
 
     SECTION("Breaking change detected by client") {
         // Make field 'non_queryable_field2' of table 'TopLevel' optional.
-        schema_v1[0].persisted_properties.back() = {"non_queryable_field2",
+        schema_v1[1].persisted_properties.back() = {"non_queryable_field2",
                                                     PropertyType::String | PropertyType::Nullable};
         config.schema = schema_v1;
         create_schema(app_session, *config.schema, config.schema_version);
@@ -273,7 +285,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
 
     SECTION("Breaking change detected by server") {
         // Remove table 'TopLevel2'.
-        schema_v1.pop_back();
+        schema_v1.erase(schema_v1.begin() + 2);
         config.schema = schema_v1;
         create_schema(app_session, *config.schema, config.schema_version);
 
@@ -435,9 +447,12 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
     REQUIRE_FALSE(realm);
     REQUIRE(error);
     REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                              "Synchronization no longer possible for client-side file");
+                              "The following changes cannot be made in additive-only schema mode");
     REQUIRE(schema_migration_required);
-    check_realm_schema(config.path, schema_v0, 1);
+    // Applying the new schema (and version) fails, therefore the schema is unversioned (the metadata table is removed
+    // during migration). There is a schema though because the server schema is already applied by the time the client
+    // applies the mismatch schema.
+    check_realm_schema(config.path, schema_v1, ObjectStore::NotVersioned);
     wait_for_sessions_to_close(harness.session());
 }
 
@@ -503,12 +518,13 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
                                         {"queryable_int_field", static_cast<int64_t>(15)},
                                         {"non_queryable_field2", "non queryable 33"s}}));
         realm->commit_transaction();
-        // This server drops this object because the client is querying on a removed field.
+        // The server filters out this object because the schema version the client migrates to removes the queryable
+        // field.
         realm->begin_transaction();
         Object::create(
             c, realm, "TopLevel3",
             std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_int_field", static_cast<int64_t>(42)}}));
-
+        realm->commit_transaction();
         realm->close();
     }
 
@@ -548,7 +564,6 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         config.schema_version = 1;
         config.schema = schema_v1;
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
-        config.sync_config->on_sync_client_event_hook = nullptr;
         auto [realm, error] = async_open_realm(config);
         REQUIRE(realm);
         REQUIRE_FALSE(error);
@@ -556,6 +571,8 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
 
         auto table = realm->read_group().get_table("class_TopLevel");
         CHECK(table->size() == 3);
+        table = realm->read_group().get_table("class_TopLevel2");
+        CHECK(!table);
         table = realm->read_group().get_table("class_TopLevel3");
         CHECK(table->size() == 1);
         CHECK(table->get_object_with_primary_key(obj3_id));
@@ -586,6 +603,8 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
 
         auto table = realm->read_group().get_table("class_TopLevel");
         CHECK(table->size() == 4);
+        table = realm->read_group().get_table("class_TopLevel2");
+        CHECK(!table);
         table = realm->read_group().get_table("class_TopLevel3");
         CHECK(table->size() == 1);
         CHECK(table->get_object_with_primary_key(obj3_id));
@@ -604,6 +623,8 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
 
         auto table = realm->read_group().get_table("class_TopLevel");
         CHECK(table->size() == 4);
+        table = realm->read_group().get_table("class_TopLevel2");
+        CHECK(!table);
         table = realm->read_group().get_table("class_TopLevel3");
         CHECK(table->size() == 1);
         CHECK(table->get_object_with_primary_key(obj3_id));
@@ -627,8 +648,9 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         auto table3 = realm->read_group().get_table("class_TopLevel3");
         CHECK(table3->is_empty());
 
-        // The existing subscription for 'TopLevel3' is on a removed field (in version 1), so data cannot be sync'd.
-        // Update subscription so data can be sync'd.
+        // The subscription for 'TopLevel3' is on a removed field (i.e, the field does not exist in the previous
+        // schema version used), so data cannot be synced.
+        // Update subscription so data can be synced.
         auto subs = realm->get_latest_subscription_set().make_mutable_copy();
         CHECK(subs.erase_by_class_name("TopLevel3"));
         subs.insert_or_assign(Query(table3));
@@ -758,6 +780,8 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
                                         {"queryable_str_field", "foo"s},
                                         {"queryable_int_field", static_cast<int64_t>(15)},
                                         {"non_queryable_field2", "non queryable 11"s}}));
+        // The server filters out this object because the schema version the client migrates to removes the queryable
+        // field.
         Object::create(
             c, realm, "TopLevel3",
             std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_int_field", static_cast<int64_t>(42)}}));
@@ -931,7 +955,7 @@ TEST_CASE("Send schema version zero if no schema is used to open the realm",
     REQUIRE(realm);
     REQUIRE_FALSE(error);
     // The schema is received from the server, but it is unversioned.
-    check_realm_schema(config.path, schema_v0, -1);
+    check_realm_schema(config.path, schema_v0, ObjectStore::NotVersioned);
 }
 
 TEST_CASE("Allow resetting the schema version to zero after bad schema version error",
@@ -972,6 +996,226 @@ TEST_CASE("Allow resetting the schema version to zero after bad schema version e
     auto realm = Realm::get_shared_realm(config);
     wait_for_download(*realm);
     check_realm_schema(config.path, schema_v0, 0);
+}
+
+TEST_CASE("Client reset and schema migration", "[sync][flx][flx schema migration][baas]") {
+    auto schema_v0 = get_schema_v0();
+    FLXSyncTestHarness harness("flx_sync_schema_migration",
+                               {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    auto config = harness.make_test_file();
+
+    {
+        config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+        check_realm_schema(config.path, schema_v0, 0);
+
+        realm->sync_session()->pause();
+
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field2", "non queryable 11"s}}));
+        Object::create(
+            c, realm, "TopLevel3",
+            std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_int_field", static_cast<int64_t>(42)}}));
+        realm->commit_transaction();
+
+        // Trigger a client reset.
+        reset_utils::trigger_client_reset(harness.session().app_session(), *realm->sync_session());
+    }
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    const AppSession& app_session = harness.session().app_session();
+    auto schema_v1 = get_schema_v1();
+    create_schema(app_session, schema_v1, 1);
+
+    config.schema_version = 1;
+    config.schema = schema_v1;
+    config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
+    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    config.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession>,
+                                                       const SyncClientHookData& data) mutable {
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+            return SyncClientHookAction::NoAction;
+        }
+        CHECK((error_code == sync::ProtocolError::schema_version_changed ||
+               error_code == sync::ProtocolError::bad_client_file_ident));
+        return SyncClientHookAction::NoAction;
+    };
+    size_t before_reset_count = 0;
+    size_t after_reset_count = 0;
+    config.sync_config->notify_before_client_reset = [&before_reset_count](SharedRealm) {
+        ++before_reset_count;
+    };
+    config.sync_config->notify_after_client_reset = [&after_reset_count](SharedRealm, ThreadSafeReference, bool) {
+        ++after_reset_count;
+    };
+
+    auto [realm, error] = async_open_realm(config);
+    REQUIRE(realm);
+    REQUIRE_FALSE(error);
+    REQUIRE(before_reset_count == 0);
+    REQUIRE(after_reset_count == 0);
+    check_realm_schema(config.path, schema_v1, 1);
+
+    auto table = realm->read_group().get_table("class_TopLevel");
+    CHECK(table->size() == 1);
+    table = realm->read_group().get_table("class_TopLevel3");
+    CHECK(table->is_empty());
+}
+
+TEST_CASE("Multiple async open tasks trigger a schema migration", "[sync][flx][flx schema migration][baas]") {
+    auto schema_v0 = get_schema_v0();
+    FLXSyncTestHarness harness("flx_sync_schema_migration",
+                               {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    auto config = harness.make_test_file();
+    config.sync_config->rerun_init_subscription_on_open = true;
+
+    {
+        config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+        check_realm_schema(config.path, schema_v0, 0);
+
+        realm->sync_session()->pause();
+
+        // Subscription to recover when upgrading the schema.
+        auto subs = realm->get_latest_subscription_set().make_mutable_copy();
+        CHECK(subs.erase_by_class_name("TopLevel2"));
+        auto table = realm->read_group().get_table("class_TopLevel2");
+        auto col_key = table->get_column_key("queryable_int_field");
+        auto query = Query(table).greater_equal(col_key, int64_t(0));
+        subs.insert_or_assign(query);
+        subs.commit();
+
+        // Object to recover when upgrading the schema.
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "biz"s},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field2", "non queryable 33"s}}));
+        realm->commit_transaction();
+        // The server filters out this object because the schema version the client migrates to removes the queryable
+        // field.
+        realm->begin_transaction();
+        Object::create(
+            c, realm, "TopLevel3",
+            std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_int_field", static_cast<int64_t>(42)}}));
+        realm->commit_transaction();
+        realm->close();
+    }
+
+    const AppSession& app_session = harness.session().app_session();
+    auto schema_v1 = get_schema_v1();
+    create_schema(app_session, schema_v1, 1);
+
+    // Upgrade the schema version
+    config.schema_version = 1;
+    config.schema = schema_v1;
+    config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
+
+    auto task1 = Realm::get_synchronized_realm(config);
+    auto task2 = Realm::get_synchronized_realm(config);
+
+    auto open_task1_pf = util::make_promise_future<SharedRealm>();
+    auto open_task2_pf = util::make_promise_future<SharedRealm>();
+    auto open_callback1 = [promise_holder = util::CopyablePromiseHolder(std::move(open_task1_pf.promise))](
+                              ThreadSafeReference ref, std::exception_ptr err) mutable {
+        REQUIRE_FALSE(err);
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(realm);
+        promise_holder.get_promise().emplace_value(realm);
+    };
+    auto open_callback2 = [promise_holder = util::CopyablePromiseHolder(std::move(open_task2_pf.promise))](
+                              ThreadSafeReference ref, std::exception_ptr err) mutable {
+        REQUIRE_FALSE(err);
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(realm);
+        promise_holder.get_promise().emplace_value(realm);
+    };
+
+    task1->start(open_callback1);
+    task2->start(open_callback2);
+
+    auto realm1 = open_task1_pf.future.get();
+    auto realm2 = open_task2_pf.future.get();
+
+    auto verify_realm = [&](SharedRealm realm) {
+        check_realm_schema(config.path, schema_v1, 1);
+
+        auto table = realm->read_group().get_table("class_TopLevel");
+        CHECK(table->size() == 1);
+        table = realm->read_group().get_table("class_TopLevel2");
+        CHECK(!table);
+        table = realm->read_group().get_table("class_TopLevel3");
+        CHECK(table->is_empty());
+    };
+
+    verify_realm(realm1);
+    verify_realm(realm2);
+}
+
+TEST_CASE("Upgrade schema version with no subscription initializer", "[sync][flx][flx schema migration][baas]") {
+    auto schema_v0 = get_schema_v0();
+    FLXSyncTestHarness harness("flx_sync_schema_migration",
+                               {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    auto config = harness.make_test_file();
+
+    {
+        config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+        check_realm_schema(config.path, schema_v0, 0);
+
+        realm->sync_session()->pause();
+
+        // Object to recover when upgrading the schema.
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "biz"s},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field2", "non queryable 33"s}}));
+        realm->commit_transaction();
+        realm->close();
+    }
+
+    const AppSession& app_session = harness.session().app_session();
+    auto schema_v1 = get_schema_v1();
+    create_schema(app_session, schema_v1, 1);
+
+    {
+        // Upgrade the schema version
+        config.schema_version = 1;
+        config.schema = schema_v1;
+        config.sync_config->subscription_initializer = nullptr;
+        auto [realm, error] = async_open_realm(config);
+        REQUIRE(realm);
+        REQUIRE_FALSE(error);
+        check_realm_schema(config.path, schema_v1, 1);
+
+        auto table = realm->read_group().get_table("class_TopLevel");
+        CHECK(table->is_empty());
+        table = realm->read_group().get_table("class_TopLevel2");
+        CHECK(!table);
+        table = realm->read_group().get_table("class_TopLevel3");
+        CHECK(table->is_empty());
+    }
 }
 
 } // namespace realm::app

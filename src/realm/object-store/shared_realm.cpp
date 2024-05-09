@@ -497,12 +497,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     schema.copy_keys_from(actual_schema, m_config.schema_subset_mode);
 
-    bool save_schema_version_on_version_decrease = false;
-#if REALM_ENABLE_SYNC
-    if (m_config.sync_config && m_config.sync_config->flx_sync_requested)
-        save_schema_version_on_version_decrease = true;
-#endif
-
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
                     m_config.schema_mode == SchemaMode::AdditiveExplicit ||
@@ -532,12 +526,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
                                           required_changes, m_config.automatically_handle_backlinks_in_migrations,
-                                          wrapper, save_schema_version_on_version_decrease);
+                                          wrapper);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes, m_config.automatically_handle_backlinks_in_migrations,
-                                          nullptr, save_schema_version_on_version_decrease);
+                                          required_changes, m_config.automatically_handle_backlinks_in_migrations);
         REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
@@ -772,7 +765,7 @@ void Realm::run_writes_on_proper_thread()
 
 void Realm::call_completion_callbacks()
 {
-    if (m_is_running_async_commit_completions) {
+    if (m_is_running_async_commit_completions || m_async_commit_q.empty()) {
         return;
     }
 

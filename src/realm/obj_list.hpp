@@ -93,6 +93,6 @@ public:
     template <class T>
     TableView find_all(ColKey column_key, T value) const;
 };
-}
+} // namespace realm
 
 #endif /* SRC_REALM_OBJ_LIST_HPP_ */

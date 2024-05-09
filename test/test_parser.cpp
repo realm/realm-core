@@ -853,9 +853,9 @@ TEST(Parser_LinksToDifferentTable)
     verify_query(test_context, t, "items = obj('Items', 'coffee')", 0); // nobody buys coffee
     verify_query(test_context, t, "items = obj('Items', 'milk')", 2);   // but milk
     verify_query(test_context, t, "items = O0", 2);                     // how many people bought milk?
-    verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
-    verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
-    verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
+    verify_query(test_context, t, "items.@count > 2", 3);               // how many people bought more than two items?
+    verify_query(test_context, t, "items.price > 3.0", 3);              // how many people buy items over $3.0?
+    verify_query(test_context, t, "items.name ==[c] 'milk'", 2);        // how many people buy milk?
     // how many people bought items with an active sale?
     verify_query(test_context, t, "items.discount.active == true", 3);
     // how many people bought an item marked down by more than $2.0?
@@ -3974,7 +3974,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NULL IN items.price", 0);                // null
     verify_query(test_context, t, "'dairy' IN fav_item.allergens.name", 2); // through link prefix
     verify_query(test_context, items, "20 IN @links.Person.items.account_balance", 1); // backlinks
-    verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
+    verify_query(test_context, t, "fav_item.price IN items.price", 2);                 // single property in list
 
     // list property compared to a constant list
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ANY items.price", 2);
@@ -4091,6 +4091,61 @@ TEST(Parser_OperatorIN)
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found '5.5'"));
     CHECK_THROW_EX(verify_query(test_context, t, "5.5 in fav_item.price", 1), query_parser::InvalidQueryArgError,
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
+}
+
+TEST(Parser_OrOfIn)
+{
+    Group g;
+
+    TableRef persons = g.add_table("class_Person");
+    constexpr bool nullable = true;
+    auto col_name = persons->add_column(type_String, "name", nullable);
+    persons->create_object().set(col_name, "Ani");
+    persons->create_object().set(col_name, "Teddy");
+    persons->create_object().set(col_name, "Poly");
+    persons->create_object().set(col_name, ""); // empty string
+    persons->create_object();                   // null value
+
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'}", 3);
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null}", 4);
+    verify_query(test_context, persons,
+                 "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null} OR name IN {''}", 5);
+}
+
+TEST_TYPES(Parser_7642, std::true_type, std::false_type)
+{
+    Group g;
+    auto cars = g.add_table("class_Car");
+    auto col_make = cars->add_column(type_String, "make");
+    auto col_int = cars->add_column(type_Int, "value");
+    if (TEST_TYPE::value) {
+        cars->add_search_index(col_make);
+        cars->add_search_index(col_int);
+    }
+
+    cars->create_object().set(col_make, "Tesla").set(col_int, 123);
+    cars->create_object().set(col_make, "Ford").set(col_int, 456);
+    cars->create_object().set(col_make, "Audi").set(col_int, 789);
+    cars->create_object().set(col_make, "Chevy").set(col_int, 1000);
+
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
+    // do not compare to floats, and do not compare to floats/doubles that are not an exact integer
+    float nan_f = std::numeric_limits<float>::quiet_NaN();
+    float inf_f = std::numeric_limits<float>::infinity();
+    Vec args = Vec{456, 789.0f, 123.0, 789.10, 1000.1f};
+    verify_query(test_context, cars, "value IN $0", {args}, 3);
+    args.push_back(inf_f);
+    args.push_back(nan_f);
+    verify_query_sub(test_context, cars, "value == $0", args, 1);
+    verify_query_sub(test_context, cars, "value == $1", args, 1);
+    verify_query_sub(test_context, cars, "value == $2", args, 1);
+    verify_query_sub(test_context, cars, "value == $3", args, 0);
+    verify_query_sub(test_context, cars, "value == $4", args, 0);
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $5", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $6", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "NaN not supported for int"));
 }
 
 TEST(Parser_KeyPathSubstitution)
@@ -4770,7 +4825,7 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed contains bin(\"trin\")", 1);
     verify_query(test_context, table, "mixed like \"Strin*\"", 24);
     verify_query(test_context, table, "mixed like bin(\"Strin*\")", 1); // 28
-    verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
+    verify_query(test_context, table, "mixed endswith \"4\"", 5);       // 4, 24, 44, 64, 84
     verify_query(test_context, table, "mixed endswith bin(\"4\")", 0);
     verify_query(test_context, table, "mixed endswith bin(\"Binary\")", 1);
     verify_query(test_context, table, "mixed.@size > 7", 22);
@@ -5353,6 +5408,12 @@ TEST(Parser_NestedMixedDictionaryList)
     list_george.add(2);
     list_george.add(3);
 
+    Obj ringo = persons->create_object_with_primary_key("Ringo");
+    ringo.set(col_self, ringo.get_key());
+    ringo.set_collection(col, CollectionType::Dictionary);
+    auto dict_ringo = ringo.get_dictionary(col);
+    dict_ringo.insert("Foo", "Bar");
+
     auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
     CHECK_EQUAL(q.count(), 1);
 
@@ -5369,15 +5430,16 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties[*] == {3, 2, 1}", 0);
     verify_query(test_context, persons, "properties[*] == {1, 2, 3}", 1);
     verify_query(test_context, persons, "ANY properties[*] == 2", 1);
-    verify_query(test_context, persons, "NONE properties[*] == 2", 2);
+    verify_query(test_context, persons, "NONE properties[*] == 2", 3);
     verify_query(test_context, persons, "properties.@keys == 'instruments'", 2);
     verify_query(test_context, persons, "properties.@keys == 'pets'", 2);
     verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
     verify_query(test_context, persons, "properties.@size == 3", 2);
     verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
-    verify_query(test_context, persons, "properties.@type == 'object'", 2);
+    verify_query(test_context, persons, "properties.@type == 'object'", 3);
     verify_query(test_context, persons, "properties.@type == 'array'", 1);
-    verify_query(test_context, persons, "properties.@type == 'collection'", 3);
+    verify_query(test_context, persons, "properties.@type == 'collection'", 4);
+    verify_query(test_context, persons, "properties.Foo == 'Bar'", 1);
 }
 
 TEST(Parser_NestedDictionaryDeep)

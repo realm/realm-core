@@ -839,10 +839,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
         // We don't want to replicate the individual column removals along the
         // way as they're covered by the table removal
         Table::DisableReplication dr(*table);
-        for (size_t i = table->get_column_count(); i > 0; --i) {
-            ColKey col_key = table->spec_ndx2colkey(i - 1);
-            table->remove_column(col_key);
-        }
+        table->remove_columns();
     }
 
     size_t prior_num_tables = m_tables.size();

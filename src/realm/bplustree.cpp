@@ -169,13 +169,11 @@ private:
         return (child_ndx) > 0 ? size_t(m_offsets.get(child_ndx - 1)) : 0;
     }
 };
-}
+} // namespace realm
 
 /****************************** BPlusTreeNode ********************************/
 
-BPlusTreeNode::~BPlusTreeNode()
-{
-}
+BPlusTreeNode::~BPlusTreeNode() {}
 
 /****************************** BPlusTreeLeaf ********************************/
 
@@ -275,9 +273,7 @@ void BPlusTreeInner::create(size_t elems_per_child)
     Array::create(Array::type_InnerBptreeNode, false, 1, tagged);
 }
 
-BPlusTreeInner::~BPlusTreeInner()
-{
-}
+BPlusTreeInner::~BPlusTreeInner() {}
 
 void BPlusTreeInner::init_from_mem(MemRef mem)
 {
@@ -651,7 +647,7 @@ ref_type BPlusTreeInner::insert_bp_node(size_t child_ndx, ref_type new_sibling_r
         new_split_offset = size_t(elem_ndx_offset + state.split_offset);
         new_split_size = elem_ndx_offset + state.split_size;
         new_sibling.add_bp_node_ref(new_sibling_ref); // Throws
-        set_tree_size(new_split_offset);             // Throws
+        set_tree_size(new_split_offset);              // Throws
     }
     else {
         // Case 2/2: The split child was not the last child of the
@@ -661,9 +657,9 @@ ref_type BPlusTreeInner::insert_bp_node(size_t child_ndx, ref_type new_sibling_r
         new_split_offset = size_t(elem_ndx_offset + state.split_size);
         new_split_size = get_tree_size() + 1;
 
-        move(&new_sibling, new_ref_ndx, (new_split_offset - 1));               // Strips off tree size
+        move(&new_sibling, new_ref_ndx, (new_split_offset - 1));                // Strips off tree size
         add_bp_node_ref(new_sibling_ref, elem_ndx_offset + state.split_offset); // Throws
-        append_tree_size(new_split_offset);                                    // Throws
+        append_tree_size(new_split_offset);                                     // Throws
     }
 
     new_sibling.append_tree_size(new_split_size - new_split_offset); // Throws
@@ -737,9 +733,7 @@ void BPlusTreeInner::verify() const
 
 /****************************** BPlusTreeBase ********************************/
 
-BPlusTreeBase::~BPlusTreeBase()
-{
-}
+BPlusTreeBase::~BPlusTreeBase() {}
 
 void BPlusTreeBase::create()
 {

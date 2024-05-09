@@ -396,7 +396,7 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
-void ClientImpl::Connection::finish_session_deactivation(Session* sess)
+void Connection::finish_session_deactivation(Session* sess)
 {
     REALM_ASSERT(sess->m_state == Session::Deactivated);
     auto ident = sess->m_ident;
@@ -1372,19 +1372,14 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
         close_due_to_protocol_error(std::move(status)); // Throws
 }
 
-void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
-                                          std::uint_fast64_t downloadable_bytes, int64_t query_version,
-                                          DownloadBatchState batch_state,
-                                          const ReceivedChangesets& received_changesets)
+void Connection::receive_download_message(session_ident_type session_ident, const DownloadMessage& message)
 {
     Session* sess = find_and_validate_session(session_ident, "DOWNLOAD");
     if (REALM_UNLIKELY(!sess)) {
         return;
     }
 
-    if (auto status = sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
-                                                     received_changesets);
-        !status.is_ok()) {
+    if (auto status = sess->receive_download_message(message); !status.is_ok()) {
         close_due_to_protocol_error(std::move(status));
     }
 }
@@ -1619,13 +1614,16 @@ void Session::on_integration_failure(const IntegrationException& error)
     }
 }
 
-void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
+void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress,
+                                       bool changesets_integrated)
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT_3(progress.download.server_version, >=, m_download_progress.server_version);
-    m_download_progress = progress.download;
     bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
+
+    m_download_progress = progress.download;
     m_progress = progress;
+
     if (upload_progressed) {
         if (progress.upload.client_version > m_last_version_selected_for_upload) {
             if (progress.upload.client_version > m_upload_progress.client_version)
@@ -1633,11 +1631,18 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
             m_last_version_selected_for_upload = progress.upload.client_version;
         }
 
+        notify_upload_progress();
         check_for_upload_completion();
     }
 
-    do_recognize_sync_version(client_version); // Allows upload process to resume
-    check_for_download_completion();           // Throws
+    bool resume_upload = do_recognize_sync_version(client_version); // Allows upload process to resume
+
+    // notify also when final DOWNLOAD received with no changesets
+    bool download_progressed = changesets_integrated || (!upload_progressed && resume_upload);
+    if (download_progressed)
+        notify_download_progress();
+
+    check_for_download_completion(); // Throws
 
     // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
     if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
@@ -1692,6 +1697,7 @@ void Session::activate()
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_download_progress = m_progress.download;
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
+    init_progress_handler();
 
     logger.debug("last_version_available  = %1", m_last_version_available);                    // Throws
     logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
@@ -2272,6 +2278,7 @@ bool Session::client_reset_if_needed()
 
     m_upload_progress = m_progress.upload;
     m_download_progress = m_progress.download;
+    init_progress_handler();
     // In recovery mode, there may be new changesets to upload and nothing left to download.
     // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
     // For both, we want to allow uploads again without needing external changes to download first.
@@ -2349,29 +2356,47 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     return Status::OK();       // Success
 }
 
-Status Session::receive_download_message(const SyncProgress& progress, std::uint_fast64_t downloadable_bytes,
-                                         DownloadBatchState batch_state, int64_t query_version,
-                                         const ReceivedChangesets& received_changesets)
+Status Session::receive_download_message(const DownloadMessage& message)
 {
-    REALM_ASSERT_EX(query_version >= 0, query_version);
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state != Active)
         return Status::OK();
 
-    if (is_steady_state_download_message(batch_state, query_version)) {
-        batch_state = DownloadBatchState::SteadyState;
-    }
+    bool is_flx = m_conn.is_flx_sync_connection();
+    int64_t query_version = is_flx ? *message.query_version : 0;
 
-    logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
-                 "latest_server_version=%3, latest_server_version_salt=%4, "
-                 "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
-                 "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
-                 progress.download.server_version, progress.download.last_integrated_client_version,
-                 progress.latest_server_version.version, progress.latest_server_version.salt,
-                 progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
+    if (!is_flx || query_version > 0)
+        enable_progress_notifications();
+
+    // If this is a PBS connection, then every download message is its own complete batch.
+    bool last_in_batch = is_flx ? *message.last_in_batch : true;
+    auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    if (is_steady_state_download_message(batch_state, query_version))
+        batch_state = DownloadBatchState::SteadyState;
+
+    auto&& progress = message.progress;
+    if (is_flx) {
+        logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
+                     "latest_server_version=%3, latest_server_version_salt=%4, "
+                     "upload_client_version=%5, upload_server_version=%6, progress_estimate=%7, "
+                     "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
+                     progress.download.server_version, progress.download.last_integrated_client_version,
+                     progress.latest_server_version.version, progress.latest_server_version.salt,
+                     progress.upload.client_version, progress.upload.last_integrated_server_version,
+                     message.progress_estimate, last_in_batch, query_version, message.changesets.size()); // Throws
+    }
+    else {
+        logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
+                     "latest_server_version=%3, latest_server_version_salt=%4, "
+                     "upload_client_version=%5, upload_server_version=%6, "
+                     "downloadable_bytes=%7, num_changesets=%8, ...)",
+                     progress.download.server_version, progress.download.last_integrated_client_version,
+                     progress.latest_server_version.version, progress.latest_server_version.salt,
+                     progress.upload.client_version, progress.upload.last_integrated_server_version,
+                     message.downloadable_bytes, message.changesets.size()); // Throws
+    }
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
     // changeset over and over again.
@@ -2391,7 +2416,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    for (const RemoteChangeset& changeset : received_changesets) {
+    for (const RemoteChangeset& changeset : message.changesets) {
         // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
         // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
@@ -2429,21 +2454,25 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
-                                       batch_state, received_changesets.size());
+                                       batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
+    if (is_flx)
+        update_download_estimate(message.progress_estimate);
+
+    if (process_flx_bootstrap_message(progress, batch_state, query_version, message.changesets)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
 
-    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
+    uint64_t downloadable_bytes = is_flx ? 0 : message.downloadable_bytes;
+    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                  batch_state, received_changesets.size());
+                                  batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2678,7 +2707,7 @@ void Session::clear_resumption_delay_state()
     }
 }
 
-Status ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress) noexcept
+Status Session::check_received_sync_progress(const SyncProgress& progress) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;

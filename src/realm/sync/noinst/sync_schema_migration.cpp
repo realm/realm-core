@@ -17,8 +17,8 @@
  **************************************************************************/
 
 #include <realm/sync/noinst/sync_schema_migration.hpp>
-
-#include <realm/exceptions.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_reset_recovery.hpp>
 
 #include <string_view>
 
@@ -104,6 +104,36 @@ void track_sync_schema_migration(Transaction& wt, uint64_t previous_schema_versi
                              schema_version, previous_schema_version));
         }
     }
+}
+
+void perform_schema_migration(DB& db)
+{
+    // Everything is performed in one single write transaction.
+    auto tr = db.start_write();
+
+    // Disable sync replication.
+    auto& repl = dynamic_cast<sync::ClientReplication&>(*db.get_replication());
+    sync::TempShortCircuitReplication sync_history_guard(repl);
+    repl.set_write_validator_factory(nullptr);
+
+    // Delete all columns before deleting tables to avoid complications with links
+    for (auto tk : tr->get_table_keys()) {
+        tr->get_table(tk)->remove_columns();
+    }
+    for (auto tk : tr->get_table_keys()) {
+        tr->remove_table(tk);
+    }
+
+    // Clear sync history, reset the file ident and the server version in the download and upload progress.
+
+    auto& history = repl.get_history();
+    sync::SaltedFileIdent reset_file_ident{0, 0};
+    sync::SaltedVersion reset_server_version{0, 0};
+    std::vector<_impl::client_reset::RecoveredChange> changes{};
+    history.set_history_adjustments(*db.get_logger(), tr->get_version(), reset_file_ident, reset_server_version,
+                                    changes);
+
+    tr->commit();
 }
 
 } // namespace realm::_impl::sync_schema_migration

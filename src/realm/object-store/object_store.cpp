@@ -114,7 +114,7 @@ std::optional<CollectionType> process_collection(const Property& property)
     else if (is_dictionary(property.type)) {
         return CollectionType::Dictionary;
     }
-    return {};
+    return std::nullopt;
 }
 
 ColKey add_column(Group& group, Table& table, Property const& property)
@@ -867,8 +867,7 @@ static const char* schema_mode_to_string(SchemaMode mode)
 void ObjectStore::apply_schema_changes(Transaction& transaction, uint64_t schema_version, Schema& target_schema,
                                        uint64_t target_schema_version, SchemaMode mode,
                                        std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
-                                       std::function<void()> migration_function,
-                                       bool set_schema_version_on_version_decrease)
+                                       std::function<void()> migration_function)
 {
     using namespace std::chrono;
     auto t1 = steady_clock::now();
@@ -889,16 +888,11 @@ void ObjectStore::apply_schema_changes(Transaction& transaction, uint64_t schema
     create_metadata_tables(transaction);
 
     if (mode == SchemaMode::AdditiveDiscovered || mode == SchemaMode::AdditiveExplicit) {
-        bool set_schema = (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned ||
-                           set_schema_version_on_version_decrease);
-
         // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
         bool update_indexes = true;
         apply_additive_changes(transaction, changes, update_indexes);
 
-        if (set_schema)
-            set_schema_version(transaction, target_schema_version);
-
+        set_schema_version(transaction, target_schema_version);
         set_schema_keys(transaction, target_schema);
         return;
     }

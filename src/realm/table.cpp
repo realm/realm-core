@@ -511,6 +511,14 @@ CollectionType Table::get_collection_type(ColKey col_key) const
     return CollectionType::Dictionary;
 }
 
+void Table::remove_columns()
+{
+    for (size_t i = get_column_count(); i > 0; --i) {
+        ColKey col_key = spec_ndx2colkey(i - 1);
+        remove_column(col_key);
+    }
+}
+
 void Table::remove_column(ColKey col_key)
 {
     check_column(col_key);
@@ -2359,6 +2367,13 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     // Check if unresolved exists
     if (unres_key) {
+        if (Replication* repl = get_repl()) {
+            if (auto logger = repl->would_log(util::Logger::Level::debug)) {
+                logger->log(LogCategory::object, util::Logger::Level::debug, "Cancel tombstone on '%1': %2",
+                            get_class_name(), unres_key);
+            }
+        }
+
         auto tombstone = m_tombstones->get(unres_key);
         ret.assign_pk_and_backlinks(tombstone);
         // If tombstones had no links to it, it may still be alive
@@ -2629,6 +2644,13 @@ Obj Table::get_or_create_tombstone(ObjKey key, ColKey pk_col, Mixed pk_val)
             }
         }
         return tombstone;
+    }
+    if (Replication* repl = get_repl()) {
+        if (auto logger = repl->would_log(util::Logger::Level::debug)) {
+            logger->log(LogCategory::object, util::Logger::Level::debug,
+                        "Create tombstone for object '%1' with primary key %2 : %3", get_class_name(), pk_val,
+                        unres_key);
+        }
     }
     return m_tombstones->insert(unres_key, {{pk_col, pk_val}});
 }

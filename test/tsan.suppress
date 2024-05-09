@@ -19,3 +19,13 @@ deadlock:realm::sync::MigrationStore::create_subscriptions
 
 # mktime, timegm, gmtime modify global time zone env var, but the race is harmless
 race:adjtime
+
+# libuv scheduler is only supposed to be used on main thread but constructed
+# on the sync thread for async open task, should be harmless to suppress,
+# but ultimately needs to be fixed: #7083
+race:uv_async_init
+
+# We try to shut down the remote BaaSaaS instance from inside a signal handler,
+# which invovles a bunch of memory allocations. This is a pretty unsafe thing
+# to do, but we want to avoid leaking server resources.
+signal:realm::Baasaas::stop

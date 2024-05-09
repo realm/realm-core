@@ -31,9 +31,7 @@ public:
     static constexpr size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     explicit ArrayBlob(Allocator&) noexcept;
-    ~ArrayBlob() noexcept override
-    {
-    }
+    ~ArrayBlob() noexcept override {}
 
     // Disable copying, this is not allowed.
     ArrayBlob& operator=(const ArrayBlob&) = delete;
@@ -67,6 +65,7 @@ public:
     static MemRef create_array(size_t init_size, Allocator&);
 
     void verify() const;
+
 private:
     size_t calc_byte_len(size_t for_size, size_t width) const override;
     size_t calc_item_count(size_t bytes, size_t width) const noexcept override;

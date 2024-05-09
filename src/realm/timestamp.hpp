@@ -224,6 +224,6 @@ struct numeric_limits<realm::Timestamp> {
         return realm::Timestamp(numeric_limits<int64_t>::max(), 0);
     }
 };
-}
+} // namespace std
 
 #endif // REALM_TIMESTAMP_HPP
