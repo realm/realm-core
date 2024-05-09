@@ -7,6 +7,13 @@
 namespace realm::sync {
 namespace {
 
+constexpr static std::string_view
+    s_dict_key_wrong_type_err("%1: Dictionary key is not a string on field '%2' in class '%3'");
+constexpr static std::string_view
+    s_list_index_wrong_type_err("%1: List index is not an integer on field '%2' in class '%3'");
+constexpr static std::string_view
+    s_wrong_collection_type_err("%1: Not a list or dictionary on field '%2' in class '%3'");
+
 REALM_NORETURN void throw_bad_transaction_log(std::string msg)
 {
     throw BadChangesetError{std::move(msg)};
@@ -1528,8 +1535,8 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
             ++m_it_begin;
             return resolve_list_element(*list, *pindex);
         }
-        on_error(util::format("%1: List index is not an integer on field '%2' in class '%3'", m_instr_name,
-                              field_name, obj.get_table()->get_name()));
+        on_error(
+            util::format(s_list_index_wrong_type_err.data(), m_instr_name, field_name, obj.get_table()->get_name()));
     }
     else if (col.is_dictionary()) {
         if (auto pkey = mpark::get_if<InternString>(&*m_it_begin)) {
@@ -1537,19 +1544,19 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
             ++m_it_begin;
             return resolve_dictionary_element(dict, *pkey);
         }
-        on_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'", m_instr_name,
-                              field_name, obj.get_table()->get_name()));
+        on_error(
+            util::format(s_dict_key_wrong_type_err.data(), m_instr_name, field_name, obj.get_table()->get_name()));
     }
     else if (col.get_type() == col_type_Mixed) {
         auto val = obj.get<Mixed>(col);
-        std::string error_msg;
+        std::string_view error_msg;
         if (val.is_type(type_Dictionary)) {
             if (auto pkey = mpark::get_if<InternString>(&*m_it_begin)) {
                 Dictionary dict(obj, col);
                 ++m_it_begin;
                 return resolve_dictionary_element(dict, *pkey);
             }
-            error_msg = "%1: Dictionary key is not a string on field '%2' in class '%3'";
+            error_msg = s_dict_key_wrong_type_err;
         }
         else if (val.is_type(type_List)) {
             if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
@@ -1557,13 +1564,13 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
                 ++m_it_begin;
                 return resolve_list_element(list, *pindex);
             }
-            error_msg = "%1: List index is not an integer on field '%2' in class '%3'";
+            error_msg = s_list_index_wrong_type_err;
         }
         else {
-            error_msg = "%1: Not a list or dictionary on field '%2' in class '%3'";
+            error_msg = s_wrong_collection_type_err;
         }
         return on_mixed_type_changed(
-            util::format(error_msg.c_str(), m_instr_name, field_name, obj.get_table()->get_name()));
+            util::format(error_msg.data(), m_instr_name, field_name, obj.get_table()->get_name()));
     }
     else if (col.get_type() == col_type_Link) {
         auto target = obj.get_table()->get_link_target(col);
@@ -1646,7 +1653,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
             }
             else {
                 auto val = mixed_list.get(index);
-                std::string error_msg;
+                std::string_view error_msg;
 
                 if (val.is_type(type_Dictionary)) {
                     if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
@@ -1654,7 +1661,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
                         ++m_it_begin;
                         return resolve_dictionary_element(d, *pfield);
                     }
-                    error_msg = "%1: Dictionary key is not a string on field '%2' in class '%3'";
+                    error_msg = s_dict_key_wrong_type_err;
                 }
                 else if (val.is_type(type_List)) {
                     if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
@@ -1662,13 +1669,13 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
                         ++m_it_begin;
                         return resolve_list_element(l, *pindex);
                     }
-                    error_msg = "%1: List index is not an integer on field '%2' in class '%3'";
+                    error_msg = s_list_index_wrong_type_err;
                 }
                 else {
-                    error_msg = "%1: Not a list or dictionary on field '%2' in class '%3'";
+                    error_msg = s_wrong_collection_type_err;
                 }
                 return on_mixed_type_changed(
-                    util::format(error_msg.c_str(), m_instr_name, field_name, table->get_name()));
+                    util::format(error_msg.data(), m_instr_name, field_name, table->get_name()));
             }
         }
         on_error(util::format(
@@ -1719,14 +1726,14 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
     }
     else {
         if (auto val = dict.try_get(string_key)) {
-            std::string error_msg;
+            std::string_view error_msg;
             if (val->is_type(type_Dictionary)) {
                 if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
                     Dictionary d(dict, dict.build_index(string_key));
                     ++m_it_begin;
                     return resolve_dictionary_element(d, *pfield);
                 }
-                error_msg = "%1: Dictionary key is not a string on field '%2' in class '%3'";
+                error_msg = s_dict_key_wrong_type_err;
             }
             else if (val->is_type(type_List)) {
                 if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
@@ -1734,13 +1741,12 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
                     ++m_it_begin;
                     return resolve_list_element(l, *pindex);
                 }
-                error_msg = "%1: List index is not an integer on field '%2' in class '%3'";
+                error_msg = s_list_index_wrong_type_err;
             }
             else {
-                error_msg = "%1: Not a list or dictionary on field '%2' in class '%3'";
+                error_msg = s_wrong_collection_type_err;
             }
-            return on_mixed_type_changed(
-                util::format(error_msg.c_str(), m_instr_name, field_name, table->get_name()));
+            return on_mixed_type_changed(util::format(error_msg.data(), m_instr_name, field_name, table->get_name()));
         }
         Status key_not_found_status = on_dict_key_not_found(table->get_name(), field_name, string_key);
         if (key_not_found_status != Status::Pending) {

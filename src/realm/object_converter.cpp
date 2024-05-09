@@ -127,7 +127,7 @@ void InterRealmValueConverter::copy_list(const LstBase& src, LstBase& dst, bool*
 
     while (dst_to_erase.size()) {
         size_t ndx_to_remove = dst_to_erase.back();
-        dst_as_link_list ? dst_as_link_list->remove(ndx_to_remove) : dst_as_lst_mixed->remove(ndx_to_remove);
+        dst_as_link_list->remove(ndx_to_remove);
         dst_to_erase.pop_back();
     }
     if (updated && update_out) {
@@ -353,14 +353,15 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
     int left = 0;
 
     // find fist not matching element from beginning
-    while (left < sz && check_matching_list(src_list, dst_list, left, left)) {
+    while (left < sz && check_if_list_elements_match(src_list, dst_list, left, left)) {
         left += 1;
     }
 
     // find first not matching element from end
     int right_src = (int)src_list.size() - 1;
     int right_dst = (int)dst_list.size() - 1;
-    while (right_src >= left && right_dst >= left && check_matching_list(src_list, dst_list, right_src, right_dst)) {
+    while (right_src >= left && right_dst >= left &&
+           check_if_list_elements_match(src_list, dst_list, right_src, right_dst)) {
         right_src -= 1;
         right_dst -= 1;
     }
@@ -385,7 +386,7 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
                 dst_list.set_collection(left_dst, coll_type);
                 copy_list_in_mixed(src_list, dst_list, left_src, left_dst, coll_type);
             }
-            else if (!check_matching_list(src_list, dst_list, left_src, left_dst)) {
+            else if (!check_if_list_elements_match(src_list, dst_list, left_src, left_dst)) {
                 // Same collection type but different contents
                 copy_list_in_mixed(src_list, dst_list, left_src, left_dst, coll_type);
             }
@@ -455,7 +456,7 @@ void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictio
                 to_insert.push_back(src_ndx);
             }
             else if (is_collection(src_any) &&
-                     !check_matching_dictionary(src_dictionary, dst_dictionary, key_src.get_string())) {
+                     !check_if_dictionary_elements_match(src_dictionary, dst_dictionary, key_src.get_string())) {
                 to_insert.push_back(src_ndx);
             }
             src_ndx += 1;
@@ -513,8 +514,8 @@ void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictio
     }
 }
 
-bool InterRealmValueConverter::check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src,
-                                                   size_t ndx_dst) const
+bool InterRealmValueConverter::check_if_list_elements_match(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list,
+                                                            size_t ndx_src, size_t ndx_dst) const
 {
     REALM_ASSERT(ndx_src < src_list.size() && ndx_dst < dst_list.size());
     auto src_any = src_list.get_any(ndx_src);
@@ -532,7 +533,7 @@ bool InterRealmValueConverter::check_matching_list(const Lst<Mixed>& src_list, L
         if (src_element_size != dst_element_size)
             return false;
         for (size_t i = 0; i < src_element_size; ++i) {
-            if (!(check_matching_list(*src_element, *dst_element, i, i)))
+            if (!(check_if_list_elements_match(*src_element, *dst_element, i, i)))
                 return false;
         }
     }
@@ -548,15 +549,16 @@ bool InterRealmValueConverter::check_matching_list(const Lst<Mixed>& src_list, L
             auto dst_key = dst_element->get_key(i);
             if (src_key != dst_key)
                 return false;
-            if (!check_matching_dictionary(*src_element, *dst_element, src_key.get_string()))
+            if (!check_if_dictionary_elements_match(*src_element, *dst_element, src_key.get_string()))
                 return false;
         }
     }
     return true;
 }
 
-bool InterRealmValueConverter::check_matching_dictionary(const Dictionary& src_dictionary,
-                                                         const Dictionary& dst_dictionary, StringData key) const
+bool InterRealmValueConverter::check_if_dictionary_elements_match(const Dictionary& src_dictionary,
+                                                                  const Dictionary& dst_dictionary,
+                                                                  StringData key) const
 {
     REALM_ASSERT(src_dictionary.contains(key) && dst_dictionary.contains(key));
     auto src_any = src_dictionary.get(key);
@@ -574,7 +576,7 @@ bool InterRealmValueConverter::check_matching_dictionary(const Dictionary& src_d
         if (src_element_size != dst_element_size)
             return false;
         for (size_t i = 0; i < src_element_size; ++i) {
-            if (!(check_matching_list(*src_element, *dst_element, i, i)))
+            if (!(check_if_list_elements_match(*src_element, *dst_element, i, i)))
                 return false;
         }
     }
@@ -590,7 +592,7 @@ bool InterRealmValueConverter::check_matching_dictionary(const Dictionary& src_d
             auto right_key = dst_element->get_key(i);
             if (left_key != right_key)
                 return false;
-            if (!check_matching_dictionary(*src_element, *dst_element, left_key.get_string()))
+            if (!check_if_dictionary_elements_match(*src_element, *dst_element, left_key.get_string()))
                 return false;
         }
     }

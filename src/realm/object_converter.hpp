@@ -64,8 +64,10 @@ private:
                             CollectionType type) const;
     void copy_dictionary_in_mixed(const Dictionary& src_list, Dictionary& dst_list, StringData key,
                                   CollectionType type) const;
-    bool check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src, size_t ndx_dst) const;
-    bool check_matching_dictionary(const Dictionary& src_list, const Dictionary& dst_list, StringData key) const;
+    bool check_if_list_elements_match(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx_src,
+                                      size_t ndx_dst) const;
+    bool check_if_dictionary_elements_match(const Dictionary& src_list, const Dictionary& dst_list,
+                                            StringData key) const;
     bool is_collection(Mixed) const;
     CollectionType to_collection_type(Mixed) const;
 

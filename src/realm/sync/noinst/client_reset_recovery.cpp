@@ -626,7 +626,7 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
 bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
                                                  util::UniqueFunction<void(LstBase&, LstBase&)> callback)
 {
-    Dictionary local_dict, remote_dict;
+    DictionaryPtr local_dict, remote_dict;
     for (auto it = path.begin(); it != path.end();) {
         if (!remote_obj || !local_obj) {
             return false;
@@ -636,26 +636,26 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
         if (it->type == ListPath::Element::Type::InternKey) {
             StringData dict_key = m_intern_keys.get_key(it->intern_key);
             // At least one dictionary does not contain the key.
-            if (!local_dict.contains(dict_key) || !remote_dict.contains(dict_key))
+            if (!local_dict->contains(dict_key) || !remote_dict->contains(dict_key))
                 return false;
-            auto local_any = local_dict.get(dict_key);
-            auto remote_any = remote_dict.get(dict_key);
+            auto local_any = local_dict->get(dict_key);
+            auto remote_any = remote_dict->get(dict_key);
             // Type mismatch.
             if (local_any != remote_any)
                 return false;
             if (local_any.is_type(type_Link, type_TypedLink)) {
-                local_obj = local_dict.get_object(dict_key);
-                remote_obj = remote_dict.get_object(dict_key);
+                local_obj = local_dict->get_object(dict_key);
+                remote_obj = remote_dict->get_object(dict_key);
             }
             else if (local_any.is_type(type_Dictionary)) {
-                local_dict = *local_dict.get_dictionary(dict_key);
-                remote_dict = *remote_dict.get_dictionary(dict_key);
+                local_dict = local_dict->get_dictionary(dict_key);
+                remote_dict = remote_dict->get_dictionary(dict_key);
             }
             else if (local_any.is_type(type_List)) {
                 ++it;
                 REALM_ASSERT(it == path.end());
-                auto local_list = local_dict.get_list(dict_key);
-                auto remote_list = remote_dict.get_list(dict_key);
+                auto local_list = local_dict->get_list(dict_key);
+                auto remote_list = remote_dict->get_list(dict_key);
                 callback(*remote_list, *local_list);
                 return true;
             }
@@ -669,6 +669,8 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
         REALM_ASSERT(it->type == ListPath::Element::Type::ColumnKey);
         ColKey col = it->col_key;
         REALM_ASSERT(col);
+        ColKey local_col = local_obj.get_table()->get_column_key(remote_obj.get_table()->get_column_name(col));
+        REALM_ASSERT(local_col);
         if (col.is_list()) {
             ++it;
             // A list is copied verbatim when there is an operation on an ambiguous index
@@ -678,36 +680,30 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
             // or embedded objects through that list is stopped.
             REALM_ASSERT(it == path.end());
             auto remote_list = remote_obj.get_listbase_ptr(col);
-            ColKey local_col = local_obj.get_table()->get_column_key(remote_obj.get_table()->get_column_name(col));
-            REALM_ASSERT(local_col);
             auto local_list = local_obj.get_listbase_ptr(local_col);
             callback(*remote_list, *local_list);
             return true;
         }
         else if (col.is_dictionary()) {
-            remote_dict = remote_obj.get_dictionary(col);
-            local_dict = local_obj.get_dictionary(remote_obj.get_table()->get_column_name(col));
+            remote_dict = remote_obj.get_dictionary_ptr(col);
+            local_dict = local_obj.get_dictionary_ptr(local_col);
             ++it;
         }
         else if (col.get_type() == col_type_Mixed) {
-            StringData col_name = remote_obj.get_table()->get_column_name(col);
-            auto local_any = local_obj.get_any(col_name);
+            auto local_any = local_obj.get_any(local_col);
             auto remote_any = remote_obj.get_any(col);
 
             if (local_any.is_type(type_List) && remote_any.is_type(type_List)) {
                 ++it;
                 REALM_ASSERT(it == path.end());
-                auto local_col = local_obj.get_table()->get_column_key(col_name);
                 Lst<Mixed> local_list{local_obj, local_col};
                 Lst<Mixed> remote_list{remote_obj, col};
                 callback(remote_list, local_list);
                 return true;
             }
             else if (local_any.is_type(type_Dictionary) && remote_any.is_type(type_Dictionary)) {
-                StringData col_name = remote_obj.get_table()->get_column_name(col);
-                auto local_col = local_obj.get_table()->get_column_key(col_name);
-                remote_dict = remote_obj.get_dictionary(col);
-                local_dict = local_obj.get_dictionary(local_col);
+                remote_dict = remote_obj.get_dictionary_ptr(col);
+                local_dict = local_obj.get_dictionary_ptr(local_col);
                 ++it;
             }
             else {
