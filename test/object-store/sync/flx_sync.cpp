@@ -27,12 +27,10 @@
 
 #include <realm/object_id.hpp>
 #include <realm/query_expression.hpp>
-#include <realm/list.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
-#include <realm/object-store/list.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -498,6 +496,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
              {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
              {"list_of_ints_field", PropertyType::Int | PropertyType::Array},
              {"sum_of_list_field", PropertyType::Int},
+             {"any_mixed", PropertyType::Mixed | PropertyType::Nullable},
+             {"dictionary_mixed", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable},
          }},
         {"TopLevel2",
          {
@@ -1494,6 +1494,72 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                                               Catch::Matchers::ContainsSubstring(class_err));
         CHECK(before_reset_count == 1);
         CHECK(after_reset_count == 1);
+    }
+
+    SECTION("Recover: inserts in collections in mixed - collections cleared remotely") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->populate_initial_object([&](SharedRealm realm) {
+                subscribe_to_all_and_bootstrap(*realm);
+                auto pk_of_added_object = ObjectId::gen();
+                auto table = realm->read_group().get_table("class_TopLevel");
+
+                realm->begin_transaction();
+                CppContext c(realm);
+                auto obj = Object::create(c, realm, "TopLevel",
+                                          std::any(AnyDict{{"_id"s, pk_of_added_object},
+                                                           {"queryable_str_field"s, "initial value"s},
+                                                           {"sum_of_list_field"s, int64_t(42)}}));
+                auto col_any = table->get_column_key("any_mixed");
+                obj.get_obj().set_collection(col_any, CollectionType::List);
+                auto list = obj.get_obj().get_list_ptr<Mixed>(col_any);
+                list->add(1);
+                auto dict = obj.get_obj().get_dictionary("dictionary_mixed");
+                dict.insert("key", 42);
+                realm->commit_transaction();
+                wait_for_upload(*realm);
+                return pk_of_added_object;
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                local_realm->begin_transaction();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any_mixed");
+                auto obj = table->get_object(0);
+                auto list = obj.get_list_ptr<Mixed>(col_any);
+                list->add(2);
+                auto dict = obj.get_dictionary("dictionary_mixed");
+                dict.insert("key2", "value");
+                local_realm->commit_transaction();
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                remote_realm->begin_transaction();
+                auto table = remote_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any_mixed");
+                auto obj = table->get_object(0);
+                auto list = obj.get_list_ptr<Mixed>(col_any);
+                list->clear();
+                auto dict = obj.get_dictionary("dictionary_mixed");
+                dict.clear();
+                remote_realm->commit_transaction();
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                wait_for_advance(*local_realm);
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto obj = table->get_object(0);
+                auto col_any = table->get_column_key("any_mixed");
+                auto list = obj.get_list_ptr<Mixed>(col_any);
+                CHECK(list->size() == 1);
+                CHECK(list->get_any(0).get_int() == 2);
+                auto dict = obj.get_dictionary("dictionary_mixed");
+                CHECK(dict.size() == 1);
+                CHECK(dict.get("key2").get_string() == "value");
+            })
+            ->run();
     }
 }
 
