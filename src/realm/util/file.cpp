@@ -418,12 +418,13 @@ size_t page_size()
 OnlyForTestingPageSizeChange::OnlyForTestingPageSizeChange(size_t new_page_size)
 {
     REALM_ASSERT(new_page_size % c_min_supported_page_size == 0);
+    m_previous_page_size = page_size();
     cached_page_size = new_page_size;
 }
 
 OnlyForTestingPageSizeChange::~OnlyForTestingPageSizeChange()
 {
-    cached_page_size = get_page_size();
+    cached_page_size = m_previous_page_size;
 }
 
 void File::open_internal(const std::string& path, AccessMode a, CreateMode c, int flags, bool* success)

@@ -117,6 +117,7 @@ size_t page_size();
 struct OnlyForTestingPageSizeChange {
     OnlyForTestingPageSizeChange(size_t new_page_size);
     ~OnlyForTestingPageSizeChange();
+    size_t m_previous_page_size = 0;
 };
 
 /// This class provides a RAII abstraction over the concept of a file

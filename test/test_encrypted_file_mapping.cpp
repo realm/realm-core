@@ -449,9 +449,9 @@ NONCONCURRENT_TEST(Encrypted_empty_blocks)
         wt.commit();
     }
 
-    // change back to 16k page size and advance the reader
+    // back to the db with 16k page size, advance the reader
     // this requires the new block to be decrypted
-    OnlyForTestingPageSizeChange change_third(16384);
+    REALM_ASSERT_3(page_size(), ==, 16384);
     pin.get_group().verify();
     // advance and make sure the new page is read correctly from disk
     pin = ReadTransaction(db_16);
