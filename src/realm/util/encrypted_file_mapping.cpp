@@ -239,7 +239,7 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mod
     REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
     size_t data_pos_casted = size_t(data_pos);
     size_t idx = data_pos_casted / block_size;
-    if (mode == IVLookupMode::UseCache && idx < m_iv_buffer.size())
+    if (mode == IVLookupMode::UseCache && idx < m_iv_buffer.size() && m_iv_buffer[idx].iv1 != 0)
         return m_iv_buffer[idx];
 
     size_t block_start = std::min(m_iv_buffer.size(), (idx / blocks_per_metadata_block) * blocks_per_metadata_block);
@@ -351,7 +351,6 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
             auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2, from=%3, size=%4)",
                                     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
                                     debug_from, size);
-            // std::cerr << std::endl << "*Timeout: " << str << std::endl;
             throw DecryptionFailed(str);
         }
         else {
@@ -383,6 +382,20 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
         return retry_count <= 5 || (retry_count - num_identical_reads > 1 && retry_count < 20);
     };
 
+    auto data_is_preallocated_space = [&]() -> bool {
+        size_t i;
+        for (i = 0; i < block_size; ++i) {
+            if (m_rw_buffer[i] != 0) {
+                break;
+            }
+        }
+        if (i != block_size) {
+            // at least one byte wasn't zero
+            return false;
+        }
+        return true;
+    };
+
     size_t bytes_read = 0;
     while (bytes_read < size) {
         ssize_t actual = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
@@ -391,15 +404,17 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
             return bytes_read;
 
         iv_table& iv = get_iv_table(fd, pos, retry_count == 0 ? IVLookupMode::UseCache : IVLookupMode::Refetch);
-        if (iv.iv1 == 0) {
-            if (should_retry()) {
-                retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "iv1 == 0");
-                continue;
-            }
+        if (iv.iv1 == 0 && data_is_preallocated_space()) {
             // This block has never been written to, so we've just read pre-allocated
-            // space. No memset() since the code using this doesn't rely on
-            // pre-allocated space being zeroed.
-            return bytes_read;
+            // space. The code using this doesn't rely on pre-allocated
+            // space being zeroed, but we memset anyways to encourage out of bounds
+            // reads to error out rather than reading stale data.
+            memset(dst, '\0', block_size);
+            pos += block_size;
+            dst += block_size;
+            bytes_read += block_size;
+            retry_count = 0;
+            continue;
         }
 
         if (!check_hmac(m_rw_buffer.get(), actual, iv.hmac1)) {
@@ -424,22 +439,21 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
                 // old hmacs that don't go with this data. ftruncate() is
                 // required to fill any added space with zeroes, so assume that's
                 // what happened if the buffer is all zeroes
-                ssize_t i;
-                for (i = 0; i < actual; ++i) {
-                    if (m_rw_buffer[i] != 0) {
-                        break;
-                    }
-                }
-                if (i != actual) {
+                if (!data_is_preallocated_space()) {
                     // at least one byte wasn't zero
                     retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "i != bytes_read");
                     continue;
                 }
-                return bytes_read;
+                memset(dst, '\0', block_size);
+                pos += block_size;
+                dst += block_size;
+                bytes_read += block_size;
+                retry_count = 0;
+                continue;
             }
         }
 
-        // We may expect some adress ranges of the destination buffer of
+        // We may expect some address ranges of the destination buffer of
         // AESCryptor::read() to stay unmodified, i.e. being overwritten with
         // the same bytes as already present, and may have read-access to these
         // from other threads while decryption is taking place.

@@ -5730,51 +5730,6 @@ TEST(Query_ListOfMixed)
     CHECK_EQUAL(tv.size(), 5);
 }
 
-
-static unsigned int hex_char_to_bin(char c)
-{
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'a' && c <= 'f')
-        return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F')
-        return c - 'A' + 10;
-    throw std::invalid_argument("Illegal key (not a hex digit)");
-}
-
-static unsigned int hex_to_bin(char first, char second)
-{
-    return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
-}
-
-
-ONLY(OpenEncrypted)
-{
-    std::string path = "/Users/james.stone/Downloads/sensor_events.realm";
-    const char* hex_key = "792cddc553a0452ee893e7583735d4e9f0942d6c8404398f612fd5e415e115e19443aa3be112e072f5fc22b7e2"
-                          "471a11ad2924c19413d84d19c32179c1063bd2";
-    char crypt_key[64];
-    for (int idx = 0; idx < 64; ++idx) {
-        crypt_key[idx] = hex_to_bin(hex_key[idx * 2], hex_key[idx * 2 + 1]);
-    }
-    std::unique_ptr<Replication> hist_w(make_in_realm_history());
-
-    CHECK_OR_RETURN(File::exists(path));
-    SHARED_GROUP_TEST_PATH(temp_copy);
-    File::copy(path, temp_copy);
-    DBOptions options(crypt_key);
-    DBRef db = DB::create(*hist_w, temp_copy, options);
-
-    TransactionRef rt = db->start_read();
-    TableKeys table_keys = rt->get_table_keys();
-    for (auto key : table_keys) {
-        TableRef table = rt->get_table(key);
-        util::format(std::cout, "table %1 has %2 rows\n", table->get_name(), table->size());
-        table->to_json(std::cout);
-        std::cout << std::endl;
-    }
-}
-
 TEST(Query_Dictionary)
 {
     Group g;
