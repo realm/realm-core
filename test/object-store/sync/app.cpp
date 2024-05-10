@@ -3167,6 +3167,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 
     SECTION("pausing a session does not hold the DB open") {
+        auto logger = util::Logger::get_default_logger();
         SyncTestFile config(app->current_user(), partition, schema);
         DBRef dbref;
         std::shared_ptr<SyncSession> sync_sess_ext_ref;
@@ -3182,19 +3183,24 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             // One ref each for the
             // - RealmCoordinator
             // - SyncSession
+            // - MigrationStore
+            // - PendingResetStore
             // - SessionWrapper
             // - local dbref
-            REQUIRE(dbref.use_count() >= 4);
+            logger->trace("DBRef ACTIVE use count: %1", dbref.use_count());
+            REQUIRE(dbref.use_count() >= 6);
 
             realm->sync_session()->pause();
             state = realm->sync_session()->state();
             REQUIRE(state == SyncSession::State::Paused);
+            logger->trace("DBRef PAUSING called use count: %1", dbref.use_count());
         }
 
         // Closing the realm should leave one ref for the SyncSession and one for the local dbref.
         REQUIRE_THAT(
             [&] {
-                return dbref.use_count() < 4;
+                logger->trace("DBRef PAUSED use count: %1", dbref.use_count());
+                return dbref.use_count() < 6;
             },
             ReturnsTrueWithinTimeLimit{});
 
@@ -3202,6 +3208,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         sync_sess_ext_ref.reset();
         REQUIRE_THAT(
             [&] {
+                logger->trace("DBRef TEARDOWN use count: %1", dbref.use_count());
                 return dbref.use_count() == 1;
             },
             ReturnsTrueWithinTimeLimit{});
