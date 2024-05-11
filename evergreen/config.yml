@@ -1122,7 +1122,6 @@ tasks:
 
 - name: generate-sync-corpus
   tags: [ "for_nightly_tests" ]
-  allowed_requesters: [ "ad_hoc", "patch" ]
   exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
