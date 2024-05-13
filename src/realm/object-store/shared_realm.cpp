@@ -531,8 +531,10 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
                                           required_changes, m_config.automatically_handle_backlinks_in_migrations);
+        // NOLINTBEGIN(bugprone-assert-side-effect)
         REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
+        // NOLINTEND(bugprone-assert-side-effect)
     }
 
     if (initialization_function && old_schema_version == ObjectStore::NotVersioned) {
