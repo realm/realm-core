@@ -136,7 +136,6 @@ void ArrayStringShort::set(size_t ndx, StringData value)
     char* end = begin + (m_width - 1);
     begin = realm::safe_copy_n(value.data(), value.size(), begin);
     std::fill(begin, end, 0); // Pad with zero bytes
-    static_assert(max_width <= max_width, "Padding size must fit in 7-bits");
 
     if (value.is_null()) {
         REALM_ASSERT_3(m_width, <=, 128);
