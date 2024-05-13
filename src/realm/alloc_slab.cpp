@@ -125,8 +125,7 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
 SlabAlloc::Slab::~Slab()
 {
     total_slab_allocated.fetch_sub(size, std::memory_order_relaxed);
-    if (addr)
-        delete[] addr;
+    delete[] addr;
 }
 
 void SlabAlloc::detach(bool keep_file_open) noexcept
