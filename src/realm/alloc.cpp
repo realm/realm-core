@@ -30,6 +30,7 @@ using namespace realm;
 
 namespace {
 
+// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 /// For use with free-standing objects (objects that are not part of a
 /// Realm group)
 ///
@@ -92,6 +93,7 @@ public:
         REALM_ASSERT(false);
     }
 };
+// NOLINTEND(cppcoreguidelines-owning-memory)
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but
 // Valgrind/Helgrind gives a false error report because it doesn't recognize gcc's static variable initialization
