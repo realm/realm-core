@@ -270,7 +270,7 @@ public:
 
     static void set_default_logger(std::shared_ptr<util::Logger>) noexcept;
     static std::shared_ptr<util::Logger>& get_default_logger() noexcept;
-    static const std::string_view level_to_string(Level level) noexcept;
+    static std::string_view level_to_string(Level level) noexcept;
 
 private:
     friend class LogCategory;

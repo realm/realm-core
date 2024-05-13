@@ -613,7 +613,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     return {Iterator(this, ndx), !old_entry};
 }
 
-const Mixed Dictionary::operator[](Mixed key)
+Mixed Dictionary::operator[](Mixed key)
 {
     auto ret = try_get(key);
     if (!ret) {

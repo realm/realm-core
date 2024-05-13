@@ -175,7 +175,7 @@ public:
         void update(ConnectionTerminationReason reason, std::optional<ResumptionDelayInfo> new_delay_info);
         std::chrono::milliseconds delay_interval();
 
-        const std::optional<ConnectionTerminationReason> reason() const noexcept
+        std::optional<ConnectionTerminationReason> reason() const noexcept
         {
             return m_backoff_state.triggering_error;
         }

@@ -44,7 +44,7 @@ struct RegularExpression {
     RegularExpression(RegularExpression&&) = default;
     RegularExpression& operator=(const RegularExpression& regex) = default;
 
-    const std::string pattern() const;
+    std::string pattern() const;
     Option options() const;
 
 private:

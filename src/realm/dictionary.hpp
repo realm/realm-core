@@ -119,7 +119,7 @@ public:
     // Noexcept version
     util::Optional<Mixed> try_get(Mixed key) const;
     // adds entry if key is not found
-    const Mixed operator[](Mixed key);
+    Mixed operator[](Mixed key);
 
     Obj get_object(StringData key);
 

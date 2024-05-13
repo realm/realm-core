@@ -148,7 +148,7 @@ const char* Logger::get_level_prefix(Level level) noexcept
     return "";
 }
 
-const std::string_view Logger::level_to_string(Level level) noexcept
+std::string_view Logger::level_to_string(Level level) noexcept
 {
     switch (level) {
         case Logger::Level::all:
