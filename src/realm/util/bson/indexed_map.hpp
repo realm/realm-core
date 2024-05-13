@@ -181,9 +181,7 @@ typename IndexedMap<T>::iterator IndexedMap<T>::iterator::operator--(int)
 }
 
 template <typename T>
-constexpr IndexedMap<T>::IndexedMap() noexcept
-{
-}
+constexpr IndexedMap<T>::IndexedMap() noexcept = default;
 
 template <typename T>
 IndexedMap<T>::IndexedMap(std::initializer_list<entry> entries)

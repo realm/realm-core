@@ -208,7 +208,6 @@ private:
 class RobustMutex : private Mutex {
 public:
     RobustMutex();
-    ~RobustMutex() noexcept;
 
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
     constexpr static bool is_robust_on_this_platform = true;
@@ -619,8 +618,6 @@ inline RobustMutex::RobustMutex()
     bool robust_if_available = true;
     init_as_process_shared(robust_if_available);
 }
-
-inline RobustMutex::~RobustMutex() noexcept {}
 
 template <class Func>
 inline void RobustMutex::lock(Func recover_func)

@@ -71,7 +71,7 @@ bool StablePath::is_prefix_of(const StablePath& other) const noexcept
 
 /***************************** CollectionParent ******************************/
 
-CollectionParent::~CollectionParent() {}
+CollectionParent::~CollectionParent() = default;
 
 void CollectionParent::check_level() const
 {

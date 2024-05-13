@@ -162,7 +162,7 @@ struct ChangesetIndex::RangeIterator {
     using pointer_type = sync::Instruction*;
     using reference_type = sync::Instruction*;
 
-    RangeIterator() {}
+    RangeIterator() = default;
 
     /// Create an iterator representing the beginning.
     explicit RangeIterator(ChangesetIndex::Ranges* ranges) noexcept

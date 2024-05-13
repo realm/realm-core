@@ -70,7 +70,7 @@ namespace realm::util {
 /// \sa http://tools.ietf.org/html/rfc3986
 class Uri {
 public:
-    Uri();
+    Uri() = default;
 
     /// Decompose the specified URI reference into its five main parts.
     Uri(std::string_view);
@@ -191,8 +191,6 @@ std::string uri_percent_decode(const std::string& escaped);
 
 
 // Implementation
-
-inline Uri::Uri() {}
 
 inline std::string Uri::recompose() const
 {

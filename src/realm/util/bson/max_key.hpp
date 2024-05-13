@@ -23,7 +23,7 @@ namespace realm::bson {
 
 /// MaxKey will always be the greatest value when comparing to other BSON types
 struct MaxKey {
-    constexpr explicit MaxKey() {}
+    constexpr explicit MaxKey() = default;
 };
 static constexpr MaxKey max_key{};
 

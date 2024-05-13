@@ -38,7 +38,7 @@ public:
     using Array::set;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override {}
+    ~ArrayInteger() noexcept override = default;
 
     static value_type default_value(bool)
     {
@@ -77,7 +77,6 @@ public:
     using value_type = util::Optional<int64_t>;
 
     explicit ArrayIntNull(Allocator&) noexcept;
-    ~ArrayIntNull() noexcept override;
 
     static value_type default_value(bool nullable)
     {
@@ -165,8 +164,6 @@ inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
     : Array(allocator)
 {
 }
-
-inline ArrayIntNull::~ArrayIntNull() noexcept {}
 
 inline size_t ArrayIntNull::size() const noexcept
 {

@@ -224,7 +224,7 @@ void notify_fd(int fd)
 } // anonymous namespace
 #endif // REALM_CONDVAR_EMULATION
 
-InterprocessCondVar::InterprocessCondVar() {}
+InterprocessCondVar::InterprocessCondVar() = default;
 
 
 void InterprocessCondVar::close() noexcept

@@ -196,7 +196,7 @@ ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree
 {
 }
 
-ClusterNodeInner::~ClusterNodeInner() {}
+ClusterNodeInner::~ClusterNodeInner() = default;
 
 void ClusterNodeInner::create(int sub_tree_depth)
 {
@@ -764,7 +764,7 @@ ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for
 {
 }
 
-ClusterTree::~ClusterTree() {}
+ClusterTree::~ClusterTree() = default;
 
 std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {

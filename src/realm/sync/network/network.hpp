@@ -629,8 +629,6 @@ public:
     Query(Query&&) noexcept = default;
     Query& operator=(Query&&) noexcept = default;
 
-    ~Query() noexcept;
-
     int flags() const;
     StreamProtocol protocol() const;
     std::string host() const;
@@ -813,8 +811,6 @@ public:
     /// one-argument constructor, and then calling the two-argument assign()
     /// with the specified protocol and native handle.
     Socket(Service&, const StreamProtocol&, native_handle_type);
-
-    ~Socket() noexcept;
 
     void connect(const Endpoint&);
     std::error_code connect(const Endpoint&, std::error_code&);
@@ -1198,7 +1194,6 @@ private:
 class Acceptor : public SocketBase {
 public:
     Acceptor(Service&);
-    ~Acceptor() noexcept;
 
     static constexpr int max_connections = SOMAXCONN;
 
@@ -1852,7 +1847,7 @@ public:
 
 protected:
     AsyncOper(std::size_t size, bool in_use) noexcept;
-    virtual ~AsyncOper() noexcept {}
+    virtual ~AsyncOper() noexcept = default;
     void set_is_complete(bool value) noexcept;
     template <class H, class... Args>
     void do_recycle_and_execute(bool orphaned, H& handler, Args&&...);
@@ -2875,8 +2870,6 @@ inline Resolver::Query::Query(const StreamProtocol& prot, std::string host_name,
 {
 }
 
-inline Resolver::Query::~Query() noexcept {}
-
 inline int Resolver::Query::flags() const
 {
     return m_flags;
@@ -3109,8 +3102,6 @@ inline Socket::Socket(Service& service, const StreamProtocol& prot, native_handl
 {
     assign(prot, native_socket); // Throws
 }
-
-inline Socket::~Socket() noexcept {}
 
 inline void Socket::connect(const Endpoint& ep)
 {
@@ -3412,8 +3403,6 @@ inline Acceptor::Acceptor(Service& service)
     : SocketBase{service}
 {
 }
-
-inline Acceptor::~Acceptor() noexcept {}
 
 inline void Acceptor::listen(int backlog)
 {

@@ -22,7 +22,7 @@ StringData trim_whitespace(StringData str)
 
 
 struct HTTPParserErrorCategory : std::error_category {
-    HTTPParserErrorCategory() {}
+    HTTPParserErrorCategory() = default;
 
     const char* name() const noexcept override
     {

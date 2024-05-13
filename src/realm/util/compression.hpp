@@ -73,7 +73,7 @@ public:
     // Returns null on "out of memory"
     virtual void* alloc(size_t size) noexcept = 0;
     virtual void free(void* addr) noexcept = 0;
-    virtual ~Alloc() {}
+    virtual ~Alloc() = default;
 };
 
 class CompressMemoryArena : public Alloc {

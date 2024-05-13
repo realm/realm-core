@@ -21,7 +21,7 @@
 
 namespace realm {
 
-Tokenizer::~Tokenizer() {}
+Tokenizer::~Tokenizer() = default;
 
 Tokenizer& Tokenizer::reset(const std::string_view text)
 {

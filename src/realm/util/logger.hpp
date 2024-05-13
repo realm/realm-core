@@ -266,7 +266,7 @@ public:
         return static_cast<int>(level) >= static_cast<int>(get_level_threshold(cat.get_index()));
     }
 
-    virtual inline ~Logger() noexcept = default;
+    virtual ~Logger() noexcept = default;
 
     static void set_default_logger(std::shared_ptr<util::Logger>) noexcept;
     static std::shared_ptr<util::Logger>& get_default_logger() noexcept;

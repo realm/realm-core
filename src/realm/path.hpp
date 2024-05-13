@@ -211,20 +211,12 @@ public:
         , m_index(index)
     {
     }
-    ExtendedColumnKey(const ExtendedColumnKey& other)
-        : m_colkey(other.m_colkey)
-        , m_index(other.m_index)
-    {
-    }
+    ExtendedColumnKey(const ExtendedColumnKey& other) = default;
+    ExtendedColumnKey& operator=(const ExtendedColumnKey& rhs) = default;
+
     operator ColKey() const
     {
         return m_colkey;
-    }
-    ExtendedColumnKey& operator=(const ExtendedColumnKey& rhs)
-    {
-        m_colkey = rhs.m_colkey;
-        m_index = rhs.m_index;
-        return *this;
     }
 
     void set_index(const PathElement& index)

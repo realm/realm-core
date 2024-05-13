@@ -44,7 +44,7 @@ public:
         : m_limit(limit)
     {
     }
-    virtual ~QueryStateBase() {}
+    virtual ~QueryStateBase() = default;
 
     // Called when we have a match.
     // The return value indicates if the query should continue.

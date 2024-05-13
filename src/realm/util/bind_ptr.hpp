@@ -303,7 +303,7 @@ bool operator>=(T*, const bind_ptr<U>&) noexcept;
 /// \sa bind_ptr
 class RefCountBase {
 public:
-    RefCountBase() noexcept {}
+    RefCountBase() noexcept = default;
     virtual ~RefCountBase() noexcept
     {
         REALM_ASSERT(m_ref_count == 0);
@@ -341,7 +341,7 @@ private:
 /// \sa bind_ptr
 class AtomicRefCountBase {
 public:
-    AtomicRefCountBase() noexcept {}
+    AtomicRefCountBase() noexcept = default;
     virtual ~AtomicRefCountBase() noexcept
     {
         REALM_ASSERT(m_ref_count == 0);

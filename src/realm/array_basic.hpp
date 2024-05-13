@@ -33,7 +33,7 @@ public:
     using value_type = T;
 
     explicit BasicArray(Allocator&) noexcept;
-    ~BasicArray() noexcept override {}
+    ~BasicArray() noexcept override = default;
 
     static T default_value(bool)
     {

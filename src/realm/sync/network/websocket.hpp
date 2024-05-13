@@ -16,7 +16,7 @@ using ReadCompletionHandler = util::UniqueFunction<void(std::error_code, size_t 
 
 class Config {
 public:
-    virtual ~Config() {}
+    virtual ~Config() = default;
 
     /// The Socket uses the caller supplied logger for logging.
     virtual const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept = 0;

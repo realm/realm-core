@@ -78,7 +78,7 @@ public:
     public:
         Sorter(std::vector<std::vector<ExtendedColumnKey>> const& columns, std::vector<bool> const& ascending,
                Table const& root_table, const IndexPairs& indexes);
-        Sorter() {}
+        Sorter() = default;
 
         bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
 

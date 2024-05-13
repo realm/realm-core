@@ -1126,7 +1126,7 @@ public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
-    virtual ~TableWriter() noexcept {}
+    virtual ~TableWriter() noexcept = default;
 
     void set_group(const Group* g)
     {

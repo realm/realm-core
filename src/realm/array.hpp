@@ -95,7 +95,7 @@ public:
     {
     }
 
-    ~Array() noexcept override {}
+    ~Array() noexcept override = default;
 
     /// Create a new integer array of the specified type and size, and filled
     /// with the specified value, and attach this accessor to it. This does not

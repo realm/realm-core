@@ -173,7 +173,7 @@ private:
 
 /****************************** BPlusTreeNode ********************************/
 
-BPlusTreeNode::~BPlusTreeNode() {}
+BPlusTreeNode::~BPlusTreeNode() = default;
 
 /****************************** BPlusTreeLeaf ********************************/
 
@@ -272,7 +272,7 @@ void BPlusTreeInner::create(size_t elems_per_child)
     Array::create(Array::type_InnerBptreeNode, false, 1, tagged);
 }
 
-BPlusTreeInner::~BPlusTreeInner() {}
+BPlusTreeInner::~BPlusTreeInner() = default;
 
 void BPlusTreeInner::init_from_mem(MemRef mem)
 {
@@ -732,7 +732,7 @@ void BPlusTreeInner::verify() const
 
 /****************************** BPlusTreeBase ********************************/
 
-BPlusTreeBase::~BPlusTreeBase() {}
+BPlusTreeBase::~BPlusTreeBase() = default;
 
 void BPlusTreeBase::create()
 {

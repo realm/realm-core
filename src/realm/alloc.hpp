@@ -343,7 +343,7 @@ public:
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
-    ~WrappedAllocator() {}
+    ~WrappedAllocator() = default;
 
     void switch_underlying_allocator(Allocator& underlying_allocator)
     {

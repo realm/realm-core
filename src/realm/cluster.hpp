@@ -51,7 +51,7 @@ struct FieldValue {
 
 class FieldValues {
 public:
-    FieldValues() {}
+    FieldValues() = default;
     FieldValues(std::initializer_list<FieldValue>);
     void insert(ColKey k, Mixed val, bool is_default = false);
     auto begin() const noexcept
@@ -113,7 +113,7 @@ public:
     {
         m_keys.set_parent(this, 0);
     }
-    virtual ~ClusterNode() {}
+    virtual ~ClusterNode() = default;
     void init_from_parent()
     {
         ref_type ref = get_ref_from_parent();

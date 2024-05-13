@@ -23,7 +23,7 @@
 #include <realm/group.hpp>
 using namespace realm;
 
-Spec::~Spec() noexcept {}
+Spec::~Spec() noexcept = default;
 
 void Spec::detach() noexcept
 {

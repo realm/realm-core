@@ -109,7 +109,7 @@ public:
     /// \param encoded_changeset The new reciprocally transformed changeset.
     virtual void set_reciprocal_transform(version_type version, BinaryData encoded_changeset) = 0;
 
-    virtual ~TransformHistory() noexcept {}
+    virtual ~TransformHistory() noexcept = default;
 };
 
 
@@ -231,7 +231,7 @@ public:
     /// changeset.
     std::size_t original_changeset_size = 0;
 
-    RemoteChangeset() {}
+    RemoteChangeset() = default;
     RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d, timestamp_type ot, file_ident_type fi);
 };
 

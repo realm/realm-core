@@ -24,7 +24,7 @@ AccessControl::AccessControl(util::Optional<PKey> public_key)
 {
 }
 
-AccessControl::~AccessControl() {}
+AccessControl::~AccessControl() = default;
 
 util::Optional<AccessToken> AccessControl::verify_access_token(StringData signed_token,
                                                                AccessToken::ParseError* out_error) const

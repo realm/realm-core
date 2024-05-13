@@ -136,7 +136,7 @@ public:
 
     struct HistoryEntryHandler {
         virtual void handle(version_type server_version, const HistoryEntry&, std::size_t original_size) = 0;
-        virtual ~HistoryEntryHandler() {}
+        virtual ~HistoryEntryHandler() = default;
     };
 
     // See table at top of `server_history.cpp`.

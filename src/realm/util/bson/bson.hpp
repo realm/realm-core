@@ -277,25 +277,18 @@ public:
     using IndexedMap<Bson>::begin;
     using IndexedMap<Bson>::end;
 
-    BsonDocument() {}
+    BsonDocument() = default;
     BsonDocument(BsonDocument&& other)
         : IndexedMap<Bson>(std::move(other))
     {
     }
-    BsonDocument(const BsonDocument& other)
-        : IndexedMap<Bson>(other)
-    {
-    }
+    BsonDocument(const BsonDocument& other) = default;
     BsonDocument(std::initializer_list<entry> entries)
         : IndexedMap<Bson>(entries)
     {
     }
 
-    BsonDocument& operator=(const BsonDocument& rhs)
-    {
-        this->IndexedMap<Bson>::operator=(rhs);
-        return *this;
-    }
+    BsonDocument& operator=(const BsonDocument& rhs) = default;
 
     uint32_t size() const
     {

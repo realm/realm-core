@@ -53,8 +53,8 @@ public:
     /*
      * Copying a Status is just copying an intrusive pointer - i.e. very cheap. Moving them is similarly cheap.
      */
-    inline Status(const Status& other);
-    inline Status& operator=(const Status& other);
+    Status(const Status& other) noexcept = default;
+    Status& operator=(const Status& other) noexcept = default;
 
     inline Status(Status&& other) noexcept;
     inline Status& operator=(Status&& other) noexcept;
@@ -130,17 +130,6 @@ inline Status Status::OK()
 {
     // Returns a status with m_error set to nullptr.
     return Status{};
-}
-
-inline Status::Status(const Status& other)
-    : m_error(other.m_error)
-{
-}
-
-inline Status& Status::operator=(const Status& other)
-{
-    m_error = other.m_error;
-    return *this;
 }
 
 inline Status::Status(Status&& other) noexcept

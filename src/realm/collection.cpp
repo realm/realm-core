@@ -134,7 +134,7 @@ size_t get_collection_size_from_ref(ref_type ref, Allocator& alloc)
 
 } // namespace _impl
 
-Collection::~Collection() {}
+Collection::~Collection() = default;
 
 void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
 {

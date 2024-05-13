@@ -167,4 +167,4 @@ void Node::do_copy_on_write(size_t minimum_size)
     m_alloc.free_(old_ref, old_begin);
 }
 
-ArrayPayload::~ArrayPayload() {}
+ArrayPayload::~ArrayPayload() = default;

@@ -243,7 +243,7 @@ inline void checked_close(native_handle_type fd) noexcept
 
 class CloseGuard {
 public:
-    CloseGuard() noexcept {}
+    CloseGuard() noexcept = default;
     explicit CloseGuard(native_handle_type fd) noexcept
         : m_fd{fd}
     {
@@ -428,7 +428,6 @@ struct GetaddrinfoResultOwner {
 class Service::IoReactor {
 public:
     IoReactor();
-    ~IoReactor() noexcept;
 
     // Add an initiated I/O operation that did not complete immediately.
     void add_oper(Descriptor&, LendersIoOperPtr, Want);
@@ -724,9 +723,6 @@ inline Service::IoReactor::IoReactor()
         throw std::system_error(ec);
     }
 }
-
-
-inline Service::IoReactor::~IoReactor() noexcept {}
 
 
 inline void Service::IoReactor::register_desc(Descriptor& desc)
@@ -1762,7 +1758,7 @@ Service::Service()
 }
 
 
-Service::~Service() noexcept {}
+Service::~Service() noexcept = default;
 
 
 void Service::run()

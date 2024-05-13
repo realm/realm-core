@@ -38,7 +38,7 @@ class History {
 public:
     using version_type = VersionID::version_type;
 
-    virtual ~History() noexcept {}
+    virtual ~History() noexcept = default;
 
     /// May be called during any transaction
     ///

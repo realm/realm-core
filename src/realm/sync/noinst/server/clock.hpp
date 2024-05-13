@@ -11,7 +11,7 @@ public:
     using time_point = clock::time_point;
     using duration = clock::duration;
 
-    virtual ~Clock() {}
+    virtual ~Clock() = default;
 
     /// Implementation must be thread-safe.
     virtual time_point now() const noexcept = 0;

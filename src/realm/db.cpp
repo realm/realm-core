@@ -443,7 +443,7 @@ struct alignas(8) DB::SharedInfo {
     VersionList readers;
 
     SharedInfo(Durability, Replication::HistoryType, int history_schema_version);
-    ~SharedInfo() noexcept {}
+    ~SharedInfo() noexcept = default;
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
@@ -523,7 +523,7 @@ public:
         : m_mutex(mutex)
     {
     }
-    virtual ~VersionManager() {}
+    virtual ~VersionManager() = default;
 
     void cleanup_versions(uint64_t& oldest_live_version, TopRefMap& top_refs, bool& any_new_unreachables)
         REQUIRES(!m_info_mutex)

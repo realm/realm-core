@@ -47,7 +47,7 @@ const size_t not_found = npos;
 /// modified.
 class ArrayParent {
 public:
-    virtual ~ArrayParent() noexcept {}
+    virtual ~ArrayParent() noexcept = default;
 
     virtual ref_type get_child_ref(size_t child_ndx) const noexcept = 0;
     virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
@@ -114,7 +114,7 @@ public:
     {
     }
 
-    virtual ~Node() {}
+    virtual ~Node() = default;
 
     /**************************** Initializers *******************************/
 

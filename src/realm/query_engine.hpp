@@ -303,10 +303,7 @@ protected:
         m_condition_column_key = column_key;
     }
 
-    ColumnNodeBase(const ColumnNodeBase& from)
-        : ParentNode(from)
-    {
-    }
+    ColumnNodeBase(const ColumnNodeBase& from) = default;
 };
 
 class IndexEvaluator {
@@ -1471,11 +1468,7 @@ public:
         : MixedNodeBase(v, column)
     {
     }
-    MixedNode(const MixedNode<Equal>& other)
-        : MixedNodeBase(other)
-        , m_index_evaluator(other.m_index_evaluator)
-    {
-    }
+    MixedNode(const MixedNode<Equal>&) = default;
     void init(bool will_query_ranges) override;
 
     void cluster_changed() override
@@ -1769,17 +1762,12 @@ public:
         return Contains::description();
     }
 
-
     std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new StringNode<Contains>(*this));
     }
 
-    StringNode(const StringNode& from)
-        : StringNodeBase(from)
-        , m_charmap(from.m_charmap)
-    {
-    }
+    StringNode(const StringNode& from) = default;
 
 protected:
     std::array<uint8_t, 256> m_charmap;
@@ -1855,13 +1843,7 @@ public:
         return std::unique_ptr<ParentNode>(new StringNode<ContainsIns>(*this));
     }
 
-    StringNode(const StringNode& from)
-        : StringNodeBase(from)
-        , m_charmap(from.m_charmap)
-        , m_ucase(from.m_ucase)
-        , m_lcase(from.m_lcase)
-    {
-    }
+    StringNode(const StringNode& from) = default;
 
 protected:
     std::array<uint8_t, 256> m_charmap;
@@ -1875,11 +1857,7 @@ public:
         : StringNodeBase(v, column)
     {
     }
-    StringNodeEqualBase(const StringNodeEqualBase& from)
-        : StringNodeBase(from)
-        , m_index_evaluator(from.m_index_evaluator)
-    {
-    }
+    StringNodeEqualBase(const StringNodeEqualBase& from) = default;
 
     void init(bool) override;
 

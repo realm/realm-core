@@ -85,7 +85,7 @@ public:
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-    CircularBuffer() noexcept;
+    CircularBuffer() noexcept = default;
     CircularBuffer(const CircularBuffer&);
     CircularBuffer(CircularBuffer&&) noexcept;
     CircularBuffer(std::initializer_list<T>);
@@ -247,7 +247,7 @@ public:
     using pointer = U*;
     using reference = U&;
 
-    Iter() noexcept {}
+    Iter() noexcept = default;
 
     template <class V>
     Iter(const Iter<V>& i) noexcept
@@ -422,11 +422,6 @@ private:
     template <class>
     friend class Iter;
 };
-
-template <class T>
-inline CircularBuffer<T>::CircularBuffer() noexcept
-{
-}
 
 template <class T>
 inline CircularBuffer<T>::CircularBuffer(const CircularBuffer& buffer)

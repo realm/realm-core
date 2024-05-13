@@ -269,7 +269,7 @@ App::App(Private, const AppConfig& config)
     }
 }
 
-App::~App() {}
+App::~App() = default;
 
 bool App::init_logger()
 {

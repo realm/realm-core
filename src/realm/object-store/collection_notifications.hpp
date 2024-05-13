@@ -161,7 +161,7 @@ public:
 
 private:
     struct Base {
-        virtual ~Base() {}
+        virtual ~Base() = default;
         virtual void before(CollectionChangeSet const&) = 0;
         virtual void after(CollectionChangeSet const&) = 0;
     };

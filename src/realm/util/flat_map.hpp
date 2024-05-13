@@ -34,7 +34,7 @@ struct FlatMap {
     using key_type = K;
     using mapped_type = V;
     using container_type = Container;
-    FlatMap() {}
+    FlatMap() = default;
     FlatMap(const FlatMap&) = default;
     FlatMap(FlatMap&&) = default;
     FlatMap(Container&& values)

@@ -23,7 +23,7 @@ namespace realm::bson {
 
 /// MinKey will always be the smallest value when comparing to other BSON types
 struct MinKey {
-    constexpr explicit MinKey() {}
+    constexpr explicit MinKey() = default;
 };
 static constexpr MinKey min_key{};
 

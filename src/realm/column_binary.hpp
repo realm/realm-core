@@ -34,7 +34,7 @@ public:
 
 class BinaryIterator {
 public:
-    BinaryIterator() {}
+    BinaryIterator() = default;
 
     BinaryIterator(BinaryData binary)
         : m_binary(binary)

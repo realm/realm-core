@@ -20,6 +20,6 @@
 
 namespace realm {
 
-ObjList::~ObjList() {}
+ObjList::~ObjList() = default;
 
 } // namespace realm

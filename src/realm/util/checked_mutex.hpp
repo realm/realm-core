@@ -74,7 +74,7 @@ public:
         : m_impl(m.lock())
     {
     }
-    ~CheckedUniqueLock() RELEASE() {}
+    ~CheckedUniqueLock() RELEASE() = default;
 
     CheckedUniqueLock(CheckedUniqueLock&&) = default;
     CheckedUniqueLock& operator=(CheckedUniqueLock&&) = default;
@@ -119,7 +119,7 @@ public:
         : m_impl(m.lock())
     {
     }
-    ~CheckedLockGuard() RELEASE() {}
+    ~CheckedLockGuard() RELEASE() = default;
 
     CheckedLockGuard(CheckedLockGuard&&) = delete;
     CheckedLockGuard& operator=(CheckedLockGuard&&) = delete;

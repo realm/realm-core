@@ -741,7 +741,7 @@ public:
 
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
-    Map() noexcept;
+    Map() noexcept = default;
 
     // Disable copying. Copying an opened Map will create a scenario
     // where the same memory will be mapped once but unmapped twice.
@@ -1127,11 +1127,6 @@ inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size
                          util::WriteObserver* observer)
 {
     map(f, a, size, map_flags, offset, observer);
-}
-
-template <class T>
-inline File::Map<T>::Map() noexcept
-{
 }
 
 template <class T>

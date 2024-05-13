@@ -215,7 +215,7 @@ struct HTTPParserBase {
         // data from other sessions in case of a buffer overflow exploit.
         m_read_buffer.reset(static_cast<char*>(std::calloc(read_buffer_size, 1)));
     }
-    virtual ~HTTPParserBase() {}
+    virtual ~HTTPParserBase() = default;
 
     std::string m_write_buffer;
     std::unique_ptr<char[], CallocDeleter> m_read_buffer;

@@ -84,7 +84,7 @@ enum Instruction {
 
 class TransactLogStream {
 public:
-    virtual ~TransactLogStream() {}
+    virtual ~TransactLogStream() = default;
 
     /// Ensure contiguous free space in the transaction log
     /// buffer. This method must update `out_free_begin`

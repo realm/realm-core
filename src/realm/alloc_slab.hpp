@@ -452,16 +452,11 @@ private:
     };
 
     struct MemBuffer {
-        char* addr;
-        size_t size;
-        ref_type start_ref;
+        char* addr = nullptr;
+        size_t size = 0;
+        ref_type start_ref = 0;
 
-        MemBuffer()
-            : addr(nullptr)
-            , size(0)
-            , start_ref(0)
-        {
-        }
+        MemBuffer() = default;
         MemBuffer(size_t s, ref_type ref)
             : addr(new char[s])
             , size(s)

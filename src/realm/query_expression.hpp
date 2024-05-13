@@ -1727,12 +1727,7 @@ public:
         , m_comparison_type(type)
     {
     }
-    ObjPropertyBase(const ObjPropertyBase& other)
-        : m_link_map(other.m_link_map)
-        , m_column_key(other.m_column_key)
-        , m_comparison_type(other.m_comparison_type)
-    {
-    }
+    ObjPropertyBase(const ObjPropertyBase& other) = default;
     ObjPropertyBase(ColKey column, const LinkMap& link_map, util::Optional<ExpressionComparisonType> type)
         : m_link_map(link_map)
         , m_column_key(column)
@@ -2151,15 +2146,8 @@ public:
     {
     }
 
-    Columns(Columns const& other)
-        : SimpleQuerySupport(other)
-    {
-    }
-
-    Columns(Columns&& other) noexcept
-        : SimpleQuerySupport(other)
-    {
-    }
+    Columns(Columns const&) = default;
+    Columns(Columns&& other) noexcept = default;
 
     Query fulltext(StringData sd) const;
 
@@ -2324,12 +2312,7 @@ public:
             m_column_key = m_link_map.pop_last();
         }
     }
-    LinkCount(LinkCount const& other)
-        : Subexpr2<Int>(other)
-        , m_link_map(other.m_link_map)
-        , m_column_key(other.m_column_key)
-    {
-    }
+    LinkCount(LinkCount const&) = default;
 
     std::unique_ptr<Subexpr> clone() const override
     {
@@ -2776,13 +2759,7 @@ class SubColumns;
 template <>
 class Columns<Link> : public Subexpr2<Link> {
 public:
-    Columns(const Columns& other)
-        : Subexpr2<Link>(other)
-        , m_link_map(other.m_link_map)
-        , m_comparison_type(other.m_comparison_type)
-        , m_is_list(other.m_is_list)
-    {
-    }
+    Columns(const Columns&) = default;
 
     Columns(ColKey column_key, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
@@ -3430,12 +3407,7 @@ public:
         return false;
     }
 
-    Columns(Columns const& other)
-        : ColumnsCollection<Mixed>(other)
-        , m_key_type(other.m_key_type)
-        , m_ctrl(other.m_ctrl)
-    {
-    }
+    Columns(Columns const&) = default;
 
 protected:
     DataType m_key_type = type_String;

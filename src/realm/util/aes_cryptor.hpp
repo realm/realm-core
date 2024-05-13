@@ -33,14 +33,14 @@ namespace realm::util {
 class WriteObserver {
 public:
     virtual bool no_concurrent_writer_seen() = 0;
-    virtual ~WriteObserver() {}
+    virtual ~WriteObserver() = default;
 };
 
 class WriteMarker {
 public:
     virtual void mark(uint64_t page_offset) = 0;
     virtual void unmark() = 0;
-    virtual ~WriteMarker() {}
+    virtual ~WriteMarker() = default;
 };
 } // namespace realm::util
 

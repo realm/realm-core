@@ -229,7 +229,7 @@ public:
     {
     }
 
-    ~ReadTransaction() noexcept {}
+    ~ReadTransaction() noexcept = default;
 
     operator Transaction&()
     {
@@ -274,7 +274,7 @@ public:
     {
     }
 
-    ~WriteTransaction() noexcept {}
+    ~WriteTransaction() noexcept = default;
 
     operator Transaction&()
     {

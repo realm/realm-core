@@ -182,7 +182,7 @@ private:
 class TableView : public ObjList {
 public:
     /// Construct null view (no memory allocated).
-    TableView() {}
+    TableView() = default;
 
     /// Construct empty view, ready for addition of row indices.
     explicit TableView(ConstTableRef parent);
@@ -201,7 +201,7 @@ public:
 
     TableView(TableView& source, Transaction* tr, PayloadPolicy mode);
 
-    ~TableView() {}
+    ~TableView() = default;
 
     TableRef get_parent() const noexcept
     {

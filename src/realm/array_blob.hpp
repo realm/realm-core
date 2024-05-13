@@ -31,7 +31,7 @@ public:
     static constexpr size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     explicit ArrayBlob(Allocator&) noexcept;
-    ~ArrayBlob() noexcept override {}
+    ~ArrayBlob() noexcept override = default;
 
     // Disable copying, this is not allowed.
     ArrayBlob& operator=(const ArrayBlob&) = delete;

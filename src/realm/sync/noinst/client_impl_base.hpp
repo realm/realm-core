@@ -267,7 +267,6 @@ private:
     // hammering protection).
     struct ServerSlot {
         explicit ServerSlot(ReconnectInfo reconnect_info);
-        ~ServerSlot();
 
         ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
         std::unique_ptr<ClientImpl::Connection> connection;
@@ -1251,8 +1250,6 @@ inline ClientImpl::ServerSlot::ServerSlot(ReconnectInfo reconnect_info)
     : reconnect_info(reconnect_info)
 {
 }
-
-inline ClientImpl::ServerSlot::~ServerSlot() = default;
 
 inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
 {

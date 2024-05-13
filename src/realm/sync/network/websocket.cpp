@@ -1258,7 +1258,7 @@ websocket::Socket::Socket(Socket&& socket) noexcept
 {
 }
 
-websocket::Socket::~Socket() noexcept {}
+websocket::Socket::~Socket() noexcept = default;
 
 void websocket::Socket::initiate_client_handshake(const std::string& request_uri, const std::string& host,
                                                   const std::string& sec_websocket_protocol, HTTPHeaders headers)

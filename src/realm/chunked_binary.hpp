@@ -34,7 +34,7 @@ namespace realm {
 /// extracting large binaries from binary columns and tables.
 class ChunkedBinaryData {
 public:
-    ChunkedBinaryData() {}
+    ChunkedBinaryData() = default;
 
     ChunkedBinaryData(const BinaryData& bd)
         : m_begin{bd}

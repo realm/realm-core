@@ -105,7 +105,7 @@ inline std::string to_string(TableKey tk)
 
 class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
 public:
-    TableVersions() {}
+    TableVersions() = default;
     TableVersions(TableKey key, uint64_t version)
     {
         emplace_back(key, version);
@@ -271,7 +271,7 @@ public:
             emplace_back(i);
         }
     }
-    ObjKeys() {}
+    ObjKeys() = default;
 };
 
 struct ObjLink {

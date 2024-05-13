@@ -532,7 +532,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
     m_keys.truncate(ndx);
 }
 
-Cluster::~Cluster() {}
+Cluster::~Cluster() = default;
 
 ColKey Cluster::get_col_key(size_t ndx_in_parent) const
 {
