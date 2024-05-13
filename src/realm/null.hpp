@@ -76,9 +76,9 @@ struct null {
     template <class T>
     static T get_null_float()
     {
-        typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
+        std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t> i;
         int64_t double_nan = 0x7ff80000000000aa;
-        i = std::is_same<T, float>::value ? 0x7fc000aa : static_cast<decltype(i)>(double_nan);
+        i = std::is_same_v<T, float> ? 0x7fc000aa : static_cast<decltype(i)>(double_nan);
         T d = type_punning<T, decltype(i)>(i);
         REALM_ASSERT_DEBUG(std::isnan(d));
         REALM_ASSERT_DEBUG(!is_signaling(d));
@@ -90,8 +90,8 @@ struct null {
     static bool is_signaling(T v)
     {
         REALM_ASSERT(std::isnan(static_cast<double>(v)));
-        typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
-        size_t signal_bit = std::is_same<T, float>::value ? 22 : 51; // If this bit is set, it's quiet
+        std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t> i;
+        size_t signal_bit = std::is_same_v<T, float> ? 22 : 51; // If this bit is set, it's quiet
         i = type_punning<decltype(i), T>(v);
         return !(i & (1ull << signal_bit));
     }
@@ -102,8 +102,8 @@ struct null {
     static T to_realm(T v)
     {
         if (std::isnan(static_cast<double>(v))) {
-            typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
-            if (std::is_same<T, float>::value) {
+            std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t> i;
+            if (std::is_same_v<T, float>) {
                 i = is_signaling(v) ? 0x7fa00000 : 0x7fc00000;
             }
             else {

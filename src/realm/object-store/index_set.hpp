@@ -38,7 +38,7 @@ template <typename OuterIterator>
 class ChunkedRangeVectorIterator {
 public:
     using iterator_category = std::bidirectional_iterator_tag;
-    using value_type = typename std::remove_reference<decltype(*OuterIterator()->data.begin())>::type;
+    using value_type = std::remove_reference_t<decltype(*OuterIterator()->data.begin())>;
     using difference_type = ptrdiff_t;
     using pointer = const value_type*;
     using reference = const value_type&;

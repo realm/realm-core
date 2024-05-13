@@ -71,10 +71,10 @@ private:
 
     template <class I>
     using RequireIter = std::enable_if_t<
-        std::is_convertible<typename std::iterator_traits<I>::iterator_category, std::input_iterator_tag>::value>;
+        std::is_convertible_v<typename std::iterator_traits<I>::iterator_category, std::input_iterator_tag>>;
 
 public:
-    static_assert(std::is_nothrow_destructible<T>::value, "");
+    static_assert(std::is_nothrow_destructible_v<T>, "");
 
     using value_type = T;
     using size_type = std::size_t;

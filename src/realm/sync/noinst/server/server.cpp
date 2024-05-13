@@ -166,8 +166,8 @@ private:
 };
 
 
-using SteadyClock = std::conditional<std::chrono::high_resolution_clock::is_steady,
-                                     std::chrono::high_resolution_clock, std::chrono::steady_clock>::type;
+using SteadyClock = std::conditional_t<std::chrono::high_resolution_clock::is_steady,
+                                       std::chrono::high_resolution_clock, std::chrono::steady_clock>;
 using SteadyTimePoint = SteadyClock::time_point;
 
 SteadyTimePoint steady_clock_now() noexcept

@@ -413,7 +413,7 @@ inline int_fast64_t from_ref(ref_type v) noexcept
     // Check that v is divisible by 8 (64-bit aligned).
     REALM_ASSERT_DEBUG(v % 8 == 0);
 
-    static_assert(std::is_same<ref_type, size_t>::value,
+    static_assert(std::is_same_v<ref_type, size_t>,
                   "If ref_type changes, from_ref and to_ref should probably be updated");
 
     // Make sure that we preserve the bit pattern of the ref_type (without sign extension).
@@ -430,7 +430,7 @@ inline ref_type to_ref(int_fast64_t v) noexcept
     // integer (modulo 2n where n is the number of bits used to represent the unsigned type). [ Note: In a two's
     // complement representation, this conversion is conceptual and there is no change in the bit pattern (if there is
     // no truncation). - end note ]
-    static_assert(std::is_unsigned<ref_type>::value,
+    static_assert(std::is_unsigned_v<ref_type>,
                   "If ref_type changes, from_ref and to_ref should probably be updated");
     return ref_type(v);
 }

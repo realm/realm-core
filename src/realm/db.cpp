@@ -478,40 +478,38 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
     static_assert(offsetof(SharedInfo, init_complete) == 0 && ATOMIC_BOOL_LOCK_FREE == 2 &&
-                      std::is_same<decltype(init_complete), std::atomic<uint8_t>>::value &&
+                      std::is_same_v<decltype(init_complete), std::atomic<uint8_t>> &&
                       offsetof(SharedInfo, shared_info_version) == 6 &&
-                      std::is_same<decltype(shared_info_version), uint16_t>::value,
+                      std::is_same_v<decltype(shared_info_version), uint16_t>,
                   "Forbidden change in SharedInfo layout");
 
     // Try to catch some of the memory layout changes that requires bumping of
     // the SharedInfo file format version (shared_info_version).
     static_assert(
-        offsetof(SharedInfo, size_of_mutex) == 1 && std::is_same<decltype(size_of_mutex), uint8_t>::value &&
-            offsetof(SharedInfo, size_of_condvar) == 2 && std::is_same<decltype(size_of_condvar), uint8_t>::value &&
+        offsetof(SharedInfo, size_of_mutex) == 1 && std::is_same_v<decltype(size_of_mutex), uint8_t> &&
+            offsetof(SharedInfo, size_of_condvar) == 2 && std::is_same_v<decltype(size_of_condvar), uint8_t> &&
             offsetof(SharedInfo, commit_in_critical_phase) == 3 &&
-            std::is_same<decltype(commit_in_critical_phase), std::atomic<uint8_t>>::value &&
+            std::is_same_v<decltype(commit_in_critical_phase), std::atomic<uint8_t>> &&
             offsetof(SharedInfo, file_format_version) == 4 &&
-            std::is_same<decltype(file_format_version), uint8_t>::value && offsetof(SharedInfo, history_type) == 5 &&
-            std::is_same<decltype(history_type), int8_t>::value && offsetof(SharedInfo, durability) == 8 &&
-            std::is_same<decltype(durability), uint16_t>::value && offsetof(SharedInfo, free_write_slots) == 10 &&
-            std::is_same<decltype(free_write_slots), uint16_t>::value &&
-            offsetof(SharedInfo, num_participants) == 12 &&
-            std::is_same<decltype(num_participants), uint32_t>::value &&
+            std::is_same_v<decltype(file_format_version), uint8_t> && offsetof(SharedInfo, history_type) == 5 &&
+            std::is_same_v<decltype(history_type), int8_t> && offsetof(SharedInfo, durability) == 8 &&
+            std::is_same_v<decltype(durability), uint16_t> && offsetof(SharedInfo, free_write_slots) == 10 &&
+            std::is_same_v<decltype(free_write_slots), uint16_t> && offsetof(SharedInfo, num_participants) == 12 &&
+            std::is_same_v<decltype(num_participants), uint32_t> &&
             offsetof(SharedInfo, latest_version_number) == 16 &&
-            std::is_same<decltype(latest_version_number), uint64_t>::value &&
+            std::is_same_v<decltype(latest_version_number), uint64_t> &&
             offsetof(SharedInfo, session_initiator_pid) == 24 &&
-            std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
+            std::is_same_v<decltype(session_initiator_pid), uint64_t> &&
             offsetof(SharedInfo, number_of_versions) == 32 &&
-            std::is_same<decltype(number_of_versions), std::atomic<uint64_t>>::value &&
-            offsetof(SharedInfo, sync_agent_present) == 40 &&
-            std::is_same<decltype(sync_agent_present), uint8_t>::value &&
-            offsetof(SharedInfo, daemon_started) == 41 && std::is_same<decltype(daemon_started), uint8_t>::value &&
-            offsetof(SharedInfo, daemon_ready) == 42 && std::is_same<decltype(daemon_ready), uint8_t>::value &&
-            offsetof(SharedInfo, filler_1) == 43 && std::is_same<decltype(filler_1), uint8_t>::value &&
+            std::is_same_v<decltype(number_of_versions), std::atomic<uint64_t>> &&
+            offsetof(SharedInfo, sync_agent_present) == 40 && std::is_same_v<decltype(sync_agent_present), uint8_t> &&
+            offsetof(SharedInfo, daemon_started) == 41 && std::is_same_v<decltype(daemon_started), uint8_t> &&
+            offsetof(SharedInfo, daemon_ready) == 42 && std::is_same_v<decltype(daemon_ready), uint8_t> &&
+            offsetof(SharedInfo, filler_1) == 43 && std::is_same_v<decltype(filler_1), uint8_t> &&
             offsetof(SharedInfo, history_schema_version) == 44 &&
-            std::is_same<decltype(history_schema_version), uint16_t>::value && offsetof(SharedInfo, filler_2) == 46 &&
-            std::is_same<decltype(filler_2), uint16_t>::value && offsetof(SharedInfo, shared_writemutex) == 48 &&
-            std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
+            std::is_same_v<decltype(history_schema_version), uint16_t> && offsetof(SharedInfo, filler_2) == 46 &&
+            std::is_same_v<decltype(filler_2), uint16_t> && offsetof(SharedInfo, shared_writemutex) == 48 &&
+            std::is_same_v<decltype(shared_writemutex), InterprocessMutex::SharedPart>,
         "Caught layout change requiring SharedInfo file format bumping");
     static_assert(std::atomic<uint64_t>::is_always_lock_free);
 #ifndef _WIN32

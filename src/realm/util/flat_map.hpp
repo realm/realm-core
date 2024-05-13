@@ -137,18 +137,17 @@ struct FlatMap {
         return emplace(std::forward<Args>(args)...);
     }
 
-    iterator erase(const_iterator pos) noexcept(std::is_nothrow_move_assignable<value_type>::value)
+    iterator erase(const_iterator pos) noexcept(std::is_nothrow_move_assignable_v<value_type>)
     {
         return m_data.erase(pos);
     }
 
-    iterator erase(const_iterator first,
-                   const_iterator last) noexcept(std::is_nothrow_move_assignable<value_type>::value)
+    iterator erase(const_iterator first, const_iterator last) noexcept(std::is_nothrow_move_assignable_v<value_type>)
     {
         return m_data.erase(first, last);
     }
 
-    size_t erase(const K& key) noexcept(std::is_nothrow_move_assignable<value_type>::value)
+    size_t erase(const K& key) noexcept(std::is_nothrow_move_assignable_v<value_type>)
     {
         auto it = find(key);
         if (it != end()) {

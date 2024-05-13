@@ -31,7 +31,7 @@ class EventLoopDispatcher;
 
 template <typename... Args>
 class EventLoopDispatcher<void(Args...)> {
-    using Tuple = std::tuple<typename std::remove_reference<Args>::type...>;
+    using Tuple = std::tuple<std::remove_reference_t<Args>...>;
 
 private:
     const std::shared_ptr<util::UniqueFunction<void(Args...)>> m_func;

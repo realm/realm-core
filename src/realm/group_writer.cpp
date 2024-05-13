@@ -1390,7 +1390,7 @@ void GroupCommitter::commit(ref_type new_top_ref)
 
     // Update top ref and file format version
     int file_format_version = m_group.get_file_format_version();
-    using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
+    using type_1 = std::remove_reference_t<decltype(file_header.m_file_format[0])>;
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     // only write the file format field if necessary (optimization)
     if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
@@ -1413,7 +1413,7 @@ void GroupCommitter::commit(ref_type new_top_ref)
 
     // Flip the slot selector bit.
     window->encryption_read_barrier(&file_header, sizeof file_header);
-    using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
+    using type_2 = std::remove_reference_t<decltype(file_header.m_flags)>;
     file_header.m_flags = type_2(new_flags);
 
     // Write new selector to disk

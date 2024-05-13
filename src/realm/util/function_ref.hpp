@@ -103,7 +103,7 @@ public:
     constexpr FunctionRef(F&& f) noexcept
         : m_obj(const_cast<void*>(reinterpret_cast<const void*>(std::addressof(f))))
         , m_callback([](void* obj, Args... args) -> Return {
-            return (*reinterpret_cast<typename std::add_pointer<F>::type>(obj))(std::forward<Args>(args)...);
+            return (*reinterpret_cast<std::add_pointer_t<F>>(obj))(std::forward<Args>(args)...);
         })
     {
     }

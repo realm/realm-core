@@ -135,7 +135,7 @@ struct Property {
 template <typename E>
 constexpr auto to_underlying(E e)
 {
-    return static_cast<typename std::underlying_type<E>::type>(e);
+    return static_cast<std::underlying_type_t<E>>(e);
 }
 
 inline constexpr PropertyType operator&(PropertyType a, PropertyType b)

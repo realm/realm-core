@@ -55,7 +55,7 @@ template <size_t Len, typename... Types>
 struct AlignedUnion {
     static constexpr size_t alignment_value = _impl::constexpr_max({alignof(Types)...});
     static constexpr size_t storage_size = _impl::constexpr_max({Len, sizeof(Types)...});
-    using type = typename std::aligned_storage<storage_size, alignment_value>::type;
+    using type = std::aligned_storage_t<storage_size, alignment_value>;
 };
 
 } // namespace util

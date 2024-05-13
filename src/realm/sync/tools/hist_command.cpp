@@ -1838,7 +1838,7 @@ int main(int argc, char* argv[])
                 std::istringstream in(str_val);
                 in.imbue(std::locale::classic());
                 in.unsetf(std::ios_base::skipws);
-                using value_type = typename std::remove_reference<decltype(var)>::type;
+                using value_type = std::remove_reference_t<decltype(var)>;
                 value_type val = value_type{};
                 in >> val;
                 using traits = std::istringstream::traits_type;

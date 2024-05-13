@@ -96,7 +96,7 @@ const SlabAlloc::Header SlabAlloc::empty_file_header = {
 
 void SlabAlloc::init_streaming_header(Header* streaming_header, int file_format_version)
 {
-    using storage_type = std::remove_reference<decltype(Header::m_file_format[0])>::type;
+    using storage_type = std::remove_reference_t<decltype(Header::m_file_format[0])>;
     REALM_ASSERT(!util::int_cast_has_overflow<storage_type>(file_format_version));
     *streaming_header = {
         {0xFFFFFFFFFFFFFFFFULL, 0}, // top-refs

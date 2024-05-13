@@ -285,8 +285,7 @@ struct MakeConditionNode {
 
     // overload for optional types
     template <class T = typename Node::TConditionValue>
-    static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value,
-                                   std::unique_ptr<ParentNode>>::type
+    static std::enable_if_t<!std::is_same_v<typename util::RemoveOptional<T>::type, T>, std::unique_ptr<ParentNode>>
     make(ColKey col_key, typename util::RemoveOptional<T>::type value)
     {
         return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};

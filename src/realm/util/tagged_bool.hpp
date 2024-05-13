@@ -42,7 +42,7 @@ struct TaggedBool {
 
     // Allow implicit construction from *just* bool and not things convertible
     // to bool (such as other types of tagged bools)
-    template <typename Bool, typename = typename std::enable_if<std::is_same<Bool, bool>::value>::type>
+    template <typename Bool, typename = std::enable_if_t<std::is_same_v<Bool, bool>>>
     constexpr TaggedBool(Bool v) noexcept
         : m_value(v)
     {

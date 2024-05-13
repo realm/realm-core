@@ -43,7 +43,7 @@ struct TaggedString {
 
     // Allow implicit construction from *just* std::string and not things convertible
     // to std::string (such as other types of tagged std::string)
-    template <typename Str, typename = typename std::enable_if<std::is_same<Str, std::string>::value>::type>
+    template <typename Str, typename = std::enable_if_t<std::is_same_v<Str, std::string>>>
     constexpr TaggedString(Str v) noexcept
         : m_value(v)
     {

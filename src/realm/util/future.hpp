@@ -190,7 +190,7 @@ template <typename Func, typename... Args>
 using RawNormalizedCallResult = decltype(throwing_call(std::declval<Func>(), std::declval<Args>()...));
 
 template <typename Func, typename... Args>
-using NormalizedCallResult = std::conditional_t<std::is_same<RawNormalizedCallResult<Func, Args...>, FakeVoid>::value,
+using NormalizedCallResult = std::conditional_t<std::is_same_v<RawNormalizedCallResult<Func, Args...>, FakeVoid>,
                                                 void, RawNormalizedCallResult<Func, Args...>>;
 
 template <typename T>
@@ -594,9 +594,9 @@ template <typename T>
 class REALM_NODISCARD future_details::Future {
 public:
     static_assert(!is_future<T>, "Future<Future<T>> is banned. Just use Future<T> instead.");
-    static_assert(!std::is_reference<T>::value, "Future<T&> is banned.");
-    static_assert(!std::is_const<T>::value, "Future<const T> is banned.");
-    static_assert(!std::is_array<T>::value, "Future<T[]> is banned.");
+    static_assert(!std::is_reference_v<T>, "Future<T&> is banned.");
+    static_assert(!std::is_const_v<T>, "Future<const T> is banned.");
+    static_assert(!std::is_array_v<T>, "Future<T[]> is banned.");
 
     using value_type = T;
 

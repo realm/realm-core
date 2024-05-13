@@ -1248,9 +1248,8 @@ struct MergeBase : MergeUtils {
 
 // Implementation that reverses order.
 template <class A, class B>
-struct Merge<A, B,
-             typename std::enable_if<(Instruction::GetInstructionType<A>::value <
-                                      Instruction::GetInstructionType<B>::value)>::type> {
+struct Merge<
+    A, B, std::enable_if_t<(Instruction::GetInstructionType<A>::value < Instruction::GetInstructionType<B>::value)>> {
     template <class LeftSide, class RightSide>
     static void merge(A& left, B& right, LeftSide& left_side, RightSide& right_side)
     {

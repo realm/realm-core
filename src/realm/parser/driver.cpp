@@ -2175,7 +2175,7 @@ std::unique_ptr<Subexpr> LinkChain::subquery(Query subquery)
 template <class T>
 SubQuery<T> column(const Table& origin, ColKey origin_col_key, Query subquery)
 {
-    static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
+    static_assert(std::is_same_v<T, BackLink>, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
 }
 

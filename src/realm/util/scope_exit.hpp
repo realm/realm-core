@@ -26,17 +26,17 @@ namespace realm::util {
 template <class H>
 class ScopeExit {
 public:
-    explicit ScopeExit(const H& handler) noexcept(std::is_nothrow_copy_constructible<H>::value)
+    explicit ScopeExit(const H& handler) noexcept(std::is_nothrow_copy_constructible_v<H>)
         : m_handler(handler)
     {
     }
 
-    explicit ScopeExit(H&& handler) noexcept(std::is_nothrow_move_constructible<H>::value)
+    explicit ScopeExit(H&& handler) noexcept(std::is_nothrow_move_constructible_v<H>)
         : m_handler(std::move(handler))
     {
     }
 
-    ScopeExit(ScopeExit&& se) noexcept(std::is_nothrow_move_constructible<H>::value)
+    ScopeExit(ScopeExit&& se) noexcept(std::is_nothrow_move_constructible_v<H>)
         : m_handler(std::move(se.m_handler))
     {
         se.m_handler = std::nullopt;
@@ -53,17 +53,17 @@ public:
     }
 
     static_assert(noexcept(std::declval<H>()()), "Handler must be nothrow executable");
-    static_assert(std::is_nothrow_destructible<H>::value, "Handler must be nothrow destructible");
+    static_assert(std::is_nothrow_destructible_v<H>, "Handler must be nothrow destructible");
 
 private:
     std::optional<H> m_handler;
 };
 
 template <class H>
-ScopeExit<typename std::remove_reference<H>::type> make_scope_exit(H&& handler) noexcept(
-    noexcept(ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler))))
+ScopeExit<std::remove_reference_t<H>>
+make_scope_exit(H&& handler) noexcept(noexcept(ScopeExit<std::remove_reference_t<H>>(std::forward<H>(handler))))
 {
-    return ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler));
+    return ScopeExit<std::remove_reference_t<H>>(std::forward<H>(handler));
 }
 
 } // namespace realm::util
