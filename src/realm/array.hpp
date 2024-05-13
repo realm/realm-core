@@ -19,10 +19,10 @@
 #ifndef REALM_ARRAY_HPP
 #define REALM_ARRAY_HPP
 
+#include <realm/array_direct.hpp>
+#include <realm/column_fwd.hpp>
 #include <realm/node.hpp>
 #include <realm/query_state.hpp>
-#include <realm/column_fwd.hpp>
-#include <realm/array_direct.hpp>
 
 namespace realm {
 

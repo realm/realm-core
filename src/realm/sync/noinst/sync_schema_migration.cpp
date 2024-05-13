@@ -16,9 +16,9 @@
  *
  **************************************************************************/
 
-#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 
 #include <string_view>
 

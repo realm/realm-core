@@ -5,9 +5,9 @@
 #include <limits>
 #include <utility>
 
+#include <realm/util/assert.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/assert.hpp>
 
 namespace realm::_impl {
 

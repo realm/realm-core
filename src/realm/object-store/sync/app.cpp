@@ -18,16 +18,16 @@
 
 #include <realm/object-store/sync/app.hpp>
 
-#include <realm/sync/network/http.hpp>
-#include <realm/util/base64.hpp>
-#include <realm/util/flat_map.hpp>
-#include <realm/util/platform_info.hpp>
-#include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_user.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/app_metadata.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/flat_map.hpp>
+#include <realm/util/platform_info.hpp>
+#include <realm/util/uri.hpp>
 
 #ifdef __EMSCRIPTEN__
 #include <realm/object-store/sync/impl/emscripten/network_transport.hpp>

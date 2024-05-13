@@ -18,8 +18,8 @@
 
 #include <realm/object-store/impl/list_notifier.hpp>
 
-#include <realm/list.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/list.hpp>
 
 #include <realm/transaction.hpp>
 #include <realm/util/scope_exit.hpp>

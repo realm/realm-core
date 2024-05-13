@@ -16,12 +16,12 @@
  *
  **************************************************************************/
 
-#include <realm/group.hpp>
-#include <realm/collection.hpp>
-#include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
-#include <realm/array_string.hpp>
 #include <realm/array_mixed.hpp>
+#include <realm/array_string.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/collection.hpp>
+#include <realm/group.hpp>
 
 namespace realm {
 

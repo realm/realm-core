@@ -19,16 +19,15 @@
 #ifndef REALM_GROUP_WRITER_HPP
 #define REALM_GROUP_WRITER_HPP
 
-#include <cstdint> // unint8_t etc
-#include <utility>
-#include <map>
-
-#include <realm/util/file.hpp>
 #include <realm/alloc.hpp>
 #include <realm/array.hpp>
-#include <realm/impl/array_writer.hpp>
 #include <realm/db_options.hpp>
+#include <realm/impl/array_writer.hpp>
+#include <realm/util/file.hpp>
 
+#include <cstdint> // unint8_t etc
+#include <map>
+#include <utility>
 
 namespace realm {
 

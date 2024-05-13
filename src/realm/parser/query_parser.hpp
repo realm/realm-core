@@ -19,15 +19,15 @@
 #ifndef REALM_PARSER_QUERY_PARSER_HPP
 #define REALM_PARSER_QUERY_PARSER_HPP
 
-#include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/timestamp.hpp>
-#include <realm/keys.hpp>
-#include <realm/object_id.hpp>
 #include <realm/decimal128.hpp>
-#include <realm/uuid.hpp>
-#include <realm/util/any.hpp>
+#include <realm/keys.hpp>
 #include <realm/mixed.hpp>
+#include <realm/object_id.hpp>
+#include <realm/string_data.hpp>
+#include <realm/timestamp.hpp>
+#include <realm/util/any.hpp>
+#include <realm/uuid.hpp>
 
 namespace realm::query_parser {
 

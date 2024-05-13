@@ -3,8 +3,8 @@
 
 #include <realm/db.hpp>
 #include <realm/sync/config.hpp>
-#include <realm/sync/protocol.hpp>
 #include <realm/sync/network/websocket_error.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {

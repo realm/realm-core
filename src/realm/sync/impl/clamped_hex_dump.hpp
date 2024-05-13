@@ -2,8 +2,8 @@
 #ifndef REALM_IMPL_CLAMPED_HEX_DUMP_HPP
 #define REALM_IMPL_CLAMPED_HEX_DUMP_HPP
 
-#include <realm/util/hex_dump.hpp>
 #include <realm/binary_data.hpp>
+#include <realm/util/hex_dump.hpp>
 
 namespace realm::_impl {
 

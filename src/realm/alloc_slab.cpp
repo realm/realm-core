@@ -16,15 +16,15 @@
  *
  **************************************************************************/
 
-#include <cinttypes>
-#include <type_traits>
-#include <exception>
 #include <algorithm>
+#include <atomic>
+#include <cinttypes>
+#include <cstring>
+#include <exception>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <map>
-#include <atomic>
-#include <cstring>
+#include <type_traits>
 
 #if REALM_DEBUG
 #include <iostream>
@@ -35,14 +35,14 @@
 #include <cstdlib>
 #endif
 
-#include <realm/util/errno.hpp>
+#include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
+#include <realm/group.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/errno.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/util/scope_exit.hpp>
-#include <realm/array.hpp>
-#include <realm/alloc_slab.hpp>
-#include <realm/group.hpp>
 
 using namespace realm;
 using namespace realm::util;

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <realm/object-store/c_api/util.hpp>
 #include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/c_api/util.hpp>
 
 namespace realm::c_api {
 

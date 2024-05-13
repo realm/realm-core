@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#include <realm/tokenizer.hpp>
 #include <realm/exceptions.hpp>
+#include <realm/tokenizer.hpp>
 
 namespace realm {
 

@@ -16,9 +16,9 @@
  *
  **************************************************************************/
 
-#include <realm/array_unsigned.hpp>
-#include <realm/array_direct.hpp>
 #include <algorithm>
+#include <realm/array_direct.hpp>
+#include <realm/array_unsigned.hpp>
 
 namespace realm {
 

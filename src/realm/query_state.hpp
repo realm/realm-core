@@ -19,8 +19,8 @@
 #ifndef REALM_QUERY_STATE_HPP
 #define REALM_QUERY_STATE_HPP
 
-#include <cstdlib> // size_t
 #include <cstdint> // unint8_t etc
+#include <cstdlib> // size_t
 
 #include <realm/node.hpp>
 

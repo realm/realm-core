@@ -16,12 +16,12 @@
  *
  **************************************************************************/
 
-#include <realm/impl/cont_transact_hist.hpp>
+#include <realm/array_key.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/db.hpp>
-#include <realm/replication.hpp>
 #include <realm/history.hpp>
-#include <realm/array_key.hpp>
+#include <realm/impl/cont_transact_hist.hpp>
+#include <realm/replication.hpp>
 
 using namespace realm;
 

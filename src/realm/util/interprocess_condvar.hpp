@@ -19,14 +19,14 @@
 #ifndef REALM_UTIL_INTERPROCESS_CONDVAR
 #define REALM_UTIL_INTERPROCESS_CONDVAR
 
-
 #include <realm/util/features.h>
-#include <realm/util/thread.hpp>
 #include <realm/util/interprocess_mutex.hpp>
+#include <realm/util/thread.hpp>
+
 #include <cstdint>
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <mutex>
+#include <sys/stat.h>
 
 #if REALM_PLATFORM_APPLE
 #include <sys/time.h>

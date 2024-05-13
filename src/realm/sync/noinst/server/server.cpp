@@ -5,7 +5,6 @@
 #include <realm/object_id.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
-#include <realm/sync/trigger.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/sync/network/http.hpp>
@@ -18,6 +17,7 @@
 #include <realm/sync/noinst/server/server_file_access_cache.hpp>
 #include <realm/sync/noinst/server/server_impl_base.hpp>
 #include <realm/sync/transform.hpp>
+#include <realm/sync/trigger.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/buffer_stream.hpp>

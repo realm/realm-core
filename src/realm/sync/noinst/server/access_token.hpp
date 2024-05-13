@@ -1,13 +1,13 @@
 #ifndef REALM_SYNC_ACCESS_TOKEN_HPP
 #define REALM_SYNC_ACCESS_TOKEN_HPP
 
+#include <chrono>
 #include <cstdint>
 #include <string>
-#include <chrono>
 
-#include <realm/util/optional.hpp>
-#include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
+#include <realm/string_data.hpp>
+#include <realm/util/optional.hpp>
 
 namespace realm::sync {
 

@@ -22,20 +22,20 @@
 #include "external/mpark/variant.hpp"
 #include <algorithm>
 #include <map>
-#include <utility>
-#include <typeinfo>
 #include <memory>
 #include <mutex>
+#include <typeinfo>
+#include <utility>
 
+#include <realm/cluster_tree.hpp>
+#include <realm/global_key.hpp>
+#include <realm/keys.hpp>
+#include <realm/query.hpp>
+#include <realm/spec.hpp>
+#include <realm/table_ref.hpp>
 #include <realm/util/features.h>
 #include <realm/util/function_ref.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/table_ref.hpp>
-#include <realm/spec.hpp>
-#include <realm/query.hpp>
-#include <realm/cluster_tree.hpp>
-#include <realm/keys.hpp>
-#include <realm/global_key.hpp>
 
 // Only set this to one when testing the code paths that exercise object ID
 // hash collisions. It artificially limits the "optimistic" local ID to use

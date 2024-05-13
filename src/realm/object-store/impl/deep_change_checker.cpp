@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/impl/deep_change_checker.hpp>
+
 #include <realm/dictionary.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>

@@ -1,5 +1,5 @@
-#include <realm/sync/instruction_applier.hpp>
 #include <realm/set.hpp>
+#include <realm/sync/instruction_applier.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #include <realm/transaction.hpp>

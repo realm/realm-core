@@ -8,8 +8,8 @@
 #ifndef SRC_REALM_EXEC_HEX_UTIL_HPP_
 #define SRC_REALM_EXEC_HEX_UTIL_HPP_
 
-#include <iostream>
 #include <cstring>
+#include <iostream>
 
 inline int hex_to_int(char c)
 {

@@ -17,12 +17,13 @@
  **************************************************************************/
 
 #include <realm/transaction.hpp>
+
 #include "impl/copy_replication.hpp"
+#include <realm/dictionary.hpp>
+#include <realm/group_writer.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
-#include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
-#include <realm/group_writer.hpp>
 
 namespace {
 

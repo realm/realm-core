@@ -23,8 +23,8 @@
 #include <cstring>
 #include <limits>
 #include <map>
-#include <zlib.h>
 #include <zconf.h> // for zlib
+#include <zlib.h>
 
 #if REALM_USE_LIBCOMPRESSION
 #include <compression.h>

@@ -20,13 +20,13 @@
 
 #include <realm/array.hpp>
 #include <realm/array_integer_tpl.hpp>
-#include <realm/transaction.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/query_conditions_tpl.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
-#include <realm/table_view.hpp>
 #include <realm/set.hpp>
+#include <realm/table_view.hpp>
+#include <realm/transaction.hpp>
 
 #include <algorithm>
 

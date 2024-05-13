@@ -17,12 +17,12 @@
  **************************************************************************/
 
 #include <realm/array_backlink.hpp>
-#include <realm/util/assert.hpp>
-#include <realm/table.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/group.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
-#include <realm/dictionary.hpp>
+#include <realm/table.hpp>
+#include <realm/util/assert.hpp>
 
 using namespace realm;
 

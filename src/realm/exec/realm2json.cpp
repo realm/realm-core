@@ -1,6 +1,6 @@
+#include <iostream>
 #include <realm.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <iostream>
 
 const char* legend =
     "Simple tool to output the JSON representation of a Realm:\n"

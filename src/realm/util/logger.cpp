@@ -19,8 +19,8 @@
 #include <realm/util/logger.hpp>
 
 #include <iostream>
-#include <mutex>
 #include <map>
+#include <mutex>
 
 namespace realm::util {
 

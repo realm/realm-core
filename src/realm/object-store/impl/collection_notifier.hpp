@@ -21,19 +21,19 @@
 
 #include <realm/object-store/impl/deep_change_checker.hpp>
 
+#include <realm/table_ref.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/version_id.hpp>
-#include <realm/table_ref.hpp>
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <exception>
 #include <functional>
 #include <mutex>
 #include <unordered_set>
-#include <chrono>
 
 namespace realm::util {
 class Logger;

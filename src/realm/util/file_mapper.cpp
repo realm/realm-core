@@ -35,17 +35,17 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
-#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/aes_cryptor.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 
 #include <atomic>
-#include <memory>
 #include <csignal>
-#include <sys/stat.h>
 #include <cstring>
 #include <fstream>
-#include <sstream>
+#include <memory>
 #include <regex>
+#include <sstream>
+#include <sys/stat.h>
 #include <thread>
 
 #include <realm/util/file.hpp>

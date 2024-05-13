@@ -19,10 +19,10 @@
 #include <realm/error_codes.hpp>
 #include <realm/util/assert.hpp>
 
-#include <iostream>
-#include <string_view>
 #include <algorithm>
 #include <cstring>
+#include <iostream>
+#include <string_view>
 
 namespace realm {
 

@@ -18,20 +18,20 @@
  * table tree should cover the whole file. Any leaked areas are reported.
  */
 
-#include <realm/array_direct.hpp>
 #include <realm/alloc_slab.hpp>
-#include <realm/keys.hpp>
 #include <realm/array.hpp>
+#include <realm/array_direct.hpp>
+#include <realm/collection_parent.hpp>
 #include <realm/column_type.hpp>
 #include <realm/data_type.hpp>
-#include <realm/table.hpp>
 #include <realm/impl/transact_log.hpp>
-#include <realm/collection_parent.hpp>
+#include <realm/keys.hpp>
+#include <realm/table.hpp>
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
 #include <cstring>
+#include <fstream>
+#include <iostream>
+#include <sstream>
 
 constexpr const int signature = 0x41414141;
 uint64_t current_logical_file_size;

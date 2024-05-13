@@ -19,11 +19,11 @@
 #ifndef REALM_IMPL_SIMULATED_FAILURE_HPP
 #define REALM_IMPL_SIMULATED_FAILURE_HPP
 
-#include <cstdint>
-#include <system_error>
-
 #include <realm/exceptions.hpp>
 #include <realm/util/features.h>
+
+#include <cstdint>
+#include <system_error>
 
 #ifdef REALM_DEBUG
 #define REALM_ENABLE_SIMULATED_FAILURE

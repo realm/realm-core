@@ -19,16 +19,16 @@
 #ifndef REALM_COLLECTION_NOTIFICATIONS_HPP
 #define REALM_COLLECTION_NOTIFICATIONS_HPP
 
-#include <realm/path.hpp>
 #include <realm/object-store/index_set.hpp>
 #include <realm/object-store/util/atomic_shared_ptr.hpp>
+#include <realm/path.hpp>
 
 #include <exception>
 #include <memory>
+#include <set>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
-#include <set>
 
 namespace realm {
 namespace _impl {

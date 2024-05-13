@@ -18,9 +18,9 @@
 
 #include <realm/replication.hpp>
 
+#include <iostream>
 #include <realm/list.hpp>
 #include <realm/path.hpp>
-#include <iostream>
 
 using namespace realm;
 using namespace realm::util;

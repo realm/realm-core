@@ -4,8 +4,8 @@
 #include <realm/object-store/c_api/util.hpp>
 
 #include <realm/object-store/keypath_helpers.hpp>
-#include <realm/parser/query_parser.hpp>
 #include <realm/parser/keypath_mapping.hpp>
+#include <realm/parser/query_parser.hpp>
 
 namespace realm::c_api {
 

@@ -128,33 +128,33 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #define REALM_QUERY_EXPRESSION_HPP
 
 #include <realm/aggregate_ops.hpp>
-#include <realm/array_timestamp.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_string.hpp>
 #include <realm/array_backlink.hpp>
-#include <realm/array_list.hpp>
-#include <realm/array_key.hpp>
+#include <realm/array_binary.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/array_fixed_bytes.hpp>
+#include <realm/array_key.hpp>
+#include <realm/array_list.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/dictionary.hpp>
 #if REALM_ENABLE_GEOSPATIAL
 #include <realm/geospatial.hpp>
 #endif
-#include <realm/table.hpp>
 #include <realm/index_string.hpp>
-#include <realm/query.hpp>
 #include <realm/list.hpp>
-#include <realm/set.hpp>
+#include <realm/query.hpp>
 #include <realm/query_value.hpp>
+#include <realm/set.hpp>
+#include <realm/table.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>
 
 #include <external/mpark/variant.hpp>
 
-#include <numeric>
 #include <algorithm>
+#include <numeric>
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit

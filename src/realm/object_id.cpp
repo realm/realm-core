@@ -17,8 +17,10 @@
  **************************************************************************/
 
 #include <realm/object_id.hpp>
+
 #include <realm/string_data.hpp>
 #include <realm/util/assert.hpp>
+
 #include <atomic>
 #include <cctype>
 #include <chrono>

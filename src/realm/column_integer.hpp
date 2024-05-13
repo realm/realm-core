@@ -19,9 +19,9 @@
 #ifndef REALM_COLUMN_INTEGER_HPP
 #define REALM_COLUMN_INTEGER_HPP
 
-#include <realm/bplustree.hpp>
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
+#include <realm/bplustree.hpp>
 
 namespace realm {
 

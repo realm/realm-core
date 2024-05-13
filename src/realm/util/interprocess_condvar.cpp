@@ -16,17 +16,17 @@
  *
  **************************************************************************/
 
-#include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/fifo_helper.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 
 #include <fcntl.h>
-#include <system_error>
 #include <sstream>
+#include <system_error>
 
 #ifdef REALM_CONDVAR_EMULATION
 #ifndef _WIN32
-#include <unistd.h>
 #include <poll.h>
+#include <unistd.h>
 #endif
 #endif
 

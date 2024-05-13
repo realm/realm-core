@@ -1,30 +1,29 @@
 #pragma once
 
+#include <realm/sync/network/network.hpp>
+#include <realm/util/assert.hpp>
+#include <realm/util/features.h>
+#include <realm/util/logger.hpp>
+#include <realm/util/misc_errors.hpp>
+#include <realm/util/optional.hpp>
+
 #include <cstddef>
+#include <exception>
 #include <limits>
 #include <memory>
 #include <string>
-#include <exception>
 #include <system_error>
-
-#include <realm/sync/network/network.hpp>
-
-#include <realm/util/features.h>
-#include <realm/util/assert.hpp>
-#include <realm/util/misc_errors.hpp>
-#include <realm/util/optional.hpp>
-#include <realm/util/logger.hpp>
 
 #if REALM_HAVE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #elif REALM_HAVE_SECURE_TRANSPORT
 #include <realm/util/cf_ptr.hpp>
-#include <Security/Security.h>
+
 #include <Security/SecureTransport.h>
+#include <Security/Security.h>
 
 #define REALM_HAVE_KEYCHAIN_APIS (TARGET_OS_MAC && !TARGET_OS_IPHONE)
-
 #endif
 
 // FIXME: Add necessary support for customizing the SSL server and client

@@ -19,8 +19,8 @@
 #ifndef REALM_OS_APP_USER_HPP
 #define REALM_OS_APP_USER_HPP
 
-#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/util/bson/bson.hpp>
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/function_ref.hpp>

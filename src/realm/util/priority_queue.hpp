@@ -21,9 +21,9 @@
 #ifndef REALM_UTIL_PRIORITY_QUEUE_HPP
 #define REALM_UTIL_PRIORITY_QUEUE_HPP
 
-#include <vector>
-#include <functional>
 #include <algorithm>
+#include <functional>
+#include <vector>
 
 namespace realm::util {
 

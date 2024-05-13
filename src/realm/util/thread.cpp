@@ -20,8 +20,8 @@
 #include <stdexcept>
 #include <system_error>
 
-#include <realm/util/thread.hpp>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/thread.hpp>
 
 #if !defined _WIN32
 #include <unistd.h>

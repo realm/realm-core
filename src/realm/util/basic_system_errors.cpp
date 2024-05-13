@@ -23,8 +23,8 @@
 #include <cstring>
 #include <string>
 
-#include <realm/util/features.h>
 #include <realm/util/basic_system_errors.hpp>
+#include <realm/util/features.h>
 
 using namespace realm::util;
 

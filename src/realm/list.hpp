@@ -21,20 +21,20 @@
 
 #include <realm/collection.hpp>
 
-#include <realm/obj.hpp>
-#include <realm/column_mixed.hpp>
-#include <realm/obj_list.hpp>
 #include <realm/array_basic.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_bool.hpp>
+#include <realm/array_decimal128.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
-#include <realm/array_bool.hpp>
-#include <realm/array_string.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_timestamp.hpp>
 #include <realm/array_ref.hpp>
-#include <realm/array_fixed_bytes.hpp>
-#include <realm/array_decimal128.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
 #include <realm/array_typed_link.hpp>
+#include <realm/column_mixed.hpp>
+#include <realm/obj.hpp>
+#include <realm/obj_list.hpp>
 #include <realm/replication.hpp>
 
 namespace realm {

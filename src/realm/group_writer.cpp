@@ -16,19 +16,18 @@
  *
  **************************************************************************/
 
-#include <algorithm>
-#include <set>
-
-#include <iostream>
-
 #include <realm/group_writer.hpp>
 
 #include <realm/alloc_slab.hpp>
-#include <realm/transaction.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/transaction.hpp>
 #include <realm/util/safe_int_ops.hpp>
+
+#include <algorithm>
+#include <iostream>
+#include <set>
 
 using namespace realm;
 using namespace realm::util;

@@ -20,8 +20,8 @@
 #define REALM_SYNC_IMPL_INSTRUCTION_REPLICATION_HPP
 
 #include <realm/replication.hpp>
-#include <realm/sync/instructions.hpp>
 #include <realm/sync/changeset_encoder.hpp>
+#include <realm/sync/instructions.hpp>
 
 namespace realm::sync {
 

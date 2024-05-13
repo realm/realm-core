@@ -16,9 +16,9 @@
  *
  **************************************************************************/
 
+#include <realm/string_data.hpp>
 #include <realm/util/features.h>
 #include <realm/version.hpp>
-#include <realm/string_data.hpp>
 #include <sstream>
 
 using namespace realm;

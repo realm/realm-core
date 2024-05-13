@@ -19,13 +19,13 @@
 #ifndef REALM_TOKENIZER_HPP
 #define REALM_TOKENIZER_HPP
 
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
-#include <map>
-#include <set>
-#include <memory>
-#include <optional>
 
 namespace realm {
 

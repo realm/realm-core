@@ -1,11 +1,11 @@
 #ifndef DRIVER_HH
 #define DRIVER_HH
-#include <string>
 #include <map>
+#include <string>
 
-#include "realm/query_expression.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
+#include "realm/query_expression.hpp"
 
 #define YY_DECL yy::parser::symbol_type yylex(void* yyscanner)
 #include "realm/parser/generated/query_bison.hpp"

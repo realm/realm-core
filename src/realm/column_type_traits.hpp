@@ -19,13 +19,13 @@
 #ifndef REALM_COLUMN_TYPE_TRAITS_HPP
 #define REALM_COLUMN_TYPE_TRAITS_HPP
 
+#include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/column_type.hpp>
 #include <realm/data_type.hpp>
-#include <realm/array.hpp>
+#include <realm/keys.hpp>
 #include <realm/object_id.hpp>
 #include <realm/uuid.hpp>
-#include <realm/keys.hpp>
 
 namespace realm {
 

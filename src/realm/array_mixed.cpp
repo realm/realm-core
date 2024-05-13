@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#include <realm/array_mixed.hpp>
 #include <realm/array_basic.hpp>
+#include <realm/array_mixed.hpp>
 
 using namespace realm;
 

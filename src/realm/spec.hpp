@@ -19,12 +19,12 @@
 #ifndef REALM_SPEC_HPP
 #define REALM_SPEC_HPP
 
-#include <realm/util/features.h>
 #include <realm/array.hpp>
 #include <realm/array_string_short.hpp>
-#include <realm/data_type.hpp>
 #include <realm/column_type.hpp>
+#include <realm/data_type.hpp>
 #include <realm/keys.hpp>
+#include <realm/util/features.h>
 
 namespace realm {
 

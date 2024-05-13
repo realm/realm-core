@@ -26,8 +26,8 @@
 
 #include <thread>
 
-#include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/impl/network_reachability.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
 
 #if NETWORK_REACHABILITY_AVAILABLE
 #include <realm/object-store/sync/impl/apple/network_reachability_observer.hpp>

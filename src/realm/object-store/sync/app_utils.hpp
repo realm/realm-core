@@ -19,9 +19,9 @@
 #ifndef APP_UTILS_HPP
 #define APP_UTILS_HPP
 
-#include <realm/util/optional.hpp>
 #include <realm/error_codes.hpp>
 #include <realm/status_with.hpp>
+#include <realm/util/optional.hpp>
 
 #include <map>
 

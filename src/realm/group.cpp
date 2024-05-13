@@ -16,24 +16,26 @@
  *
  **************************************************************************/
 
-#include <new>
-#include <algorithm>
-#include <fstream>
+#include <realm/group.hpp>
 
-#ifdef REALM_DEBUG
-#include <iostream>
-#include <iomanip>
-#endif
-
+#include <realm/exceptions.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/replication.hpp>
+#include <realm/transaction.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
-#include <realm/exceptions.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/transaction.hpp>
-#include <realm/replication.hpp>
+
+#include <algorithm>
+#include <fstream>
+#include <new>
+
+#ifdef REALM_DEBUG
+#include <iomanip>
+#include <iostream>
+#endif
 
 using namespace realm;
 using namespace realm::util;

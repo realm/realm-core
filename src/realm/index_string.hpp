@@ -19,14 +19,14 @@
 #ifndef REALM_INDEX_STRING_HPP
 #define REALM_INDEX_STRING_HPP
 
-#include <cstring>
-#include <memory>
-#include <array>
-#include <set>
-
 #include <realm/array.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/search_index.hpp>
+
+#include <array>
+#include <cstring>
+#include <memory>
+#include <set>
 
 /*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_Timestamp and

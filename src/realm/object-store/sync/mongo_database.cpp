@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
 
 namespace realm::app {
 

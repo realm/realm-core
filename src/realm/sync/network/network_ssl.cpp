@@ -2,9 +2,9 @@
 #include <mutex>
 
 #include <realm/string_data.hpp>
+#include <realm/sync/network/network_ssl.hpp>
 #include <realm/util/cf_str.hpp>
 #include <realm/util/features.h>
-#include <realm/sync/network/network_ssl.hpp>
 
 #if REALM_HAVE_OPENSSL
 #ifdef _WIN32

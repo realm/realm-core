@@ -18,9 +18,9 @@
 
 #include <realm/exceptions.hpp>
 
-#include <realm/version.hpp>
-#include <realm/util/to_string.hpp>
 #include <realm/util/demangle.hpp>
+#include <realm/util/to_string.hpp>
+#include <realm/version.hpp>
 
 namespace realm {
 

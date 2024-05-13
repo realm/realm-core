@@ -18,12 +18,12 @@
 
 #include <realm/object-store/thread_safe_reference.hpp>
 
-#include <realm/object-store/list.hpp>
-#include <realm/object-store/set.hpp>
 #include <realm/object-store/dictionary.hpp>
+#include <realm/object-store/list.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/results.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/shared_realm.hpp>
 
 #include "impl/realm_coordinator.hpp"

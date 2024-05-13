@@ -19,8 +19,9 @@
 #ifndef REALM_KEYS_HPP
 #define REALM_KEYS_HPP
 
-#include <realm/util/to_string.hpp>
 #include <realm/column_type.hpp>
+#include <realm/util/to_string.hpp>
+
 #include <ostream>
 #include <vector>
 

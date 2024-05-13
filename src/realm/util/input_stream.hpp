@@ -19,8 +19,8 @@
 #ifndef REALM_UTIL_INPUT_STREAM_HPP
 #define REALM_UTIL_INPUT_STREAM_HPP
 
-#include <realm/utilities.hpp>
 #include <realm/util/span.hpp>
+#include <realm/utilities.hpp>
 
 namespace realm::util {
 class InputStream {

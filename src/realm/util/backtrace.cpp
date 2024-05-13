@@ -19,9 +19,9 @@
 #include <realm/util/backtrace.hpp>
 #include <realm/util/features.h>
 
-#include <sstream>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 
 #if !defined(REALM_HAVE_BACKTRACE) && (REALM_PLATFORM_APPLE || (defined(__linux__) && defined(__GNUC__)))
 // we detect the backtrace facility in CMake, but if building outside it we assume

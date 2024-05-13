@@ -20,9 +20,9 @@
 #define REALM_DICTIONARY_HPP
 
 #include <realm/collection.hpp>
-#include <realm/obj.hpp>
-#include <realm/mixed.hpp>
 #include <realm/column_mixed.hpp>
+#include <realm/mixed.hpp>
+#include <realm/obj.hpp>
 
 namespace realm {
 

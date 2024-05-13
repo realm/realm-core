@@ -1,7 +1,7 @@
-#include <realm.hpp>
-#include <iostream>
-#include <ctime>
 #include "realm/util/time.hpp"
+#include <ctime>
+#include <iostream>
+#include <realm.hpp>
 
 using namespace realm;
 

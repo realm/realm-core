@@ -25,11 +25,11 @@
 #include <realm/util/span.hpp>
 
 #include <array>
-#include <memory>
-#include <system_error>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <system_error>
 #include <vector>
 
 // Use libcompression by default on Apple platforms, but it can be disabled to

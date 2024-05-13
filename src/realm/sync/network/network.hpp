@@ -1,11 +1,11 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
-#include <chrono>
+#include <ostream>
 #include <string>
 #include <system_error>
-#include <ostream>
 
 #include <sys/types.h>
 
@@ -16,18 +16,18 @@
 #include <Ws2def.h>
 #pragma comment(lib, "Ws2_32.lib")
 #else
-#include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/socket.h>
 #endif
 
 #include <realm/status.hpp>
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/backtrace.hpp>
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/buffer.hpp>
+#include <realm/util/features.h>
 #include <realm/util/misc_ext_errors.hpp>
 #include <realm/util/scope_exit.hpp>
 

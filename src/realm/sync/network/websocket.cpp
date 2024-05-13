@@ -2,8 +2,8 @@
 
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/websocket.hpp>
-#include <realm/util/buffer.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/buffer.hpp>
 #include <realm/util/sha_crypto.hpp>
 
 using namespace realm;

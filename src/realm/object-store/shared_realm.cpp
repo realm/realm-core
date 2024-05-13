@@ -42,13 +42,13 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
-#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
+#include <realm/history.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/history.hpp>
 #endif
 #ifdef REALM_DEBUG
 #include <iostream>

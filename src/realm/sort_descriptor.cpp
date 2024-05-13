@@ -17,12 +17,13 @@
  **************************************************************************/
 
 #include <realm/sort_descriptor.hpp>
+
+#include <realm/db.hpp>
+#include <realm/dictionary.hpp>
+#include <realm/list.hpp>
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
-#include <realm/db.hpp>
 #include <realm/util/assert.hpp>
-#include <realm/list.hpp>
-#include <realm/dictionary.hpp>
 
 using namespace realm;
 

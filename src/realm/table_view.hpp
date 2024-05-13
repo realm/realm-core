@@ -19,12 +19,12 @@
 #ifndef REALM_TABLE_VIEW_HPP
 #define REALM_TABLE_VIEW_HPP
 
+#include <realm/list.hpp>
+#include <realm/obj_list.hpp>
+#include <realm/set.hpp>
 #include <realm/sort_descriptor.hpp>
 #include <realm/table.hpp>
 #include <realm/util/features.h>
-#include <realm/obj_list.hpp>
-#include <realm/list.hpp>
-#include <realm/set.hpp>
 
 namespace realm {
 

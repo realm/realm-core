@@ -19,10 +19,10 @@
 #ifndef REALM_NOINST_CLIENT_RESET_HPP
 #define REALM_NOINST_CLIENT_RESET_HPP
 
-#include <realm/util/logger.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
 
 #include <ostream>
 

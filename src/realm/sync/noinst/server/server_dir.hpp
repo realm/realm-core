@@ -1,17 +1,17 @@
 #ifndef REALM_NOINST_SERVER_DIR_HPP
 #define REALM_NOINST_SERVER_DIR_HPP
 
-#include <string>
-#include <set>
 #include <random>
+#include <set>
 #include <stdexcept>
+#include <string>
 
+#include <realm/binary_data.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/backtrace.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/string_data.hpp>
-#include <realm/binary_data.hpp>
 
 namespace realm::_impl {
 

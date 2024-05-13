@@ -19,14 +19,14 @@
 #ifndef REALM_ARRAY_MIXED_HPP
 #define REALM_ARRAY_MIXED_HPP
 
+#include <realm/array_binary.hpp>
+#include <realm/array_key.hpp>
+#include <realm/array_ref.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
 #include <realm/data_type.hpp>
 #include <realm/mixed.hpp>
 #include <realm/obj.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_string.hpp>
-#include <realm/array_timestamp.hpp>
-#include <realm/array_key.hpp>
-#include <realm/array_ref.hpp>
 
 namespace realm {
 

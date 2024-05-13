@@ -19,9 +19,9 @@
 #ifndef REALM_UTIL_ERRNO_HPP
 #define REALM_UTIL_ERRNO_HPP
 
-#include <string>
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/util/to_string.hpp>
+#include <string>
 
 namespace realm::util {
 

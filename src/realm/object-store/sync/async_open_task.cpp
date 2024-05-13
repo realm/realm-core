@@ -18,11 +18,11 @@
 
 #include <realm/object-store/sync/async_open_task.hpp>
 
-#include <realm/sync/subscriptions.hpp>
-#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
+#include <realm/sync/subscriptions.hpp>
 #include <utility>
 
 namespace realm {

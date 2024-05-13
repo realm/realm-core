@@ -19,9 +19,9 @@
 #ifndef REALM_SET_HPP
 #define REALM_SET_HPP
 
-#include <realm/collection.hpp>
-#include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/collection.hpp>
 
 namespace realm {
 class SetBase : public CollectionBase {

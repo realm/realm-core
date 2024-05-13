@@ -21,8 +21,8 @@
 
 #include <realm/string_data.hpp>
 
-#include <string>
 #include <cstring>
+#include <string>
 
 #include "null.hpp"
 

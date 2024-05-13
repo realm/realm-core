@@ -16,20 +16,20 @@
  *
  **************************************************************************/
 
-#include <cstdlib>
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
 #ifdef REALM_DEBUG
 #include <cstdio>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #endif
 
-#include <realm/utilities.hpp>
 #include <realm/array_string_short.hpp>
-#include <realm/impl/destroy_guard.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/utilities.hpp>
 
 using namespace realm;
 

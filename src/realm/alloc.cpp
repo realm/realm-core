@@ -16,13 +16,13 @@
  *
  **************************************************************************/
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <stdexcept>
-#include <algorithm>
 
-#include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
 #include <realm/group.hpp>
 
 using namespace realm;

@@ -19,24 +19,23 @@
 #ifndef REALM_MIXED_HPP
 #define REALM_MIXED_HPP
 
-#include <cstdint> // int64_t - not part of C++03, not even required by C++11 (see C++11 section 18.4.1)
-
-#include <cstddef> // size_t
-#include <cstring>
-
-#include <realm/keys.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/data_type.hpp>
+#include <realm/keys.hpp>
 #if REALM_ENABLE_GEOSPATIAL
 #include <realm/geospatial.hpp>
 #endif
-#include <realm/string_data.hpp>
-#include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
-#include <realm/uuid.hpp>
+#include <realm/string_data.hpp>
+#include <realm/timestamp.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
+#include <realm/uuid.hpp>
+
+#include <cstddef> // size_t
+#include <cstdint>
+#include <cstring>
 
 namespace realm {
 

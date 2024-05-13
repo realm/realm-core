@@ -18,9 +18,9 @@
 
 // Realm daemon (realmd) responsible for async commits
 
+#include <iostream>
 #include <realm/db.hpp>
 #include <unistd.h>
-#include <iostream>
 
 using namespace realm;
 

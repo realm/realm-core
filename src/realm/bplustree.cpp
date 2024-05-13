@@ -16,10 +16,10 @@
  *
  **************************************************************************/
 
+#include <realm/array_integer.hpp>
+#include <realm/array_unsigned.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/impl/destroy_guard.hpp>
-#include <realm/array_unsigned.hpp>
-#include <realm/array_integer.hpp>
 
 using namespace realm;
 

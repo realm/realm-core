@@ -6,8 +6,8 @@
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/assert.hpp>
@@ -22,8 +22,8 @@
 #include <realm/version.hpp>
 
 
-#include <system_error>
 #include <sstream>
+#include <system_error>
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 

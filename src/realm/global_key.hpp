@@ -21,8 +21,9 @@
 
 #include <realm/keys.hpp>
 #include <realm/util/optional.hpp>
-#include <limits>
+
 #include <cstdint>
+#include <limits>
 
 namespace realm {
 

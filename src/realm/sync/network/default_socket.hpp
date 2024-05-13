@@ -2,9 +2,9 @@
 
 #include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/config.hpp>
-#include <realm/sync/socket_provider.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/util/future.hpp>
 #include <realm/util/tagged_bool.hpp>
 

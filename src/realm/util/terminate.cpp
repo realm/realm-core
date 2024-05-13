@@ -19,18 +19,18 @@
 #include <realm/util/terminate.hpp>
 
 #include <iostream>
-#include <sstream>
+#include <realm/util/backtrace.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#include <realm/util/backtrace.hpp>
 #include <realm/version.hpp>
+#include <sstream>
 
 #if REALM_PLATFORM_APPLE
 #include <os/log.h>
 
+#include <CoreFoundation/CoreFoundation.h>
 #include <dlfcn.h>
 #include <execinfo.h>
-#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 #if REALM_ANDROID

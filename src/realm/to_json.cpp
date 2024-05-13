@@ -16,12 +16,13 @@
  *
  **************************************************************************/
 
-#include <realm/group.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/group.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
+#include <realm/util/base64.hpp>
+
 #include <external/json/json.hpp>
-#include "realm/util/base64.hpp"
 
 namespace realm {
 

@@ -1,29 +1,29 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <cstdlib>
-#include <type_traits>
+#include <cstring>
+#include <iostream>
 #include <limits>
-#include <algorithm>
 #include <memory>
-#include <string>
 #include <set>
 #include <sstream>
-#include <iostream>
+#include <string>
+#include <type_traits>
 
 #include <realm/array_integer.hpp>
-#include <realm/util/compression.hpp>
-#include <realm/util/features.h>
-#include <realm/util/optional.hpp>
-#include <realm/util/enum.hpp>
-#include <realm/util/hex_dump.hpp>
-#include <realm/util/timestamp_formatter.hpp>
-#include <realm/util/load_file.hpp>
 #include <realm/group.hpp>
-#include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/util/compression.hpp>
+#include <realm/util/enum.hpp>
+#include <realm/util/features.h>
+#include <realm/util/hex_dump.hpp>
+#include <realm/util/load_file.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/timestamp_formatter.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
 using util::TimestampFormatter;

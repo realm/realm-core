@@ -20,11 +20,11 @@
 #define REALM_OS_COLLECTION_HPP
 
 #include <realm/collection.hpp>
-#include <realm/object-store/property.hpp>
-#include <realm/object-store/object.hpp>
-#include <realm/object-store/util/copyable_atomic.hpp>
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/util/copyable_atomic.hpp>
 
 namespace realm {
 class Realm;

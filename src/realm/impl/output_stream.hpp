@@ -19,14 +19,12 @@
 #ifndef REALM_IMPL_OUTPUT_STREAM_HPP
 #define REALM_IMPL_OUTPUT_STREAM_HPP
 
-#include <cstddef>
-#include <ostream>
-
-#include <cstdint>
-
+#include <realm/impl/array_writer.hpp>
 #include <realm/util/features.h>
 
-#include <realm/impl/array_writer.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
 
 namespace realm::_impl {
 

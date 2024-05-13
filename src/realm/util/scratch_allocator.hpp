@@ -3,8 +3,8 @@
 #define REALM_UTIL_SCRATCH_ALLOCATOR_HPP
 
 #include <cstddef>
-#include <new>
 #include <memory>
+#include <new>
 
 #include <realm/util/assert.hpp>
 #include <realm/util/backtrace.hpp>

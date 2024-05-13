@@ -20,17 +20,17 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <type_traits>
-#include <map>
-#include <system_error>
 #include <iosfwd>
 #include <locale>
+#include <map>
 #include <sstream>
+#include <system_error>
+#include <type_traits>
 
-#include <realm/util/optional.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/string_data.hpp>
+#include <realm/util/optional.hpp>
 
 namespace realm::sync {
 enum class HTTPParserError {

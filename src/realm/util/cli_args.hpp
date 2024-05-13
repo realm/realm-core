@@ -1,9 +1,9 @@
 #ifndef REALM_UTIL_CLI_ARGS_HPP
 #define REALM_UTIL_CLI_ARGS_HPP
 
-#include <vector>
-#include <string_view>
 #include <stdexcept>
+#include <string_view>
+#include <vector>
 
 namespace realm::util {
 

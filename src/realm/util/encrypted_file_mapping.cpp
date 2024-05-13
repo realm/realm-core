@@ -25,13 +25,13 @@
 #if REALM_ENABLE_ENCRYPTION
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/errno.hpp>
-#include <realm/utilities.hpp>
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/terminate.hpp>
+#include <realm/utilities.hpp>
 
-#include <cstdlib>
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
@@ -50,9 +50,9 @@
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
 #else
+#include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <pthread.h>
 #endif
 
 namespace realm::util {

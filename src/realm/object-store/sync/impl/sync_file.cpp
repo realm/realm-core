@@ -25,14 +25,14 @@
 #include <realm/sync/config.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/hex_dump.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/time.hpp>
-#include <realm/util/scope_exit.hpp>
 
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <system_error>
-#include <fstream>
 
 #ifdef _WIN32
 #include <io.h>

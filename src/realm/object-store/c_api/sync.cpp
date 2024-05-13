@@ -16,14 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/sync/config.hpp>
-#include <realm/sync/client.hpp>
-#include <realm/sync/protocol.hpp>
-#include <realm/sync/network/websocket.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
-#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/sync/client.hpp>
+#include <realm/sync/config.hpp>
+#include <realm/sync/network/websocket.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/util/basic_system_errors.hpp>
 
 #include "types.hpp"

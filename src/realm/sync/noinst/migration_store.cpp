@@ -1,7 +1,7 @@
 #include <realm/sync/noinst/migration_store.hpp>
 
-#include <realm/transaction.hpp>
 #include <realm/sync/noinst/sync_metadata_schema.hpp>
+#include <realm/transaction.hpp>
 
 namespace realm::sync {
 namespace {

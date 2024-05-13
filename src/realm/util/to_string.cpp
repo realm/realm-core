@@ -18,8 +18,8 @@
 
 #include <realm/util/to_string.hpp>
 
-#include <realm/util/assert.hpp>
 #include <realm/string_data.hpp>
+#include <realm/util/assert.hpp>
 
 #include <cstring>
 #include <iomanip>

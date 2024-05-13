@@ -19,10 +19,10 @@
 #ifndef REALM_COLUMN_BINARY_HPP
 #define REALM_COLUMN_BINARY_HPP
 
-#include <realm/bplustree.hpp>
 #include <realm/array_binary.hpp>
-#include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
+#include <realm/array_blobs_small.hpp>
+#include <realm/bplustree.hpp>
 
 namespace realm {
 

@@ -19,8 +19,8 @@
 #ifndef REALM_IMPL_DESTROY_GUARD_HPP
 #define REALM_IMPL_DESTROY_GUARD_HPP
 
-#include <realm/util/features.h>
 #include <realm/array.hpp>
+#include <realm/util/features.h>
 
 namespace realm {
 class Array;

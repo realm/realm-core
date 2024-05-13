@@ -16,14 +16,14 @@
  *
  **************************************************************************/
 
-#include <realm/dictionary.hpp>
 #include <realm/aggregate_ops.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/array_ref.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/group.hpp>
 #include <realm/list.hpp>
-#include <realm/set.hpp>
 #include <realm/replication.hpp>
+#include <realm/set.hpp>
 
 #include <algorithm>
 

@@ -1,15 +1,15 @@
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
-#include <string>
 #include <iostream>
+#include <string>
 
-#include <realm/util/cli_args.hpp>
-#include <realm/util/compression.hpp>
-#include <realm/util/base64.hpp>
-#include <realm/util/load_file.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/cli_args.hpp>
+#include <realm/util/compression.hpp>
+#include <realm/util/load_file.hpp>
 
 using namespace realm;
 #if REALM_DEBUG

@@ -16,11 +16,11 @@
  *
  **************************************************************************/
 
-#include <cstdlib> // size_t
-#include <string>
-#include <cstdint>
 #include <atomic>
+#include <cstdint>
+#include <cstdlib> // size_t
 #include <fstream>
+#include <string>
 
 #ifdef _WIN32
 #include "windows.h"
@@ -31,9 +31,9 @@
 #include <unistd.h>
 #endif
 
-#include <realm/utilities.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/utilities.hpp>
 
 #ifdef REALM_COMPILER_SSE
 #ifdef _MSC_VER

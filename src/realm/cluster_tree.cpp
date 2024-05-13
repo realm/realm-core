@@ -17,17 +17,17 @@
  **************************************************************************/
 
 #include "realm/cluster_tree.hpp"
+#include "realm/array_backlink.hpp"
+#include "realm/array_bool.hpp"
+#include "realm/array_fixed_bytes.hpp"
+#include "realm/array_integer.hpp"
+#include "realm/array_key.hpp"
+#include "realm/array_mixed.hpp"
+#include "realm/array_string.hpp"
+#include "realm/array_timestamp.hpp"
+#include "realm/array_typed_link.hpp"
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
-#include "realm/array_key.hpp"
-#include "realm/array_integer.hpp"
-#include "realm/array_backlink.hpp"
-#include "realm/array_typed_link.hpp"
-#include "realm/array_timestamp.hpp"
-#include "realm/array_bool.hpp"
-#include "realm/array_string.hpp"
-#include "realm/array_mixed.hpp"
-#include "realm/array_fixed_bytes.hpp"
 
 #include <iostream>
 

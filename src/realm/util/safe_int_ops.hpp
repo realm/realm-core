@@ -27,8 +27,8 @@
 
 #include <limits>
 
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/features.h>
 
 namespace realm {
 namespace util {

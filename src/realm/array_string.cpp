@@ -17,8 +17,8 @@
  **************************************************************************/
 
 #include <realm/array_string.hpp>
-#include <realm/spec.hpp>
 #include <realm/mixed.hpp>
+#include <realm/spec.hpp>
 
 using namespace realm;
 

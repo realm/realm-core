@@ -19,9 +19,9 @@
 #ifndef REALM_OS_DICTIONARY_HPP
 #define REALM_OS_DICTIONARY_HPP
 
+#include <realm/dictionary.hpp>
 #include <realm/object-store/collection.hpp>
 #include <realm/object-store/object.hpp>
-#include <realm/dictionary.hpp>
 
 namespace realm {
 

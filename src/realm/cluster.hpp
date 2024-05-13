@@ -19,12 +19,12 @@
 #ifndef REALM_CLUSTER_HPP
 #define REALM_CLUSTER_HPP
 
-#include <realm/keys.hpp>
-#include <realm/mixed.hpp>
 #include <realm/array.hpp>
 #include <realm/array_unsigned.hpp>
-#include <realm/data_type.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/data_type.hpp>
+#include <realm/keys.hpp>
+#include <realm/mixed.hpp>
 
 namespace realm {
 

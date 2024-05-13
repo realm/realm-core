@@ -19,6 +19,11 @@
 #ifndef REALM_IMPORTER_HPP
 #define REALM_IMPORTER_HPP
 
+#include <realm.hpp>
+
+#include <cstddef>
+#include <vector>
+
 /*
 Main method: import_csv(). Arguments:
 ---------------------------------------------------------------------------------------------------------------------
@@ -67,8 +72,6 @@ import_csv(csv file handle, realm table)
     Calls table.add_empty_row(), table.set_float(), table.set_bool()
 */
 
-#include <cstddef>
-
 // Disk read chunk size. This MUST be large enough to contain at least TWO rows of csv plaintext! It's a good idea
 // to set it as low as ever possible (like 32 K) even though it's counter-intuitive with respect to performance. It
 // will make the operating system read 32 K from disk and return it, and then read-ahead 32-64 K more after fread()
@@ -81,9 +84,6 @@ static const size_t record_chunks = 100;
 
 // Width of each column when printing them on screen (non-Quiet mode)
 const size_t print_width = 25;
-
-#include <vector>
-#include <realm.hpp>
 
 namespace realm {
 

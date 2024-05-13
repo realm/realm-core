@@ -18,8 +18,8 @@
 
 #include <utility> // pair
 
-#include <realm/array_blobs_small.hpp>
 #include <realm/array_blob.hpp>
+#include <realm/array_blobs_small.hpp>
 #include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;

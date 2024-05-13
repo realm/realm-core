@@ -16,9 +16,9 @@
  *
  **************************************************************************/
 
-#include <realm/query_expression.hpp>
-#include <realm/group.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/group.hpp>
+#include <realm/query_expression.hpp>
 
 namespace realm {
 

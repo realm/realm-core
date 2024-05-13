@@ -18,13 +18,13 @@
 
 #include <realm/object-store/results.hpp>
 
+#include <realm/object-store/audit.hpp>
+#include <realm/object-store/class.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/results_notifier.hpp>
-#include <realm/object-store/audit.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
-#include <realm/object-store/class.hpp>
 #include <realm/object-store/sectioned_results.hpp>
 
 #include <realm/set.hpp>

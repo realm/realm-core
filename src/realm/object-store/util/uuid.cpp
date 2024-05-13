@@ -20,9 +20,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <functional>
 #include <random>
-#include <cstdio>
 
 namespace {
 

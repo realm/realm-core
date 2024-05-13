@@ -18,14 +18,15 @@
 
 // Test tool in test/test_csv/test.pl
 
+#include "importer.hpp"
+
+#include <realm/util/assert.hpp>
+
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <sstream>
-#include <cstdint>
 #include <vector>
-
-#include <realm/util/assert.hpp>
-#include "importer.hpp"
 
 using namespace realm;
 

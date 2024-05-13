@@ -1,8 +1,8 @@
 #include <realm/error_codes.hpp>
-#include <realm/status.hpp>
 #include <realm/object-store/c_api/util.hpp>
-#include <realm/sync/socket_provider.hpp>
+#include <realm/status.hpp>
 #include <realm/sync/network/websocket.hpp>
+#include <realm/sync/socket_provider.hpp>
 
 namespace realm::c_api {
 namespace {

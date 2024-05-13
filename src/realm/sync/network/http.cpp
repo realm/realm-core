@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <cctype>
-#include <sstream>
 #include <ostream>
+#include <sstream>
 
 #include <realm/sync/network/http.hpp>
 

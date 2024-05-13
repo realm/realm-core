@@ -1,10 +1,11 @@
+#include <realm/util/demangle.hpp>
+
+#include <realm/util/assert.hpp>
+#include <realm/util/backtrace.hpp>
+#include <realm/util/features.h>
+
 #include <cstdlib>
 #include <memory>
-
-#include <realm/util/features.h>
-#include <realm/util/assert.hpp>
-#include <realm/util/demangle.hpp>
-#include <realm/util/backtrace.hpp>
 
 #if REALM_HAVE_AT_LEAST_GCC(3, 2)
 #define REALM_HAVE_CXXABI_DEMANGLE

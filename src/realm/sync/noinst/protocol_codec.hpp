@@ -1,18 +1,12 @@
 #ifndef REALM_NOINST_PROTOCOL_CODEC_HPP
 #define REALM_NOINST_PROTOCOL_CODEC_HPP
 
-#include <cstdint>
 #include <algorithm>
+#include <cstdint>
 #include <memory>
-#include <vector>
 #include <string>
+#include <vector>
 
-#include <realm/util/buffer_stream.hpp>
-#include <realm/util/compression.hpp>
-#include <realm/util/from_chars.hpp>
-#include <realm/util/logger.hpp>
-#include <realm/util/memory_stream.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/chunked_binary.hpp>
 #include <realm/sync/changeset_parser.hpp>
@@ -21,6 +15,12 @@
 #include <realm/sync/noinst/integer_codec.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/transform.hpp>
+#include <realm/util/buffer_stream.hpp>
+#include <realm/util/compression.hpp>
+#include <realm/util/from_chars.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/memory_stream.hpp>
+#include <realm/util/optional.hpp>
 
 #include <external/json/json.hpp>
 

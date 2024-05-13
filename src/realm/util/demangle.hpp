@@ -1,8 +1,8 @@
 #ifndef REALM_UTIL_DEMANGLE_HPP
 #define REALM_UTIL_DEMANGLE_HPP
 
-#include <typeinfo>
 #include <string>
+#include <typeinfo>
 
 namespace realm::util {
 

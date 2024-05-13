@@ -19,17 +19,17 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
-#include <realm/object-store/schema.hpp>
 #include <realm/object-store/class.hpp>
+#include <realm/object-store/schema.hpp>
 
-#include <realm/util/optional.hpp>
-#include <realm/util/functional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/transaction.hpp>
+#include <realm/util/functional.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
-#include <memory>
 #include <deque>
+#include <memory>
 
 namespace realm {
 class AuditInterface;

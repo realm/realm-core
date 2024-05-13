@@ -19,11 +19,11 @@
 #ifndef REALM_UTIL_FILE_MAPPER_HPP
 #define REALM_UTIL_FILE_MAPPER_HPP
 
-#include <realm/util/file.hpp>
-#include <realm/utilities.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/file.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/thread.hpp>
+#include <realm/utilities.hpp>
 
 #include <unordered_map>
 #include <unordered_set>

@@ -19,12 +19,12 @@
 #ifndef REALM_UTILITIES_HPP
 #define REALM_UTILITIES_HPP
 
-#include <cstdint>
-#include <cstdlib>
-#include <cstdio>
 #include <algorithm>
-#include <functional>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <ctime>
+#include <functional>
 
 #ifdef _WIN32
 
@@ -40,8 +40,8 @@ typedef SSIZE_T ssize_t;
 
 #endif // _WIN32
 
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/features.h>
 #include <realm/util/functional.hpp>
 #include <realm/util/safe_int_ops.hpp>
 

@@ -19,8 +19,8 @@
 #ifndef REALM_NODE_HPP
 #define REALM_NODE_HPP
 
-#include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
+#include <realm/node_header.hpp>
 
 namespace realm {
 

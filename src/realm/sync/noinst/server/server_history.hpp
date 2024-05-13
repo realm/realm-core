@@ -8,21 +8,21 @@
 #include <string>
 #include <unordered_map>
 
-#include <realm/util/buffer.hpp>
-#include <realm/util/logger.hpp>
-#include <realm/util/backtrace.hpp>
+#include <realm/array_integer.hpp>
+#include <realm/array_ref.hpp>
 #include <realm/chunked_binary.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/replication.hpp>
-#include <realm/transaction.hpp>
-#include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/instruction_replication.hpp>
+#include <realm/sync/noinst/server/clock.hpp>
+#include <realm/sync/noinst/server/permissions.hpp>
 #include <realm/sync/object_id.hpp>
 #include <realm/sync/transform.hpp>
-#include <realm/sync/instruction_replication.hpp>
-#include <realm/sync/noinst/server/permissions.hpp>
-#include <realm/array_integer.hpp>
-#include <realm/array_ref.hpp>
+#include <realm/transaction.hpp>
+#include <realm/util/backtrace.hpp>
+#include <realm/util/buffer.hpp>
+#include <realm/util/logger.hpp>
 
 namespace realm {
 namespace sync {

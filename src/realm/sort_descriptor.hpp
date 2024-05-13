@@ -19,13 +19,13 @@
 #ifndef REALM_SORT_DESCRIPTOR_HPP
 #define REALM_SORT_DESCRIPTOR_HPP
 
-#include <vector>
-#include <unordered_set>
 #include <realm/cluster.hpp>
-#include <realm/path.hpp>
 #include <realm/mixed.hpp>
+#include <realm/path.hpp>
 #include <realm/util/bind_ptr.hpp>
 
+#include <unordered_set>
+#include <vector>
 
 namespace realm {
 

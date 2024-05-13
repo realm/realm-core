@@ -36,10 +36,10 @@
 #include <vector>
 
 #ifndef _WIN32
-#include <unistd.h>
-#include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
+#include <sys/mman.h>
 #include <sys/statvfs.h>
+#include <unistd.h>
 #endif
 
 #if REALM_PLATFORM_APPLE

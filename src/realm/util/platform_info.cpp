@@ -2,14 +2,14 @@
 #include <sstream>
 #include <vector>
 
-#include <realm/util/features.h>
-#include <realm/util/basic_system_errors.hpp>
-#include <realm/util/platform_info.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/basic_system_errors.hpp>
+#include <realm/util/features.h>
+#include <realm/util/platform_info.hpp>
 
 #ifndef _WIN32
-#include <unistd.h>
 #include <sys/utsname.h>
+#include <unistd.h>
 #else
 #include <windows.h>
 #include <VersionHelpers.h>

@@ -19,8 +19,8 @@
 #ifndef REALM_UTIL_BASE64_HPP
 #define REALM_UTIL_BASE64_HPP
 
-#include <realm/util/span.hpp>
 #include <optional>
+#include <realm/util/span.hpp>
 #include <vector>
 
 namespace realm::util {

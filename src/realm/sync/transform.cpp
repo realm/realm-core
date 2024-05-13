@@ -4,9 +4,9 @@
 #include <realm/sync/noinst/protocol_codec.hpp>
 
 #if REALM_DEBUG
-#include <sstream>
 #include <iostream> // std::cerr used for debug tracing
 #include <mutex>    // std::unique_lock used for debug tracing
+#include <sstream>
 #endif              // REALM_DEBUG
 
 using namespace realm;

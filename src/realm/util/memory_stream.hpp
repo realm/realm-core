@@ -20,9 +20,9 @@
 #define REALM_UTIL_MEMORY_STREAM_HPP
 
 #include <cstddef>
-#include <string>
 #include <istream>
 #include <ostream>
+#include <string>
 
 namespace realm::util {
 

@@ -19,18 +19,18 @@
 #ifndef REALM_ALLOC_HPP
 #define REALM_ALLOC_HPP
 
-#include <cstdint>
-#include <cstddef>
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 
-#include <realm/util/features.h>
-#include <realm/util/terminate.hpp>
-#include <realm/util/assert.hpp>
-#include <realm/util/file.hpp>
 #include <realm/exceptions.hpp>
-#include <realm/util/safe_int_ops.hpp>
 #include <realm/node_header.hpp>
+#include <realm/util/assert.hpp>
+#include <realm/util/features.h>
+#include <realm/util/file.hpp>
 #include <realm/util/file_mapper.hpp>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/terminate.hpp>
 
 // Temporary workaround for
 // https://developercommunity.visualstudio.com/content/problem/994075/64-bit-atomic-load-ices-cl-1924-with-o2-ob1.html

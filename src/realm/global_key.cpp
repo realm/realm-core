@@ -17,14 +17,16 @@
  **************************************************************************/
 
 #include <realm/global_key.hpp>
-#include <realm/string_data.hpp>
+
 #include <realm/mixed.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/sha_crypto.hpp>
-#include <iomanip>
-#include <ostream>
-#include <istream>
-#include <sstream>
+
 #include <cctype>
+#include <iomanip>
+#include <istream>
+#include <ostream>
+#include <sstream>
 
 namespace realm {
 

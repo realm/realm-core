@@ -19,11 +19,11 @@
 #ifndef REALM_SYNC_IMPL_INSTRUCTION_APPLIER_HPP
 #define REALM_SYNC_IMPL_INSTRUCTION_APPLIER_HPP
 
-#include <realm/sync/instructions.hpp>
-#include <realm/sync/changeset.hpp>
-#include <realm/util/logger.hpp>
-#include <realm/list.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/list.hpp>
+#include <realm/sync/changeset.hpp>
+#include <realm/sync/instructions.hpp>
+#include <realm/util/logger.hpp>
 
 #include <tuple>
 

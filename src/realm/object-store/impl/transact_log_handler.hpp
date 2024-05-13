@@ -20,8 +20,8 @@
 #define REALM_TRANSACT_LOG_HANDLER_HPP
 
 #include <cstdint>
-#include <stdexcept>
 #include <memory>
+#include <stdexcept>
 
 #include <realm/version_id.hpp>
 

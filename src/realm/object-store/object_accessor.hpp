@@ -21,19 +21,19 @@
 
 #include <realm/object-store/object.hpp>
 
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/list.hpp>
-#include <realm/object-store/dictionary.hpp>
-#include <realm/object-store/set.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/shared_realm.hpp>
 
+#include <realm/table_view.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/table_view.hpp>
 
 #include <string>
 

@@ -24,8 +24,8 @@
 #include <realm/query.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/checked_mutex.hpp>
-#include <realm/util/future.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/tagged_bool.hpp>
 

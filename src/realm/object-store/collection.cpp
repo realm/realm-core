@@ -19,15 +19,15 @@
 #include <realm/object-store/collection.hpp>
 
 #include <realm/object-store/audit.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/impl/list_notifier.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/list.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
-#include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/list.hpp>
-#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/set.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 namespace realm::object_store {
 

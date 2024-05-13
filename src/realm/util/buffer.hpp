@@ -19,16 +19,16 @@
 #ifndef REALM_UTIL_BUFFER_HPP
 #define REALM_UTIL_BUFFER_HPP
 
-#include <cstddef>
+#include <realm/util/features.h>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/utilities.hpp>
+
 #include <algorithm>
+#include <cstddef>
 #include <exception>
 #include <limits>
-#include <utility>
-
-#include <realm/util/features.h>
-#include <realm/utilities.hpp>
-#include <realm/util/safe_int_ops.hpp>
 #include <memory>
+#include <utility>
 
 namespace realm::util {
 

@@ -1,6 +1,6 @@
+#include <iomanip>
 #include <locale>
 #include <stdexcept>
-#include <iomanip>
 
 #include <realm/util/time.hpp>
 #include <realm/util/timestamp_formatter.hpp>

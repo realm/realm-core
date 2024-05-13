@@ -20,8 +20,9 @@
 #define REALM_OS_CLASS_HPP
 
 #include <realm/obj.hpp>
-#include "realm/parser/keypath_mapping.hpp"
-#include "realm/parser/query_parser.hpp"
+#include <realm/parser/keypath_mapping.hpp>
+#include <realm/parser/query_parser.hpp>
+
 #include <memory>
 
 namespace realm {

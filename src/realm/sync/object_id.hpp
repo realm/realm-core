@@ -20,18 +20,18 @@
 #define REALM_SYNC_OBJECT_ID_HPP
 
 #include <functional> // std::hash
-#include <string>
 #include <iosfwd> // operator<<
 #include <map>
 #include <set>
+#include <string>
 
 #include <external/mpark/variant.hpp>
-#include <realm/global_key.hpp>
-#include <realm/string_data.hpp>
 #include <realm/data_type.hpp>
-#include <realm/keys.hpp>
 #include <realm/db.hpp>
+#include <realm/global_key.hpp>
+#include <realm/keys.hpp>
 #include <realm/mixed.hpp>
+#include <realm/string_data.hpp>
 
 namespace realm {
 

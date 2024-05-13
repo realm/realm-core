@@ -1,5 +1,5 @@
-#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/changeset_index.hpp>
+#include <realm/sync/noinst/compact_changesets.hpp>
 
 using namespace realm;
 using namespace realm::sync;

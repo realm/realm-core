@@ -2,19 +2,19 @@
 #define REALM_SYNC_SERVER_HPP
 
 #include <cstdint>
-#include <memory>
-#include <string>
-#include <map>
-#include <set>
 #include <exception>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
 
-#include <realm/util/logger.hpp>
-#include <realm/util/optional.hpp>
-#include <realm/util/time.hpp>
+#include <realm/sync/client.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/noinst/server/crypto_server.hpp>
-#include <realm/sync/client.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/time.hpp>
 
 namespace realm::sync {
 

@@ -19,12 +19,12 @@
 #ifndef REALM_UTIL_INTERPROCESS_MUTEX
 #define REALM_UTIL_INTERPROCESS_MUTEX
 
-#include <realm/util/features.h>
-#include <realm/util/thread.hpp>
-#include <realm/util/file.hpp>
-#include <realm/utilities.hpp>
-#include <mutex>
 #include <map>
+#include <mutex>
+#include <realm/util/features.h>
+#include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
+#include <realm/utilities.hpp>
 #include <thread>
 
 #if REALM_PLATFORM_APPLE

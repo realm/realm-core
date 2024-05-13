@@ -16,11 +16,11 @@
  *
  **************************************************************************/
 
-#include <realm/impl/destroy_guard.hpp>
-#include <realm/spec.hpp>
-#include <realm/replication.hpp>
-#include <realm/util/to_string.hpp>
 #include <realm/group.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/replication.hpp>
+#include <realm/spec.hpp>
+#include <realm/util/to_string.hpp>
 using namespace realm;
 
 Spec::~Spec() noexcept = default;

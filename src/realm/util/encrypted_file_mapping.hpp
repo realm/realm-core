@@ -19,9 +19,9 @@
 #ifndef REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 #define REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 
-#include <realm/util/file.hpp>
-#include <realm/util/features.h>
 #include <realm/util/aes_cryptor.hpp>
+#include <realm/util/features.h>
+#include <realm/util/file.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
 

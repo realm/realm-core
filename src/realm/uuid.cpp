@@ -16,10 +16,10 @@
  *
  **************************************************************************/
 
-#include <realm/uuid.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/uuid.hpp>
 
 #include <atomic>
 #include <cctype>

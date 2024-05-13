@@ -1,7 +1,7 @@
 #include <getopt.h>
-#include <string>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 #include <realm.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>

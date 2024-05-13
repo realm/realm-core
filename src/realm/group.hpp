@@ -19,14 +19,6 @@
 #ifndef REALM_GROUP_HPP
 #define REALM_GROUP_HPP
 
-#include <functional>
-#include <map>
-#include <optional>
-#include <stdexcept>
-#include <string>
-#include <set>
-#include <chrono>
-
 #include <realm/alloc_slab.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
@@ -34,6 +26,14 @@
 #include <realm/table.hpp>
 #include <realm/util/features.h>
 #include <realm/util/input_stream.hpp>
+
+#include <chrono>
+#include <functional>
+#include <map>
+#include <optional>
+#include <set>
+#include <stdexcept>
+#include <string>
 
 namespace realm {
 

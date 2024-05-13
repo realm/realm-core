@@ -5,11 +5,11 @@
 #include <realm/util/backtrace.hpp>
 
 #include <algorithm>
-#include <utility>
-#include <stdexcept>
 #include <cctype>
-#include <sstream>
 #include <iomanip>
+#include <sstream>
+#include <stdexcept>
+#include <utility>
 
 using namespace realm;
 

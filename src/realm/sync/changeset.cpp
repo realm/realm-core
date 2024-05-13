@@ -1,8 +1,8 @@
 #include <realm/sync/changeset.hpp>
 
 #if REALM_DEBUG
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #endif // REALM_DEBUG
 

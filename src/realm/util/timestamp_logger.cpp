@@ -1,5 +1,5 @@
-#include <utility>
 #include <iostream>
+#include <utility>
 
 #include <realm/util/timestamp_logger.hpp>
 

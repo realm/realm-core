@@ -19,9 +19,9 @@
 #ifndef DEEP_CHANGE_CHECKER_HPP
 #define DEEP_CHANGE_CHECKER_HPP
 
-#include <realm/object-store/object_changeset.hpp>
-#include <realm/object-store/impl/collection_change_builder.hpp>
 #include <realm/collection_parent.hpp>
+#include <realm/object-store/impl/collection_change_builder.hpp>
+#include <realm/object-store/object_changeset.hpp>
 
 #include <array>
 

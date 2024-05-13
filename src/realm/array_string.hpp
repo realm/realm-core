@@ -19,9 +19,9 @@
 #ifndef REALM_ARRAY_STRING_HPP
 #define REALM_ARRAY_STRING_HPP
 
-#include <realm/array_string_short.hpp>
-#include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
+#include <realm/array_blobs_small.hpp>
+#include <realm/array_string_short.hpp>
 
 namespace realm {
 

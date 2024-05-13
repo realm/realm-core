@@ -2,11 +2,11 @@
 #include <realm/util/backtrace.hpp>
 #include <realm/util/overload.hpp>
 
-#include <sstream>
-#include <iomanip>
-#include <ostream>
 #include <cctype>   // std::isxdigit
 #include <cstdlib> // strtoull
+#include <iomanip>
+#include <ostream>
+#include <sstream>
 
 using namespace realm;
 using namespace realm::sync;

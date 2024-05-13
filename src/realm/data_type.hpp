@@ -20,8 +20,8 @@
 #define REALM_DATA_TYPE_HPP
 
 #include <cstdint>
-#include <realm/util/to_string.hpp>
 #include <realm/util/features.h>
+#include <realm/util/to_string.hpp>
 
 namespace realm {
 

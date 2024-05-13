@@ -18,12 +18,12 @@
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
+#include <realm/object-store/audit.hpp>
+#include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/impl/external_commit_helper.hpp>
 #include <realm/object-store/impl/transact_log_handler.hpp>
 #include <realm/object-store/impl/weak_realm_notifier.hpp>
-#include <realm/object-store/audit.hpp>
-#include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
@@ -43,8 +43,8 @@
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
-#include <realm/util/fifo_helper.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/util/fifo_helper.hpp>
 
 #include <algorithm>
 #include <unordered_map>

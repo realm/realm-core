@@ -19,18 +19,18 @@
 #ifndef REALM_BSON_HPP
 #define REALM_BSON_HPP
 
-#include <realm/util/bson/indexed_map.hpp>
-#include <realm/util/bson/regular_expression.hpp>
-#include <realm/util/bson/min_key.hpp>
-#include <realm/util/bson/max_key.hpp>
-#include <realm/util/bson/mongo_timestamp.hpp>
-#include <realm/util/span.hpp>
-
 #include <realm/binary_data.hpp>
-#include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
+#include <realm/timestamp.hpp>
+#include <realm/util/bson/indexed_map.hpp>
+#include <realm/util/bson/max_key.hpp>
+#include <realm/util/bson/min_key.hpp>
+#include <realm/util/bson/mongo_timestamp.hpp>
+#include <realm/util/bson/regular_expression.hpp>
+#include <realm/util/span.hpp>
 #include <realm/uuid.hpp>
+
 #include <ostream>
 
 namespace realm::bson {

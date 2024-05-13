@@ -2,13 +2,13 @@
 #ifndef REALM_UTIL_TIMESTAMP_FORMATTER_HPP
 #define REALM_UTIL_TIMESTAMP_FORMATTER_HPP
 
-#include <ctime>
 #include <chrono>
-#include <utility>
+#include <ctime>
 #include <string>
+#include <utility>
 
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/features.h>
 #include <realm/util/memory_stream.hpp>
 
 namespace realm::util {

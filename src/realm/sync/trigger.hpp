@@ -19,8 +19,8 @@
 #pragma once
 
 #include <realm/status.hpp>
-#include <realm/util/bind_ptr.hpp>
 #include <realm/sync/socket_provider.hpp>
+#include <realm/util/bind_ptr.hpp>
 
 namespace realm::sync {
 

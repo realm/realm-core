@@ -16,11 +16,12 @@
  *
  **************************************************************************/
 
-#include <realm/util/bson/bson.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/bson/bson.hpp>
+
+#include <algorithm>
 #include <external/json/json.hpp>
 #include <sstream>
-#include <algorithm>
 
 namespace realm::bson {
 

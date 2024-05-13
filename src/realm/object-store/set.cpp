@@ -18,6 +18,7 @@
 
 #include <realm/object-store/set.hpp>
 
+#include <realm/exceptions.hpp>
 #include <realm/object-store/impl/list_notifier.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -25,7 +26,6 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/exceptions.hpp>
 
 namespace realm::object_store {
 

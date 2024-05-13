@@ -19,10 +19,10 @@
 #ifndef REALM_UTIL_FLAT_MAP_HPP
 #define REALM_UTIL_FLAT_MAP_HPP
 
-#include <vector>
-#include <utility>   // std::pair
 #include <algorithm> // std::lower_bound etc.
 #include <type_traits>
+#include <utility>   // std::pair
+#include <vector>
 
 #include <realm/util/backtrace.hpp>
 

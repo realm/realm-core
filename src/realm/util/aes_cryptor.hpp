@@ -21,9 +21,9 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <realm/util/features.h>
-#include <cstdint>
 #include <vector>
 
 #include <realm/util/file.hpp>

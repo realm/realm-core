@@ -16,12 +16,13 @@
  *
  **************************************************************************/
 
+#include <realm/impl/output_stream.hpp>
+
+#include <realm/util/backtrace.hpp>
+#include <realm/util/safe_int_ops.hpp>
+
 #include <limits>
 #include <stdexcept>
-
-#include <realm/util/safe_int_ops.hpp>
-#include <realm/util/backtrace.hpp>
-#include <realm/impl/output_stream.hpp>
 
 using namespace realm;
 using namespace realm::util;

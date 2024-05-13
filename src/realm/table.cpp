@@ -39,8 +39,8 @@
 #include <stdexcept>
 
 #ifdef REALM_DEBUG
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #endif
 
 /// \page AccessorConsistencyLevels

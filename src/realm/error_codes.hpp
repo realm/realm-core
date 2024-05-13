@@ -18,11 +18,12 @@
 
 #pragma once
 
-#include <cstdint>
-#include <type_traits>
-#include <string>
-#include <vector>
 #include <realm/error_codes.h>
+
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 namespace realm {
 

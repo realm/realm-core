@@ -19,13 +19,14 @@
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
-#include <array>
-#include <cstdint>
-#include <ostream>
-#include <chrono>
-#include <ctime>
-#include <realm/util/assert.hpp>
 #include <realm/null.hpp>
+#include <realm/util/assert.hpp>
+
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <ctime>
+#include <ostream>
 
 namespace realm {
 

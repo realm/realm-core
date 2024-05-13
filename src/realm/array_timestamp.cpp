@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#include <realm/array_timestamp.hpp>
 #include <realm/array_integer_tpl.hpp>
+#include <realm/array_timestamp.hpp>
 
 using namespace realm;
 

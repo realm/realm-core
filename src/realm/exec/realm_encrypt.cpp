@@ -1,7 +1,7 @@
-#include <iostream>
-#include <cstring>
-#include <realm.hpp>
 #include "hex_util.hpp"
+#include <cstring>
+#include <iostream>
+#include <realm.hpp>
 
 using namespace realm;
 

@@ -20,13 +20,13 @@
 #define REALM_UTIL_BIND_PTR_HPP
 
 #include <algorithm>
-#include <memory>
 #include <atomic>
+#include <memory>
 #include <ostream>
 #include <utility>
 
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/features.h>
 
 namespace realm::util {
 

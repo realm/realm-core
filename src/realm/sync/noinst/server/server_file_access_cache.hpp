@@ -2,16 +2,16 @@
 #ifndef REALM_NOINST_SERVER_FILE_ACCESS_CACHE_HPP
 #define REALM_NOINST_SERVER_FILE_ACCESS_CACHE_HPP
 
-#include <utility>
 #include <memory>
-#include <string>
 #include <random>
+#include <string>
+#include <utility>
 
+#include <realm/db.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/db.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/sync/noinst/server/server_history.hpp>
 
 namespace realm::_impl {
 

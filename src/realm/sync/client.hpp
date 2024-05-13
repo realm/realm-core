@@ -9,10 +9,10 @@
 #include <string>
 #include <utility>
 
+#include <realm/sync/client_base.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/future.hpp>
-#include <realm/sync/client_base.hpp>
 
 namespace realm::sync {
 

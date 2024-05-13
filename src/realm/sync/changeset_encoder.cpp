@@ -1,5 +1,5 @@
-#include <realm/sync/noinst/integer_codec.hpp>
 #include <realm/sync/changeset_encoder.hpp>
+#include <realm/sync/noinst/integer_codec.hpp>
 
 using namespace realm;
 using namespace realm::sync;

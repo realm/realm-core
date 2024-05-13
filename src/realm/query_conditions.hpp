@@ -22,11 +22,11 @@
 #include <cstdint>
 #include <string>
 
-#include <realm/query_state.hpp>
-#include <realm/unicode.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/query_value.hpp>
 #include <realm/mixed.hpp>
+#include <realm/query_state.hpp>
+#include <realm/query_value.hpp>
+#include <realm/unicode.hpp>
 #include <realm/utilities.hpp>
 
 namespace realm {

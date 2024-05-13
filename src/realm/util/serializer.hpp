@@ -23,8 +23,8 @@
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 
-#include <string>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace realm {

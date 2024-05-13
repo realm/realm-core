@@ -32,8 +32,8 @@
 #include <realm/version.hpp>
 
 #include <algorithm>
-#include <ctime>
 #include <cstring>
+#include <ctime>
 #include <utility>
 
 namespace realm::sync {

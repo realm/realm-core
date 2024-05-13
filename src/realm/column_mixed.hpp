@@ -19,8 +19,8 @@
 #ifndef REALM_COLUMN_MIXED_HPP
 #define REALM_COLUMN_MIXED_HPP
 
-#include <realm/bplustree.hpp>
 #include <realm/array_mixed.hpp>
+#include <realm/bplustree.hpp>
 
 namespace realm {
 

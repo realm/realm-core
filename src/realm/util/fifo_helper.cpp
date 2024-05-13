@@ -22,8 +22,8 @@
 #include <realm/util/errno.hpp>
 
 #include <sstream>
-#include <system_error>
 #include <sys/stat.h>
+#include <system_error>
 
 // FIFOs do not work on Windows.
 namespace realm::util {

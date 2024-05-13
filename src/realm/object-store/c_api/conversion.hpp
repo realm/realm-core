@@ -3,17 +3,17 @@
 
 #include <realm.h>
 
+#include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
-#include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
 
-#include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
-#include <realm/object_id.hpp>
 #include <realm/mixed.hpp>
+#include <realm/object_id.hpp>
+#include <realm/string_data.hpp>
+#include <realm/timestamp.hpp>
 #include <realm/uuid.hpp>
 
 #include <string>

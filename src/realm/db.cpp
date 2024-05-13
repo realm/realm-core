@@ -21,16 +21,16 @@
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <fcntl.h>
 #include <iostream>
 #include <mutex>
-#include <sstream>
-#include <type_traits>
 #include <random>
-#include <deque>
+#include <sstream>
 #include <thread>
-#include <chrono>
-#include <condition_variable>
+#include <type_traits>
 
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/group_writer.hpp>
@@ -45,8 +45,8 @@
 #include <realm/util/to_string.hpp>
 
 #ifndef _WIN32
-#include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #else
 #include <windows.h>

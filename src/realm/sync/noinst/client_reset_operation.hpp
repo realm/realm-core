@@ -20,11 +20,11 @@
 #define REALM_NOINST_CLIENT_RESET_OPERATION_HPP
 
 #include <realm/db.hpp>
-#include <realm/util/functional.hpp>
-#include <realm/util/function_ref.hpp>
-#include <realm/util/logger.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/util/function_ref.hpp>
+#include <realm/util/functional.hpp>
+#include <realm/util/logger.hpp>
 
 namespace realm::sync {
 class SubscriptionStore;

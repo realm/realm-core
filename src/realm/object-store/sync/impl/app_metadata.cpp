@@ -18,12 +18,12 @@
 
 #include <realm/object-store/sync/impl/app_metadata.hpp>
 
-#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 #if REALM_PLATFORM_APPLE
 #include <realm/object-store/impl/apple/keychain_helper.hpp>

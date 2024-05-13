@@ -18,12 +18,12 @@
 
 #include <realm/object-store/list.hpp>
 
+#include <realm/exceptions.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/exceptions.hpp>
 
 namespace {
 using namespace realm;

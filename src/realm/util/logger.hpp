@@ -20,14 +20,14 @@
 #define REALM_UTIL_LOGGER_HPP
 
 #include <realm/util/features.h>
-#include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
 
+#include <array>
 #include <cstring>
 #include <ostream>
 #include <string>
 #include <utility>
-#include <array>
 
 namespace realm::util {
 

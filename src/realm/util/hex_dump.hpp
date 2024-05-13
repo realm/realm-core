@@ -20,11 +20,11 @@
 #define REALM_UTIL_HEX_DUMP_HPP
 
 #include <cstddef>
-#include <type_traits>
-#include <limits>
-#include <string>
-#include <sstream>
 #include <iomanip>
+#include <limits>
+#include <sstream>
+#include <string>
+#include <type_traits>
 
 #include <realm/util/safe_int_ops.hpp>
 

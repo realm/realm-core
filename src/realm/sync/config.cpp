@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
-#include <realm/sync/protocol.hpp>
+#include <realm/sync/config.hpp>
 #include <realm/sync/network/network.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/util/bson/bson.hpp>
 
 #include <ostream>

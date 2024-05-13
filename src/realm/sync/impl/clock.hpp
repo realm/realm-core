@@ -2,8 +2,8 @@
 #ifndef REALM_IMPL_CLOCK_HPP
 #define REALM_IMPL_CLOCK_HPP
 
-#include <cstdint>
 #include <chrono>
+#include <cstdint>
 
 #include <realm/sync/protocol.hpp>
 

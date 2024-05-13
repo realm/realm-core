@@ -2,10 +2,10 @@
 #ifndef REALM_UTIL_ENUM_HPP
 #define REALM_UTIL_ENUM_HPP
 
-#include <map>
-#include <string>
 #include <ios>
 #include <locale>
+#include <map>
+#include <string>
 
 
 namespace realm {

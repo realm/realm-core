@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#include <realm/column_binary.hpp>
 #include <realm/array_key.hpp>
+#include <realm/column_binary.hpp>
 
 #include <algorithm>
 #include <iomanip>

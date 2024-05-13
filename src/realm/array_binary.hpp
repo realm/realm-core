@@ -19,8 +19,8 @@
 #ifndef REALM_ARRAY_BINARY_HPP
 #define REALM_ARRAY_BINARY_HPP
 
-#include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
+#include <realm/array_blobs_small.hpp>
 
 namespace realm {
 

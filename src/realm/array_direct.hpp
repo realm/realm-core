@@ -19,8 +19,8 @@
 #ifndef REALM_ARRAY_DIRECT_HPP
 #define REALM_ARRAY_DIRECT_HPP
 
-#include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
+#include <realm/utilities.hpp>
 
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */

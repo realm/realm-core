@@ -5,9 +5,9 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 
+#include <map>
 #include <random>
 #include <system_error>
-#include <map>
 
 namespace realm::sync::websocket {
 

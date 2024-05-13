@@ -20,17 +20,17 @@
 #define REALM_REPLICATION_HPP
 
 #include <algorithm>
+#include <exception>
 #include <limits>
 #include <memory>
-#include <exception>
 #include <string>
 
+#include <realm/impl/cont_transact_hist.hpp>
+#include <realm/impl/transact_log.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/impl/cont_transact_hist.hpp>
-#include <realm/impl/transact_log.hpp>
 
 namespace realm {
 namespace util {

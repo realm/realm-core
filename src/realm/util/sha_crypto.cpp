@@ -16,9 +16,9 @@
  *
  **************************************************************************/
 
-#include <realm/util/sha_crypto.hpp>
-#include <realm/util/backtrace.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/backtrace.hpp>
+#include <realm/util/sha_crypto.hpp>
 
 #if REALM_PLATFORM_APPLE
 #include <CommonCrypto/CommonCrypto.h>

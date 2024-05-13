@@ -20,8 +20,8 @@
 #define REALM_ARRAY_TIMESTAMP_HPP
 
 #include <realm/array_integer.hpp>
-#include <realm/timestamp.hpp>
 #include <realm/query_conditions.hpp>
+#include <realm/timestamp.hpp>
 
 namespace realm {
 

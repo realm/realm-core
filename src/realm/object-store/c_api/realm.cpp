@@ -1,5 +1,5 @@
-#include <realm/object-store/c_api/types.hpp>
 #include "realm.hpp"
+#include <realm/object-store/c_api/types.hpp>
 
 
 realm_callback_token_realm::~realm_callback_token_realm()

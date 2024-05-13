@@ -1,10 +1,10 @@
 // This program generates the upper_lower array in unicode.cpp
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <cstring>
 
 std::vector<std::string> tokenize(const char* src, char delim, bool want_empty_tokens = true)
 {

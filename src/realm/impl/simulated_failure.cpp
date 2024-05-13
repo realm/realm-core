@@ -16,17 +16,18 @@
  *
  **************************************************************************/
 
+#include <realm/impl/simulated_failure.hpp>
+
+#include <realm/util/assert.hpp>
+#include <realm/util/basic_system_errors.hpp>
+#include <realm/util/features.h>
+
 #include <algorithm>
 #include <atomic>
 #include <memory>
 #include <random>
 #include <stdexcept>
 #include <system_error>
-
-#include <realm/util/features.h>
-#include <realm/util/assert.hpp>
-#include <realm/util/basic_system_errors.hpp>
-#include <realm/impl/simulated_failure.hpp>
 
 #if REALM_PLATFORM_APPLE || REALM_ANDROID
 #define USE_PTHREADS_IMPL 1

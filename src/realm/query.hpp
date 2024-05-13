@@ -19,10 +19,10 @@
 #ifndef REALM_QUERY_HPP
 #define REALM_QUERY_HPP
 
+#include <algorithm>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
-#include <climits>
-#include <algorithm>
 #include <string>
 #include <vector>
 

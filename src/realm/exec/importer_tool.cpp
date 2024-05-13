@@ -20,12 +20,14 @@
 
 #define NOMINMAX
 
-#include <cstring>
-#include <iostream>
+#include "importer.hpp"
+
 #include <realm.hpp>
 #include <realm/utilities.hpp>
+
 #include <cstdarg>
-#include "importer.hpp"
+#include <cstring>
+#include <iostream>
 
 using namespace realm;
 

@@ -2,18 +2,18 @@
 #ifndef REALM_UTIL_CIRCULAR_BUFFER_HPP
 #define REALM_UTIL_CIRCULAR_BUFFER_HPP
 
+#include <algorithm>
 #include <cstddef>
-#include <type_traits>
+#include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <memory>
-#include <iterator>
-#include <algorithm>
-#include <utility>
 #include <stdexcept>
-#include <initializer_list>
+#include <type_traits>
+#include <utility>
 
-#include <realm/util/safe_int_ops.hpp>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/safe_int_ops.hpp>
 
 namespace realm::util {
 

@@ -37,10 +37,10 @@
 #include <cstddef>
 #include <string>
 
-#include <realm/util/features.h>
-#include <realm/util/assert.hpp>
-#include <realm/util/terminate.hpp>
 #include <memory>
+#include <realm/util/assert.hpp>
+#include <realm/util/features.h>
+#include <realm/util/terminate.hpp>
 #include <stdexcept>
 
 #include <atomic>

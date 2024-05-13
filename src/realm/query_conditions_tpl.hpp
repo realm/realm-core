@@ -20,8 +20,8 @@
 #define REALM_QUERY_CONDITIONS_TPL_HPP
 
 #include <realm/aggregate_ops.hpp>
-#include <realm/query_conditions.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/query_conditions.hpp>
 #include <realm/table.hpp>
 
 #include <cmath>

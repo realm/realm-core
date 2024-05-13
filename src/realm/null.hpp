@@ -19,13 +19,13 @@
 #ifndef REALM_NULL_HPP
 #define REALM_NULL_HPP
 
-#include <cmath>
-#include <cstring>
-
+#include <realm/exceptions.hpp>
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 #include <realm/utilities.hpp>
-#include <realm/exceptions.hpp>
+
+#include <cmath>
+#include <cstring>
 
 namespace realm {
 

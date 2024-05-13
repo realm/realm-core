@@ -19,9 +19,9 @@
 #ifndef REALM_PROPERTY_HPP
 #define REALM_PROPERTY_HPP
 
-#include <realm/util/features.h>
-#include <realm/util/assert.hpp>
 #include <realm/keys.hpp>
+#include <realm/util/assert.hpp>
+#include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 #include <realm/util/tagged_bool.hpp>
 

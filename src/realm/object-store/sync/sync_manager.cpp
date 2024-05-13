@@ -18,16 +18,16 @@
 
 #include <realm/object-store/sync/sync_manager.hpp>
 
+#include <realm/object-store/sync/app.hpp>
+#include <realm/object-store/sync/impl/app_metadata.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
-#include <realm/object-store/sync/impl/app_metadata.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
-#include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/util/uuid.hpp>
 
-#include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
+#include <realm/util/sha_crypto.hpp>
 
 #include <realm/exceptions.hpp>
 

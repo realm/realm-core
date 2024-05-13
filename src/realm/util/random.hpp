@@ -2,12 +2,12 @@
 #ifndef REALM_UTIL_RANDOM_HPP
 #define REALM_UTIL_RANDOM_HPP
 
-#include <cstddef>
-#include <limits>
-#include <array>
-#include <random>
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <functional>
+#include <limits>
+#include <random>
 
 namespace realm {
 namespace util {

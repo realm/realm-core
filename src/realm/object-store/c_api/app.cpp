@@ -17,12 +17,12 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "types.hpp"
-#include "util.hpp"
 #include "conversion.hpp"
+#include "util.hpp"
 
-#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 namespace realm::c_api {
 using namespace realm::app;

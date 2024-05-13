@@ -19,9 +19,9 @@
 #ifndef REALM_UTIL_FIXED_SIZE_BUFFER_HPP
 #define REALM_UTIL_FIXED_SIZE_BUFFER_HPP
 
-#include <vector>
 #include <cstddef>
 #include <stdexcept>
+#include <vector>
 
 namespace realm::util {
 

@@ -20,16 +20,16 @@
 #define REALM_OBJECT_STORE_HPP
 
 #include <realm/object-store/property.hpp>
-#include <realm/exceptions.hpp>
 
+#include <realm/exceptions.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/util/optional.hpp>
 
 #include <functional>
+#include <limits>
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include <limits>
 
 namespace realm {
 class Group;

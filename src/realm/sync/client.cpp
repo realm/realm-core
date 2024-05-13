@@ -1,25 +1,25 @@
 
-#include <memory>
-#include <tuple>
-#include <atomic>
-
-#include "realm/sync/client_base.hpp"
-#include "realm/sync/protocol.hpp"
-#include "realm/util/optional.hpp"
 #include <realm/sync/client.hpp>
+#include <realm/sync/client_base.hpp>
 #include <realm/sync/config.hpp>
-#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/pending_bootstrap_store.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/circular_buffer.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/value_reset_guard.hpp>
 #include <realm/version.hpp>
+
+#include <atomic>
+#include <memory>
+#include <tuple>
 
 namespace realm::sync {
 

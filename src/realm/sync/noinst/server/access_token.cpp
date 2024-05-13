@@ -1,12 +1,12 @@
-#include <cstddef>
 #include <algorithm>
-#include <vector>
+#include <cstddef>
 #include <stack>
+#include <vector>
 
+#include <realm/sync/noinst/server/access_token.hpp>
+#include <realm/sync/noinst/server/permissions.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/json_parser.hpp>
-#include <realm/sync/noinst/server/permissions.hpp>
-#include <realm/sync/noinst/server/access_token.hpp>
 
 using namespace realm;
 using namespace realm::util;

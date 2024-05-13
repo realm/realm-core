@@ -19,9 +19,10 @@
 #ifndef REALM_GROUP_SHARED_OPTIONS_HPP
 #define REALM_GROUP_SHARED_OPTIONS_HPP
 
+#include <realm/backup_restore.hpp>
+
 #include <functional>
 #include <string>
-#include <realm/backup_restore.hpp>
 
 namespace realm {
 

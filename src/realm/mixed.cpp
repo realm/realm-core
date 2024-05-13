@@ -16,13 +16,13 @@
  *
  **************************************************************************/
 
-#include <realm/mixed.hpp>
-#include <realm/decimal128.hpp>
-#include <realm/unicode.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/decimal128.hpp>
+#include <realm/mixed.hpp>
 #include <realm/obj.hpp>
-#include <realm/table.hpp>
 #include <realm/query_value.hpp>
+#include <realm/table.hpp>
+#include <realm/unicode.hpp>
 #include <realm/util/serializer.hpp>
 
 namespace realm {

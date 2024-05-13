@@ -16,6 +16,16 @@
  *
  **************************************************************************/
 
+#include <realm/index_string.hpp>
+
+#include <realm/column_integer.hpp>
+#include <realm/exceptions.hpp>
+#include <realm/list.hpp>
+#include <realm/table.hpp>
+#include <realm/timestamp.hpp>
+#include <realm/tokenizer.hpp>
+#include <realm/unicode.hpp>
+
 #include <cstdio>
 #include <iomanip>
 #include <list>
@@ -23,15 +33,6 @@
 #ifdef REALM_DEBUG
 #include <iostream>
 #endif
-
-#include <realm/exceptions.hpp>
-#include <realm/index_string.hpp>
-#include <realm/table.hpp>
-#include <realm/list.hpp>
-#include <realm/timestamp.hpp>
-#include <realm/column_integer.hpp>
-#include <realm/unicode.hpp>
-#include <realm/tokenizer.hpp>
 
 using namespace realm;
 using namespace realm::util;

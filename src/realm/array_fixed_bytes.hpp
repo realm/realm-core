@@ -20,9 +20,9 @@
 #define REALM_ARRAY_FIXED_BYTES_HPP
 
 #include <realm/array.hpp>
+#include <realm/mixed.hpp>
 #include <realm/object_id.hpp>
 #include <realm/uuid.hpp>
-#include <realm/mixed.hpp>
 
 namespace realm {
 

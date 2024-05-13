@@ -1,7 +1,7 @@
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/from_chars.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
 
 namespace realm::_impl {
 

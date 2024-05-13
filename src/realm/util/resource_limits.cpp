@@ -1,8 +1,8 @@
 #include <system_error>
 
 #include <realm/util/assert.hpp>
-#include <realm/util/resource_limits.hpp>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/resource_limits.hpp>
 
 #ifndef _WIN32
 #define REALM_HAVE_POSIX_RLIMIT 1

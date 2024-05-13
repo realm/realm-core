@@ -29,9 +29,9 @@
 #include <realm/util/future.hpp>
 #include <realm/version_id.hpp>
 
+#include <map>
 #include <mutex>
 #include <unordered_map>
-#include <map>
 
 namespace realm {
 class DB;

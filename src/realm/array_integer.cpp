@@ -19,8 +19,8 @@
 #include <vector>
 
 #include <realm/array_integer_tpl.hpp>
-#include <realm/impl/destroy_guard.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
 

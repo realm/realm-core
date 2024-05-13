@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/features.h>
 #include <realm/util/misc_errors.hpp>
 
 using namespace realm::util;

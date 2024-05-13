@@ -26,17 +26,17 @@
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/checked_mutex.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/features.h>
 #include <realm/util/functional.hpp>
 #include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/interprocess_mutex.hpp>
-#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/version_id.hpp>
 
-#include <functional>
-#include <cstdint>
-#include <limits>
 #include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <limits>
 
 namespace realm {
 

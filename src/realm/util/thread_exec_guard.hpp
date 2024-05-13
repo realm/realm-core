@@ -2,11 +2,11 @@
 #define REALM_UTIL_THREAD_EXEC_GUARD_HPP
 
 #include <exception>
-#include <utility>
 #include <string>
+#include <utility>
 
-#include <realm/util/thread.hpp>
 #include <realm/util/signal_blocker.hpp>
+#include <realm/util/thread.hpp>
 
 namespace realm::util {
 

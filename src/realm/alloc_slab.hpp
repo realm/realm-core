@@ -19,20 +19,20 @@
 #ifndef REALM_ALLOC_SLAB_HPP
 #define REALM_ALLOC_SLAB_HPP
 
-#include <cstdint> // unint8_t etc
-#include <vector>
-#include <map>
-#include <string>
 #include <atomic>
+#include <cstdint> // unint8_t etc
+#include <map>
 #include <mutex>
+#include <string>
+#include <vector>
 
+#include <realm/alloc.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/alloc.hpp>
-#include <realm/disable_sync_to_disk.hpp>
 #include <realm/version_id.hpp>
 
 namespace realm {

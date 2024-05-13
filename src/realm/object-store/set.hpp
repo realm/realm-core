@@ -19,12 +19,11 @@
 #ifndef REALM_OS_SET_HPP
 #define REALM_OS_SET_HPP
 
+#include <realm/object-store/collection.hpp>
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
-
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/property.hpp>
-#include <realm/object-store/collection.hpp>
 
 #include <realm/set.hpp>
 

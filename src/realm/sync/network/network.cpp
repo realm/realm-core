@@ -14,16 +14,16 @@
 
 #ifndef _WIN32
 #include <netinet/tcp.h>
-#include <unistd.h>
 #include <poll.h>
 #include <realm/util/to_string.hpp>
+#include <unistd.h>
 #endif
 
-#include <realm/util/features.h>
-#include <realm/util/optional.hpp>
-#include <realm/util/misc_errors.hpp>
-#include <realm/util/priority_queue.hpp>
 #include <realm/sync/network/network.hpp>
+#include <realm/util/features.h>
+#include <realm/util/misc_errors.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/priority_queue.hpp>
 
 #if defined _GNU_SOURCE && !REALM_ANDROID
 #define HAVE_LINUX_PIPE2 1
@@ -50,9 +50,9 @@
 #include <linux/version.h>
 #include <sys/epoll.h>
 #elif REALM_HAVE_KQUEUE
-#include <sys/types.h>
 #include <sys/event.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #else
 #include <poll.h>
 #endif

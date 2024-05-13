@@ -19,8 +19,8 @@
 #ifndef REALM_OS_UTIL_TAGGED_STRING_HPP
 #define REALM_OS_UTIL_TAGGED_STRING_HPP
 
-#include <type_traits>
 #include <string>
+#include <type_traits>
 
 namespace realm::util {
 // A type factory which defines a type which is implicitly convertable to and

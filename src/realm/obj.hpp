@@ -19,10 +19,10 @@
 #ifndef REALM_OBJ_HPP
 #define REALM_OBJ_HPP
 
-#include <realm/node.hpp>
 #include <realm/collection_parent.hpp>
+#include <realm/column_type_traits.hpp>
 #include <realm/mixed.hpp>
-#include "realm/column_type_traits.hpp"
+#include <realm/node.hpp>
 
 #include <map>
 

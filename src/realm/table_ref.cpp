@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#include <realm/table_ref.hpp>
 #include <realm/table.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 

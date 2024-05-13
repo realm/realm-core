@@ -1,14 +1,14 @@
 #ifndef REALM_COLLECTION_HPP
 #define REALM_COLLECTION_HPP
 
-#include <realm/obj.hpp>
 #include <realm/bplustree.hpp>
+#include <realm/obj.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/table.hpp>
 
 #include <iosfwd>      // std::ostream
-#include <type_traits> // std::void_t
 #include <set>
+#include <type_traits> // std::void_t
 
 namespace realm {
 

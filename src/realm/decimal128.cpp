@@ -20,9 +20,9 @@
 #include <realm/string_data.hpp>
 #include <realm/util/to_string.hpp>
 
+#include <cstring>
 #include <external/IntelRDFPMathLib20U2/LIBRARY/src/bid_conf.h>
 #include <external/IntelRDFPMathLib20U2/LIBRARY/src/bid_functions.h>
-#include <cstring>
 #include <stdexcept>
 
 namespace realm {

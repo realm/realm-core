@@ -17,25 +17,25 @@
  **************************************************************************/
 
 #include "realm/cluster.hpp"
-#include "realm/array_integer.hpp"
+#include "realm/array_backlink.hpp"
 #include "realm/array_basic.hpp"
-#include "realm/array_bool.hpp"
-#include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
-#include "realm/array_mixed.hpp"
-#include "realm/array_timestamp.hpp"
+#include "realm/array_bool.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_fixed_bytes.hpp"
+#include "realm/array_integer.hpp"
 #include "realm/array_key.hpp"
+#include "realm/array_mixed.hpp"
 #include "realm/array_ref.hpp"
+#include "realm/array_string.hpp"
+#include "realm/array_timestamp.hpp"
 #include "realm/array_typed_link.hpp"
-#include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
-#include "realm/replication.hpp"
 #include "realm/dictionary.hpp"
 #include "realm/list.hpp"
-#include <iostream>
+#include "realm/replication.hpp"
 #include <cmath>
+#include <iostream>
 
 namespace realm {
 
