@@ -1259,7 +1259,7 @@ Mixed ConstantNode::get_value()
             int64_t seconds;
             int32_t nanoseconds;
             if (s[0] == 'T') {
-                size_t colon_pos = s.find(":");
+                size_t colon_pos = s.find(':');
                 std::string s1 = s.substr(1, colon_pos - 1);
                 std::string s2 = s.substr(colon_pos + 1);
                 seconds = strtol(s1.c_str(), nullptr, 0);
@@ -1268,7 +1268,7 @@ Mixed ConstantNode::get_value()
             else {
                 // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
                 struct tm tmp = tm();
-                char sep = s.find("@") < s.size() ? '@' : 'T';
+                char sep = s.find('@') < s.size() ? '@' : 'T';
                 std::string fmt = "%d-%d-%d"s + sep + "%d:%d:%d:%d"s;
                 int cnt = sscanf(s.c_str(), fmt.c_str(), &tmp.tm_year, &tmp.tm_mon, &tmp.tm_mday, &tmp.tm_hour,
                                  &tmp.tm_min, &tmp.tm_sec, &nanoseconds);
@@ -1301,7 +1301,7 @@ Mixed ConstantNode::get_value()
         case Type::LINK:
             return ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0));
         case Type::TYPED_LINK: {
-            size_t colon_pos = text.find(":");
+            size_t colon_pos = text.find(':');
             auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
             auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
             return ObjLink(TableKey(table_key_val), ObjKey(obj_key_val));

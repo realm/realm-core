@@ -161,7 +161,7 @@ Response AppUtils::make_apperror_response(const AppError& error)
         if (auto pos = error.reason().find(match); pos != std::string::npos) {
             message = error.reason().substr(pos + std::char_traits<char>::length(match));
             // Remove the text added by AppError
-            pos = message.find_last_of(".");
+            pos = message.find_last_of('.');
             if (pos != std::string::npos) {
                 message.erase(pos);
             }

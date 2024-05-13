@@ -72,7 +72,7 @@ int main(int argc, char const* argv[])
         }
         else if (arg == "--filter") {
             std::string filter_val = argv[++idx];
-            auto sep = filter_val.find(":");
+            auto sep = filter_val.find(':');
             abort_if(filter_val.size() < 3, "Expected filter of form 'class_Name:query'");
             abort_if(sep == std::string::npos, "Expected filter of form 'class_Name:query'");
             table_filter = filter_val.substr(0, sep);
