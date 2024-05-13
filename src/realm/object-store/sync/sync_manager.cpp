@@ -289,7 +289,7 @@ void SyncManager::wait_for_sessions_to_terminate()
     client.wait_for_session_terminations();
 }
 
-void SyncManager::unregister_session(const std::string& path)
+void SyncManager::unregister_session(const std::string& path) noexcept
 {
     util::CheckedUniqueLock lock(m_session_mutex);
     auto it = m_sessions.find(path);

@@ -79,19 +79,19 @@ public:
     CheckedUniqueLock(CheckedUniqueLock&&) = default;
     CheckedUniqueLock& operator=(CheckedUniqueLock&&) = default;
 
-    void lock() ACQUIRE()
+    void lock() noexcept ACQUIRE()
     {
         m_impl.lock();
     }
-    void unlock() RELEASE()
+    void unlock() noexcept RELEASE()
     {
         m_impl.unlock();
     }
-    void lock_unchecked()
+    void lock_unchecked() noexcept
     {
         m_impl.lock();
     }
-    void unlock_unchecked()
+    void unlock_unchecked() noexcept
     {
         m_impl.unlock();
     }
@@ -100,7 +100,7 @@ public:
         return m_impl.owns_lock();
     }
 
-    Impl& native_handle()
+    Impl& native_handle() noexcept
     {
         return m_impl;
     }
@@ -115,7 +115,7 @@ class SCOPED_CAPABILITY CheckedLockGuard {
 
 public:
     template <typename Mutex>
-    CheckedLockGuard(Mutex const& m) ACQUIRE(m)
+    CheckedLockGuard(Mutex const& m) noexcept ACQUIRE(m)
         : m_impl(m.lock())
     {
     }
@@ -124,7 +124,7 @@ public:
     CheckedLockGuard(CheckedLockGuard&&) = delete;
     CheckedLockGuard& operator=(CheckedLockGuard&&) = delete;
 
-    Impl& native_handle()
+    Impl& native_handle() noexcept
     {
         return m_impl;
     }
@@ -136,7 +136,7 @@ private:
 // std::mutex with thread safety annotations
 class CAPABILITY("mutex") CheckedMutex {
 public:
-    CheckedMutex() = default;
+    CheckedMutex() noexcept = default;
 
     // Required for REQUIRES(!m); do not actually call
     CheckedMutex const& operator!() const
@@ -148,7 +148,7 @@ public:
     // UniqueLock to a function, the analysis doesn't know what mutex is
     // released by unlock(). Unlocking via this function tells it which one is
     // used.
-    void unlock(CheckedUniqueLock& lock) RELEASE()
+    void unlock(CheckedUniqueLock& lock) noexcept RELEASE()
     {
         REALM_ASSERT(lock.owns_lock());
         REALM_ASSERT(lock.native_handle().mutex() == &m_mutex);
@@ -160,7 +160,7 @@ private:
     friend class CheckedUniqueLock;
     friend class CheckedLockGuard;
 
-    std::unique_lock<std::mutex> lock() const
+    std::unique_lock<std::mutex> lock() const noexcept
     {
         return std::unique_lock<std::mutex>(m_mutex);
     }

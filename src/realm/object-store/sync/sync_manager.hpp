@@ -174,7 +174,7 @@ private:
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.
-    void unregister_session(const std::string& path) REQUIRES(!m_session_mutex);
+    void unregister_session(const std::string& path) noexcept REQUIRES(!m_session_mutex);
 
     _impl::SyncClient& get_sync_client() const REQUIRES(!m_mutex);
     std::unique_ptr<_impl::SyncClient> create_sync_client() const REQUIRES(m_mutex);
