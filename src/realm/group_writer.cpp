@@ -92,8 +92,8 @@ public:
 private:
     util::File::Map<char> m_map;
     ref_type m_base_ref;
-    ref_type aligned_to_mmap_block(ref_type start_ref);
-    size_t get_window_size(util::File& f, ref_type start_ref, size_t size);
+    ref_type aligned_to_mmap_block(ref_type start_ref) const;
+    size_t get_window_size(util::File& f, ref_type start_ref, size_t size) const;
     size_t m_alignment;
 };
 
@@ -114,14 +114,14 @@ bool WriteWindowMgr::MapWindow::matches(ref_type start_ref, size_t size)
 //
 // In cases where a 1MB window would stretch beyond the end of the file, we choose
 // a smaller window. Anything mapped after the end of file would be undefined anyways.
-ref_type WriteWindowMgr::MapWindow::aligned_to_mmap_block(ref_type start_ref)
+ref_type WriteWindowMgr::MapWindow::aligned_to_mmap_block(ref_type start_ref) const
 {
     // align to 1MB boundary
     size_t page_mask = m_alignment - 1;
     return start_ref & ~page_mask;
 }
 
-size_t WriteWindowMgr::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size)
+size_t WriteWindowMgr::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size) const
 {
     size_t window_size = start_ref + size - m_base_ref;
     // always map at least to match alignment

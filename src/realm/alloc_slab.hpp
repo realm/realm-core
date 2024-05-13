@@ -510,11 +510,11 @@ private:
     struct FreeList {
         int size = 0; // size of every element in the list, 0 if not found
         FreeListMap::iterator it;
-        bool found_something()
+        bool found_something() const
         {
             return size != 0;
         }
-        bool found_exact(int sz)
+        bool found_exact(int sz) const
         {
             return size == sz;
         }

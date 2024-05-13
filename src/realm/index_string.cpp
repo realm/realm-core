@@ -1419,15 +1419,15 @@ struct FindResWrapper {
     InternalFindResult& res;
     IntegerColumn& indexes;
     size_t n = 0;
-    size_t size()
+    size_t size() const
     {
         return res.end_ndx - res.start_ndx;
     }
-    auto begin()
+    auto begin() const
     {
         return indexes.cbegin();
     }
-    auto end()
+    auto end() const
     {
         return indexes.cend();
     }

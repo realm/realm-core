@@ -591,7 +591,7 @@ public:
         limit = size_t(strtol(str.c_str(), nullptr, 0));
     }
     ~DescriptorNode() override;
-    Type get_type()
+    Type get_type() const
     {
         return type;
     }

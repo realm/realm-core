@@ -465,7 +465,7 @@ public:
     /// response. The negotiated protocol version is guaranteed to be greater
     /// than or equal to get_oldest_supported_protocol_version(), and be less
     /// than or equal to get_current_protocol_version().
-    int get_negotiated_protocol_version() noexcept;
+    int get_negotiated_protocol_version() const noexcept;
 
     // Methods from WebSocketObserver interface for websockets from the Socket Provider
     void websocket_connected_handler(const std::string& protocol);
@@ -1265,7 +1265,7 @@ inline auto ClientImpl::Connection::get_client_protocol() noexcept -> ClientProt
     return m_client.m_client_protocol;
 }
 
-inline int ClientImpl::Connection::get_negotiated_protocol_version() noexcept
+inline int ClientImpl::Connection::get_negotiated_protocol_version() const noexcept
 {
     return m_negotiated_protocol_version;
 }

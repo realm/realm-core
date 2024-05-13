@@ -76,7 +76,7 @@ public:
 
     std::string translate(const LinkChain&, std::string_view identifier);
     std::string translate(ConstTableRef table, std::string_view identifier);
-    std::string translate_table_name(std::string_view identifier);
+    std::string translate_table_name(std::string_view identifier) const;
 
 protected:
     std::unordered_map<std::pair<TableKey, std::string>, std::string, TableAndColHash> m_mapping;

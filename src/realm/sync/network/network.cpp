@@ -2102,7 +2102,7 @@ void Service::Descriptor::deregister_for_async() noexcept
 #endif // REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE
 
 
-void Service::Descriptor::set_nonblock_flag(bool value)
+void Service::Descriptor::set_nonblock_flag(bool value) const
 {
     ::set_nonblock_flag(m_fd, value); // Throws
 }

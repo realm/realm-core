@@ -686,7 +686,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
     }
 }
 
-bool NotNode::evaluate_at(size_t rowndx)
+bool NotNode::evaluate_at(size_t rowndx) const
 {
     return m_condition->find_first(rowndx, rowndx + 1) == not_found;
 }

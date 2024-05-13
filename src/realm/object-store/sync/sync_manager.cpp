@@ -330,7 +330,7 @@ void SyncManager::unregister_session(const std::string& path)
 }
 
 void SyncManager::update_sessions_for(SyncUser& user, SyncUser::State old_state, SyncUser::State new_state,
-                                      std::string_view new_access_token)
+                                      std::string_view new_access_token) const
 {
     bool should_revive = old_state != SyncUser::State::LoggedIn && new_state == SyncUser::State::LoggedIn;
     bool should_stop = old_state == SyncUser::State::LoggedIn && new_state != SyncUser::State::LoggedIn;
@@ -407,7 +407,7 @@ void SyncManager::set_sync_route(std::string sync_route, bool verified)
     }
 }
 
-void SyncManager::restart_all_sessions()
+void SyncManager::restart_all_sessions() const
 {
     // Restart the sessions that are currently active
     auto sessions = get_all_sessions();

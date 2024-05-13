@@ -2374,12 +2374,12 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
 }
 
 
-ColKey Obj::spec_ndx2colkey(size_t col_ndx)
+ColKey Obj::spec_ndx2colkey(size_t col_ndx) const
 {
     return get_table()->spec_ndx2colkey(col_ndx);
 }
 
-size_t Obj::colkey2spec_ndx(ColKey key)
+size_t Obj::colkey2spec_ndx(ColKey key) const
 {
     return get_table()->colkey2spec_ndx(key);
 }

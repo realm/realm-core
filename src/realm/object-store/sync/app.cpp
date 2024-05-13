@@ -111,7 +111,7 @@ T parse(std::string_view str)
 
 struct UserAPIKeyResponseHandler {
     UniqueFunction<void(App::UserAPIKey&&, Optional<AppError>)> completion;
-    void operator()(const Response& response)
+    void operator()(const Response& response) const
     {
         if (auto error = AppUtils::check_for_errors(response)) {
             return completion({}, std::move(error));

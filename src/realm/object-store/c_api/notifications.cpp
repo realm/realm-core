@@ -15,7 +15,7 @@ struct ObjectNotificationsCallback {
     {
     }
 
-    void operator()(const CollectionChangeSet& changes)
+    void operator()(const CollectionChangeSet& changes) const
     {
         if (m_on_change) {
             realm_object_changes_t c{changes};
@@ -35,7 +35,7 @@ struct CollectionNotificationsCallback {
     {
     }
 
-    void operator()(const CollectionChangeSet& changes)
+    void operator()(const CollectionChangeSet& changes) const
     {
         if (m_on_change) {
             realm_collection_changes_t c{changes};
@@ -55,7 +55,7 @@ struct DictionaryNotificationsCallback {
     {
     }
 
-    void operator()(const DictionaryChangeSet& changes)
+    void operator()(const DictionaryChangeSet& changes) const
     {
         if (m_on_change) {
             realm_dictionary_changes_t c{changes};

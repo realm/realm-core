@@ -98,7 +98,7 @@ public:
         return tmp;
     }
 
-    ptrdiff_t operator-(const IntegerColumnIterator& rhs)
+    ptrdiff_t operator-(const IntegerColumnIterator& rhs) const
     {
         return m_pos - rhs.m_pos;
     }

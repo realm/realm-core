@@ -836,7 +836,7 @@ private:
 
 class TableKeyIterator {
 public:
-    bool operator!=(const TableKeyIterator& other)
+    bool operator!=(const TableKeyIterator& other) const
     {
         return m_pos != other.m_pos;
     }

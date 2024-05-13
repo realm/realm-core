@@ -400,7 +400,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         }
     }
 
-    void delete_user_realms(SyncFileManager& file_manager, Obj& obj)
+    void delete_user_realms(SyncFileManager& file_manager, Obj& obj) const
     {
         Set<StringData> paths = obj.get_set<StringData>(m_user_schema.realm_file_paths_col);
         bool any_failed = false;
@@ -662,7 +662,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         realm->commit_transaction();
     }
 
-    bool is_valid_user(Obj& obj)
+    bool is_valid_user(Obj& obj) const
     {
         // This is overly cautious and merely checking the state should suffice,
         // but because this is a persisted file that can be modified it's possible

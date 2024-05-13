@@ -49,7 +49,7 @@ public:
     void flush() noexcept;
 
     // Sync the image of this file in shared cache to disk. Does not imply flush.
-    void sync() noexcept;
+    void sync() const noexcept;
 
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier or refresh_outdated_pages().
@@ -76,7 +76,7 @@ public:
     // have been allocated earlier
     void extend_to(size_t offset, size_t new_size);
 
-    size_t collect_decryption_count()
+    size_t collect_decryption_count() const
     {
         return m_num_decrypted;
     }
@@ -92,7 +92,7 @@ public:
     {
         return m_first_page + m_page_state.size();
     }
-    size_t get_start_index()
+    size_t get_start_index() const
     {
         return m_first_page;
     }

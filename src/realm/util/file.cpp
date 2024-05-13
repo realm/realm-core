@@ -1001,7 +1001,7 @@ void File::prealloc(size_t size)
 }
 
 
-bool File::prealloc_if_supported(SizeType offset, size_t size)
+bool File::prealloc_if_supported(SizeType offset, size_t size) const
 {
     REALM_ASSERT_RELEASE(is_attached());
 
@@ -1065,7 +1065,7 @@ bool File::is_prealloc_supported()
 #endif
 }
 
-void File::seek(SizeType position)
+void File::seek(SizeType position) const
 {
     REALM_ASSERT_RELEASE(is_attached());
     seek_static(m_fd, position);
@@ -1099,7 +1099,7 @@ void File::seek_static(FileDesc fd, SizeType position)
 // actually written to disk. POSIX is rather vague on what fsync() has
 // to do unless _POSIX_SYNCHRONIZED_IO is defined. See also
 // http://www.humboldt.co.uk/2009/03/fsync-across-platforms.html.
-void File::sync()
+void File::sync() const
 {
     REALM_ASSERT_RELEASE(is_attached());
 
@@ -1124,7 +1124,7 @@ void File::sync()
 #endif
 }
 
-void File::barrier()
+void File::barrier() const
 {
 #if REALM_PLATFORM_APPLE
     if (::fcntl(m_fd, F_BARRIERFSYNC) == 0)
@@ -1947,14 +1947,14 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     return false;
 }
 
-void File::MapBase::sync()
+void File::MapBase::sync() const
 {
     REALM_ASSERT(m_addr);
 
     File::sync_map(m_fd, m_addr, m_size);
 }
 
-void File::MapBase::flush()
+void File::MapBase::flush() const
 {
     REALM_ASSERT(m_addr);
 #if REALM_ENABLE_ENCRYPTION

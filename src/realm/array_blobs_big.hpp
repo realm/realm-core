@@ -48,7 +48,7 @@ public:
     size_t count(BinaryData value, bool is_string = false, size_t begin = 0, size_t end = npos) const noexcept;
     size_t find_first(BinaryData value, bool is_string = false, size_t begin = 0, size_t end = npos) const noexcept;
     void find_all(IntegerColumn& result, BinaryData value, bool is_string = false, size_t add_offset = 0,
-                  size_t begin = 0, size_t end = npos);
+                  size_t begin = 0, size_t end = npos) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or

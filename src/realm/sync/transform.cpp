@@ -112,7 +112,7 @@ struct Side {
         return m_discriminant;
     }
 
-    InternString adopt_string(const Side& other_side, InternString other_string)
+    InternString adopt_string(const Side& other_side, InternString other_string) const
     {
         // FIXME: This needs to change if we choose to compare strings through a
         // mapping of InternStrings.
@@ -201,12 +201,12 @@ struct MinorSide : Side {
         get() = instr;
     }
 
-    Position begin() noexcept
+    Position begin() const noexcept
     {
         return Position{m_conflict_ranges};
     }
 
-    Position end() noexcept
+    Position end() const noexcept
     {
         return Position{m_conflict_ranges, Position::end_tag{}};
     }
@@ -313,7 +313,7 @@ public:
             m_changeset = changeset;
         }
 
-        StringData get_string(InternString str)
+        StringData get_string(InternString str) const
         {
             return m_changeset->get_string(str);
         }

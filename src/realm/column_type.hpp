@@ -192,7 +192,7 @@ public:
         : m_value(0)
     {
     }
-    bool test(ColumnAttr prop)
+    bool test(ColumnAttr prop) const
     {
         return (m_value & prop) != 0;
     }

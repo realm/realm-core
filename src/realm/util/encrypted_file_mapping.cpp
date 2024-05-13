@@ -928,7 +928,7 @@ void EncryptedFileMapping::flush() noexcept
 #ifdef _MSC_VER
 #pragma warning(disable : 4297) // throw in noexcept
 #endif
-void EncryptedFileMapping::sync() noexcept
+void EncryptedFileMapping::sync() const noexcept
 {
 #ifdef _WIN32
     if (FlushFileBuffers(m_file.fd))

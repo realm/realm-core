@@ -120,7 +120,7 @@ struct GlobalKey {
     // in this realm (sync_file_id == hi) then 0 is used for hi. In this
     // way we achieves that objects created before first contact with the
     // server does not need to change key.
-    ObjKey get_local_key(uint64_t sync_file_id)
+    ObjKey get_local_key(uint64_t sync_file_id) const
     {
         REALM_ASSERT(m_hi <= 0x3fffffff);
 

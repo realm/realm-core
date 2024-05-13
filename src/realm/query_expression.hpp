@@ -1111,18 +1111,18 @@ public:
 template <>
 class Subexpr2<StringData> : public Subexpr, public Overloads<StringData, StringData> {
 public:
-    Query equal(StringData sd, bool case_sensitive = true);
-    Query equal(const Subexpr2<StringData>& col, bool case_sensitive = true);
-    Query not_equal(StringData sd, bool case_sensitive = true);
-    Query not_equal(const Subexpr2<StringData>& col, bool case_sensitive = true);
-    Query begins_with(StringData sd, bool case_sensitive = true);
-    Query begins_with(const Subexpr2<StringData>& col, bool case_sensitive = true);
-    Query ends_with(StringData sd, bool case_sensitive = true);
-    Query ends_with(const Subexpr2<StringData>& col, bool case_sensitive = true);
-    Query contains(StringData sd, bool case_sensitive = true);
-    Query contains(const Subexpr2<StringData>& col, bool case_sensitive = true);
-    Query like(StringData sd, bool case_sensitive = true);
-    Query like(const Subexpr2<StringData>& col, bool case_sensitive = true);
+    Query equal(StringData sd, bool case_sensitive = true) const;
+    Query equal(const Subexpr2<StringData>& col, bool case_sensitive = true) const;
+    Query not_equal(StringData sd, bool case_sensitive = true) const;
+    Query not_equal(const Subexpr2<StringData>& col, bool case_sensitive = true) const;
+    Query begins_with(StringData sd, bool case_sensitive = true) const;
+    Query begins_with(const Subexpr2<StringData>& col, bool case_sensitive = true) const;
+    Query ends_with(StringData sd, bool case_sensitive = true) const;
+    Query ends_with(const Subexpr2<StringData>& col, bool case_sensitive = true) const;
+    Query contains(StringData sd, bool case_sensitive = true) const;
+    Query contains(const Subexpr2<StringData>& col, bool case_sensitive = true) const;
+    Query like(StringData sd, bool case_sensitive = true) const;
+    Query like(const Subexpr2<StringData>& col, bool case_sensitive = true) const;
     DataType get_type() const final
     {
         return type_String;
@@ -1132,18 +1132,18 @@ public:
 template <>
 class Subexpr2<BinaryData> : public Subexpr, public Overloads<BinaryData, BinaryData> {
 public:
-    Query equal(BinaryData sd, bool case_sensitive = true);
-    Query equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
-    Query not_equal(BinaryData sd, bool case_sensitive = true);
-    Query not_equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
-    Query begins_with(BinaryData sd, bool case_sensitive = true);
-    Query begins_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
-    Query ends_with(BinaryData sd, bool case_sensitive = true);
-    Query ends_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
-    Query contains(BinaryData sd, bool case_sensitive = true);
-    Query contains(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
-    Query like(BinaryData sd, bool case_sensitive = true);
-    Query like(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query equal(BinaryData sd, bool case_sensitive = true) const;
+    Query equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true) const;
+    Query not_equal(BinaryData sd, bool case_sensitive = true) const;
+    Query not_equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true) const;
+    Query begins_with(BinaryData sd, bool case_sensitive = true) const;
+    Query begins_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true) const;
+    Query ends_with(BinaryData sd, bool case_sensitive = true) const;
+    Query ends_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true) const;
+    Query contains(BinaryData sd, bool case_sensitive = true) const;
+    Query contains(const Subexpr2<BinaryData>& col, bool case_sensitive = true) const;
+    Query like(BinaryData sd, bool case_sensitive = true) const;
+    Query like(const Subexpr2<BinaryData>& col, bool case_sensitive = true) const;
     DataType get_type() const final
     {
         return type_Binary;
@@ -1165,18 +1165,18 @@ class Subexpr2<Mixed> : public Subexpr,
                         public Overloads<Mixed, UUID>,
                         public Overloads<Mixed, null> {
 public:
-    Query equal(Mixed sd, bool case_sensitive = true);
-    Query equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
-    Query not_equal(Mixed sd, bool case_sensitive = true);
-    Query not_equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
-    Query begins_with(Mixed sd, bool case_sensitive = true);
-    Query begins_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
-    Query ends_with(Mixed sd, bool case_sensitive = true);
-    Query ends_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
-    Query contains(Mixed sd, bool case_sensitive = true);
-    Query contains(const Subexpr2<Mixed>& col, bool case_sensitive = true);
-    Query like(Mixed sd, bool case_sensitive = true);
-    Query like(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query equal(Mixed sd, bool case_sensitive = true) const;
+    Query equal(const Subexpr2<Mixed>& col, bool case_sensitive = true) const;
+    Query not_equal(Mixed sd, bool case_sensitive = true) const;
+    Query not_equal(const Subexpr2<Mixed>& col, bool case_sensitive = true) const;
+    Query begins_with(Mixed sd, bool case_sensitive = true) const;
+    Query begins_with(const Subexpr2<Mixed>& col, bool case_sensitive = true) const;
+    Query ends_with(Mixed sd, bool case_sensitive = true) const;
+    Query ends_with(const Subexpr2<Mixed>& col, bool case_sensitive = true) const;
+    Query contains(Mixed sd, bool case_sensitive = true) const;
+    Query contains(const Subexpr2<Mixed>& col, bool case_sensitive = true) const;
+    Query like(Mixed sd, bool case_sensitive = true) const;
+    Query like(const Subexpr2<Mixed>& col, bool case_sensitive = true) const;
     DataType get_type() const override
     {
         return type_Mixed;

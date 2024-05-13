@@ -516,62 +516,62 @@ std::string LinkCount::description(util::serializer::SerialisationState& state) 
     return state.describe_columns(m_link_map, m_column_key) + util::serializer::value_separator + "@count";
 }
 
-Query Subexpr2<StringData>::equal(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::equal(StringData sd, bool case_sensitive) const
 {
     return string_compare<StringData, Equal, EqualIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<StringData>::equal(const Subexpr2<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::equal(const Subexpr2<StringData>& col, bool case_sensitive) const
 {
     return string_compare<Equal, EqualIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<StringData>::not_equal(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::not_equal(StringData sd, bool case_sensitive) const
 {
     return string_compare<StringData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<StringData>::not_equal(const Subexpr2<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::not_equal(const Subexpr2<StringData>& col, bool case_sensitive) const
 {
     return string_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<StringData>::begins_with(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::begins_with(StringData sd, bool case_sensitive) const
 {
     return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<StringData>::begins_with(const Subexpr2<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::begins_with(const Subexpr2<StringData>& col, bool case_sensitive) const
 {
     return string_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<StringData>::ends_with(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::ends_with(StringData sd, bool case_sensitive) const
 {
     return string_compare<StringData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<StringData>::ends_with(const Subexpr2<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::ends_with(const Subexpr2<StringData>& col, bool case_sensitive) const
 {
     return string_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<StringData>::contains(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::contains(StringData sd, bool case_sensitive) const
 {
     return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<StringData>::contains(const Subexpr2<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::contains(const Subexpr2<StringData>& col, bool case_sensitive) const
 {
     return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<StringData>::like(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::like(StringData sd, bool case_sensitive) const
 {
     return string_compare<StringData, Like, LikeIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<StringData>::like(const Subexpr2<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::like(const Subexpr2<StringData>& col, bool case_sensitive) const
 {
     return string_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
@@ -585,124 +585,124 @@ Query Columns<StringData>::fulltext(StringData text) const
 
 // BinaryData
 
-Query Subexpr2<BinaryData>::equal(BinaryData sd, bool case_sensitive)
+Query Subexpr2<BinaryData>::equal(BinaryData sd, bool case_sensitive) const
 {
     return binary_compare<BinaryData, Equal, EqualIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::equal(const Subexpr2<BinaryData>& col, bool case_sensitive)
+Query Subexpr2<BinaryData>::equal(const Subexpr2<BinaryData>& col, bool case_sensitive) const
 {
     return binary_compare<Equal, EqualIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::not_equal(BinaryData sd, bool case_sensitive)
+Query Subexpr2<BinaryData>::not_equal(BinaryData sd, bool case_sensitive) const
 {
     return binary_compare<BinaryData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::not_equal(const Subexpr2<BinaryData>& col, bool case_sensitive)
+Query Subexpr2<BinaryData>::not_equal(const Subexpr2<BinaryData>& col, bool case_sensitive) const
 {
     return binary_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::begins_with(BinaryData sd, bool case_sensitive)
+Query Subexpr2<BinaryData>::begins_with(BinaryData sd, bool case_sensitive) const
 {
     return binary_compare<BinaryData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::begins_with(const Subexpr2<BinaryData>& col, bool case_sensitive)
+Query Subexpr2<BinaryData>::begins_with(const Subexpr2<BinaryData>& col, bool case_sensitive) const
 {
     return binary_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::ends_with(BinaryData sd, bool case_sensitive)
+Query Subexpr2<BinaryData>::ends_with(BinaryData sd, bool case_sensitive) const
 {
     return binary_compare<BinaryData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::ends_with(const Subexpr2<BinaryData>& col, bool case_sensitive)
+Query Subexpr2<BinaryData>::ends_with(const Subexpr2<BinaryData>& col, bool case_sensitive) const
 {
     return binary_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::contains(BinaryData sd, bool case_sensitive)
+Query Subexpr2<BinaryData>::contains(BinaryData sd, bool case_sensitive) const
 {
     return binary_compare<BinaryData, Contains, ContainsIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::contains(const Subexpr2<BinaryData>& col, bool case_sensitive)
+Query Subexpr2<BinaryData>::contains(const Subexpr2<BinaryData>& col, bool case_sensitive) const
 {
     return binary_compare<Contains, ContainsIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::like(BinaryData sd, bool case_sensitive)
+Query Subexpr2<BinaryData>::like(BinaryData sd, bool case_sensitive) const
 {
     return binary_compare<BinaryData, Like, LikeIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<BinaryData>::like(const Subexpr2<BinaryData>& col, bool case_sensitive)
+Query Subexpr2<BinaryData>::like(const Subexpr2<BinaryData>& col, bool case_sensitive) const
 {
     return binary_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
 
 // Mixed
 
-Query Subexpr2<Mixed>::equal(Mixed sd, bool case_sensitive)
+Query Subexpr2<Mixed>::equal(Mixed sd, bool case_sensitive) const
 {
     return mixed_compare<Mixed, Equal, EqualIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::equal(const Subexpr2<Mixed>& col, bool case_sensitive)
+Query Subexpr2<Mixed>::equal(const Subexpr2<Mixed>& col, bool case_sensitive) const
 {
     return mixed_compare<Equal, EqualIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::not_equal(Mixed sd, bool case_sensitive)
+Query Subexpr2<Mixed>::not_equal(Mixed sd, bool case_sensitive) const
 {
     return mixed_compare<Mixed, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::not_equal(const Subexpr2<Mixed>& col, bool case_sensitive)
+Query Subexpr2<Mixed>::not_equal(const Subexpr2<Mixed>& col, bool case_sensitive) const
 {
     return mixed_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::begins_with(Mixed sd, bool case_sensitive)
+Query Subexpr2<Mixed>::begins_with(Mixed sd, bool case_sensitive) const
 {
     return mixed_compare<Mixed, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::begins_with(const Subexpr2<Mixed>& col, bool case_sensitive)
+Query Subexpr2<Mixed>::begins_with(const Subexpr2<Mixed>& col, bool case_sensitive) const
 {
     return mixed_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::ends_with(Mixed sd, bool case_sensitive)
+Query Subexpr2<Mixed>::ends_with(Mixed sd, bool case_sensitive) const
 {
     return mixed_compare<Mixed, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::ends_with(const Subexpr2<Mixed>& col, bool case_sensitive)
+Query Subexpr2<Mixed>::ends_with(const Subexpr2<Mixed>& col, bool case_sensitive) const
 {
     return mixed_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::contains(Mixed sd, bool case_sensitive)
+Query Subexpr2<Mixed>::contains(Mixed sd, bool case_sensitive) const
 {
     return mixed_compare<Mixed, Contains, ContainsIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::contains(const Subexpr2<Mixed>& col, bool case_sensitive)
+Query Subexpr2<Mixed>::contains(const Subexpr2<Mixed>& col, bool case_sensitive) const
 {
     return mixed_compare<Contains, ContainsIns>(*this, col, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::like(Mixed sd, bool case_sensitive)
+Query Subexpr2<Mixed>::like(Mixed sd, bool case_sensitive) const
 {
     return mixed_compare<Mixed, Like, LikeIns>(*this, sd, case_sensitive);
 }
 
-Query Subexpr2<Mixed>::like(const Subexpr2<Mixed>& col, bool case_sensitive)
+Query Subexpr2<Mixed>::like(const Subexpr2<Mixed>& col, bool case_sensitive) const
 {
     return mixed_compare<Like, LikeIns>(*this, col, case_sensitive);
 }

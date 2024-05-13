@@ -75,7 +75,7 @@ public:
     template <class F>
     void start(F func);
 
-    bool joinable() noexcept;
+    bool joinable() const noexcept;
 
     void join();
 
@@ -188,7 +188,7 @@ public:
 
     void lock() noexcept;
     void unlock() noexcept;
-    bool holds_lock() noexcept;
+    bool holds_lock() const noexcept;
 
 private:
     Mutex* m_mutex;
@@ -448,7 +448,7 @@ inline Thread::~Thread() noexcept
         REALM_TERMINATE("Destruction of joinable thread");
 }
 
-inline bool Thread::joinable() noexcept
+inline bool Thread::joinable() const noexcept
 {
     return m_joinable;
 }
@@ -582,7 +582,7 @@ inline UniqueLock::~UniqueLock() noexcept
         m_mutex->unlock();
 }
 
-inline bool UniqueLock::holds_lock() noexcept
+inline bool UniqueLock::holds_lock() const noexcept
 {
     return m_is_locked;
 }

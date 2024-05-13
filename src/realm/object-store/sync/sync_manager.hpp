@@ -110,12 +110,12 @@ public:
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
 
     // Force all the active sessions to restart
-    void restart_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
+    void restart_all_sessions() const REQUIRES(!m_mutex, !m_session_mutex);
 
     // Update all sessions for a given user following a state change for that
     // user (and optionally a new access token)
     void update_sessions_for(SyncUser& user, SyncUser::State old_state, SyncUser::State new_state,
-                             std::string_view new_access_token) REQUIRES(!m_mutex, !m_session_mutex);
+                             std::string_view new_access_token) const REQUIRES(!m_mutex, !m_session_mutex);
 
 
     // Used by App to update the sync route any time the location info has been refreshed.

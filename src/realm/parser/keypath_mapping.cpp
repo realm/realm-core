@@ -94,7 +94,7 @@ util::Optional<std::string> KeyPathMapping::get_table_mapping(const std::string&
 
 constexpr static size_t max_substitutions_allowed = 50;
 
-std::string KeyPathMapping::translate_table_name(std::string_view identifier)
+std::string KeyPathMapping::translate_table_name(std::string_view identifier) const
 {
     size_t substitutions = 0;
     std::string alias{identifier};

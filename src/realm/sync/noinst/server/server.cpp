@@ -875,7 +875,7 @@ public:
         return m_sync_connections.size();
     }
 
-    bool is_sync_stopped()
+    bool is_sync_stopped() const
     {
         return m_sync_stopped;
     }
@@ -1121,7 +1121,7 @@ public:
         return m_server.get_server_protocol();
     }
 
-    int get_client_protocol_version()
+    int get_client_protocol_version() const
     {
         return m_client_protocol_version;
     }
@@ -1952,7 +1952,7 @@ private:
         handle_text_response(HTTPStatus::ServiceUnavailable, message); // Throws
     }
 
-    void add_common_http_response_headers(HTTPResponse& response)
+    void add_common_http_response_headers(HTTPResponse& response) const
     {
         response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
         if (m_negotiated_protocol_version < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {

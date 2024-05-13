@@ -339,7 +339,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
 }
 
 // Schema version is not allowed to decrease for local and pbs realms.
-void Realm::verify_schema_version_not_decreasing(uint64_t version)
+void Realm::verify_schema_version_not_decreasing(uint64_t version) const
 {
 #if REALM_ENABLE_SYNC
     if (m_config.sync_config && m_config.sync_config->flx_sync_requested)

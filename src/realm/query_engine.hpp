@@ -2330,7 +2330,7 @@ private:
     size_t m_known_range_end;
     size_t m_first_in_known_range;
 
-    bool evaluate_at(size_t rowndx);
+    bool evaluate_at(size_t rowndx) const;
     void update_known(size_t start, size_t end, size_t first);
     size_t find_first_loop(size_t start, size_t end);
     size_t find_first_covers_known(size_t start, size_t end);

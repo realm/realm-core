@@ -325,7 +325,7 @@ protected:
     static MemRef create_node(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
                               WidthType width_type = wtype_Ignore, int width = 1);
 
-    void set_header_size(size_t value) noexcept
+    void set_header_size(size_t value) const noexcept
     {
         set_size_in_header(value, get_header());
     }

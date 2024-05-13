@@ -121,7 +121,7 @@ public:
     // adds entry if key is not found
     Mixed operator[](Mixed key);
 
-    Obj get_object(StringData key);
+    Obj get_object(StringData key) const;
 
     bool contains(Mixed key) const noexcept;
     Iterator find(Mixed key) const noexcept;

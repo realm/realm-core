@@ -269,7 +269,8 @@ size_t ArrayStringShort::find_first(StringData value, size_t begin, size_t end) 
     return not_found;
 }
 
-void ArrayStringShort::find_all(IntegerColumn& result, StringData value, size_t add_offset, size_t begin, size_t end)
+void ArrayStringShort::find_all(IntegerColumn& result, StringData value, size_t add_offset, size_t begin,
+                                size_t end) const
 {
     size_t begin_2 = begin;
     for (;;) {

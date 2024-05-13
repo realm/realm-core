@@ -111,7 +111,7 @@ struct DefaultFactory {
         m_inner->m_factory_func = factory_func;
     }
 
-    std::shared_ptr<Scheduler> operator()()
+    std::shared_ptr<Scheduler> operator()() const
     {
         if (m_inner->m_factory_func) {
             auto ptr = m_inner->m_factory_func(m_inner->m_userdata);

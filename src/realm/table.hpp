@@ -910,7 +910,7 @@ std::ostream& operator<<(std::ostream& o, Table::Type table_type);
 
 class ColKeyIterator {
 public:
-    bool operator!=(const ColKeyIterator& other)
+    bool operator!=(const ColKeyIterator& other) const
     {
         return m_pos != other.m_pos;
     }

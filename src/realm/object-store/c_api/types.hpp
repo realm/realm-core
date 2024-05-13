@@ -99,7 +99,7 @@ struct FreeUserdata {
         : m_func(func)
     {
     }
-    void operator()(void* ptr)
+    void operator()(void* ptr) const
     {
         if (m_func) {
             (m_func)(ptr);

@@ -624,7 +624,7 @@ Mixed Dictionary::operator[](Mixed key)
     return *ret;
 }
 
-Obj Dictionary::get_object(StringData key)
+Obj Dictionary::get_object(StringData key) const
 {
     if (auto val = try_get(key)) {
         if ((*val).is_type(type_TypedLink)) {

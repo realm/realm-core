@@ -326,7 +326,7 @@ public:
     {
         return m_transaction != nullptr;
     }
-    uint64_t last_seen_transaction_version()
+    uint64_t last_seen_transaction_version() const
     {
         return m_schema_transaction_version;
     }
@@ -565,7 +565,7 @@ private:
     void set_schema(Schema const& reference, Schema schema);
     bool reset_file(Schema& schema, std::vector<SchemaChange>& changes_required);
     bool schema_change_needs_write_transaction(Schema& schema, std::vector<SchemaChange>& changes, uint64_t version);
-    void verify_schema_version_not_decreasing(uint64_t version);
+    void verify_schema_version_not_decreasing(uint64_t version) const;
     Schema get_full_schema();
 
     // Ensure that m_schema and m_schema_version match that of the current

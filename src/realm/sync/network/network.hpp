@@ -517,7 +517,7 @@ private:
     void set_read_ready(bool) noexcept;
     void set_write_ready(bool) noexcept;
 
-    void set_nonblock_flag(bool value);
+    void set_nonblock_flag(bool value) const;
     void add_initiated_oper(LendersIoOperPtr, Want);
 
     void do_close() noexcept;

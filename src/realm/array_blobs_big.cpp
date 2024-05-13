@@ -175,7 +175,7 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string, size_t begin,
 
 
 void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_string, size_t add_offset, size_t begin,
-                             size_t end)
+                             size_t end) const
 {
     size_t begin_2 = begin;
     for (;;) {

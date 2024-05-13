@@ -308,7 +308,7 @@ public:
     ///
     /// \sa prealloc()
     /// \sa is_prealloc_supported()
-    bool prealloc_if_supported(SizeType offset, size_t size);
+    bool prealloc_if_supported(SizeType offset, size_t size) const;
 
     /// See prealloc_if_supported().
     static bool is_prealloc_supported();
@@ -316,19 +316,19 @@ public:
     /// Reposition the read/write offset of this File
     /// instance. Distinct File instances have separate independent
     /// offsets, as long as the cucrrent process is not forked.
-    void seek(SizeType);
+    void seek(SizeType) const;
     static void seek_static(FileDesc, SizeType);
 
     /// Flush in-kernel buffers to disk. This blocks the caller until the
     /// synchronization operation is complete. On POSIX systems this function
     /// calls `fsync()`. On Apple platforms if calls `fcntl()` with command
     /// `F_FULLFSYNC`.
-    void sync();
+    void sync() const;
 
     /// Issue a write barrier which forbids ordering writes after this call
     /// before writes performed before this call. Equivalent to `sync()` on
     /// non-Apple platforms.
-    void barrier();
+    void barrier() const;
 
     /// Place an exclusive lock on this file. This blocks the caller
     /// until all other locks have been released.
@@ -691,13 +691,13 @@ private:
         // fully update any process shared representation (e.g. buffer cache).
         // other processes will be able to see changes, but a full platform crash
         // may loose data
-        void flush();
+        void flush() const;
         // try to extend the mapping in-place. Virtual address space must have
         // been set aside earlier by a call to reserve()
         bool try_extend_to(size_t size) noexcept;
         // fully synchronize any underlying storage. After completion, a full platform
         // crash will *not* have lost data.
-        void sync();
+        void sync() const;
 #if REALM_ENABLE_ENCRYPTION
         mutable util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
         inline util::EncryptedFileMapping* get_encrypted_mapping() const

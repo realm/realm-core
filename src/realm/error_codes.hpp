@@ -45,7 +45,7 @@ struct ErrorCategory {
         sync_error = RLM_ERR_CAT_SYNC_ERROR,
     };
     constexpr ErrorCategory() = default;
-    constexpr bool test(Type cat)
+    constexpr bool test(Type cat) const
     {
         return (m_value & cat) != 0;
     }

@@ -93,7 +93,7 @@ struct VersionList {
         uint32_t count_live;
         uint32_t count_frozen;
         uint32_t count_full;
-        bool is_active()
+        bool is_active() const
         {
             return version != 0;
         }

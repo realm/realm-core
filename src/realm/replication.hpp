@@ -420,7 +420,7 @@ private:
             , path(std::move(p))
         {
         }
-        bool operator!=(const CollectionId& other)
+        bool operator!=(const CollectionId& other) const
         {
             return object_key != other.object_key || table_key != other.table_key || path != other.path;
         }

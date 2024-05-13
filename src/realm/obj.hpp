@@ -365,11 +365,11 @@ private:
     Obj& _set_all(size_t col_ndx, Val v);
     template <class Head, class... Tail>
     Obj& _set_all(size_t col_ndx, Head v, Tail... tail);
-    ColKey spec_ndx2colkey(size_t col_ndx);
-    size_t colkey2spec_ndx(ColKey);
+    ColKey spec_ndx2colkey(size_t col_ndx) const;
+    size_t colkey2spec_ndx(ColKey) const;
     bool ensure_writeable();
     void sync(Node& arr);
-    int_fast64_t bump_content_version();
+    int_fast64_t bump_content_version() const;
     template <class T>
     void do_set_null(ColKey col_key);
 
@@ -657,7 +657,7 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
     return _set_all(start_index, v, tail...);
 }
 
-inline int_fast64_t Obj::bump_content_version()
+inline int_fast64_t Obj::bump_content_version() const
 {
     Allocator& alloc = get_alloc();
     return alloc.bump_content_version();
