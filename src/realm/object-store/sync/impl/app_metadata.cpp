@@ -858,6 +858,7 @@ class InMemoryMetadataStorage : public app::MetadataStore {
     {
         std::lock_guard lock(m_mutex);
         std::vector<std::string> users;
+        users.reserve(m_users.size());
         for (auto& [user_id, _] : m_users) {
             users.push_back(user_id);
         }

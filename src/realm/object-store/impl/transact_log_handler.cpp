@@ -65,6 +65,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
         return;
 
     std::vector<TableKey> tables_needed;
+    tables_needed.reserve(observers.size());
     for (auto& observer : observers) {
         tables_needed.push_back(observer.table_key);
     }

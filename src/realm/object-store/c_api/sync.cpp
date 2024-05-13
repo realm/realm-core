@@ -273,6 +273,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.user_info_length = c_user_info.size();
 
         std::vector<realm_sync_error_compensating_write_info_t> c_compensating_writes;
+        c_compensating_writes.reserve(error.compensating_writes_info.size());
         for (const auto& compensating_write : error.compensating_writes_info) {
             c_compensating_writes.push_back({compensating_write.reason.c_str(),
                                              compensating_write.object_name.c_str(),

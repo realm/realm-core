@@ -95,6 +95,7 @@ public:
         capi_endpoint.path = endpoint.path.c_str();
 
         std::vector<const char*> protocols;
+        protocols.reserve(endpoint.protocols.size());
         for (auto& protocol : endpoint.protocols) {
             protocols.push_back(protocol.c_str());
         }

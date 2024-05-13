@@ -1250,6 +1250,7 @@ client_reset::process_recovered_changesets(Transaction& dest_tr, Transaction& pr
 {
     RecoverLocalChangesetsHandler handler(dest_tr, pre_reset_state, logger);
     std::vector<RecoveredChange> encoded;
+    encoded.reserve(local_changes.size());
     for (auto& local_change : local_changes) {
         encoded.push_back({handler.process_changeset(local_change.changeset), local_change.version});
     }

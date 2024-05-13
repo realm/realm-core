@@ -864,6 +864,7 @@ void RealmFile::memory_leaks()
         auto nodes = m_group->get_allocated_nodes();
         auto free_list = m_group->get_free_list();
         std::vector<Entry> free_blocks;
+        free_blocks.reserve(free_list.size());
         for (auto& entry : free_list) {
             free_blocks.emplace_back(entry.start, entry.length);
         }
