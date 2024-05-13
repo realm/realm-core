@@ -61,20 +61,20 @@ std::ostream& operator<<(std::ostream& os, HttpMethod method)
     return os << "UNKNOWN";
 }
 
-AppError::AppError(ErrorCodes::Error ec, std::string message, std::string link,
+AppError::AppError(ErrorCodes::Error ec, const std::string& message, std::string link,
                    std::optional<int> additional_error_code, std::optional<std::string> server_err)
     : Exception(ec, ec == ErrorCodes::HTTPError && additional_error_code
                         ? http_message(message, *additional_error_code)
                         : message)
     , additional_status_code(additional_error_code)
-    , link_to_server_logs(link)
+    , link_to_server_logs(std::move(link))
     , server_error(server_err ? *server_err : "")
 {
     // For these errors, the server_error string is empty
     REALM_ASSERT(ErrorCodes::error_categories(ec).test(ErrorCategory::app_error));
 }
 
-std::ostream& operator<<(std::ostream& os, AppError error)
+std::ostream& operator<<(std::ostream& os, const AppError& error)
 {
     return os << error.server_error << ": " << error.what();
 }

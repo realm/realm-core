@@ -60,7 +60,7 @@ public:
     // can be read from any thread.
     std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr, bool first_time_open = false)
+    std::shared_ptr<Realm> get_realm(const std::shared_ptr<util::Scheduler>& = nullptr, bool first_time_open = false)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 
     // Return a frozen copy of the source Realm. May return a cached instance
@@ -72,7 +72,7 @@ public:
     // If the Realm is not already present, it will be fully downloaded before being returned.
     // If the Realm is already on disk, it will be fully synchronized before being returned.
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
-    std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config)
+    std::shared_ptr<AsyncOpenTask> get_synchronized_realm(const Realm::Config& config)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 
     std::shared_ptr<SyncSession> sync_session() REQUIRES(!m_realm_mutex)

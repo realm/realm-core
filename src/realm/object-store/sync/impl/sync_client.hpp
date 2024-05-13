@@ -41,7 +41,7 @@ namespace realm::_impl {
 
 struct SyncClient {
     SyncClient(const std::shared_ptr<util::Logger>& logger, SyncClientConfig const& config,
-               std::weak_ptr<const SyncManager> weak_sync_manager)
+               const std::weak_ptr<const SyncManager>& weak_sync_manager)
         : m_socket_provider([&]() -> std::shared_ptr<sync::SyncSocketProvider> {
             if (config.socket_provider) {
                 return config.socket_provider;

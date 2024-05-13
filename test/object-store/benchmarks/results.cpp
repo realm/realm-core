@@ -234,7 +234,7 @@ TEST_CASE("Benchmark results notifier", "[benchmark][results]") {
         realm->commit_transaction();
 
         Results r(realm, tables[0]->where());
-        auto token = r.add_notification_callback([](CollectionChangeSet) {});
+        auto token = r.add_notification_callback([](const CollectionChangeSet&) {});
         auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
         coordinator.on_change();
 
@@ -299,7 +299,7 @@ TEST_CASE("Benchmark results notifier", "[benchmark][results]") {
         realm->commit_transaction();
 
         Results r(realm, tables[0]->where());
-        auto token = r.add_notification_callback([](CollectionChangeSet) {});
+        auto token = r.add_notification_callback([](const CollectionChangeSet&) {});
         auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
         coordinator.on_change();
 

@@ -212,12 +212,12 @@ void make_property_required(Group& group, Table& table, Property property)
     property.column_key = add_column(group, table, property);
 }
 
-void add_search_index(Table& table, Property property, IndexType type)
+void add_search_index(Table& table, const Property& property, IndexType type)
 {
     table.add_search_index(table.get_column_key(property.name), type);
 }
 
-void remove_search_index(Table& table, Property property)
+void remove_search_index(Table& table, const Property& property)
 {
     table.remove_search_index(table.get_column_key(property.name));
 }

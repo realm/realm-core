@@ -735,7 +735,7 @@ public:
     void force_handshake_response_for_testing(int status_code, std::string body)
     {
         m_test_handshake_response.emplace(status_code);
-        m_test_handshake_response_body = body;
+        m_test_handshake_response_body = std::move(body);
     }
 
 private:
@@ -862,7 +862,7 @@ private:
     }
 
     // The client receives the HTTP response.
-    void handle_http_response_received(HTTPResponse response)
+    void handle_http_response_received(const HTTPResponse& response)
     {
         m_logger.debug(util::LogCategory::network, "WebSocket::handle_http_response_received()");
         m_logger.trace(util::LogCategory::network, "HTTP response = %1", response);
@@ -887,7 +887,7 @@ private:
         frame_reader_loop();
     }
 
-    void handle_http_request_received(HTTPRequest request)
+    void handle_http_request_received(const HTTPRequest& request)
     {
         m_logger.trace(util::LogCategory::network, "WebSocket::handle_http_request_received()");
 
@@ -1314,7 +1314,7 @@ void websocket::Socket::stop() noexcept
 
 void websocket::Socket::force_handshake_response_for_testing(int status_code, std::string body)
 {
-    m_impl->force_handshake_response_for_testing(status_code, body);
+    m_impl->force_handshake_response_for_testing(status_code, std::move(body));
 }
 
 util::Optional<std::string> websocket::read_sec_websocket_protocol(const HTTPRequest& request)

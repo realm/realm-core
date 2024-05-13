@@ -136,7 +136,7 @@ private:
         ".rtest"; // Must have same length as c_realm_file_suffix.
     static constexpr const char c_legacy_sync_directory[] = "realm-object-server";
 
-    std::string get_special_directory(std::string directory_name) const;
+    std::string get_special_directory(const std::string& directory_name) const;
 
     std::string get_utility_directory() const
     {

@@ -35,6 +35,7 @@
 
 #include <iostream>
 #include <random>
+#include <utility>
 
 using namespace realm;
 
@@ -42,7 +43,7 @@ class CaptureHelper {
 public:
     CaptureHelper(TransactionRef group, SharedRealm const& r, LnkLst& lv, TableKey table_key)
         : m_realm(r)
-        , m_group(group)
+        , m_group(std::move(group))
         , m_list(lv)
         , m_table_key(table_key)
     {

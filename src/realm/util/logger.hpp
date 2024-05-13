@@ -373,7 +373,7 @@ private:
 /// level threshold.
 class FileLogger : public StreamLogger {
 public:
-    explicit FileLogger(std::string path);
+    explicit FileLogger(const std::string& path);
     explicit FileLogger(util::File);
 
 private:
@@ -388,7 +388,7 @@ private:
 /// level threshold.
 class AppendToFileLogger : public StreamLogger {
 public:
-    explicit AppendToFileLogger(std::string path);
+    explicit AppendToFileLogger(const std::string& path);
     explicit AppendToFileLogger(util::File);
 
 private:
@@ -633,7 +633,7 @@ inline StreamLogger::StreamLogger(std::ostream& out) noexcept
 {
 }
 
-inline FileLogger::FileLogger(std::string path)
+inline FileLogger::FileLogger(const std::string& path)
     : StreamLogger(m_out)
     , m_file(path, util::File::mode_Write) // Throws
     , m_streambuf(&m_file)                 // Throws
@@ -649,7 +649,7 @@ inline FileLogger::FileLogger(util::File file)
 {
 }
 
-inline AppendToFileLogger::AppendToFileLogger(std::string path)
+inline AppendToFileLogger::AppendToFileLogger(const std::string& path)
     : StreamLogger(m_out)
     , m_file(path, util::File::mode_Append) // Throws
     , m_streambuf(&m_file)                  // Throws

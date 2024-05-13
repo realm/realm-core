@@ -237,21 +237,21 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
     REQUIRE(app);
     AutoVerifiedEmailCredentials creds;
     app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-        creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+        creds.email, creds.password, [&](const util::Optional<app::AppError>& error) {
             REQUIRE(!error);
         });
     log_in_user(app, creds);
     return creds;
 }
 
-void log_in_user(app::SharedApp app, app::AppCredentials creds)
+void log_in_user(app::SharedApp app, const app::AppCredentials& creds)
 {
     REQUIRE(app);
-    app->log_in_with_credentials(creds,
-                                 [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
-                                     REQUIRE(user);
-                                     REQUIRE(!error);
-                                 });
+    app->log_in_with_credentials(
+        creds, [&](std::shared_ptr<realm::SyncUser> user, const util::Optional<app::AppError>& error) {
+            REQUIRE(user);
+            REQUIRE(!error);
+        });
 }
 
 #endif // REALM_APP_SERVICES
@@ -293,7 +293,7 @@ void async_open_realm(const Realm::Config& config,
     auto task = Realm::get_synchronized_realm(config);
     ThreadSafeReference tsr;
     std::exception_ptr err = nullptr;
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+    task->start([&](ThreadSafeReference&& ref, const std::exception_ptr& e) {
         std::lock_guard lock(mutex);
         did_finish = true;
         tsr = std::move(ref);

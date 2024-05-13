@@ -476,7 +476,7 @@ void Changeset::Printer::name(StringData n)
     pad_or_ellipsis(n, 16);
 }
 
-void Changeset::Printer::print_field(StringData name, std::string value)
+void Changeset::Printer::print_field(StringData name, const std::string& value)
 {
     if (!m_first) {
         m_out << ", ";

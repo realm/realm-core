@@ -136,14 +136,15 @@ void SyncSession::become_dying(util::CheckedUniqueLock lock)
     }
 
     size_t current_death_count = ++m_death_count;
-    m_session->async_wait_for_upload_completion([weak_session = weak_from_this(), current_death_count](Status) {
-        if (auto session = weak_session.lock()) {
-            util::CheckedUniqueLock lock(session->m_state_mutex);
-            if (session->m_state == State::Dying && session->m_death_count == current_death_count) {
-                session->become_inactive(std::move(lock));
+    m_session->async_wait_for_upload_completion(
+        [weak_session = weak_from_this(), current_death_count](const Status&) {
+            if (auto session = weak_session.lock()) {
+                util::CheckedUniqueLock lock(session->m_state_mutex);
+                if (session->m_state == State::Dying && session->m_death_count == current_death_count) {
+                    session->become_inactive(std::move(lock));
+                }
             }
-        }
-    });
+        });
     m_state_mutex.unlock(lock);
 }
 
@@ -152,7 +153,7 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status, b
     REALM_ASSERT(m_state != State::Inactive);
     m_state = State::Inactive;
 
-    do_become_inactive(std::move(lock), status, cancel_subscription_notifications);
+    do_become_inactive(std::move(lock), std::move(status), cancel_subscription_notifications);
 }
 
 void SyncSession::become_paused(util::CheckedUniqueLock lock)
@@ -248,7 +249,7 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
-void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
+void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, const Status& status)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {
@@ -553,14 +554,14 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
             // it immediately
             fresh_sync_session->force_close();
             if (auto strong_self = weak_self.lock()) {
-                strong_self->handle_fresh_realm_downloaded(db, s, server_requests_action);
+                strong_self->handle_fresh_realm_downloaded(db, std::move(s), server_requests_action);
             }
         });
     }
     fresh_sync_session->revive_if_needed();
 }
 
-void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, const Status& status,
                                                 sync::ProtocolErrorInfo::Action server_requests_action,
                                                 std::optional<sync::SubscriptionSet> new_subs)
 {
@@ -597,7 +598,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     // re-registered when the session becomes active again.
     {
         m_server_requests_action = server_requests_action;
-        m_client_reset_fresh_copy = db;
+        m_client_reset_fresh_copy = std::move(db);
         CompletionCallbacks callbacks;
         std::swap(m_completion_callbacks, callbacks);
         // always swap back, even if advance_state throws
@@ -799,7 +800,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 }
 
-void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error)
+void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, const Status& error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
@@ -1442,7 +1443,7 @@ void SyncSession::create_subscription_store()
     m_flx_subscription_store = m_subscription_store_base;
 }
 
-void SyncSession::set_write_validator_factory(std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr)
+void SyncSession::set_write_validator_factory(const std::weak_ptr<sync::SubscriptionStore>& weak_sub_mgr)
 {
     auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
     history.set_write_validator_factory(

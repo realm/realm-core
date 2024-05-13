@@ -94,7 +94,7 @@ public:
     }
     TransactionRef duplicate();
 
-    void copy_to(TransactionRef dest) const;
+    void copy_to(const TransactionRef& dest) const;
 
     _impl::History* get_history() const;
 
@@ -224,7 +224,7 @@ private:
 
 class ReadTransaction {
 public:
-    ReadTransaction(DBRef sg)
+    ReadTransaction(const DBRef& sg)
         : trans(sg->start_read())
     {
     }
@@ -269,7 +269,7 @@ private:
 
 class WriteTransaction {
 public:
-    WriteTransaction(DBRef sg)
+    WriteTransaction(const DBRef& sg)
         : trans(sg->start_write())
     {
     }

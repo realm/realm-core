@@ -39,40 +39,6 @@
 #include <vector>
 
 using namespace realm;
-using std::any;
-
-struct TestContext : CppContext {
-    std::map<std::string, AnyDict> defaults;
-
-    using CppContext::CppContext;
-    TestContext(TestContext& parent, Obj obj, realm::Property const& prop)
-        : CppContext(parent, obj, prop)
-        , defaults(parent.defaults)
-    {
-    }
-
-    util::Optional<std::any> default_value_for_property(ObjectSchema const& object, Property const& prop)
-    {
-        auto obj_it = defaults.find(object.name);
-        if (obj_it == defaults.end())
-            return util::none;
-        auto prop_it = obj_it->second.find(prop.name);
-        if (prop_it == obj_it->second.end())
-            return util::none;
-        return prop_it->second;
-    }
-
-    void will_change(Object const&, Property const&) {}
-    void did_change() {}
-    std::string print(std::any)
-    {
-        return "not implemented";
-    }
-    bool allow_missing(std::any)
-    {
-        return false;
-    }
-};
 
 TEST_CASE("Benchmark index change calculations", "[benchmark][index]") {
     _impl::CollectionChangeBuilder c;
@@ -195,7 +161,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
 
     config.schema_version = 0;
     auto r = Realm::get_shared_realm(config);
-    TestContext d(r);
+    CppContext d(r);
 
     SECTION("create object") {
         r->begin_transaction();
@@ -259,7 +225,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
 
         Results result(r, table);
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback([&](CollectionChangeSet c) {
+        auto token = result.add_notification_callback([&](const CollectionChangeSet& c) {
             num_modifications += c.modifications.count();
         });
 
@@ -345,7 +311,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
         size_t num_insertions = 0;
         size_t num_deletions = 0;
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback([&](CollectionChangeSet c) {
+        auto token = result.add_notification_callback([&](const CollectionChangeSet& c) {
             num_insertions += c.insertions.count();
             num_deletions += c.deletions.count();
             num_modifications += c.modifications_new.count();
@@ -544,7 +510,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
             constexpr size_t num_modifications = 300;
             for (size_t i = 0; i < num_modifications; ++i) {
                 Object o = get_object();
-                auto token = o.add_notification_callback([&notifiers, i](CollectionChangeSet c) {
+                auto token = o.add_notification_callback([&notifiers, i](const CollectionChangeSet& c) {
                     notifiers[i].num_insertions += c.insertions.count();
                     notifiers[i].num_modifications += c.modifications.count();
                     notifiers[i].num_deletions += c.deletions.count();
@@ -588,7 +554,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
         size_t num_insertions = 0;
         size_t num_deletions = 0;
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback([&](CollectionChangeSet c) {
+        auto token = result.add_notification_callback([&](const CollectionChangeSet& c) {
             num_insertions += c.insertions.count();
             num_deletions += c.deletions.count();
             num_modifications += c.modifications_new.count();

@@ -164,7 +164,7 @@ std::map<DB::TransactStage, const char*> log_stage = {
 
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
     : Group(alloc)
-    , db(_db)
+    , db(std::move(_db))
     , m_read_lock(rli)
     , m_log_id(util::gen_log_id(this))
 {
@@ -395,7 +395,7 @@ TransactionRef Transaction::duplicate()
     REALM_UNREACHABLE();
 }
 
-void Transaction::copy_to(TransactionRef dest) const
+void Transaction::copy_to(const TransactionRef& dest) const
 {
     _impl::CopyReplication repl(dest);
     replicate(dest.get(), repl);

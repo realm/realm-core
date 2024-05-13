@@ -120,7 +120,7 @@ struct realm_async_error : realm::c_api::WrapC {
     {
     }
 
-    explicit realm_async_error(std::exception_ptr ep)
+    explicit realm_async_error(const std::exception_ptr& ep)
         : error_storage(ep)
     {
     }
@@ -507,7 +507,7 @@ struct realm_query : realm::c_api::WrapC {
     explicit realm_query(realm::Query query, realm::util::bind_ptr<realm::DescriptorOrdering> ordering,
                          std::weak_ptr<realm::Realm> realm)
         : query(std::move(query))
-        , weak_realm(realm)
+        , weak_realm(std::move(realm))
         , m_ordering(std::move(ordering))
     {
     }
@@ -576,7 +576,7 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 
 struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
     realm_async_open_task_progress_notification_token(std::shared_ptr<realm::AsyncOpenTask> task, uint64_t token)
-        : task(task)
+        : task(std::move(task))
         , token(token)
     {
     }
@@ -588,7 +588,7 @@ struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
 struct realm_sync_session_connection_state_notification_token : realm::c_api::WrapC {
     realm_sync_session_connection_state_notification_token(std::shared_ptr<realm::SyncSession> session,
                                                            uint64_t token)
-        : session(session)
+        : session(std::move(session))
         , token(token)
     {
     }
@@ -658,7 +658,7 @@ struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {
 struct realm_app_user_subscription_token : realm::c_api::WrapC {
     using Token = realm::Subscribable<realm::app::User>::Token;
     realm_app_user_subscription_token(std::shared_ptr<realm::app::User> user, Token&& token)
-        : user(user)
+        : user(std::move(user))
         , token(std::move(token))
     {
     }

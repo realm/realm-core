@@ -288,7 +288,7 @@ void ServerProtocol::make_pong(OutputBuffer& out, milliseconds_type timestamp)
     out << "pong " << timestamp << "\n"; // Throws
 }
 
-void ServerProtocol::make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+void ServerProtocol::make_log_message(OutputBuffer& out, util::Logger::Level level, const std::string& message,
                                       session_ident_type sess_id, std::optional<std::string> co_id)
 {
     nlohmann::json log_msg_json;

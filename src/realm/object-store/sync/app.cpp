@@ -329,7 +329,7 @@ std::string App::get_ws_host_url()
     return m_ws_host_url;
 }
 
-std::string App::make_sync_route(Optional<std::string> ws_host_url)
+std::string App::make_sync_route(const Optional<std::string>& ws_host_url)
 {
     return util::format("%1%2%3/%4%5", ws_host_url.value_or(m_ws_host_url), s_base_path, s_app_path, m_config.app_id,
                         s_sync_path);
@@ -1383,7 +1383,8 @@ void App::call_function(const std::shared_ptr<User>& user, const std::string& na
 
     call_function(user, name, std::move(args_ejson).str(), service_name,
                   [self = shared_from_this(), name, service_name = std::move(service_name2),
-                   completion = std::move(completion)](const std::string* response, util::Optional<AppError> err) {
+                   completion = std::move(completion)](const std::string* response,
+                                                       const util::Optional<AppError>& err) {
                       if (err) {
                           return completion({}, err);
                       }

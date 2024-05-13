@@ -220,7 +220,7 @@ ClientImpl::ClientImpl(ClientConfig config)
                     "never do this in production");
     }
 
-    m_actualize_and_finalize = create_trigger([this](Status status) {
+    m_actualize_and_finalize = create_trigger([this](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -245,7 +245,7 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
             --m_outstanding_posts;
             m_drain_cv.notify_all();
         });
-        handler(status);
+        handler(std::move(status));
     });
 }
 
@@ -279,7 +279,7 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
         m_drained = false;
     }
     return m_socket_provider->create_timer(delay, [handler = std::move(handler), this](Status status) {
-        handler(status);
+        handler(std::move(status));
 
         std::lock_guard lock(m_drain_mutex);
         REALM_ASSERT(m_outstanding_posts);
@@ -674,7 +674,7 @@ void Connection::initiate_reconnect_wait()
     // We create a timer for the reconnect_disconnect timer even if the delay is zero because
     // we need it to be cancelable in case the connection is terminated before the timer
     // callback is run.
-    m_reconnect_disconnect_timer = m_client.create_timer(delay, [this](Status status) {
+    m_reconnect_disconnect_timer = m_client.create_timer(delay, [this](const Status& status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
         if (status != ErrorCodes::OperationAborted)
@@ -683,7 +683,7 @@ void Connection::initiate_reconnect_wait()
 }
 
 
-void Connection::handle_reconnect_wait(Status status)
+void Connection::handle_reconnect_wait(const Status& status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
@@ -803,7 +803,7 @@ void Connection::initiate_connect_wait()
     // long, or even indefinite time.
     milliseconds_type time = m_client.m_connect_timeout;
 
-    m_connect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
+    m_connect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](const Status& status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
         if (status != ErrorCodes::OperationAborted)
@@ -812,7 +812,7 @@ void Connection::initiate_connect_wait()
 }
 
 
-void Connection::handle_connect_wait(Status status)
+void Connection::handle_connect_wait(const Status& status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
@@ -912,7 +912,7 @@ void Connection::initiate_ping_delay(milliseconds_type now)
 
     m_ping_delay_in_progress = true;
 
-    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(delay), [this](Status status) {
+    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(delay), [this](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -947,7 +947,7 @@ void Connection::initiate_pong_timeout()
     m_pong_wait_started_at = monotonic_clock_now();
 
     milliseconds_type time = m_client.m_pong_keepalive_timeout;
-    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
+    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -973,7 +973,7 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
     if (m_websocket_error_received)
         return;
 
-    m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](Status status) {
+    m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](const Status& status) {
         if (sentinel->destroyed) {
             return;
         }
@@ -1058,7 +1058,7 @@ void Connection::send_ping()
 
 void Connection::initiate_write_ping(const OutputBuffer& out)
 {
-    m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](Status status) {
+    m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](const Status& status) {
         if (sentinel->destroyed) {
             return;
         }
@@ -1103,17 +1103,18 @@ void Connection::initiate_disconnect_wait()
 
     milliseconds_type time = m_client.m_connection_linger_time;
 
-    m_reconnect_disconnect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (status != ErrorCodes::OperationAborted)
-            handle_disconnect_wait(status); // Throws
-    });                                     // Throws
+    m_reconnect_disconnect_timer =
+        m_client.create_timer(std::chrono::milliseconds(time), [this](const Status& status) {
+            // If the operation is aborted, the connection object may have been
+            // destroyed.
+            if (status != ErrorCodes::OperationAborted)
+                handle_disconnect_wait(status); // Throws
+        });                                     // Throws
     m_disconnect_delay_in_progress = true;
 }
 
 
-void Connection::handle_disconnect_wait(Status status)
+void Connection::handle_disconnect_wait(const Status& status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
@@ -2687,7 +2688,7 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
         try_again_interval = std::chrono::milliseconds{1000};
     }
     logger.debug("Will attempt to resume session after %1 milliseconds", try_again_interval.count());
-    m_try_again_activation_timer = get_client().create_timer(try_again_interval, [this](Status status) {
+    m_try_again_activation_timer = get_client().create_timer(try_again_interval, [this](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())

@@ -49,51 +49,7 @@ using util::any_cast;
 namespace {
 using AnyDict = std::map<std::string, std::any>;
 using AnyVec = std::vector<std::any>;
-template <class T>
-std::vector<T> get_vector(std::initializer_list<T> list)
-{
-    return std::vector<T>(list);
-}
 } // namespace
-
-struct TestContext : CppContext {
-    std::map<std::string, AnyDict> defaults;
-
-    using CppContext::CppContext;
-    TestContext(TestContext& parent, realm::Obj& obj, realm::Property const& prop)
-        : CppContext(parent, obj, prop)
-        , defaults(parent.defaults)
-    {
-    }
-
-    util::Optional<std::any> default_value_for_property(ObjectSchema const& object, Property const& prop)
-    {
-        auto obj_it = defaults.find(object.name);
-        if (obj_it == defaults.end())
-            return util::none;
-        auto prop_it = obj_it->second.find(prop.name);
-        if (prop_it == obj_it->second.end())
-            return util::none;
-        return prop_it->second;
-    }
-
-    void will_change(Object const&, Property const&) {}
-    void did_change() {}
-    std::string print(std::any)
-    {
-        return "not implemented";
-    }
-    bool allow_missing(std::any)
-    {
-        return false;
-    }
-
-    template <class T>
-    T get(Object& obj, const std::string& name)
-    {
-        return util::any_cast<T>(obj.get_property_value<std::any>(*this, name));
-    }
-};
 
 TEST_CASE("geospatial", "[geospatial]") {
     using namespace std::string_literals;

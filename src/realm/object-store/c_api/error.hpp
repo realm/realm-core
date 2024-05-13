@@ -25,14 +25,14 @@
 
 namespace realm::c_api {
 
-void set_last_exception(std::exception_ptr eptr);
+void set_last_exception(const std::exception_ptr& eptr);
 
 class ErrorStorage {
 public:
     static ErrorStorage* get_thread_local();
 
     ErrorStorage() = default;
-    explicit ErrorStorage(std::exception_ptr eptr) noexcept;
+    explicit ErrorStorage(const std::exception_ptr& eptr) noexcept;
     ErrorStorage(const ErrorStorage& other);
     ErrorStorage& operator=(const ErrorStorage& other);
 
@@ -41,7 +41,7 @@ public:
 
     bool operator==(const ErrorStorage& other) const noexcept;
 
-    void assign(std::exception_ptr eptr) noexcept;
+    void assign(const std::exception_ptr& eptr) noexcept;
     bool has_error() const noexcept;
     bool get_as_realm_error_t(realm_error_t* out) const noexcept;
     bool clear() noexcept;

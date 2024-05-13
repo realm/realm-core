@@ -12,7 +12,7 @@
 
 namespace realm::c_api {
 
-ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
+ErrorStorage::ErrorStorage(const std::exception_ptr& ptr) noexcept
     : m_err(none)
     , m_user_code_error(nullptr)
 {
@@ -74,7 +74,7 @@ bool ErrorStorage::operator==(const ErrorStorage& other) const noexcept
     return m_err->error == other.m_err->error && m_message_buf == other.m_message_buf;
 }
 
-void ErrorStorage::assign(std::exception_ptr eptr) noexcept
+void ErrorStorage::assign(const std::exception_ptr& eptr) noexcept
 {
     if (!eptr) {
         clear();
@@ -204,7 +204,7 @@ ErrorStorage* ErrorStorage::get_thread_local()
 #endif
 }
 
-void set_last_exception(std::exception_ptr eptr)
+void set_last_exception(const std::exception_ptr& eptr)
 {
     ErrorStorage::get_thread_local()->assign(eptr);
 }

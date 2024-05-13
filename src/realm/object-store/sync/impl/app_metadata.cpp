@@ -179,7 +179,7 @@ struct FileActionSchema {
     }
 };
 
-void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm)
+void migrate_to_v7(const std::shared_ptr<Realm>& old_realm, const std::shared_ptr<Realm>& realm)
 {
     // Before schema version 7 there may have been multiple UserMetadata entries
     // for a single user_id with different provider types, so we need to merge

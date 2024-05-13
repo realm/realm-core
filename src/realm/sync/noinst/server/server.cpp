@@ -432,8 +432,8 @@ public:
     // Logger to be used by the worker thread
     util::PrefixLogger wlogger;
 
-    ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path, std::string real_path,
-               bool disable_sync_to_disk);
+    ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path,
+               const std::string& real_path, bool disable_sync_to_disk);
     ~ServerFile() noexcept override;
 
     void initialize();
@@ -845,8 +845,8 @@ public:
 
     void start(std::string listen_address, std::string listen_port, bool reuse_address)
     {
-        m_config.listen_address = listen_address;
-        m_config.listen_port = listen_port;
+        m_config.listen_address = std::move(listen_address);
+        m_config.listen_port = std::move(listen_port);
         m_config.reuse_address = reuse_address;
 
         start(); // Throws
@@ -1100,7 +1100,7 @@ public:
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
         network::Service& service = m_server.get_service();
-        auto handler = [this](Status status) {
+        auto handler = [this](const Status& status) {
             if (!status.is_ok())
                 return;
             if (!m_is_sending)
@@ -1272,7 +1272,7 @@ public:
 
     void initiate_pong_output_buffer();
 
-    void handle_protocol_error(Status status);
+    void handle_protocol_error(const Status& status);
 
     void receive_bind_message(session_ident_type, std::string path, std::string signed_user_token,
                               bool need_client_file_ident, bool is_subserver);
@@ -1637,7 +1637,7 @@ private:
     {
         logger.debug("Connection initiates HTTP receipt");
 
-        auto handler = [this](HTTPRequest request, std::error_code ec) {
+        auto handler = [this](const HTTPRequest& request, std::error_code ec) {
             if (REALM_UNLIKELY(ec == util::error::operation_aborted))
                 return;
             if (REALM_UNLIKELY(ec == HTTPParserError::MalformedRequest)) {
@@ -2279,8 +2279,8 @@ public:
         // This session is now destroyed!
     }
 
-    bool receive_bind_message(std::string path, std::string signed_user_token, bool need_client_file_ident,
-                              bool is_subserver, ProtocolError& error)
+    bool receive_bind_message(const std::string& path, const std::string& signed_user_token,
+                              bool need_client_file_ident, bool is_subserver, ProtocolError& error)
     {
         if (logger.would_log(util::Logger::Level::info)) {
             logger.detail("Received: BIND(server_path=%1, signed_user_token='%2', "
@@ -3210,7 +3210,7 @@ void SessionQueue::clear() noexcept
 // ============================ ServerFile implementation ============================
 
 ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path,
-                       std::string real_path, bool disable_sync_to_disk)
+                       const std::string& real_path, bool disable_sync_to_disk)
     : logger{util::LogCategory::server, "ServerFile[" + virt_path + "]: ", server.logger_ptr}               // Throws
     , wlogger{util::LogCategory::server, "ServerFile[" + virt_path + "]: ", server.get_worker().logger_ptr} // Throws
     , m_server{server}
@@ -3433,7 +3433,7 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
 
     // Pass control back to the network event loop thread
     network::Service& service = m_server.get_service();
-    service.post([this](Status) {
+    service.post([this](const Status&) {
         // FIXME: The safety of capturing `this` here, relies on the fact
         // that ServerFile objects currently are not destroyed until the
         // server object is destroyed.
@@ -4082,7 +4082,7 @@ void ServerImpl::remove_sync_connection(int_fast64_t connection_id)
 
 void ServerImpl::set_connection_reaper_timeout(milliseconds_type timeout)
 {
-    get_service().post([this, timeout](Status) {
+    get_service().post([this, timeout](const Status&) {
         m_config.connection_reaper_timeout = timeout;
     });
 }
@@ -4090,7 +4090,7 @@ void ServerImpl::set_connection_reaper_timeout(milliseconds_type timeout)
 
 void ServerImpl::close_connections()
 {
-    get_service().post([this](Status) {
+    get_service().post([this](const Status&) {
         do_close_connections(); // Throws
     });
 }
@@ -4105,7 +4105,7 @@ bool ServerImpl::map_virtual_to_real_path(const std::string& virt_path, std::str
 void ServerImpl::recognize_external_change(const std::string& virt_path)
 {
     std::string virt_path_2 = virt_path; // Throws (copy)
-    get_service().post([this, virt_path = std::move(virt_path_2)](Status) {
+    get_service().post([this, virt_path = std::move(virt_path_2)](const Status&) {
         do_recognize_external_change(virt_path); // Throws
     });                                          // Throws
 }
@@ -4118,7 +4118,7 @@ void ServerImpl::stop_sync_and_wait_for_backup_completion(
                 "timeout = %1",
                 timeout); // Throws
 
-    get_service().post([this, completion_handler = std::move(completion_handler), timeout](Status) mutable {
+    get_service().post([this, completion_handler = std::move(completion_handler), timeout](const Status&) mutable {
         do_stop_sync_and_wait_for_backup_completion(std::move(completion_handler),
                                                     timeout); // Throws
     });
@@ -4128,7 +4128,7 @@ void ServerImpl::stop_sync_and_wait_for_backup_completion(
 void ServerImpl::initiate_connection_reaper_timer(milliseconds_type timeout)
 {
     m_connection_reaper_timer.emplace(get_service());
-    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), [this, timeout](Status status) {
+    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), [this, timeout](const Status& status) {
         if (status != ErrorCodes::OperationAborted) {
             reap_connections();                        // Throws
             initiate_connection_reaper_timer(timeout); // Throws
@@ -4259,7 +4259,7 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
 }
 
 
-void SyncConnection::handle_protocol_error(Status status)
+void SyncConnection::handle_protocol_error(const Status& status)
 {
     logger.error("%1", status);
     switch (status.code()) {

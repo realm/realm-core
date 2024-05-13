@@ -46,7 +46,7 @@ static TableRef get_table(Realm& realm, StringData object_name)
     return ObjectStore::table_for_object_type(realm.read_group(), object_name);
 }
 
-static Object create_object(SharedRealm const& realm, StringData object_type, AnyDict value)
+static Object create_object(SharedRealm const& realm, StringData object_type, const AnyDict& value)
 {
     CppContext ctx(realm);
     return Object::create(ctx, realm, object_type, std::any(value));

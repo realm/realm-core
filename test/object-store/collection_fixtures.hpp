@@ -31,6 +31,7 @@
 
 #include <string>
 #include <type_traits>
+#include <utility>
 
 namespace realm::collection_fixtures {
 
@@ -543,7 +544,7 @@ struct ListOfObjects : public LinkedCollectionBase {
 
     List get_collection(SharedRealm r, Obj obj)
     {
-        return List(r, obj, get_link_col_key(obj.get_table()));
+        return List(std::move(r), obj, get_link_col_key(obj.get_table()));
     }
 };
 
@@ -625,7 +626,7 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
     constexpr static bool allows_storing_nulls = true;
     List get_collection(SharedRealm r, Obj obj)
     {
-        return List(r, obj, get_link_col_key(obj.get_table()));
+        return List(std::move(r), obj, get_link_col_key(obj.get_table()));
     }
 };
 
@@ -679,7 +680,7 @@ struct SetOfObjects : public LinkedCollectionBase {
 
     object_store::Set get_collection(SharedRealm r, Obj obj)
     {
-        return object_store::Set(r, obj, get_link_col_key(obj.get_table()));
+        return object_store::Set(std::move(r), obj, get_link_col_key(obj.get_table()));
     }
 };
 
@@ -742,7 +743,7 @@ struct SetOfMixedLinks : public LinkedCollectionBase {
 
     object_store::Set get_collection(SharedRealm r, Obj obj)
     {
-        return object_store::Set(r, obj, get_link_col_key(obj.get_table()));
+        return object_store::Set(std::move(r), obj, get_link_col_key(obj.get_table()));
     }
 };
 
@@ -811,7 +812,7 @@ struct DictionaryOfObjects : public LinkedCollectionBase {
     }
     object_store::Dictionary get_collection(SharedRealm r, Obj obj)
     {
-        return object_store::Dictionary(r, obj, get_link_col_key(obj.get_table()));
+        return object_store::Dictionary(std::move(r), obj, get_link_col_key(obj.get_table()));
     }
     size_t key_counter = 0;
     constexpr static bool allows_storing_nulls = true;
@@ -890,7 +891,7 @@ struct DictionaryOfMixedLinks : public LinkedCollectionBase {
 
     object_store::Dictionary get_collection(SharedRealm r, Obj obj)
     {
-        return object_store::Dictionary(r, obj, get_link_col_key(obj.get_table()));
+        return object_store::Dictionary(std::move(r), obj, get_link_col_key(obj.get_table()));
     }
 };
 

@@ -368,7 +368,7 @@ public:
     // Each time you call distinct() it will compound on the previous calls
     void distinct(ColKey column);
     void distinct(DistinctDescriptor columns);
-    void limit(LimitDescriptor limit);
+    void limit(const LimitDescriptor& limit);
     void filter(FilterDescriptor filter);
 
     // Replace the order of sort and distinct operations, bypassing manually

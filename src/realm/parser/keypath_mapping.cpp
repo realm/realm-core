@@ -34,7 +34,7 @@ std::size_t TableAndColHash::operator()(const std::pair<TableKey, std::string>& 
 }
 
 
-bool KeyPathMapping::add_mapping(ConstTableRef table, const std::string& name, std::string alias)
+bool KeyPathMapping::add_mapping(ConstTableRef table, const std::string& name, const std::string& alias)
 {
     auto table_key = table->get_key();
     auto it_and_success = m_mapping.insert({{table_key, name}, alias});

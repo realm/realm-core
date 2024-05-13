@@ -34,6 +34,7 @@
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <numeric>
+#include <utility>
 
 using namespace realm;
 using namespace realm::util;
@@ -80,7 +81,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
 
     CollectionChangeSet change_dictionary;
     auto token_dict = dict_mixed.add_notification_callback([&](CollectionChangeSet c) {
-        change_dictionary = c;
+        change_dictionary = std::move(c);
     });
 
     auto write = [&](auto&& f) {
@@ -104,7 +105,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
 
         auto require_change = [&] {
             auto token = list.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
             return token;
@@ -129,7 +130,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
 
             auto new_list = dict_mixed.get_list("A");
             auto token_new_list = new_list.add_notification_callback([&](CollectionChangeSet c) {
-                change_list_after_insert = c;
+                change_list_after_insert = std::move(c);
             });
             write([&] {
                 new_list.add(Mixed{42});
@@ -718,15 +719,15 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
         auto token = dict.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             ++calls;
         });
         auto rtoken = values_as_results.add_notification_callback([&](CollectionChangeSet c) {
-            rchange = c;
+            rchange = std::move(c);
             ++calls;
         });
         auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c) {
-            srchange = c;
+            srchange = std::move(c);
             ++calls;
         });
 
@@ -788,7 +789,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("key based notification") {
             DictionaryChangeSet key_change;
             auto token = dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c) {
-                key_change = c;
+                key_change = std::move(c);
             });
             advance_and_notify(*r);
 
@@ -828,7 +829,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("clear list") {
             DictionaryChangeSet key_change;
             auto token = dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c) {
-                key_change = c;
+                key_change = std::move(c);
             });
             advance_and_notify(*r);
 
@@ -903,7 +904,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
             CollectionChangeSet local_change;
             auto x = links.add_notification_callback([&local_change](CollectionChangeSet c) {
-                local_change = c;
+                local_change = std::move(c);
             });
             advance_and_notify(*r);
 
@@ -953,7 +954,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(all_sources.size() == 2);
             CollectionChangeSet local_changes;
             auto x = all_sources.add_notification_callback([&local_changes](CollectionChangeSet c) {
-                local_changes = c;
+                local_changes = std::move(c);
             });
             advance_and_notify(*r);
 
@@ -1246,7 +1247,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
     auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
-        local_changes = c;
+        local_changes = std::move(c);
     });
     advance_and_notify(*r);
     local_changes = {};
@@ -1726,7 +1727,7 @@ TEST_CASE("callback with empty keypatharray", "[dictionary]") {
     auto shallow_require_change = [&] {
         auto token = dict.add_notification_callback(
             [&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             },
             KeyPathArray());
         advance_and_notify(*r);
@@ -1736,7 +1737,7 @@ TEST_CASE("callback with empty keypatharray", "[dictionary]") {
     auto shallow_require_no_change = [&] {
         bool first = true;
         auto token = dict.add_notification_callback(
-            [&first](CollectionChangeSet) mutable {
+            [&first](const CollectionChangeSet&) mutable {
                 REQUIRE(first);
                 first = false;
             },

@@ -38,6 +38,7 @@
 #include <realm/db.hpp>
 
 #include <cstdint>
+#include <utility>
 
 using namespace realm;
 using util::any_cast;
@@ -107,7 +108,7 @@ TEST_CASE("list", "[list]") {
 
         auto require_change = [&] {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
             return token;
@@ -115,7 +116,7 @@ TEST_CASE("list", "[list]") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = lst.add_notification_callback([&, first](CollectionChangeSet) mutable {
+            auto token = lst.add_notification_callback([&, first](const CollectionChangeSet&) mutable {
                 REQUIRE(first);
                 first = false;
             });
@@ -190,7 +191,7 @@ TEST_CASE("list", "[list]") {
 
         SECTION("deleting list before first run of notifier reports deletions") {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
             write([&] {
@@ -203,7 +204,7 @@ TEST_CASE("list", "[list]") {
         SECTION("deleting an empty list triggers the notifier") {
             size_t notifier_count = 0;
             auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
                 ++notifier_count;
             });
             advance_and_notify(*r);
@@ -391,7 +392,7 @@ TEST_CASE("list", "[list]") {
 
             List list2(r, obj, col_link);
             auto token2 = list2.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
 
@@ -529,7 +530,7 @@ TEST_CASE("list", "[list]") {
 
         SECTION("changes are sent in initial notification") {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             r2->begin_transaction();
             r2_lv->remove(5);
@@ -539,7 +540,7 @@ TEST_CASE("list", "[list]") {
         }
 
         SECTION("changes are sent in initial notification after removing and then re-adding callback") {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet) {
+            auto token = lst.add_notification_callback([&](const CollectionChangeSet&) {
                 REQUIRE(false);
             });
             token = {};
@@ -552,7 +553,7 @@ TEST_CASE("list", "[list]") {
 
             SECTION("add new callback before transaction") {
                 token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                    change = c;
+                    change = std::move(c);
                 });
 
                 write();
@@ -565,7 +566,7 @@ TEST_CASE("list", "[list]") {
                 write();
 
                 token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                    change = c;
+                    change = std::move(c);
                 });
 
                 advance_and_notify(*r);
@@ -577,7 +578,7 @@ TEST_CASE("list", "[list]") {
                 coordinator.on_change();
 
                 token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                    change = c;
+                    change = std::move(c);
                 });
 
                 advance_and_notify(*r);
@@ -593,7 +594,7 @@ TEST_CASE("list", "[list]") {
         int notification_calls = 0;
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             ++notification_calls;
         });
 
@@ -640,7 +641,7 @@ TEST_CASE("list", "[list]") {
         int notification_calls = 0;
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             ++notification_calls;
         });
 
@@ -720,7 +721,7 @@ TEST_CASE("list", "[list]") {
         SECTION("some callbacks have filters") {
             auto require_change_no_filter = [&] {
                 auto token = list.add_notification_callback([&](CollectionChangeSet c) {
-                    collection_change_set_without_filter = c;
+                    collection_change_set_without_filter = std::move(c);
                 });
                 advance_and_notify(*r);
                 return token;
@@ -729,7 +730,7 @@ TEST_CASE("list", "[list]") {
             auto require_change_target_value_filter = [&] {
                 auto token = list.add_notification_callback(
                     [&](CollectionChangeSet c) {
-                        collection_change_set_with_filter_on_target_value = c;
+                        collection_change_set_with_filter_on_target_value = std::move(c);
                     },
                     key_path_array_target_value);
                 advance_and_notify(*r);
@@ -770,7 +771,7 @@ TEST_CASE("list", "[list]") {
             auto require_change = [&] {
                 auto token = list.add_notification_callback(
                     [&](CollectionChangeSet c) {
-                        collection_change_set_with_filter_on_target_value = c;
+                        collection_change_set_with_filter_on_target_value = std::move(c);
                     },
                     key_path_array_target_value);
                 advance_and_notify(*r);
@@ -780,7 +781,7 @@ TEST_CASE("list", "[list]") {
             auto require_no_change = [&] {
                 bool first = true;
                 auto token = list.add_notification_callback(
-                    [&, first](CollectionChangeSet) mutable {
+                    [&, first](const CollectionChangeSet&) mutable {
                         REQUIRE(first);
                         first = false;
                     },
@@ -812,7 +813,7 @@ TEST_CASE("list", "[list]") {
             auto shallow_require_change = [&] {
                 auto token = list.add_notification_callback(
                     [&](CollectionChangeSet c) {
-                        collection_change_set_with_empty_filter = c;
+                        collection_change_set_with_empty_filter = std::move(c);
                     },
                     KeyPathArray());
                 advance_and_notify(*r);
@@ -822,7 +823,7 @@ TEST_CASE("list", "[list]") {
             auto shallow_require_no_change = [&] {
                 bool first = true;
                 auto token = list.add_notification_callback(
-                    [&first](CollectionChangeSet) mutable {
+                    [&first](const CollectionChangeSet&) mutable {
                         REQUIRE(first);
                         first = false;
                     },
@@ -882,7 +883,7 @@ TEST_CASE("list", "[list]") {
             auto require_change_origin_to_target = [&] {
                 auto token = object.add_notification_callback(
                     [&](CollectionChangeSet c) {
-                        collection_change_set_linked_filter = c;
+                        collection_change_set_linked_filter = std::move(c);
                     },
                     key_path_array_origin_to_target_value);
                 advance_and_notify(*r);
@@ -1329,7 +1330,7 @@ TEST_CASE("nested List") {
 
         auto require_change = [&] {
             auto token = lst0.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
             return token;
@@ -1337,7 +1338,7 @@ TEST_CASE("nested List") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = lst0.add_notification_callback([&, first](CollectionChangeSet) mutable {
+            auto token = lst0.add_notification_callback([&, first](const CollectionChangeSet&) mutable {
                 REQUIRE(first);
                 first = false;
             });
@@ -1359,7 +1360,7 @@ TEST_CASE("nested List") {
             Results res = lst0.as_results();
             CollectionChangeSet change1;
             auto token_res = res.add_notification_callback([&](CollectionChangeSet c) {
-                change1 = c;
+                change1 = std::move(c);
             });
 
             auto token = require_change();
@@ -1541,7 +1542,7 @@ TEST_CASE("embedded List", "[list]") {
 
         auto require_change = [&] {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
             return token;
@@ -1549,7 +1550,7 @@ TEST_CASE("embedded List", "[list]") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = lst.add_notification_callback([&, first](CollectionChangeSet) mutable {
+            auto token = lst.add_notification_callback([&, first](const CollectionChangeSet&) mutable {
                 REQUIRE(first);
                 first = false;
             });
@@ -1590,7 +1591,7 @@ TEST_CASE("embedded List", "[list]") {
 
         SECTION("deleting list before first run of notifier reports deletions") {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
             write([&] {
@@ -1643,7 +1644,7 @@ TEST_CASE("embedded List", "[list]") {
         int notification_calls = 0;
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             ++notification_calls;
         });
 
@@ -1680,7 +1681,7 @@ TEST_CASE("embedded List", "[list]") {
         int notification_calls = 0;
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             ++notification_calls;
         });
 
@@ -2093,7 +2094,7 @@ TEST_CASE("list with unresolved links", "[list]") {
     bool called = false;
 
     auto require_change = [&] {
-        auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
+        auto token = lst.add_notification_callback([&](const CollectionChangeSet& c) {
             if (!c.empty()) {
                 change = c;
                 called = true;

@@ -52,7 +52,7 @@ void WeakRealmNotifier::bind_to_scheduler()
     m_scheduler = realm()->scheduler();
 }
 
-bool WeakRealmNotifier::is_cached_for_scheduler(std::shared_ptr<util::Scheduler> scheduler) const
+bool WeakRealmNotifier::is_cached_for_scheduler(const std::shared_ptr<util::Scheduler>& scheduler) const
 {
     return m_cache && (m_scheduler && scheduler) && (m_scheduler->is_same_as(scheduler.get()));
 }

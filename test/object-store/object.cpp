@@ -39,6 +39,7 @@
 #include <realm/util/any.hpp>
 
 #include <cstdint>
+#include <utility>
 
 using namespace realm;
 using util::any_cast;
@@ -74,17 +75,6 @@ struct TestContext : CppContext {
         return prop_it->second;
     }
 
-    void will_change(Object const&, Property const&) {}
-    void did_change() {}
-    std::string print(std::any)
-    {
-        return "not implemented";
-    }
-    bool allow_missing(std::any)
-    {
-        return false;
-    }
-
     template <class T>
     T get(Object& obj, const std::string& name)
     {
@@ -96,7 +86,7 @@ class CreatePolicyRecordingContext {
 public:
     CreatePolicyRecordingContext(CreatePolicyRecordingContext&, Obj, Property const&) {}
     CreatePolicyRecordingContext() = default;
-    CreatePolicyRecordingContext(std::shared_ptr<Realm>, const ObjectSchema*) {}
+    CreatePolicyRecordingContext(const std::shared_ptr<Realm>&, const ObjectSchema*) {}
 
     util::Optional<std::any> value_for_property(std::any&, const Property&, size_t) const
     {
@@ -337,9 +327,9 @@ TEST_CASE("object") {
         auto require_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c) {
-                    change = c;
+                    change = std::move(c);
                 },
-                key_path_array);
+                std::move(key_path_array));
             advance_and_notify(*r);
             return token;
         };
@@ -347,11 +337,11 @@ TEST_CASE("object") {
         auto require_no_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             bool first = true;
             auto token = object.add_notification_callback(
-                [&](CollectionChangeSet) {
+                [&](const CollectionChangeSet&) {
                     REQUIRE(first);
                     first = false;
                 },
-                key_path_array);
+                std::move(key_path_array));
             advance_and_notify(*r);
             return token;
         };
@@ -475,7 +465,7 @@ TEST_CASE("object") {
 
         SECTION("add notification callback, remove it, then add another notification callback") {
             {
-                auto token = object.add_notification_callback([&](CollectionChangeSet) {
+                auto token = object.add_notification_callback([&](const CollectionChangeSet&) {
                     FAIL("This should never happen");
                 });
             }
@@ -1268,7 +1258,7 @@ TEST_CASE("object") {
             {"uuid array", AnyVec{UUID(), UUID("3b241101-1234-5678-9012-4136c566a962")}}});
 
         auto token = obj.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             callback_called = true;
         });
         advance_and_notify(*r);
@@ -1333,7 +1323,7 @@ TEST_CASE("object") {
         Results result(r, table);
         result = result.sort({{"_id", false}});
         auto token = result.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             callback_called = true;
         });
         advance_and_notify(*r);
@@ -1401,13 +1391,13 @@ TEST_CASE("object") {
         bool callback_called;
         bool results_callback_called;
         bool sub_callback_called;
-        auto token1 = obj.add_notification_callback([&](CollectionChangeSet) {
+        auto token1 = obj.add_notification_callback([&](const CollectionChangeSet&) {
             callback_called = true;
         });
-        auto token2 = result.add_notification_callback([&](CollectionChangeSet) {
+        auto token2 = result.add_notification_callback([&](const CollectionChangeSet&) {
             results_callback_called = true;
         });
-        auto token3 = sub_obj.add_notification_callback([&](CollectionChangeSet) {
+        auto token3 = sub_obj.add_notification_callback([&](const CollectionChangeSet&) {
             sub_callback_called = true;
         });
         advance_and_notify(*r);
@@ -1490,7 +1480,7 @@ TEST_CASE("object") {
 
         auto obj_table = r->read_group().get_table("class_all types");
         Results result(r, obj_table);
-        auto token1 = result.add_notification_callback([&](CollectionChangeSet) {
+        auto token1 = result.add_notification_callback([&](const CollectionChangeSet&) {
             callback_called = true;
         });
         advance_and_notify(*r);
@@ -1924,7 +1914,7 @@ TEST_CASE("object") {
 
             CollectionChangeSet change;
             auto token = obj.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
 
@@ -2257,11 +2247,11 @@ TEST_CASE("Embedded Object") {
         Results result(realm, array_table);
 
         bool obj_callback_called = false;
-        auto token = obj.add_notification_callback([&](CollectionChangeSet) {
+        auto token = obj.add_notification_callback([&](const CollectionChangeSet&) {
             obj_callback_called = true;
         });
         bool list_callback_called = false;
-        auto token1 = result.add_notification_callback([&](CollectionChangeSet) {
+        auto token1 = result.add_notification_callback([&](const CollectionChangeSet&) {
             list_callback_called = true;
         });
         advance_and_notify(*realm);
@@ -2406,7 +2396,8 @@ TEST_CASE("Asymmetric Object") {
     }
     CppContext ctx(realm);
 
-    auto create = [&](std::any&& value, std::string table_name, CreatePolicy policy = CreatePolicy::ForceCreate) {
+    auto create = [&](std::any&& value, const std::string& table_name,
+                      CreatePolicy policy = CreatePolicy::ForceCreate) {
         realm->begin_transaction();
         auto obj = Object::create(ctx, realm, *realm->schema().find(table_name), value, policy);
         realm->commit_transaction();

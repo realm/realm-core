@@ -547,7 +547,7 @@ TEST_CASE("Reclaim Frozen", "[frozen]") {
         entry.linked_value = linked.get<Int>(col);
         // add a dummy notification callback to later exercise the notification machinery
         if (!entry.realm->is_frozen()) {
-            entry.token = o.add_notification_callback([&](CollectionChangeSet) {
+            entry.token = o.add_notification_callback([&](const CollectionChangeSet&) {
                 ++notifications;
             });
         }

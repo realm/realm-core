@@ -504,7 +504,7 @@ NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>
 
 NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                                  std::shared_ptr<Transaction> pin_tr)
-    : m_pin_tr(pin_tr)
+    : m_pin_tr(std::move(pin_tr))
     , m_notifiers(std::move(notifiers))
 {
 }

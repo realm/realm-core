@@ -86,7 +86,7 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
         // If the session is still active (in this case the audit session) wait for audit to complete
         if (session->state() == SyncSession::State::Active) {
             auto [promise, future] = util::make_promise_future<void>();
-            session->wait_for_upload_completion([promise = std::move(promise)](Status) mutable {
+            session->wait_for_upload_completion([promise = std::move(promise)](const Status&) mutable {
                 // Don't care if error occurred, just finish operation
                 promise.emplace_value();
             });
@@ -240,7 +240,7 @@ public:
     }
 };
 
-void assert_no_error(std::exception_ptr e)
+void assert_no_error(const std::exception_ptr& e)
 {
     REALM_ASSERT(!e);
 }
@@ -1383,7 +1383,7 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
         std::atomic<size_t> completions = 0;
         std::array<std::pair<std::atomic<size_t>, std::atomic<bool>>, 5> completion_results;
         auto expect_completion = [&](size_t expected) {
-            return [&, expected](std::exception_ptr e) {
+            return [&, expected](const std::exception_ptr& e) {
                 completion_results[expected].second = bool(e);
                 completion_results[expected].first = completions++;
             };

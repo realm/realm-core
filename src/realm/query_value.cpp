@@ -214,7 +214,7 @@ std::string TypeOfValue::to_string() const
     }
     else {
         return util::format("{%1}", std::accumulate(std::next(values.begin()), values.end(), values[0],
-                                                    [](std::string previous, std::string current) {
+                                                    [](std::string previous, const std::string& current) {
                                                         return std::move(previous) + ", " + current;
                                                     }));
     }

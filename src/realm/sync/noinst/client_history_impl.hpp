@@ -73,7 +73,7 @@ constexpr int get_client_history_schema_version() noexcept
 
 class IntegrationException : public Exception {
 public:
-    IntegrationException(ErrorCodes::Error error, std::string message,
+    IntegrationException(ErrorCodes::Error error, const std::string& message,
                          ProtocolError error_for_server = ProtocolError::other_session_error)
         : Exception(error, message)
         , error_for_server(error_for_server)
@@ -408,7 +408,8 @@ private:
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(const HistoryEntry&);
-    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes, TransactionRef);
+    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes,
+                              const TransactionRef&);
     void trim_ct_history();
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);

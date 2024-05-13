@@ -401,25 +401,25 @@ private:
     void update_subscription_store(bool flx_sync_requested, std::optional<sync::SubscriptionSet> new_subs)
         REQUIRES(!m_state_mutex);
     void create_subscription_store() REQUIRES(m_state_mutex);
-    void set_write_validator_factory(std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr);
+    void set_write_validator_factory(const std::weak_ptr<sync::SubscriptionStore>& weak_sub_mgr);
     // Update the sync config after a PBS->FLX migration or FLX->PBS rollback occurs
     void apply_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex, !m_state_mutex);
     void save_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex);
 
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, Status status,
+    void handle_fresh_realm_downloaded(DBRef db, const Status& status,
                                        sync::ProtocolErrorInfo::Action server_requests_action,
                                        std::optional<sync::SubscriptionSet> new_subs = std::nullopt)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
-    void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
+    void handle_bad_auth(const std::shared_ptr<SyncUser>& user, const Status& status)
         REQUIRES(!m_state_mutex, !m_config_mutex);
     void handle_location_update_failed(Status status)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     // If sub_notify_error is set (including Status::OK()), then the pending subscription waiters will
     // also be called with the sub_notify_error status value.
-    void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
+    void cancel_pending_waits(util::CheckedUniqueLock, const Status&) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, double, double);

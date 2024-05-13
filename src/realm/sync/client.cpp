@@ -355,7 +355,7 @@ ClientImpl::~ClientImpl()
 void ClientImpl::cancel_reconnect_delay()
 {
     // Thread safety required
-    post([this](Status status) {
+    post([this](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -390,7 +390,7 @@ void ClientImpl::cancel_reconnect_delay()
 void ClientImpl::voluntary_disconnect_all_connections()
 {
     auto done_pf = util::make_promise_future<void>();
-    post([this, promise = std::move(done_pf.promise)](Status status) mutable {
+    post([this, promise = std::move(done_pf.promise)](const Status& status) mutable {
         if (status == ErrorCodes::OperationAborted) {
             return;
         }
@@ -459,7 +459,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
     // below gets to execute.
-    post([this](Status status) mutable {
+    post([this](const Status& status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -485,7 +485,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 util::Future<void> ClientImpl::notify_session_terminated()
 {
     auto pf = util::make_promise_future<void>();
-    post([promise = std::move(pf.promise)](Status status) mutable {
+    post([promise = std::move(pf.promise)](const Status& status) mutable {
         // Includes operation_aborted
         if (!status.is_ok()) {
             promise.set_error(status);
@@ -500,7 +500,7 @@ util::Future<void> ClientImpl::notify_session_terminated()
 
 void ClientImpl::drain_connections_on_loop()
 {
-    post([this](Status status) mutable {
+    post([this](const Status& status) mutable {
         REALM_ASSERT(status.is_ok());
         drain_connections();
     });
@@ -1181,7 +1181,7 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 
     auto pf = util::make_promise_future<std::string>();
 
-    get_client().post([this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
+    get_client().post([this, promise = std::move(pf.promise), body = std::move(body)](const Status& status) mutable {
         // Includes operation_aborted
         if (!status.is_ok()) {
             promise.set_error(status);
@@ -1382,7 +1382,7 @@ void SessionWrapper::on_commit(version_type new_version)
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.post([self = std::move(self), new_version](Status status) {
+    m_client.post([self = std::move(self), new_version](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -1408,7 +1408,7 @@ void SessionWrapper::cancel_reconnect_delay()
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.post([self = std::move(self)](Status status) {
+    m_client.post([self = std::move(self)](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -1436,7 +1436,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
 
     util::bind_ptr<SessionWrapper> self{this};
     m_client.post([self = std::move(self), handler = std::move(handler), upload_completion,
-                   download_completion](Status status) mutable {
+                   download_completion](const Status& status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -1484,7 +1484,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.post([self = std::move(self), target_mark](Status status) {
+    m_client.post([self = std::move(self), target_mark](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -1529,7 +1529,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.post([self = std::move(self), target_mark](Status status) {
+    m_client.post([self = std::move(self), target_mark](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -1567,23 +1567,24 @@ void SessionWrapper::refresh(std::string_view signed_access_token)
     REALM_ASSERT(m_initiated);
     REALM_ASSERT(!m_abandoned);
 
-    m_client.post([self = util::bind_ptr(this), token = std::string(signed_access_token)](Status status) mutable {
-        if (status == ErrorCodes::OperationAborted)
-            return;
-        else if (!status.is_ok())
-            throw Exception(status);
+    m_client.post(
+        [self = util::bind_ptr(this), token = std::string(signed_access_token)](const Status& status) mutable {
+            if (status == ErrorCodes::OperationAborted)
+                return;
+            else if (!status.is_ok())
+                throw Exception(status);
 
-        REALM_ASSERT(self->m_actualized);
-        if (REALM_UNLIKELY(!self->m_sess))
-            return; // Already finalized
-        self->m_signed_access_token = std::move(token);
-        SessionImpl& sess = *self->m_sess;
-        ClientImpl::Connection& conn = sess.get_connection();
-        // FIXME: This only makes sense when each session uses a separate connection.
-        conn.update_connect_info(self->m_http_request_path_prefix, self->m_signed_access_token); // Throws
-        sess.cancel_resumption_delay();                                                          // Throws
-        conn.cancel_reconnect_delay();                                                           // Throws
-    });
+            REALM_ASSERT(self->m_actualized);
+            if (REALM_UNLIKELY(!self->m_sess))
+                return; // Already finalized
+            self->m_signed_access_token = std::move(token);
+            SessionImpl& sess = *self->m_sess;
+            ClientImpl::Connection& conn = sess.get_connection();
+            // FIXME: This only makes sense when each session uses a separate connection.
+            conn.update_connect_info(self->m_http_request_path_prefix, self->m_signed_access_token); // Throws
+            sess.cancel_resumption_delay();                                                          // Throws
+            conn.cancel_reconnect_delay();                                                           // Throws
+        });
 }
 
 
@@ -1984,7 +1985,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
     REALM_ASSERT(pending_reset);
     m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
                         pending_reset->time);
-    async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset = *pending_reset](Status status) {
+    async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset = *pending_reset](const Status& status) {
         if (status == ErrorCodes::OperationAborted) {
             return;
         }
@@ -2032,7 +2033,7 @@ std::string SessionWrapper::get_appservices_connection_id()
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self(this);
-    get_client().post([self, promise = std::move(pf.promise)](Status status) mutable {
+    get_client().post([self, promise = std::move(pf.promise)](const Status& status) mutable {
         if (!status.is_ok()) {
             promise.set_error(status);
             return;
@@ -2072,7 +2073,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_authorization_header_name{authorization_header_name} // DEPRECATED
     , m_custom_http_headers{custom_http_headers}             // DEPRECATED
 {
-    m_on_idle = m_client.create_trigger([this](Status status) {
+    m_on_idle = m_client.create_trigger([this](const Status& status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())

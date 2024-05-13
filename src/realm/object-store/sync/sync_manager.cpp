@@ -397,7 +397,7 @@ void SyncManager::close_all_sessions()
     get_sync_client().wait_for_session_terminations();
 }
 
-void SyncManager::set_sync_route(std::string sync_route, bool verified)
+void SyncManager::set_sync_route(const std::string& sync_route, bool verified)
 {
     REALM_ASSERT(!sync_route.empty()); // Cannot be set to empty string
     {

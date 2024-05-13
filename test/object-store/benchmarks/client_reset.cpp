@@ -30,6 +30,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <utility>
 
 namespace realm {
 
@@ -48,7 +49,7 @@ static Obj create_object(Realm& realm, StringData object_type, util::Optional<in
 }
 
 struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
-    BenchmarkLocalClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
+    BenchmarkLocalClientReset(const realm::Realm::Config& local_config, const realm::Realm::Config& remote_config)
         : reset_utils::TestClientReset(local_config, remote_config)
     {
         REALM_ASSERT(m_local_config.sync_config);
@@ -200,7 +201,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
     config.sync_config->client_resync_mode = reset_mode;
     SyncTestFile config2(init_sync_manager, "default");
 
-    auto populate_objects = [&](SharedRealm realm, size_t num_objects) {
+    auto populate_objects = [&](const SharedRealm& realm, size_t num_objects) {
         TableRef table = get_table(*realm, "object");
         REQUIRE(table);
         ColKey partition_col_key = table->get_column_key(partition_prop.name);
@@ -232,7 +233,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
         }
     };
 
-    auto populate_source_objects_with_links = [&](SharedRealm realm) {
+    auto populate_source_objects_with_links = [&](const SharedRealm& realm) {
         TableRef table = get_table(*realm, "source");
         TableRef dest = get_table(*realm, "object");
         REQUIRE(table);
@@ -284,7 +285,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
 
     SECTION(util::format("%1: populated with %2 simple objects", reset_mode, num_objects)) {
         test_reset.setup([&](SharedRealm realm) {
-            populate_objects(realm, num_objects);
+            populate_objects(std::move(realm), num_objects);
         });
 
         SECTION("no change") {
@@ -294,7 +295,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
             };
         }
         SECTION("remote removes half the local data") {
-            test_reset.make_remote_changes([&](SharedRealm remote) {
+            test_reset.make_remote_changes([&](const SharedRealm& remote) {
                 remove_odd_objects(get_table(*remote, "object"));
             });
             test_reset.prepare();
@@ -303,7 +304,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
             };
         }
         SECTION("local removes half the objects") {
-            test_reset.make_local_changes([&](SharedRealm local) {
+            test_reset.make_local_changes([&](const SharedRealm& local) {
                 remove_odd_objects(get_table(*local, "object"));
             });
             test_reset.prepare();
@@ -314,7 +315,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
     }
 
     SECTION(util::format("%1: %2 source objects linked to %2 dest objects", reset_mode, num_objects / 2)) {
-        test_reset.setup([&](SharedRealm realm) {
+        test_reset.setup([&](const SharedRealm& realm) {
             populate_objects(realm, num_objects / 2);
             populate_source_objects_with_links(realm);
         });
@@ -326,7 +327,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
             };
         }
         SECTION("remote removes half the local data") {
-            test_reset.make_remote_changes([&](SharedRealm remote) {
+            test_reset.make_remote_changes([&](const SharedRealm& remote) {
                 remove_odd_objects(get_table(*remote, "object"));
                 remove_odd_objects(get_table(*remote, "source"));
             });
@@ -336,7 +337,7 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
             };
         }
         SECTION("local removes half the objects") {
-            test_reset.make_local_changes([&](SharedRealm local) {
+            test_reset.make_local_changes([&](const SharedRealm& local) {
                 remove_odd_objects(get_table(*local, "object"));
                 remove_odd_objects(get_table(*local, "source"));
             });

@@ -41,6 +41,7 @@
 #include <realm/version.hpp>
 
 #include <numeric>
+#include <utility>
 
 using namespace realm;
 using namespace realm::util;
@@ -623,15 +624,15 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
         auto token = list.add_notification_callback([&](CollectionChangeSet c) {
-            change = c;
+            change = std::move(c);
             ++calls;
         });
         auto rtoken = results.add_notification_callback([&](CollectionChangeSet c) {
-            rchange = c;
+            rchange = std::move(c);
             ++calls;
         });
         auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c) {
-            srchange = c;
+            srchange = std::move(c);
             ++calls;
         });
 
@@ -722,7 +723,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             auto distinct = results.distinct({{"self"}});
             CollectionChangeSet drchange;
             auto drtoken = distinct.add_notification_callback([&](CollectionChangeSet c) {
-                drchange = c;
+                drchange = std::move(c);
                 ++calls;
             });
 
@@ -897,7 +898,7 @@ TEST_CASE("list of mixed links", "[primitives]") {
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
     auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
-        local_changes = c;
+        local_changes = std::move(c);
     });
     advance_and_notify(*r);
     local_changes = {};

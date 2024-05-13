@@ -74,7 +74,7 @@ struct SyncError {
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
-    SyncError(Status status, bool is_fatal, std::optional<std::string_view> server_log = std::nullopt,
+    SyncError(const Status& status, bool is_fatal, std::optional<std::string_view> server_log = std::nullopt,
               std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
@@ -236,7 +236,7 @@ struct SyncConfig {
     bool rerun_init_subscription_on_open{false};
 
     SyncConfig() = default;
-    explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, const bson::Bson& partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, FLXSyncEnabled);

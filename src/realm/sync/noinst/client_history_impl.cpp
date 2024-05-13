@@ -831,7 +831,7 @@ void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 
 
 void ClientHistory::update_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                         TransactionRef)
+                                         const TransactionRef&)
 {
     Array& root = m_arrays->root;
 

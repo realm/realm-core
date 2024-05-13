@@ -28,6 +28,7 @@
 #include <realm/object-store/sectioned_results.hpp>
 
 #include <realm/util/any.hpp>
+#include <utility>
 
 using namespace realm;
 using namespace realm::util;
@@ -570,7 +571,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
     }
 
     SECTION("reset section callback") {
-        sectioned_results.reset_section_callback([&](Mixed value, SharedRealm realm) {
+        sectioned_results.reset_section_callback([&](Mixed value, const SharedRealm& realm) {
             algo_run_count++;
             auto obj = Object(realm, value.get_link());
             auto v = obj.get_column_value<StringData>("name_col");
@@ -591,7 +592,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         REQUIRE(algo_run_count == 5);
         algo_run_count = 0;
 
-        sectioned_results.reset_section_callback([&](Mixed value, SharedRealm realm) {
+        sectioned_results.reset_section_callback([&](Mixed value, const SharedRealm& realm) {
             algo_run_count++;
             auto obj = Object(realm, value.get_link());
             return obj.get_column_value<StringData>("name_col").contains("o");
@@ -606,7 +607,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
 
     SECTION("correctly asserts key") {
         // Should throw on Object being a section key.
-        auto sr = sorted.sectioned_results([](Mixed value, SharedRealm) {
+        auto sr = sorted.sectioned_results([](Mixed value, const SharedRealm&) {
             return value.get_link();
         });
         REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
@@ -623,7 +624,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         r->commit_transaction();
 
         // Should throw on `type_TypedLink` being a section key.
-        sr = sorted.sectioned_results([&](Mixed value, SharedRealm realm) {
+        sr = sorted.sectioned_results([&](Mixed value, const SharedRealm& realm) {
             auto obj = Object(realm, value.get_link());
             return obj.get_obj().get<Mixed>(col_mixed);
         });
@@ -751,7 +752,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
     SECTION("notifications") {
         SectionedResultsChangeSet changes;
         auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes = c;
+            changes = std::move(c);
         });
 
         coordinator->on_change();
@@ -1008,7 +1009,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         // Ascending
         SectionedResultsChangeSet changes;
         auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes = c;
+            changes = std::move(c);
         });
 
         coordinator->on_change();
@@ -1053,7 +1054,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
 
         // Descending
         sorted = results.sort({{"name_col", false}});
-        sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm realm) {
+        sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm& realm) {
             algo_run_count++;
             auto obj = Object(realm, value.get_link());
             auto v = obj.get_column_value<StringData>("name_col");
@@ -1061,7 +1062,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         });
 
         token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes = c;
+            changes = std::move(c);
         });
 
         coordinator->on_change();
@@ -1108,15 +1109,16 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         auto str_list = o1.get_list<StringData>(array_string_col);
         r->commit_transaction();
         List lst(r, o1, array_string_col);
-        sectioned_results = lst.sort({{"self", true}}).sectioned_results([&algo_run_count](Mixed value, SharedRealm) {
-            algo_run_count++;
-            auto v = value.get_string();
-            return v.prefix(1);
-        });
+        sectioned_results =
+            lst.sort({{"self", true}}).sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) {
+                algo_run_count++;
+                auto v = value.get_string();
+                return v.prefix(1);
+            });
 
         SectionedResultsChangeSet changes;
         auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes = c;
+            changes = std::move(c);
         });
 
         coordinator->on_change();
@@ -1155,14 +1157,14 @@ TEST_CASE("sectioned results", "[sectioned results]") {
 
         // Descending
         sectioned_results =
-            lst.sort({{"self", false}}).sectioned_results([&algo_run_count](Mixed value, SharedRealm) {
+            lst.sort({{"self", false}}).sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) {
                 algo_run_count++;
                 auto v = value.get_string();
                 return v.prefix(1);
             });
 
         token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes = c;
+            changes = std::move(c);
         });
 
         coordinator->on_change();
@@ -1208,7 +1210,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         int section1_notification_calls = 0;
         SectionedResultsChangeSet section1_changes;
         auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c) {
-            section1_changes = c;
+            section1_changes = std::move(c);
             ++section1_notification_calls;
         });
 
@@ -1216,7 +1218,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         int section2_notification_calls = 0;
         SectionedResultsChangeSet section2_changes;
         auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c) {
-            section2_changes = c;
+            section2_changes = std::move(c);
             ++section2_notification_calls;
         });
 
@@ -1315,7 +1317,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         int section1_notification_calls = 0;
         SectionedResultsChangeSet section1_changes;
         auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c) {
-            section1_changes = c;
+            section1_changes = std::move(c);
             ++section1_notification_calls;
         });
 
@@ -1323,7 +1325,7 @@ TEST_CASE("sectioned results", "[sectioned results]") {
         int section2_notification_calls = 0;
         SectionedResultsChangeSet section2_changes;
         auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c) {
-            section2_changes = c;
+            section2_changes = std::move(c);
             ++section2_notification_calls;
         });
 
@@ -1543,7 +1545,7 @@ TEST_CASE("sectioned results link notification bug", "[sectioned results]") {
 
     Results results(r, transaction_table);
     auto sorted = results.sort({{"date", false}});
-    auto sectioned_results = sorted.sectioned_results([](Mixed value, SharedRealm realm) {
+    auto sectioned_results = sorted.sectioned_results([](Mixed value, const SharedRealm& realm) {
         auto obj = Object(realm, value.get_link());
         auto ts = obj.get_column_value<Timestamp>("date");
         auto tp = ts.get_time_point();
@@ -1557,7 +1559,7 @@ TEST_CASE("sectioned results link notification bug", "[sectioned results]") {
     SectionedResultsChangeSet changes;
     size_t callback_count = 0;
     auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
-        changes = c;
+        changes = std::move(c);
         ++callback_count;
     });
     coordinator->on_change();
@@ -1626,10 +1628,11 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", c
 
     SECTION("primitives section correctly with sort ascending") {
         auto sorted = results.sort({{"self", true}});
-        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
-            algo_run_count++;
-            return TestType::comparison_value(value);
-        });
+        auto sectioned_results =
+            sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) -> Mixed {
+                algo_run_count++;
+                return TestType::comparison_value(value);
+            });
         REQUIRE(sectioned_results.size() == TestType::expected_size);
         auto size = sectioned_results.size();
         auto results_idx = 0;
@@ -1652,10 +1655,11 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", c
 
     SECTION("primitives section correctly with sort decending") {
         auto sorted = results.sort({{"self", false}});
-        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
-            algo_run_count++;
-            return TestType::comparison_value(value);
-        });
+        auto sectioned_results =
+            sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) -> Mixed {
+                algo_run_count++;
+                return TestType::comparison_value(value);
+            });
         std::reverse(exp_values_sorted.begin(), exp_values_sorted.end());
         std::reverse(exp_keys.begin(), exp_keys.end());
         REQUIRE(sectioned_results.size() == TestType::expected_size);
@@ -1677,14 +1681,15 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", c
 
     SECTION("notifications") {
         auto sorted = results.sort({{"self", true}});
-        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
-            algo_run_count++;
-            return TestType::comparison_value(value);
-        });
+        auto sectioned_results =
+            sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) -> Mixed {
+                algo_run_count++;
+                return TestType::comparison_value(value);
+            });
 
         SectionedResultsChangeSet changes;
         auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes = c;
+            changes = std::move(c);
         });
 
         coordinator->on_change();
@@ -1702,19 +1707,20 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", c
 
     SECTION("notifications on section") {
         auto sorted = results.sort({{"self", true}});
-        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
-            algo_run_count++;
-            return TestType::comparison_value(value);
-        });
+        auto sectioned_results =
+            sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) -> Mixed {
+                algo_run_count++;
+                return TestType::comparison_value(value);
+            });
         auto section1 = sectioned_results[0];
         auto section2 = sectioned_results[1];
 
         SectionedResultsChangeSet changes1, changes2;
         auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes1 = c;
+            changes1 = std::move(c);
         });
         auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c) {
-            changes2 = c;
+            changes2 = std::move(c);
         });
 
         coordinator->on_change();
@@ -1761,10 +1767,11 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", c
 
     SECTION("frozen primitive") {
         auto sorted = results.sort({{"self", true}});
-        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
-            algo_run_count++;
-            return TestType::comparison_value(value);
-        });
+        auto sectioned_results =
+            sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) -> Mixed {
+                algo_run_count++;
+                return TestType::comparison_value(value);
+            });
         auto frozen_realm = r->freeze();
         auto frozen_sr = sectioned_results.freeze(frozen_realm);
         auto size = frozen_sr.size();
@@ -1787,10 +1794,11 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", c
     SECTION("frozen results primitive") {
         auto frozen_realm = r->freeze();
         auto sorted = results.sort({{"self", true}}).freeze(frozen_realm);
-        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
-            algo_run_count++;
-            return TestType::comparison_value(value);
-        });
+        auto sectioned_results =
+            sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm&) -> Mixed {
+                algo_run_count++;
+                return TestType::comparison_value(value);
+            });
         auto size = sectioned_results.size();
         REQUIRE(size == TestType::expected_size);
         auto results_idx = 0;

@@ -216,7 +216,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& c
     if (!config.cache)
         return nullptr;
     util::CheckedUniqueLock lock(m_realm_mutex);
-    return do_get_cached_realm(config, scheduler);
+    return do_get_cached_realm(config, std::move(scheduler));
 }
 
 std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const& config,
@@ -280,7 +280,8 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     return realm;
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler, bool first_time_open)
+std::shared_ptr<Realm> RealmCoordinator::get_realm(const std::shared_ptr<util::Scheduler>& scheduler,
+                                                   bool first_time_open)
 {
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
@@ -413,7 +414,7 @@ void RealmCoordinator::bind_to_context(Realm& realm)
 }
 
 #if REALM_ENABLE_SYNC
-std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
+std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(const Realm::Config& config)
 {
     if (!config.sync_config)
         throw LogicError(ErrorCodes::IllegalOperation,

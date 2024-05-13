@@ -99,7 +99,7 @@ public:
 
     private:
         struct SortColumn {
-            SortColumn(const Table* t, ExtendedColumnKey c, bool a)
+            SortColumn(const Table* t, const ExtendedColumnKey& c, bool a)
                 : table(t)
                 , col_key(c)
                 , ascending(a)
@@ -333,7 +333,7 @@ public:
 
     void append_sort(SortDescriptor sort, SortDescriptor::MergeMode mode = SortDescriptor::MergeMode::prepend);
     void append_distinct(DistinctDescriptor distinct);
-    void append_limit(LimitDescriptor limit);
+    void append_limit(const LimitDescriptor& limit);
     void append_filter(FilterDescriptor predicate);
     void append(const DescriptorOrdering& other);
     void append(DescriptorOrdering&& other);

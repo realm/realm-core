@@ -123,7 +123,7 @@ public:
     // the SyncManager is created by App. If this is incorrect, the websocket connection
     // will fail, resulting in an update to the access token (and the location, if it hasn't
     // been updated yet).
-    void set_sync_route(std::string sync_route, bool verified) REQUIRES(!m_mutex);
+    void set_sync_route(const std::string& sync_route, bool verified) REQUIRES(!m_mutex);
 
     std::pair<const std::string&, bool> sync_route() REQUIRES(!m_mutex)
     {

@@ -429,7 +429,7 @@ void Realm::set_schema_subset(Schema schema)
 }
 
 void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
-                          DataInitializationFunction initialization_function, bool in_transaction)
+                          const DataInitializationFunction& initialization_function, bool in_transaction)
 {
     uint64_t validation_mode = SchemaValidationMode::Basic;
 #if REALM_ENABLE_SYNC

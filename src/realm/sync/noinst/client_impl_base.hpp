@@ -528,10 +528,10 @@ private:
     std::string get_http_request_path() const;
 
     void initiate_reconnect_wait();
-    void handle_reconnect_wait(Status status);
+    void handle_reconnect_wait(const Status& status);
     void initiate_reconnect();
     void initiate_connect_wait();
-    void handle_connect_wait(Status status);
+    void handle_connect_wait(const Status& status);
 
     void handle_connection_established();
     void schedule_urgent_ping();
@@ -547,7 +547,7 @@ private:
     void handle_write_ping();
     void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
-    void handle_disconnect_wait(Status status);
+    void handle_disconnect_wait(const Status& status);
     void close_due_to_protocol_error(Status status);
     void close_due_to_client_side_error(Status, IsFatal is_fatal, ConnectionTerminationReason reason);
     void close_due_to_transient_error(Status status, ConnectionTerminationReason reason);

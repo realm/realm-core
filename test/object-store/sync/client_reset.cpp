@@ -370,7 +370,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     size_t before_callback_invocations = 0;
     size_t after_callback_invocations = 0;
     std::mutex mtx;
-    local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
+    local_config.sync_config->notify_before_client_reset = [&](const SharedRealm& before) {
         std::lock_guard<std::mutex> lock(mtx);
         ++before_callback_invocations;
         REQUIRE(before);
@@ -381,7 +381,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         REQUIRE(before->schema_version() != ObjectStore::NotVersioned);
         REQUIRE(util::File::exists(local_config.path));
     };
-    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
+    local_config.sync_config->notify_after_client_reset = [&](const SharedRealm& before, ThreadSafeReference after_ref,
                                                               bool) {
         std::lock_guard<std::mutex> lock(mtx);
         SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
@@ -411,7 +411,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     Object object;
     CollectionChangeSet object_changes, results_changes;
     NotificationToken object_token, results_token;
-    auto setup_listeners = [&](SharedRealm realm) {
+    auto setup_listeners = [&](const SharedRealm& realm) {
         results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object"))
                       .sort({{{"value", true}}});
         if (results.size() >= 1) {
@@ -434,13 +434,13 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset(local_config, remote_config);
         SECTION("modify an existing object") {
             test_reset
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
                     CHECK(before_callback_invocations == 1);
@@ -463,14 +463,14 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("modify a deleted object") {
             ObjectId pk = ObjectId::gen();
             test_reset
-                ->setup([&](SharedRealm realm) {
+                ->setup([&](const SharedRealm& realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
                     auto obj = create_object(*realm, "object", {pk}, partition);
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, 100);
                 })
-                ->make_local_changes([&](SharedRealm realm) {
+                ->make_local_changes([&](const SharedRealm& realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 2);
@@ -479,7 +479,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     Obj obj = table->get_object(key);
                     obj.set("value", 200);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 2);
@@ -487,14 +487,14 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     REQUIRE(key);
                     table->remove_object(key);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 2);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                     CHECK(results.get<Obj>(1).get<Int>("value") == 200);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
@@ -516,7 +516,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("insert") {
             int64_t new_value = 42;
             test_reset
-                ->make_local_changes([&](SharedRealm realm) {
+                ->make_local_changes([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
@@ -526,12 +526,12 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, new_value);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 2);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
@@ -554,19 +554,19 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("delete") {
             test_reset
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto table = get_table(*local, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
                     table->clear();
                     REQUIRE(table->size() == 0);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 0);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 0);
                     CHECK(!object.is_valid());
@@ -591,7 +591,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                                       PropertyType::Float | PropertyType::Nullable};
             ObjectId pk1 = ObjectId::gen();
             ObjectId pk2 = ObjectId::gen();
-            auto verify_changes = [&](SharedRealm realm) {
+            auto verify_changes = [&](const SharedRealm& realm) {
                 REQUIRE_NOTHROW(advance_and_notify(*realm));
                 std::vector<std::string> tables_to_check = {existing_table_name, new_table_name,
                                                             locally_added_table_name, remotely_added_table_name};
@@ -610,7 +610,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
-                ->setup([&](SharedRealm before) {
+                ->setup([&](const SharedRealm& before) {
                     before->update_schema(
                         {
                             {existing_table_name,
@@ -621,7 +621,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         1, nullptr, nullptr, true);
                 })
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     local->update_schema(
                         {
                             {new_table_name,
@@ -654,7 +654,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     create_object(*local, locally_added_table_name, {pk1}, partition);
                     create_object(*local, locally_added_table_name, {pk2}, partition);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     remote->update_schema(
                         {
                             {new_table_name,
@@ -687,7 +687,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     create_object(*remote, remotely_added_table_name, {pk1}, partition);
                     create_object(*remote, remotely_added_table_name, {pk2}, partition);
                 })
-                ->on_post_reset([&](SharedRealm local) {
+                ->on_post_reset([&](const SharedRealm& local) {
                     verify_changes(local);
                 })
                 ->run();
@@ -710,7 +710,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     local->update_schema(
                         {
                             {table_name,
@@ -722,7 +722,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         1, nullptr, nullptr, true);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     remote->update_schema(
                         {
                             {table_name,
@@ -734,7 +734,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         0, nullptr, nullptr, true);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     util::EventLoop::main().run_until([&] {
                         return bool(err);
                     });
@@ -749,7 +749,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("add remotely deleted object to list") {
             test_reset
-                ->setup([&](SharedRealm realm) {
+                ->setup([&](const SharedRealm& realm) {
                     ObjKey k1 =
                         create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
                     ObjKey k2 =
@@ -763,7 +763,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     list.add(k3);
                     // 1, 2, 3
                 })
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto key1 = get_key_for_object_with_value(get_table(*local, "link target"), 1);
                     auto key2 = get_key_for_object_with_value(get_table(*local, "link target"), 2);
                     auto key3 = get_key_for_object_with_value(get_table(*local, "link target"), 3);
@@ -777,13 +777,13 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     // this set operation triggers the list copy because the index becomes ambiguous
                     list.set(0, key1);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "link target");
                     auto key = get_key_for_object_with_value(table, 2);
                     REQUIRE(key);
                     table->remove_object(key);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(realm->refresh());
                     auto table = get_table(*realm, "link origin");
                     auto target_table = get_table(*realm, "link target");
@@ -803,14 +803,14 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("add_int on non-integer field") {
             ObjectId pk = ObjectId::gen();
             test_reset
-                ->setup([&](SharedRealm realm) {
+                ->setup([&](const SharedRealm& realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
                     auto obj = create_object(*realm, "object", {pk}, partition);
                     auto col = obj.get_table()->get_column_key("any_mixed");
                     obj.set_any(col, 42);
                 })
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto table = get_table(*local, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 2);
@@ -819,7 +819,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     Obj obj = table->get_object(key);
                     obj.add_int("any_mixed", 200);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 2);
@@ -828,7 +828,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     Obj obj = table->get_object(key);
                     obj.set_any("any_mixed", "value");
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(realm->refresh());
                     auto table = get_table(*realm, "object");
                     REQUIRE(table->size() == 2);
@@ -848,13 +848,13 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("modify") {
             test_reset
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
                     CHECK(before_callback_invocations == 1);
@@ -882,7 +882,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 test_reset = make_reset(local_config, config3);
                 test_reset->set_pk_of_object_driving_reset(to_continue_reset);
                 test_reset
-                    ->setup([&](SharedRealm realm) {
+                    ->setup([&](const SharedRealm& realm) {
                         // after a reset we already start with a value of 6
                         TableRef table = get_table(*realm, "object");
                         REQUIRE(table->size() == 1);
@@ -940,7 +940,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             client_reset_harness->disable_wait_for_reset_completion();
             std::shared_ptr<SyncSession> session;
             client_reset_harness
-                ->on_post_local_changes([&](SharedRealm local) {
+                ->on_post_local_changes([&](const SharedRealm& local) {
                     // retain a reference so the sync session completes, even though the Realm is cleaned up
                     session = local->sync_session();
                 })
@@ -971,7 +971,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 temp_config.persist();
                 temp_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
                 config_copy = std::make_unique<SyncConfig>(*temp_config.sync_config);
-                config_copy->notify_before_client_reset = [&](SharedRealm before_realm) {
+                config_copy->notify_before_client_reset = [&](const SharedRealm& before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
                     REQUIRE(before_realm);
                     REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
@@ -982,7 +982,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     ++after_callback_invocations_2;
                 };
 
-                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm before_realm) {
+                temp_config.sync_config->notify_before_client_reset = [&](const SharedRealm& before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invocations;
                     REQUIRE(session);
@@ -1062,7 +1062,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             test_reset->disable_wait_for_reset_completion();
             SharedRealm realm;
             test_reset
-                ->on_post_local_changes([&](SharedRealm local) {
+                ->on_post_local_changes([&](const SharedRealm& local) {
                     // retain a reference of the realm.
                     realm = local;
                 })
@@ -1135,7 +1135,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.encryption_key.resize(64, 'a');
 
             make_reset(local_config, remote_config)
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     realm->close();
                     SharedRealm r_after;
                     REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(local_config));
@@ -1149,7 +1149,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("delete and insert new") {
             constexpr int64_t new_value = 42;
             test_reset
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
@@ -1159,13 +1159,13 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, new_value);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == new_value);
@@ -1183,7 +1183,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("delete and insert same pk is reported as modification") {
             constexpr int64_t new_value = 42;
             test_reset
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
@@ -1194,13 +1194,13 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, new_value);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == new_value);
@@ -1219,7 +1219,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("insert in discarded transaction is deleted") {
             constexpr int64_t new_value = 42;
             test_reset
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto table = get_table(*local, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
@@ -1228,12 +1228,12 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     REQUIRE(table->size() == 2);
                     obj.set(col, new_value);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 2);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
@@ -1251,19 +1251,19 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("delete in discarded transaction is recovered") {
             test_reset
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto table = get_table(*local, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
                     table->clear();
                     REQUIRE(table->size() == 0);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 0);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
@@ -1282,7 +1282,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     local->update_schema(
                         {
                             {"object2",
@@ -1295,7 +1295,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     create_object(*local, "object2", ObjectId::gen(), partition);
                     create_object(*local, "object2", ObjectId::gen(), partition);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     util::EventLoop::main().run_until([&] {
                         return bool(err);
                     });
@@ -1315,7 +1315,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
-                ->make_local_changes([](SharedRealm local) {
+                ->make_local_changes([](const SharedRealm& local) {
                     local->update_schema(
                         {
                             {"object",
@@ -1331,7 +1331,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     auto table = ObjectStore::table_for_object_type(local->read_group(), "object");
                     table->begin()->set(table->get_column_key("value2"), 123);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     util::EventLoop::main().run_until([&] {
                         return bool(err);
                     });
@@ -1347,7 +1347,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("compatible schema changes in both remote and local transactions") {
             test_reset->set_development_mode(true)
-                ->make_local_changes([](SharedRealm local) {
+                ->make_local_changes([](const SharedRealm& local) {
                     local->update_schema(
                         {
                             {"object",
@@ -1365,7 +1365,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         1, nullptr, nullptr, true);
                 })
-                ->make_remote_changes([](SharedRealm remote) {
+                ->make_remote_changes([](const SharedRealm& remote) {
                     remote->update_schema(
                         {
                             {"object",
@@ -1383,7 +1383,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         0, nullptr, nullptr, true);
                 })
-                ->on_post_reset([](SharedRealm realm) {
+                ->on_post_reset([](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(realm->refresh());
                     auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
                     REQUIRE(table->get_column_count() == 3);
@@ -1399,7 +1399,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
-                ->make_local_changes([](SharedRealm local) {
+                ->make_local_changes([](const SharedRealm& local) {
                     local->update_schema(
                         {
                             {"object",
@@ -1411,7 +1411,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         1, nullptr, nullptr, true);
                 })
-                ->make_remote_changes([](SharedRealm remote) {
+                ->make_remote_changes([](const SharedRealm& remote) {
                     remote->update_schema(
                         {
                             {"object",
@@ -1423,7 +1423,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         0, nullptr, nullptr, true);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     util::EventLoop::main().run_until([&] {
                         return bool(err);
                     });
@@ -1442,7 +1442,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
-                ->make_local_changes([](SharedRealm local) {
+                ->make_local_changes([](const SharedRealm& local) {
                     local->update_schema(
                         {
                             {"new table",
@@ -1453,7 +1453,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         1, nullptr, nullptr, true);
                 })
-                ->make_remote_changes([](SharedRealm remote) {
+                ->make_remote_changes([](const SharedRealm& remote) {
                     remote->update_schema(
                         {
                             {"new table",
@@ -1464,7 +1464,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         },
                         0, nullptr, nullptr, true);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     util::EventLoop::main().run_until([&] {
                         return bool(err);
                     });
@@ -1477,7 +1477,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("list operations") {
             ObjKey k0, k1, k2;
-            test_reset->setup([&](SharedRealm realm) {
+            test_reset->setup([&](const SharedRealm& realm) {
                 k0 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
                 k1 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 2).get_key();
                 k2 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 3).get_key();
@@ -1499,14 +1499,14 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
             SECTION("list insertions in local transaction") {
                 test_reset
-                    ->make_local_changes([&](SharedRealm local) {
+                    ->make_local_changes([&](const SharedRealm& local) {
                         auto table = get_table(*local, "link origin");
                         auto list = table->begin()->get_linklist(table->get_column_key("list"));
                         list.add(k0);
                         list.insert(0, k2);
                         list.insert(0, k1);
                     })
-                    ->on_post_reset([&](SharedRealm realm) {
+                    ->on_post_reset([&](const SharedRealm& realm) {
                         REQUIRE_NOTHROW(realm->refresh());
                         check_links(realm);
                     })
@@ -1515,12 +1515,12 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
             SECTION("list deletions in local transaction") {
                 test_reset
-                    ->make_local_changes([&](SharedRealm local) {
+                    ->make_local_changes([&](const SharedRealm& local) {
                         auto table = get_table(*local, "link origin");
                         auto list = table->begin()->get_linklist(table->get_column_key("list"));
                         list.remove(1);
                     })
-                    ->on_post_reset([&](SharedRealm realm) {
+                    ->on_post_reset([&](const SharedRealm& realm) {
                         REQUIRE_NOTHROW(realm->refresh());
                         check_links(realm);
                     })
@@ -1529,12 +1529,12 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
             SECTION("list clear in local transaction") {
                 test_reset
-                    ->make_local_changes([&](SharedRealm local) {
+                    ->make_local_changes([&](const SharedRealm& local) {
                         auto table = get_table(*local, "link origin");
                         auto list = table->begin()->get_linklist(table->get_column_key("list"));
                         list.clear();
                     })
-                    ->on_post_reset([&](SharedRealm realm) {
+                    ->on_post_reset([&](const SharedRealm& realm) {
                         REQUIRE_NOTHROW(realm->refresh());
                         check_links(realm);
                     })
@@ -1548,27 +1548,27 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             ObjectId id3 = ObjectId::gen();
             ObjectId id4 = ObjectId::gen();
             test_reset
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto table = get_table(*local, "object");
                     table->clear();
                     create_object(*local, "object", {id1}, partition).set("value", 4);
                     create_object(*local, "object", {id2}, partition).set("value", 5);
                     create_object(*local, "object", {id3}, partition).set("value", 6);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "object");
                     table->clear();
                     create_object(*remote, "object", {id1}, partition).set("value", 4);
                     create_object(*remote, "object", {id2}, partition).set("value", 7);
                     create_object(*remote, "object", {id4}, partition).set("value", 8);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 3);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 3);
                     // here we rely on results being sorted by "value"
@@ -1591,7 +1591,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("link to remotely deleted object") {
             test_reset
-                ->setup([&](SharedRealm realm) {
+                ->setup([&](const SharedRealm& realm) {
                     auto k0 =
                         create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
                     create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 2);
@@ -1600,19 +1600,19 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     Obj o = create_object(*realm, "link origin", ObjectId::gen(), partition);
                     o.set("link", k0);
                 })
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto target_table = get_table(*local, "link target");
                     auto key_of_second_target = get_key_for_object_with_value(target_table, 2);
                     REQUIRE(key_of_second_target);
                     auto table = get_table(*local, "link origin");
                     table->begin()->set("link", key_of_second_target);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "link target");
                     auto key_of_second_target = get_key_for_object_with_value(table, 2);
                     table->remove_object(key_of_second_target);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(realm->refresh());
                     auto origin = get_table(*realm, "link origin");
                     auto target = get_table(*realm, "link target");
@@ -1630,26 +1630,26 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("add remotely deleted object to list") {
             ObjKey k0, k1, k2;
             test_reset
-                ->setup([&](SharedRealm realm) {
+                ->setup([&](const SharedRealm& realm) {
                     k0 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
                     k1 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 2).get_key();
                     k2 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 3).get_key();
                     Obj o = create_object(*realm, "link origin", ObjectId::gen(), partition);
                     o.get_linklist("list").add(k0);
                 })
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto key = get_key_for_object_with_value(get_table(*local, "link target"), 2);
                     auto table = get_table(*local, "link origin");
                     auto list = table->begin()->get_linklist("list");
                     list.add(key);
                 })
-                ->make_remote_changes([&](SharedRealm remote) {
+                ->make_remote_changes([&](const SharedRealm& remote) {
                     auto table = get_table(*remote, "link target");
                     auto key = get_key_for_object_with_value(table, 2);
                     REQUIRE(key);
                     table->remove_object(key);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(realm->refresh());
                     auto table = get_table(*realm, "link origin");
                     auto target_table = get_table(*realm, "link target");
@@ -1666,7 +1666,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     } // end discard local section
 
     SECTION("cycle detection") {
-        auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<_impl::client_reset::PendingReset> {
+        auto has_reset_cycle_flag = [](const SharedRealm& realm) -> util::Optional<_impl::client_reset::PendingReset> {
             auto db = TestHelper::get_db(realm);
             auto rt = db->start_read();
             return _impl::client_reset::has_pending_reset(*rt);
@@ -1676,7 +1676,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             err = error;
         };
         auto make_fake_previous_reset = [&local_config](ClientResyncMode type) {
-            local_config.sync_config->notify_before_client_reset = [previous_type = type](SharedRealm realm) {
+            local_config.sync_config->notify_before_client_reset = [previous_type = type](const SharedRealm& realm) {
                 auto db = TestHelper::get_db(realm);
                 auto wt = db->start_write();
                 _impl::client_reset::track_reset(*wt, previous_type);
@@ -1685,7 +1685,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         };
         SECTION("a normal reset adds and removes a cycle detection flag") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
-            local_config.sync_config->notify_before_client_reset = [&](SharedRealm realm) {
+            local_config.sync_config->notify_before_client_reset = [&](const SharedRealm& realm) {
                 REQUIRE_FALSE(has_reset_cycle_flag(realm));
                 std::lock_guard lock(mtx);
                 ++before_callback_invocations;
@@ -1701,7 +1701,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 ++after_callback_invocations;
             };
             make_reset(local_config, remote_config)
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     REQUIRE_FALSE(has_reset_cycle_flag(realm));
                 })
                 ->run();
@@ -1713,7 +1713,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("a failed reset leaves a cycle detection flag") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
             make_reset(local_config, remote_config)
-                ->make_local_changes([](SharedRealm realm) {
+                ->make_local_changes([](const SharedRealm& realm) {
                     auto table = realm->read_group().get_table("class_object");
                     table->remove_column(table->add_column(type_Int, "new col"));
                 })
@@ -1763,7 +1763,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             REQUIRE(err.value()->is_client_reset_requested());
         }
         const ObjectId added_pk = ObjectId::gen();
-        auto has_added_object = [&](SharedRealm realm) -> bool {
+        auto has_added_object = [&](const SharedRealm& realm) -> bool {
             REQUIRE_NOTHROW(realm->refresh());
             auto table = get_table(*realm, "object");
             REQUIRE(table);
@@ -1774,7 +1774,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             "In RecoverOrDiscard mode: a previous failed recovery is detected and triggers a DiscardLocal reset") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+            local_config.sync_config->notify_after_client_reset = [&](const SharedRealm& before,
                                                                       ThreadSafeReference after_ref,
                                                                       bool did_recover) {
                 SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
@@ -1786,7 +1786,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 ++after_callback_invocations;
             };
             make_reset(local_config, remote_config)
-                ->make_local_changes([&](SharedRealm realm) {
+                ->make_local_changes([&](const SharedRealm& realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
                     create_object(*realm, "object", {added_pk}, partition);
@@ -1803,7 +1803,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("In DiscardLocal mode: a previous failed recovery does not cause an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+            local_config.sync_config->notify_after_client_reset = [&](const SharedRealm& before,
                                                                       ThreadSafeReference after_ref,
                                                                       bool did_recover) {
                 SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
@@ -1815,7 +1815,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 ++after_callback_invocations;
             };
             make_reset(local_config, remote_config)
-                ->make_local_changes([&](SharedRealm realm) {
+                ->make_local_changes([&](const SharedRealm& realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
                     create_object(*realm, "object", {added_pk}, partition);
@@ -1865,7 +1865,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             constexpr int64_t new_value = 123456;
             make_reset(local_config, remote_config)
-                ->make_local_changes([&](SharedRealm local) {
+                ->make_local_changes([&](const SharedRealm& local) {
                     auto table = get_table(*local, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
@@ -1874,12 +1874,12 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     REQUIRE(table->size() == 2);
                     obj.set(col, new_value);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 2);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1); // insert was discarded
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
@@ -2015,7 +2015,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
     Object object;
     CollectionChangeSet object_changes, results_changes;
     NotificationToken object_token, results_token;
-    auto setup_listeners = [&](SharedRealm realm) {
+    auto setup_listeners = [&](const SharedRealm& realm) {
         results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "test type"))
                       .sort({{{"_id", true}}});
         if (results.size() >= 1) {
@@ -2067,7 +2067,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
         int64_t pk_val = 0;
         T initial_value = values[0];
 
-        auto set_value = [](SharedRealm realm, T value) {
+        auto set_value = [](const SharedRealm& realm, T value) {
             auto table = get_table(*realm, "test type");
             REQUIRE(table);
             REQUIRE(table->size() == 1);
@@ -2079,7 +2079,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
             REQUIRE(obj.get<T>(col) == value);
         };
 
-        test_reset->setup([&pk_val, &initial_value](SharedRealm realm) {
+        test_reset->setup([&pk_val, &initial_value](const SharedRealm& realm) {
             auto table = get_table(*realm, "test type");
             REQUIRE(table);
             auto obj = table->create_object_with_primary_key(pk_val);
@@ -2089,13 +2089,13 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
 
         auto reset_property = [&](T local_state, T remote_state) {
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
+                ->make_local_changes([&](const SharedRealm& local_realm) {
                     set_value(local_realm, local_state);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     set_value(remote_realm, remote_state);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
@@ -2104,7 +2104,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                     check_value(results.get<Obj>(0), local_state);
                     check_value(object.get_obj(), local_state);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
                     CHECK(results.size() == 1);
@@ -2149,7 +2149,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
         // MSVC doesn't seem to automatically capture a templated variable so
         // the following lambda is explicit about it's captures
         T initial_list_value = values[0];
-        test_reset->setup([&pk_val, &initial_list_value](SharedRealm realm) {
+        test_reset->setup([&pk_val, &initial_list_value](const SharedRealm& realm) {
             auto table = get_table(*realm, "test type");
             REQUIRE(table);
             auto obj = table->create_object_with_primary_key(pk_val);
@@ -2159,21 +2159,21 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
 
         auto reset_list = [&](std::vector<T>&& local_state, std::vector<T>&& remote_state) {
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
+                ->make_local_changes([&](const SharedRealm& local_realm) {
                     auto table = get_table(*local_realm, "test type");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("list");
                     table->begin()->template set_list_values<T>(col, local_state);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     auto table = get_table(*remote_realm, "test type");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("list");
                     table->begin()->template set_list_values<T>(col, remote_state);
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
@@ -2182,7 +2182,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                     check_list(results.get<Obj>(0), local_state);
                     check_list(object.get_obj(), local_state);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
                     CHECK(results.size() == 1);
@@ -2243,7 +2243,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
         REQUIRE(values[0] != values[1]);
         int64_t pk_val = 0;
         std::string dict_key = "hello";
-        test_reset->setup([&](SharedRealm realm) {
+        test_reset->setup([&](const SharedRealm& realm) {
             auto table = get_table(*realm, "test type");
             REQUIRE(table);
             auto obj = table->create_object_with_primary_key(pk_val);
@@ -2255,7 +2255,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
         auto reset_dictionary = [&](std::map<std::string, Mixed>&& local_state,
                                     std::map<std::string, Mixed>&& remote_state) {
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
+                ->make_local_changes([&](const SharedRealm& local_realm) {
                     auto table = get_table(*local_realm, "test type");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
@@ -2276,7 +2276,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                         }
                     }
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     auto table = get_table(*remote_realm, "test type");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
@@ -2297,7 +2297,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                         }
                     }
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
@@ -2306,14 +2306,14 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                     check_dictionary(results.get<Obj>(0), local_state);
                     check_dictionary(object.get_obj(), local_state);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
 
                     auto& expected_state = remote_state;
                     if (test_mode == ClientResyncMode::Recover) {
-                        for (auto it : local_state) {
+                        for (const auto& it : local_state) {
                             expected_state[it.first] = it.second;
                         }
                         if (local_state.find(dict_key) == local_state.end()) {
@@ -2374,7 +2374,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
 
         auto reset_set = [&](std::set<Mixed> local_state, std::set<Mixed> remote_state) {
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
+                ->make_local_changes([&](const SharedRealm& local_realm) {
                     auto table = get_table(*local_realm, "test type");
                     REQUIRE(table);
                     ColKey col = table->get_column_key("set");
@@ -2389,7 +2389,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                         set->insert_any(e);
                     }
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     auto table = get_table(*remote_realm, "test type");
                     REQUIRE(table);
                     ColKey col = table->get_column_key("set");
@@ -2404,7 +2404,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                         set->insert_any(e);
                     }
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
@@ -2413,7 +2413,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
                     check_set(results.get<Obj>(0), local_state);
                     check_set(object.get_obj(), local_state);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
@@ -2448,7 +2448,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
 
         REQUIRE(values.size() >= 2);
         REQUIRE(values[0] != values[1]);
-        test_reset->setup([&](SharedRealm realm) {
+        test_reset->setup([&](const SharedRealm& realm) {
             auto table = get_table(*realm, "test type");
             REQUIRE(table);
             auto obj = table->create_object_with_primary_key(pk_val);
@@ -2675,7 +2675,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         reset_utils::make_fake_local_client_reset(config, config2);
 
     CppContext c;
-    auto create_one_source_object = [&](realm::SharedRealm r, int64_t val, std::vector<ObjLink> links = {}) {
+    auto create_one_source_object = [&](const realm::SharedRealm& r, int64_t val, const std::vector<ObjLink>& links = {}) {
         auto object = Object::create(
             c, r, "source",
             std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
@@ -2686,7 +2686,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         }
     };
 
-    auto create_one_dest_object = [&](realm::SharedRealm r, util::Optional<int64_t> val) -> ObjLink {
+    auto create_one_dest_object = [&](const realm::SharedRealm& r, util::Optional<int64_t> val) -> ObjLink {
         std::any v;
         if (val) {
             v = std::any(*val);
@@ -2726,7 +2726,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
     Object object;
     CollectionChangeSet object_changes, results_changes;
     NotificationToken object_token, results_token;
-    auto setup_listeners = [&](SharedRealm realm) {
+    auto setup_listeners = [&](const SharedRealm& realm) {
         TableRef source_table = get_table(*realm, "source");
         ColKey id_col = source_table->get_column_key("_id");
         results = Results(realm, source_table->where().equal(id_col, source_pk));
@@ -2741,11 +2741,11 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         });
     };
 
-    auto get_source_object = [&](SharedRealm realm) -> Obj {
+    auto get_source_object = [&](const SharedRealm& realm) -> Obj {
         TableRef src_table = get_table(*realm, "source");
         return src_table->try_get_object(src_table->find_primary_key(Mixed{source_pk}));
     };
-    auto apply_instructions = [&](SharedRealm realm, std::vector<CollectionOperation>& instructions) {
+    auto apply_instructions = [&](const SharedRealm& realm, std::vector<CollectionOperation>& instructions) {
         TableRef dst_table = get_table(*realm, "dest");
         for (auto& instruction : instructions) {
             Obj src_obj = get_source_object(realm);
@@ -2759,7 +2759,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             std::vector<util::Optional<int64_t>> remote_pks;
             std::vector<util::Optional<int64_t>> local_pks;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
+                ->make_local_changes([&](const SharedRealm& local_realm) {
                     apply_instructions(local_realm, local_ops);
                     Obj source_obj = get_source_object(local_realm);
                     if (source_obj) {
@@ -2771,7 +2771,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                                        });
                     }
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     apply_instructions(remote_realm, remote_ops);
                     Obj source_obj = get_source_object(remote_realm);
                     if (source_obj) {
@@ -2783,12 +2783,12 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                                        });
                     }
                 })
-                ->on_post_local_changes([&](SharedRealm realm) {
+                ->on_post_local_changes([&](const SharedRealm& realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                 })
-                ->on_post_reset([&](SharedRealm realm) {
+                ->on_post_reset([&](const SharedRealm& realm) {
                     object_changes = {};
                     results_changes = {};
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2840,20 +2840,20 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
     auto reset_collection_removing_source_object = [&](std::vector<CollectionOperation>&& local_ops,
                                                        std::vector<CollectionOperation>&& remote_ops) {
         test_reset
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 apply_instructions(local_realm, local_ops);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 apply_instructions(remote_realm, remote_ops);
             })
-            ->on_post_reset([&](SharedRealm realm) {
+            ->on_post_reset([&](const SharedRealm& realm) {
                 REQUIRE_NOTHROW(advance_and_notify(*realm));
                 TableRef table = realm->read_group().get_table("class_source");
                 REQUIRE(!table->find_primary_key(Mixed{source_pk}));
             })
             ->run();
     };
-    auto populate_initial_state = [&](SharedRealm realm) {
+    auto populate_initial_state = [&](const SharedRealm& realm) {
         test_type.reset_test_state();
         // add a container collection with three valid links
         ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
@@ -2864,7 +2864,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
     };
 
-    test_reset->setup([&](SharedRealm realm) {
+    test_reset->setup([&](const SharedRealm& realm) {
         populate_initial_state(realm);
     });
 
@@ -2900,7 +2900,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         reset_collection({}, {{Remove{dest_pk_3}}}, {dest_pk_1, dest_pk_2});
     }
     SECTION("local adds a link with a null pk value") {
-        test_reset->setup([&](SharedRealm realm) {
+        test_reset->setup([&](const SharedRealm& realm) {
             test_type.reset_test_state();
             create_one_dest_object(realm, util::none);
             create_one_source_object(realm, source_pk, {});
@@ -2990,10 +2990,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             {dest_pk_3, 6}, 2);
     }
     SECTION("local has unresolved links") {
-        test_reset->setup([&](SharedRealm realm) {
+        test_reset->setup([&](const SharedRealm& realm) {
             populate_initial_state(realm);
 
-            auto invalidate_object = [&](SharedRealm realm, std::string_view table_name, Mixed pk) {
+            auto invalidate_object = [&](const SharedRealm& realm, std::string_view table_name, Mixed pk) {
                 TableRef table = get_table(*realm, table_name);
                 Obj obj = table->get_object_with_primary_key(pk);
                 REALM_ASSERT(obj.is_valid());
@@ -3167,7 +3167,7 @@ template <typename T>
 void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
 {
     auto it = from.begin();
-    for (auto val : to) {
+    for (const auto& val : to) {
         it = ++from.insert(it, val);
     }
 }
@@ -3228,7 +3228,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         {
             datetime = other.datetime;
             pk_of_linked_object = other.pk_of_linked_object;
-            for (auto it : other.dict_values) {
+            for (const auto& it : other.dict_values) {
                 dict_values[it.first] = it.second;
             }
             for (auto oid : other.set_of_objects) {
@@ -3425,7 +3425,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         void apply_recovery_from(const TopLevelContent& other)
         {
             combine_array_values(array_values, other.array_values);
-            for (auto it : other.dict_values) {
+            for (const auto& it : other.dict_values) {
                 dict_values[it.first] = it.second;
             }
             if (link_value && other.link_value) {
@@ -3530,32 +3530,31 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_fake_local_client_reset(config, config2);
 
-    auto get_top_object = [](SharedRealm realm) {
-        advance_and_notify(*realm);
-        TableRef table = get_table(*realm, "TopLevel");
+    auto get_top_object = [](Realm& realm) {
+        advance_and_notify(realm);
+        TableRef table = get_table(realm, "TopLevel");
         REQUIRE(table->size() == 1);
-        Obj obj = *table->begin();
-        return obj;
+        return *table->begin();
     };
 
     using StateList = std::vector<TopLevelContent>;
     auto reset_embedded_object = [&](StateList local_content, StateList remote_content,
                                      TopLevelContent expected_recovered) {
         test_reset
-            ->make_local_changes([&](SharedRealm local_realm) {
-                Obj obj = get_top_object(local_realm);
+            ->make_local_changes([&](const SharedRealm& local_realm) {
+                Obj obj = get_top_object(*local_realm);
                 for (auto& s : local_content) {
                     s.assign_to(obj);
                 }
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
-                Obj obj = get_top_object(remote_realm);
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                Obj obj = get_top_object(*remote_realm);
                 for (auto& s : remote_content) {
                     s.assign_to(obj);
                 }
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
-                Obj obj = get_top_object(local_realm);
+            ->on_post_reset([&](const SharedRealm& local_realm) {
+                Obj obj = get_top_object(*local_realm);
                 TopLevelContent actual = TopLevelContent::get_from(obj);
                 if (test_mode == ClientResyncMode::Recover) {
                     actual.test(expected_recovered);
@@ -3572,7 +3571,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
     };
 
     ObjectId pk_val = ObjectId::gen();
-    test_reset->setup([&pk_val](SharedRealm realm) {
+    test_reset->setup([&pk_val](const SharedRealm& realm) {
         auto table = get_table(*realm, "TopLevel");
         REQUIRE(table);
         auto obj = table->create_object_with_primary_key(pk_val);
@@ -3687,7 +3686,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
     }
     SECTION("with shared initial state") {
         TopLevelContent initial;
-        test_reset->setup([&](SharedRealm realm) {
+        test_reset->setup([&](const SharedRealm& realm) {
             auto table = get_table(*realm, "TopLevel");
             REQUIRE(table);
             auto obj = table->create_object_with_primary_key(pk_val);
@@ -3752,22 +3751,22 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         }
         SECTION("moving preexisting list items triggers a list copy") {
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     REQUIRE(list.size() == 3);
                     list.move(0, 1);
                     list.move(1, 2);
                     list.move(1, 0);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    Obj obj = get_top_object(remote_realm);
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0, list.size()); // any change here is lost
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     TopLevelContent actual = TopLevelContent::get_from(obj);
                     if (test_mode == ClientResyncMode::Recover) {
                         TopLevelContent expected_recovered = local;
@@ -3792,22 +3791,22 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             remote.array_values.erase(remote.array_values.begin());
             remote.array_values.erase(remote.array_values.begin());
             test_reset
-                ->make_local_changes([&](SharedRealm local) {
-                    Obj obj = get_top_object(local);
+                ->make_local_changes([&](const SharedRealm& local) {
+                    Obj obj = get_top_object(*local);
                     auto list = obj.get_linklist("array_of_objs");
                     auto embedded = list.create_and_insert_linked_object(3);
                     new_element1.assign_to(embedded);
                     embedded = list.create_and_insert_linked_object(0);
                     new_element2.assign_to(embedded);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    Obj obj = get_top_object(remote_realm);
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0, list.size() - 1);
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     TopLevelContent actual = TopLevelContent::get_from(obj);
                     if (test_mode == ClientResyncMode::Recover) {
                         TopLevelContent expected_recovered = remote;
@@ -3875,8 +3874,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             EmbeddedContent local_added_at_begin, local_added_at_end, local_added_before_end, remote_added;
             size_t list_end = initial.array_values.size();
             test_reset
-                ->make_local_changes([&](SharedRealm local) {
-                    Obj obj = get_top_object(local);
+                ->make_local_changes([&](const SharedRealm& local) {
+                    Obj obj = get_top_object(*local);
                     auto list = obj.get_linklist("array_of_objs");
                     auto embedded = list.create_and_insert_linked_object(0);
                     local_added_at_begin.assign_to(embedded);
@@ -3896,16 +3895,16 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     local_added_at_end.assign_to(list.get_object(0));
                     local_added_at_begin.assign_to(list.get_object(list_end));
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    Obj obj = get_top_object(remote_realm);
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
                     remote_added.name = "remote added at zero, should end up in the middle of the list";
                     remote_added.assign_to(list.create_and_insert_linked_object(0));
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     if (test_mode == ClientResyncMode::Recover) {
                         auto list = obj.get_linklist("array_of_objs");
                         REQUIRE(list.size() == 4);
@@ -3928,8 +3927,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         SECTION("deep modifications to inserted and moved list items are recovered") {
             EmbeddedContent local_added_at_begin, local_added_at_end, remote_added;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     auto embedded = list.create_and_insert_linked_object(0);
                     local_added_at_begin.assign_to(embedded);
@@ -3947,16 +3946,16 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     local_added_at_end.assign_to(list.get_object(0));
                     local_added_at_begin.assign_to(list.get_object(1));
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    Obj obj = get_top_object(remote_realm);
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
                     remote_added.name = "remote added at zero, should end up at the end of the list";
                     remote_added.assign_to(list.create_and_insert_linked_object(0));
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     if (test_mode == ClientResyncMode::Recover) {
                         auto list = obj.get_linklist("array_of_objs");
                         REQUIRE(list.size() == 3);
@@ -3978,8 +3977,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         SECTION("removing an added list item does not trigger a list copy") {
             EmbeddedContent local_added_and_removed, local_added;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     auto embedded = list.create_and_insert_linked_object(0);
                     local_added_and_removed.assign_to(embedded);
@@ -3989,14 +3988,14 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     local_realm->begin_transaction();
                     list.remove(0);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    Obj obj = get_top_object(remote_realm);
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     TopLevelContent actual = TopLevelContent::get_from(obj);
                     if (test_mode == ClientResyncMode::Recover) {
                         TopLevelContent expected_recovered = remote;
@@ -4012,8 +4011,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         SECTION("removing a preexisting list item triggers a list copy") {
             EmbeddedContent remote_updated_item_0, local_added;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0);
                     list.remove(0);
@@ -4021,16 +4020,16 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     local_added.assign_to(embedded);
                     local = TopLevelContent::get_from(obj);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     // any change made to the list here is overwritten by the list copy
-                    Obj obj = get_top_object(remote_realm);
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(1, list.size()); // individual ArrayErase instructions, not a clear.
                     remote_updated_item_0.assign_to(list.get_object(0));
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     TopLevelContent actual = TopLevelContent::get_from(obj);
                     if (test_mode == ClientResyncMode::Recover) {
                         actual.test(local);
@@ -4044,8 +4043,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         SECTION("adding and removing a list item when the remote removes the base object has no effect") {
             EmbeddedContent local_added_at_begin;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     auto embedded = list.create_and_insert_linked_object(0);
                     local_added_at_begin.assign_to(embedded);
@@ -4053,12 +4052,12 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     local_realm->begin_transaction();
                     list.remove(0);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     // any change made to the list here is overwritten by the list copy
-                    Obj obj = get_top_object(remote_realm);
+                    Obj obj = get_top_object(*remote_realm);
                     obj.remove();
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
+                ->on_post_reset([&](const SharedRealm& local_realm) {
                     advance_and_notify(*local_realm);
                     TableRef table = get_table(*local_realm, "TopLevel");
                     REQUIRE(table->size() == 0);
@@ -4067,17 +4066,17 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         }
         SECTION("removing a preexisting list item when the remote removes the base object has no effect") {
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     // any change made to the list here is overwritten by the list copy
-                    Obj obj = get_top_object(remote_realm);
+                    Obj obj = get_top_object(*remote_realm);
                     obj.remove();
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
+                ->on_post_reset([&](const SharedRealm& local_realm) {
                     advance_and_notify(*local_realm);
                     TableRef table = get_table(*local_realm, "TopLevel");
                     REQUIRE(table->size() == 0);
@@ -4087,17 +4086,17 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         SECTION("modifications to an embedded object are ignored when the base object is removed") {
             EmbeddedContent local_modifications;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     local_modifications.assign_to(list.get_object(0));
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
                     // any change made to the list here is overwritten by the list copy
-                    Obj obj = get_top_object(remote_realm);
+                    Obj obj = get_top_object(*remote_realm);
                     obj.remove();
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
+                ->on_post_reset([&](const SharedRealm& local_realm) {
                     advance_and_notify(*local_realm);
                     TableRef table = get_table(*local_realm, "TopLevel");
                     REQUIRE(table->size() == 0);
@@ -4113,8 +4112,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             remote_added.array_of_seconds = {{}, {}};
             SecondLevelEmbeddedContent modified, inserted;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     auto embedded = list.create_and_insert_linked_object(0);
                     local_added_at_0.assign_to(embedded);
@@ -4137,16 +4136,16 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     local_added_at_1.array_of_seconds[0] = modified;
                     local_added_at_1.array_of_seconds.insert(local_added_at_1.array_of_seconds.begin(), inserted);
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    Obj obj = get_top_object(remote_realm);
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
                     remote_added.name = "remote added at zero, should end up at the end of the list";
                     remote_added.assign_to(list.create_and_insert_linked_object(0));
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     if (test_mode == ClientResyncMode::Recover) {
                         auto list = obj.get_linklist("array_of_objs");
                         REQUIRE(list.size() == 3);
@@ -4167,22 +4166,22 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         SECTION("insertions to a preexisting object through two layers of embedded lists triggers a list copy") {
             SecondLevelEmbeddedContent local_added, remote_added;
             test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->make_local_changes([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     local_added.assign_to(
                         list.get_object(0).get_linklist("array_of_seconds").create_and_insert_linked_object(0));
                 })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    Obj obj = get_top_object(remote_realm);
+                ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                    Obj obj = get_top_object(*remote_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     remote_added.assign_to(
                         list.get_object(0).get_linklist("array_of_seconds").create_and_insert_linked_object(0));
                     list.move(0, 1);
                     remote = TopLevelContent::get_from(obj);
                 })
-                ->on_post_reset([&](SharedRealm local_realm) {
-                    Obj obj = get_top_object(local_realm);
+                ->on_post_reset([&](const SharedRealm& local_realm) {
+                    Obj obj = get_top_object(*local_realm);
                     if (test_mode == ClientResyncMode::Recover) {
                         auto list = obj.get_linklist("array_of_objs");
                         REQUIRE(list.size() == 3);
@@ -4216,8 +4215,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         }
 
         SECTION("add int") {
-            auto add_to_dict_item = [&](SharedRealm realm, std::string key, int64_t addition) {
-                Obj obj = get_top_object(realm);
+            auto add_to_dict_item = [&](const SharedRealm& realm, const std::string& key, int64_t addition) {
+                Obj obj = get_top_object(*realm);
                 auto dict = obj.get_dictionary("embedded_dict");
                 auto embedded = dict.get_object(key);
                 REQUIRE(embedded);
@@ -4227,8 +4226,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             TopLevelContent expected_recovered;
             const std::string existing_key = "foo";
 
-            test_reset->on_post_reset([&](SharedRealm local_realm) {
-                Obj obj = get_top_object(local_realm);
+            test_reset->on_post_reset([&](const SharedRealm& local_realm) {
+                Obj obj = get_top_object(*local_realm);
                 TopLevelContent actual = TopLevelContent::get_from(obj);
                 actual.test(test_mode == ClientResyncMode::Recover ? expected_recovered : initial);
             });
@@ -4242,7 +4241,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                 expected_recovered = initial;
                 expected_recovered.dict_values[existing_key]->int_value += addition;
                 test_reset
-                    ->make_local_changes([&](SharedRealm local) {
+                    ->make_local_changes([&](const SharedRealm& local) {
                         add_to_dict_item(local, existing_key, addition);
                     })
                     ->run();
@@ -4253,10 +4252,10 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                 expected_recovered = initial;
                 expected_recovered.dict_values[existing_key]->int_value += (addition + remote_addition);
                 test_reset
-                    ->make_local_changes([&](SharedRealm local) {
+                    ->make_local_changes([&](const SharedRealm& local) {
                         add_to_dict_item(local, existing_key, addition);
                     })
-                    ->make_remote_changes([&](SharedRealm remote) {
+                    ->make_remote_changes([&](const SharedRealm& remote) {
                         initial = add_to_dict_item(remote, existing_key, remote_addition);
                     })
                     ->run();
@@ -4264,11 +4263,11 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             SECTION("local add_int on a dictionary item which the remote removed is ignored") {
                 INFO("adding " << initial_value << " with " << addition);
                 test_reset
-                    ->make_local_changes([&](SharedRealm local) {
+                    ->make_local_changes([&](const SharedRealm& local) {
                         add_to_dict_item(local, existing_key, addition);
                     })
-                    ->make_remote_changes([&](SharedRealm remote_realm) {
-                        Obj obj = get_top_object(remote_realm);
+                    ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                        Obj obj = get_top_object(*remote_realm);
                         auto dict = obj.get_dictionary("embedded_dict");
                         dict.erase(Mixed{existing_key});
                         initial = TopLevelContent::get_from(obj);
@@ -4280,16 +4279,16 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     "is ignored") {
                 INFO("adding " << initial_value << " with " << addition);
                 test_reset
-                    ->make_local_changes([&](SharedRealm local) {
+                    ->make_local_changes([&](const SharedRealm& local) {
                         add_to_dict_item(local, existing_key, addition);
                     })
-                    ->make_remote_changes([&](SharedRealm remote_realm) {
-                        Obj obj = get_top_object(remote_realm);
+                    ->make_remote_changes([&](const SharedRealm& remote_realm) {
+                        Obj obj = get_top_object(*remote_realm);
                         TableRef table = obj.get_table();
                         obj.remove();
                         REQUIRE(table->size() == 0);
                     })
-                    ->on_post_reset([&](SharedRealm local_realm) {
+                    ->on_post_reset([&](const SharedRealm& local_realm) {
                         advance_and_notify(*local_realm);
                         TableRef table = get_table(*local_realm, "TopLevel");
                         REQUIRE(table->size() == 0);
@@ -4324,14 +4323,14 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         TopLevelContent remote_content;
 
         test_reset
-            ->make_remote_changes([&](SharedRealm remote) {
+            ->make_remote_changes([&](const SharedRealm& remote) {
                 advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 REQUIRE(table->size() == 1);
                 remote_content.assign_to(obj);
             })
-            ->on_post_reset([&](SharedRealm local) {
+            ->on_post_reset([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4346,7 +4345,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         config2.schema = Schema{shared_class};
         test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         TopLevelContent local_content;
-        test_reset->make_local_changes([&](SharedRealm local) {
+        test_reset->make_local_changes([&](const SharedRealm& local) {
             TableRef table = get_table(*local, "TopLevel");
             auto obj = table->create_object_with_primary_key(pk_val);
             REQUIRE(table->size() == 1);
@@ -4361,7 +4360,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             // if the server is in production which in that case the changes will be rejected.
             // Since this is a fake reset, it always succeeds here.
             test_reset
-                ->on_post_reset([&](SharedRealm local) {
+                ->on_post_reset([&](const SharedRealm& local) {
                     TableRef table = get_table(*local, "TopLevel");
                     REQUIRE(table->size() == 1);
                 })
@@ -4405,7 +4404,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = Schema{shared_class};
 
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
-        test_reset->make_local_changes([&](SharedRealm local) {
+        test_reset->make_local_changes([&](const SharedRealm& local) {
             advance_and_notify(*local);
             TableRef table = get_table(*local, "TopLevel");
             auto obj = table->create_object_with_primary_key(pk_val);
@@ -4424,7 +4423,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         }
         else {
             test_reset
-                ->on_post_reset([&](SharedRealm local) {
+                ->on_post_reset([&](const SharedRealm& local) {
                     advance_and_notify(*local);
                     TableRef table = get_table(*local, "TopLevel");
                     REQUIRE(table->size() == 1);
@@ -4448,7 +4447,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
 
         test_reset
-            ->make_remote_changes([&](SharedRealm remote) {
+            ->make_remote_changes([&](const SharedRealm& remote) {
                 advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4471,7 +4470,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(list.size() == 3);
                 REQUIRE(table->size() == 1);
             })
-            ->on_post_reset([&](SharedRealm local) {
+            ->on_post_reset([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4499,7 +4498,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config.schema = Schema{shared_class};
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->make_remote_changes([&](SharedRealm remote) {
+            ->make_remote_changes([&](const SharedRealm& remote) {
                 advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4522,7 +4521,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(dict.size() == 3);
                 REQUIRE(table->size() == 1);
             })
-            ->on_post_reset([&](SharedRealm local) {
+            ->on_post_reset([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4549,7 +4548,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->make_local_changes([&](SharedRealm local) {
+            ->make_local_changes([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 auto table = get_table(*local, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4559,7 +4558,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.insert(0, Mixed{30});
                 REQUIRE(list.size() == 1);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4569,7 +4568,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 dict.insert("Test", Mixed{40});
                 REQUIRE(dict.size() == 1);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     TableRef table = get_table(*local_realm, "TopLevel");
@@ -4598,7 +4597,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->make_local_changes([&](SharedRealm local) {
+            ->make_local_changes([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 auto table = get_table(*local, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4610,7 +4609,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 dict.insert("Test", Mixed{30});
                 REQUIRE(list.size() == 1);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4622,7 +4621,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.insert(0, Mixed{30});
                 REQUIRE(nlist.size() == 1);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     TableRef table = get_table(*local_realm, "TopLevel");
@@ -4659,7 +4658,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->make_local_changes([&](SharedRealm local) {
+            ->make_local_changes([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 auto table = get_table(*local, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4674,7 +4673,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 dict.insert("Test", Mixed{10});
                 REQUIRE(list.size() == 2);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4689,7 +4688,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 dict.insert("Test1", Mixed{11});
                 REQUIRE(list.size() == 2);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4728,7 +4727,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->make_local_changes([&](SharedRealm local) {
+            ->make_local_changes([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 auto table = get_table(*local, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4744,7 +4743,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.insert(0, Mixed{2}); // this shifts all the other collections by 1
                 REQUIRE(list.size() == 3);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4760,7 +4759,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.insert(0, Mixed{30}); // this shifts all the other collections by 1
                 REQUIRE(list.size() == 3);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4804,7 +4803,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->make_local_changes([&](SharedRealm local) {
+            ->make_local_changes([&](const SharedRealm& local) {
                 advance_and_notify(*local);
                 auto table = get_table(*local, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4815,7 +4814,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = list.get_list(0);
                 n_list.insert(0, Mixed{30});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -4826,7 +4825,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = dict.get_list("List");
                 n_list.insert(0, Mixed{30});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4855,7 +4854,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -4868,7 +4867,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 n_list = list.get_list(1);
                 n_list.insert(0, Mixed{31});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // The changes are recovered (instead of copying the entire list) because
                 // the first index in the path is known (it is just inserted)
                 advance_and_notify(*local_realm);
@@ -4882,7 +4881,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 n_list.insert(0, Mixed{50});
                 REQUIRE(list.size() == 3);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4895,7 +4894,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = list.get_list(0);
                 REQUIRE(n_list.get_any(0).get_int() == 31); // new position 0 is the list with entry set to 31
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4926,7 +4925,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -4936,7 +4935,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = list.get_list(0);
                 n_list.insert(0, Mixed{30});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4947,7 +4946,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = list.get_list(0);
                 n_list.insert(0, Mixed{50});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -4957,7 +4956,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(list.size() == 1);
                 list.remove(0);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     TableRef table = get_table(*local_realm, "TopLevel");
@@ -4987,7 +4986,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -4997,7 +4996,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = list.get_list(0);
                 n_list.insert(0, Mixed{30});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5011,7 +5010,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list1 = list.get_list(0);
                 n_list1.insert(0, Mixed{150});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5024,7 +5023,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list1 = list.get_list(0);
                 n_list1.insert(0, Mixed{42});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5061,7 +5060,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5071,7 +5070,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = list.get_list(0);
                 n_list.insert(0, Mixed{30});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5081,7 +5080,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(list.size() == 1);
                 list.remove(0);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5091,7 +5090,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.add(Mixed{10});
                 REQUIRE(list.size() == 2);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5119,7 +5118,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5130,7 +5129,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 n_list.insert(0, Mixed{30});
                 n_list.insert(1, Mixed{10});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5143,7 +5142,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(nlist.get_any(0).get_int() == 10);
                 REQUIRE(nlist.get_any(1).get_int() == 30);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5156,7 +5155,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.add(Mixed{2});
                 REQUIRE(nlist.size() == 3);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5190,7 +5189,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5200,7 +5199,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_dictionary = dictionary.get_dictionary("Test");
                 n_dictionary.insert("Val", 30);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5210,7 +5209,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(dictionary.size() == 1);
                 dictionary.erase("Test");
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5221,7 +5220,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_dictionary = dictionary.get_dictionary("Test");
                 n_dictionary.insert("Val1", 31);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5249,7 +5248,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5264,7 +5263,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 ndict.insert("Int", Mixed(3));
                 ndict.insert("String", Mixed("Test"));
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5281,7 +5280,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 ndict = ndict.get_dictionary("key");
                 ndict.insert("Int2", 6);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5298,7 +5297,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 ndict = ndict.get_dictionary("key");
                 ndict.insert("Int3", Mixed{9});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5352,7 +5351,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5364,7 +5363,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.add(Mixed{2});
                 nlist.add(Mixed{3});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5379,7 +5378,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.add(Mixed{6});
                 nlist.add(Mixed{7});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5397,7 +5396,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.add(Mixed{7});
                 REQUIRE(nlist.size() == 9);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5442,13 +5441,13 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
                 obj.set_collection(col, CollectionType::List);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5459,7 +5458,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = list.get_list(0);
                 nlist.add(Mixed{"Local"});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5470,7 +5469,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndict = list.get_dictionary(0);
                 ndict.insert("Test", Mixed{"Remote"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5501,7 +5500,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("list_mixed");
@@ -5515,7 +5514,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 ndict.insert("Int", Mixed(3));
                 ndict.insert("String", Mixed("Test"));
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5529,7 +5528,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndict = list.get_dictionary(1);
                 ndict.insert("Int", Mixed{6});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5543,7 +5542,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndict = list.get_dictionary(1);
                 ndict.insert("Int", Mixed{9});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5585,7 +5584,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("dictionary_mixed");
@@ -5599,7 +5598,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 ndict.insert("Int", Mixed(3));
                 ndict.insert("String", Mixed("Test"));
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5612,7 +5611,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndict = dict.get_dictionary("key2");
                 ndict.insert("Int", Mixed{6});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5625,7 +5624,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndict = dict.get_dictionary("key2");
                 ndict.insert("String", Mixed("Test2"));
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5671,7 +5670,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5682,7 +5681,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = list.get_list(0);
                 nlist.add(Mixed{"Setup"});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5695,7 +5694,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = list.get_list(0);
                 nlist.add(Mixed{"Local"});
             })
-            ->on_post_local_changes([&](SharedRealm realm) {
+            ->on_post_local_changes([&](const SharedRealm& realm) {
                 TableRef table = get_table(*realm, "TopLevel");
                 REQUIRE(table->size() == 1);
                 auto obj = table->get_object(0);
@@ -5720,7 +5719,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     nlist_local_changes = std::move(changes);
                 });
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5733,7 +5732,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = list.get_list(0);
                 nlist.add(Mixed{"Remote"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5817,7 +5816,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5828,7 +5827,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = dictionary.get_list("[Setup]");
                 nlist.add(Mixed{"Setup"});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5841,7 +5840,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = dictionary.get_list("[Local]");
                 nlist.add(Mixed{"Local"});
             })
-            ->on_post_local_changes([&](SharedRealm realm) {
+            ->on_post_local_changes([&](const SharedRealm& realm) {
                 TableRef table = get_table(*realm, "TopLevel");
                 REQUIRE(table->size() == 1);
                 auto obj = table->get_object(0);
@@ -5866,7 +5865,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     nlist_local_changes = std::move(changes);
                 });
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5879,7 +5878,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = dictionary.get_list("[Remote]");
                 nlist.add(Mixed{"Remote"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5962,7 +5961,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -5973,7 +5972,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = list.get_dictionary(0);
                 ndictionary.insert("Key", Mixed{"Setup"});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -5986,7 +5985,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = list.get_dictionary(0);
                 ndictionary.insert("Key", Mixed{"Local"});
             })
-            ->on_post_local_changes([&](SharedRealm realm) {
+            ->on_post_local_changes([&](const SharedRealm& realm) {
                 TableRef table = get_table(*realm, "TopLevel");
                 REQUIRE(table->size() == 1);
                 auto obj = table->get_object(0);
@@ -6013,7 +6012,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                         ndictionary_local_changes = std::move(changes);
                     });
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6026,7 +6025,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = list.get_dictionary(0);
                 ndictionary.insert("Key", Mixed{"Remote"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6110,7 +6109,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -6121,7 +6120,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = dictionary.get_dictionary("<Setup>");
                 ndictionary.insert("Key", Mixed{"Setup"});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6133,7 +6132,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = dictionary.get_dictionary("<Local>");
                 ndictionary.insert("Key", Mixed{"Local"});
             })
-            ->on_post_local_changes([&](SharedRealm realm) {
+            ->on_post_local_changes([&](const SharedRealm& realm) {
                 TableRef table = get_table(*realm, "TopLevel");
                 REQUIRE(table->size() == 1);
                 auto obj = table->get_object(0);
@@ -6160,7 +6159,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                         ndictionary_local_changes = std::move(changes);
                     });
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6173,7 +6172,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = dictionary.get_dictionary("<Remote>");
                 ndictionary.insert("Key", Mixed{"Remote"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6266,7 +6265,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto other_table = get_table(*realm, "Other");
 
@@ -6291,7 +6290,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 CHECK(table->query("any_mixed['<Setup>']['Key']._id == $0", std::vector<Mixed>{Mixed{pk_val}})
                           .count() == 1);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 auto table = get_table(*local_realm, "TopLevel");
                 auto other_table = get_table(*local_realm, "Other");
@@ -6323,10 +6322,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[0] == 1").count() == 1);
                 CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[1] == 2").count() == 1);
             })
-            ->on_post_local_changes([&](SharedRealm realm) {
+            ->on_post_local_changes([&](const SharedRealm& realm) {
                 advance_and_notify(*realm);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto other_table = get_table(*remote_realm, "Other");
@@ -6362,7 +6361,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[1] == 2").count() == 1);
                 CHECK(table->query("any_mixed['<Setup>']['Key'].any_mixed[2] == 3").count() == 1);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 TableRef other_table = get_table(*local_realm, "Other");
@@ -6440,7 +6439,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -6448,7 +6447,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dictionary{realm, obj, col};
                 dictionary.insert_collection("MyDictionary", CollectionType::Dictionary);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 auto table = get_table(*local_realm, "TopLevel");
                 auto other_table = get_table(*local_realm, "Other_one");
@@ -6480,10 +6479,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[0] == 1").count() == 1);
                 CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[1] == 2").count() == 1);
             })
-            ->on_post_local_changes([&](SharedRealm realm) {
+            ->on_post_local_changes([&](const SharedRealm& realm) {
                 advance_and_notify(*realm);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto other_table = get_table(*remote_realm, "Other_two");
@@ -6517,7 +6516,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[1] == 2").count() == 1);
                 CHECK(table->query("any_mixed['MyDictionary']['Key'].any_mixed[2] == 3").count() == 1);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6610,7 +6609,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
@@ -6618,7 +6617,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dictionary{realm, obj, col};
                 dictionary.insert_collection("MyDictionary", CollectionType::Dictionary);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 auto table = get_table(*local_realm, "TopLevel");
                 auto other_table = get_table(*local_realm, "Other_one");
@@ -6650,10 +6649,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed[0] == 1").count() == 1);
                 CHECK(table->query("any_mixed['MyDictionary']['KeyLocal'].any_mixed[1] == 2").count() == 1);
             })
-            ->on_post_local_changes([&](SharedRealm realm) {
+            ->on_post_local_changes([&](const SharedRealm& realm) {
                 advance_and_notify(*realm);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 advance_and_notify(*remote_realm);
                 auto table = get_table(*remote_realm, "TopLevel");
                 auto other_table = get_table(*remote_realm, "Other_two");
@@ -6687,7 +6686,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[1] == 2").count() == 1);
                 CHECK(table->query("any_mixed['MyDictionary']['KeyRemote'].any_mixed[2] == 3").count() == 1);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6765,7 +6764,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [1, 2, 3]}}}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -6780,7 +6779,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.add(Mixed{2});
                 nlist.add(Mixed{3});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [1, 2, 3, 4, [5]]}}}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -6794,7 +6793,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist = nlist->get_list(4);
                 nlist->add(Mixed{5});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [2, 3]}}}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -6804,7 +6803,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1", "key2"});
                 nlist->remove(0);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6838,7 +6837,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -6852,7 +6851,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist = nlist.get_list(1);
                 nlist.add(Mixed{2});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 3, [4]]}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -6869,7 +6868,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist = nlist->get_list(3);
                 nlist->add(Mixed{4});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key1": [1, [2], 5]}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -6879,7 +6878,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1"});
                 nlist->add(Mixed{5});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -6922,7 +6921,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": [1]}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -6931,7 +6930,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 List list{realm, obj, col};
                 list.add(Mixed{1});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": [1, 2, 3]}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -6943,7 +6942,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.add(Mixed{2});
                 list.add(Mixed{3});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key": "value"}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -6955,7 +6954,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dictionary{remote_realm, obj, col};
                 dictionary.insert("key", "value");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 // Result: {"_id": <id>, "any_mixed": {{"key": "value"}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -6976,7 +6975,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key": 42}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -6985,7 +6984,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dict{realm, obj, col};
                 dict.insert("key", 42);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key": 42}, {"key2": 1}, {"key3": 2}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -6997,7 +6996,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 dict.insert("key2", 1);
                 dict.insert("key3", 2);
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": ["value"]}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7009,7 +7008,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 List list{remote_realm, obj, col};
                 list.add(Mixed{"value"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 // Result: {"_id": <id>, "any_mixed": ["value"]}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7030,7 +7029,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": [1]}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7039,7 +7038,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 List list{realm, obj, col};
                 list.add(Mixed{1});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": [1, 2, 3]}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7051,7 +7050,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.add(Mixed{2});
                 list.add(Mixed{3});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": "value"}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7061,7 +7060,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 // Change type from list to string
                 obj.set_any(col, "value");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 // Result: {"_id": <id>, "any_mixed": "value"}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7080,7 +7079,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": {{"key2": []}}}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7091,7 +7090,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = dictionary.get_dictionary("key1");
                 ndictionary.insert_collection("key2", CollectionType::List);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [1]}}}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7101,7 +7100,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1", "key2"});
                 nlist->add(Mixed{1});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key3": "value"}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7114,7 +7113,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 dict.erase("key1");
                 dict.insert("key3", "value");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 // Result: {"_id": <id>, "any_mixed": {{"key3": "value"}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7135,7 +7134,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": {{"key2": []}}}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7146,7 +7145,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndictionary = dictionary.get_dictionary("key1");
                 ndictionary.insert_collection("key2", CollectionType::List);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [1]}}}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7156,7 +7155,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1", "key2"});
                 nlist->add(Mixed{1});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key1": "value"}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7167,7 +7166,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 // Change type of value at 'key1' so the path to local insert does not exist anymore.
                 ndict->insert("key1", "value");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 // Result: {"_id": <id>, "any_mixed": {{"key1": "value"}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7188,7 +7187,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}, {"key2": 42}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7203,7 +7202,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist = nlist.get_list(1);
                 nlist.add(Mixed{2});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key1": [1, [2, 3]]}, {"key2": 42}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7214,7 +7213,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1", 1});
                 nlist->add(Mixed{3});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key1": ["value", [2]]}, {"key2": 43}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7226,7 +7225,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1"});
                 nlist->set_any(0, Mixed{"value"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7263,7 +7262,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [1]}}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7276,7 +7275,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = ndict.get_list("key2");
                 nlist.add(Mixed{1});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key1": {{"key2": [42]}}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7287,7 +7286,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = obj.get_list_ptr<Mixed>({col, "key1", "key2"});
                 nlist->set_any(0, Mixed{42});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7317,7 +7316,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7331,7 +7330,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist = nlist.get_list(1);
                 nlist.add(Mixed{2});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7345,7 +7344,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndict = obj.get_dictionary(col);
                 ndict.erase("key1");
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key1": [[2]]}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7356,7 +7355,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 // Remove first element in list at 'key1'
                 nlist->remove(0);
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7387,7 +7386,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": [42]}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7396,7 +7395,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 List list{realm, obj, col};
                 list.add(Mixed{42});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": "value"}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7409,7 +7408,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 // change list to string
                 obj.set_any(col, Mixed{"value"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7436,7 +7435,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key1": [1, [2]]}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7450,7 +7449,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist = nlist.get_list(1);
                 nlist.add(Mixed{2});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key1": 42}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7464,7 +7463,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto ndict = obj.get_dictionary(col);
                 ndict.insert("key1", Mixed{42});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7500,7 +7499,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key": 42}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7509,7 +7508,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 object_store::Dictionary dict{realm, obj, col};
                 dict.insert("key", 42);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key": "some value"}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7521,7 +7520,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 dict.remove_all();
                 dict.insert("key", "some value");
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": "value"}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7531,7 +7530,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 // Change type from dictionary to string
                 obj.set_any(col, "value");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7558,7 +7557,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": [1]}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7567,7 +7566,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 List list{realm, obj, col};
                 list.add(Mixed{1});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": [2]}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7579,7 +7578,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.delete_all();
                 list.add(Mixed{2});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": "value"}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7589,7 +7588,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 // Change type from list to string
                 obj.set_any(col, "value");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7616,7 +7615,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key": [42]}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7627,7 +7626,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = dict.get_list("key");
                 nlist.add(Mixed{42});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key": ["value"]}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7639,7 +7638,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist->clear();
                 nlist->add(Mixed{"value"});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7670,7 +7669,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {{"key": [42]}}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7681,7 +7680,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = dict.get_list("key");
                 nlist.add(Mixed{42});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key": [1]}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7693,7 +7692,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist->clear();
                 nlist->add(Mixed{1});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7705,7 +7704,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 // Remove list at 'key'
                 dict.erase("key");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7734,7 +7733,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": [1, [2]]}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
@@ -7746,7 +7745,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto nlist = list.get_list(1);
                 nlist.add(Mixed{2});
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": [1, [3]]}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7760,7 +7759,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.delete_all();
                 nlist.add(Mixed{3});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": [42, [2]]}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7771,7 +7770,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(list.size() == 2);
                 list.set_any(0, Mixed{42});
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);
@@ -7803,14 +7802,14 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         config2.schema = config.schema;
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset
-            ->setup([&](SharedRealm realm) {
+            ->setup([&](const SharedRealm& realm) {
                 // Baseline: {"_id": <id>, "any_mixed": {}}
                 auto table = get_table(*realm, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 auto col = table->get_column_key("any_mixed");
                 obj.set_collection(col, CollectionType::Dictionary);
             })
-            ->make_local_changes([&](SharedRealm local_realm) {
+            ->make_local_changes([&](const SharedRealm& local_realm) {
                 // Local client: {"_id": <id>, "any_mixed": {{"key": [42, [2]]}}}
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
@@ -7827,7 +7826,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 nlist.delete_all();
                 nlist.add(Mixed{2});
             })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
+            ->make_remote_changes([&](const SharedRealm& remote_realm) {
                 // Remote client: {"_id": <id>, "any_mixed": {{"key2": "value"}}}
                 advance_and_notify(*remote_realm);
                 TableRef table = get_table(*remote_realm, "TopLevel");
@@ -7838,7 +7837,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(dict.size() == 0);
                 dict.insert("key2", "value");
             })
-            ->on_post_reset([&](SharedRealm local_realm) {
+            ->on_post_reset([&](const SharedRealm& local_realm) {
                 advance_and_notify(*local_realm);
                 TableRef table = get_table(*local_realm, "TopLevel");
                 REQUIRE(table->size() == 1);

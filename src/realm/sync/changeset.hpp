@@ -408,7 +408,7 @@ private:
     bool m_first = true;
     const Changeset* m_changeset = nullptr;
     void pad_or_ellipsis(StringData, int width) const;
-    void print_field(StringData name, std::string value);
+    void print_field(StringData name, const std::string& value);
 
     std::string primary_key_to_string(const Instruction::PrimaryKey&);
 };

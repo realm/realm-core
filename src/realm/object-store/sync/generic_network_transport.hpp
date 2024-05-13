@@ -37,7 +37,7 @@ struct AppError : public Exception {
     std::string link_to_server_logs;
     std::string server_error;
 
-    AppError(ErrorCodes::Error ec, std::string message, std::string link = "",
+    AppError(ErrorCodes::Error ec, const std::string& message, std::string link = "",
              std::optional<int> additional_error_code = std::nullopt,
              std::optional<std::string> server_err = std::nullopt);
 
@@ -72,7 +72,7 @@ struct AppError : public Exception {
     }
 };
 
-std::ostream& operator<<(std::ostream& os, AppError error);
+std::ostream& operator<<(std::ostream& os, const AppError& error);
 
 /**
  * An HTTP method type.

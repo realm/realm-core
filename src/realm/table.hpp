@@ -1021,7 +1021,7 @@ public:
         }
     }
 
-    bool link(std::string col_name)
+    bool link(const std::string& col_name)
     {
         if (auto ck = m_current_table->get_column_key(col_name)) {
             return add(ck);
@@ -1029,7 +1029,7 @@ public:
         return false;
     }
 
-    bool index(PathElement index)
+    bool index(const PathElement& index)
     {
         if (!m_link_cols.empty() && !m_link_cols.back().has_index()) {
             if (index.is_all())
@@ -1054,7 +1054,7 @@ public:
     }
 
     std::unique_ptr<Subexpr> column(const std::string&, bool has_path);
-    std::unique_ptr<Subexpr> subquery(Query subquery);
+    std::unique_ptr<Subexpr> subquery(const Query& subquery);
 
     template <class T>
     inline Columns<T> column(ColKey col_key)

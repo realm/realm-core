@@ -228,7 +228,8 @@ public:
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version = 0, MigrationFunction migration_function = nullptr,
-                       DataInitializationFunction initialization_function = nullptr, bool in_transaction = false);
+                       const DataInitializationFunction& initialization_function = nullptr,
+                       bool in_transaction = false);
 
     void rename_property(Schema schema, StringData object_type, StringData old_name, StringData new_name);
 

@@ -4237,7 +4237,7 @@ private:
 template <class>
 class SubQuery {
 public:
-    SubQuery(Columns<Link> link_column, Query query)
+    SubQuery(const Columns<Link>& link_column, Query query)
         : m_query(std::move(query))
         , m_link_map(link_column.link_map())
     {

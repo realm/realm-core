@@ -314,7 +314,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             {"object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
         };
         bool migration_called = false;
-        config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
+        config.migration_function = [&](const SharedRealm& old_realm, const SharedRealm& new_realm, Schema&) {
             migration_called = true;
             REQUIRE_FALSE(old_realm->auto_refresh());
             REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
@@ -332,7 +332,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             {"object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
         };
         bool migration_called = false;
-        config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
+        config.migration_function = [&](const SharedRealm& old_realm, const SharedRealm& new_realm, Schema&) {
             REQUIRE_FALSE(old_realm->auto_refresh());
             REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
             REQUIRE(ObjectStore::table_for_object_type(new_realm->read_group(), "object")->get_column_count() == 2);
@@ -945,7 +945,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         ThreadSafeReference realm_ref;
         std::exception_ptr error;
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+        task->start([&](ThreadSafeReference&& ref, const std::exception_ptr& e) {
             std::lock_guard lock(mutex);
             realm_ref = std::move(ref);
             error = e;
@@ -1070,7 +1070,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             REQUIRE(!task2_completed);
             progress_notifier2_called = true;
         });
-        task->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
+        task->start([&](ThreadSafeReference realm_ref, const std::exception_ptr& err) {
             std::lock_guard<std::mutex> guard(mutex);
             REQUIRE(!err);
             REQUIRE(realm_ref);
@@ -1078,7 +1078,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         });
         task->cancel();
         ThreadSafeReference rref;
-        task2->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
+        task2->start([&](ThreadSafeReference realm_ref, const std::exception_ptr& err) {
             std::lock_guard<std::mutex> guard(mutex);
             REQUIRE(!err);
             REQUIRE(realm_ref);
@@ -1199,7 +1199,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         SyncTestFile config(user, "realm");
 
         bool got_error = false;
-        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+        config.sync_config->error_handler = [&](const std::shared_ptr<SyncSession>&, const SyncError&) {
             got_error = true;
         };
         std::atomic<bool> called{false};
@@ -1289,7 +1289,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         the_app.reset();
 
-        auto err_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
+        auto err_handler = [](const std::shared_ptr<SyncSession>& session, const SyncError& error) {
             auto logger = util::Logger::get_default_logger();
             logger->debug("The sync error handler caught an error: '%1' for '%2'", error.status, session->path());
             // Ignore connection failed non-fatal errors and check for access token refresh unauthorized fatal errors
@@ -1872,7 +1872,7 @@ TEST_CASE("SharedRealm: async writes") {
             REQUIRE(write_nr == 0);
             ++write_nr;
             table->create_object().set(col, 45);
-            realm->async_commit_transaction([&](std::exception_ptr) {
+            realm->async_commit_transaction([&](const std::exception_ptr&) {
                 REQUIRE(commit_nr == 0);
                 ++commit_nr;
             });
@@ -1987,7 +1987,7 @@ TEST_CASE("SharedRealm: async writes") {
             SECTION("inside async_begin_transaction() callback after async commit") {
                 realm->async_begin_transaction([&] {
                     table->create_object().set(col, 45);
-                    realm->async_commit_transaction([&](std::exception_ptr) {
+                    realm->async_commit_transaction([&](const std::exception_ptr&) {
                         persisted = true;
                     });
                     std::invoke(close_functions[i], *realm);
@@ -2000,7 +2000,7 @@ TEST_CASE("SharedRealm: async writes") {
             SECTION("inside async commit completion") {
                 realm->async_begin_transaction([&] {
                     table->create_object().set(col, 45);
-                    realm->async_commit_transaction([&](std::exception_ptr) {
+                    realm->async_commit_transaction([&](const std::exception_ptr&) {
                         done = true;
                         std::invoke(close_functions[i], *realm);
                     });
@@ -2011,7 +2011,7 @@ TEST_CASE("SharedRealm: async writes") {
             SECTION("between commit and sync") {
                 realm->async_begin_transaction([&] {
                     table->create_object().set(col, 45);
-                    realm->async_commit_transaction([&](std::exception_ptr) {
+                    realm->async_commit_transaction([&](const std::exception_ptr&) {
                         persisted = true;
                     });
                     done = true;
@@ -2025,7 +2025,7 @@ TEST_CASE("SharedRealm: async writes") {
                 int complete_count = 0;
                 realm->async_begin_transaction([&] {
                     table->create_object().set(col, 45);
-                    realm->async_commit_transaction([&](std::exception_ptr) {
+                    realm->async_commit_transaction([&](const std::exception_ptr&) {
                         ++complete_count;
                     });
                 });
@@ -2056,7 +2056,7 @@ TEST_CASE("SharedRealm: async writes") {
                 int complete_count = 0;
                 realm->async_begin_transaction([&] {
                     table->create_object().set(col, 45);
-                    realm->async_commit_transaction([&](std::exception_ptr) {
+                    realm->async_commit_transaction([&](const std::exception_ptr&) {
                         ++complete_count;
                     });
                 });
@@ -2089,7 +2089,7 @@ TEST_CASE("SharedRealm: async writes") {
 
                 realm->async_begin_transaction([&] {
                     table->create_object().set(col, 45);
-                    realm->async_commit_transaction([&](std::exception_ptr) {
+                    realm->async_commit_transaction([&](const std::exception_ptr&) {
                         done = true;
                     });
                 });
@@ -2220,7 +2220,7 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->begin_transaction();
         table->create_object();
-        h = realm->async_commit_transaction([&](std::exception_ptr) {
+        h = realm->async_commit_transaction([&](const std::exception_ptr&) {
             throw std::runtime_error("an error");
         });
         wait_for_done();
@@ -2230,7 +2230,7 @@ TEST_CASE("SharedRealm: async writes") {
     SECTION("exception thrown from async commit completion callback without error handler") {
         realm->begin_transaction();
         table->create_object();
-        realm->async_commit_transaction([&](std::exception_ptr) {
+        realm->async_commit_transaction([&](const std::exception_ptr&) {
             throw std::runtime_error("an error");
         });
         REQUIRE_THROWS_CONTAINING(util::EventLoop::main().run_until([&] {
@@ -2382,7 +2382,7 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->begin_transaction();
         table->create_object().set(col, 90);
-        realm->async_commit_transaction([&](std::exception_ptr) {
+        realm->async_commit_transaction([&](const std::exception_ptr&) {
             done = true;
         });
         wait_for_done();
@@ -2396,7 +2396,7 @@ TEST_CASE("SharedRealm: async writes") {
         });
         realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
-            realm->async_commit_transaction([&](std::exception_ptr) {
+            realm->async_commit_transaction([&](const std::exception_ptr&) {
                 done = true;
             });
         });
@@ -2415,13 +2415,13 @@ TEST_CASE("SharedRealm: async writes") {
         realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             done = true;
-            realm->async_commit_transaction([&](std::exception_ptr) {
+            realm->async_commit_transaction([&](const std::exception_ptr&) {
                 persisted = true;
             });
         });
         realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
-            auto handle = realm->async_commit_transaction([&](std::exception_ptr) {
+            auto handle = realm->async_commit_transaction([&](const std::exception_ptr&) {
                 FAIL();
             });
             realm->async_cancel_transaction(handle);
@@ -2444,7 +2444,7 @@ TEST_CASE("SharedRealm: async writes") {
     SECTION("cancelled sync transaction with pending async transaction") {
         realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
-            realm->async_commit_transaction([&](std::exception_ptr) {
+            realm->async_commit_transaction([&](const std::exception_ptr&) {
                 done = true;
             });
         });
@@ -2461,7 +2461,7 @@ TEST_CASE("SharedRealm: async writes") {
         realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             done = true;
-            realm->async_commit_transaction([&](std::exception_ptr) {
+            realm->async_commit_transaction([&](const std::exception_ptr&) {
                 persisted = true;
             });
         });
@@ -2493,7 +2493,7 @@ TEST_CASE("SharedRealm: async writes") {
         std::weak_ptr<Realm> weak_realm = realm;
         realm->async_begin_transaction([&]() {
             table->create_object().set(col, 45);
-            weak_realm.lock()->async_commit_transaction([&](std::exception_ptr) {
+            weak_realm.lock()->async_commit_transaction([&](const std::exception_ptr&) {
                 done = true;
             });
         });
@@ -2575,7 +2575,7 @@ TEST_CASE("SharedRealm: async writes") {
 
                 table->create_object();
                 realm->async_commit_transaction(
-                    [&](std::exception_ptr) {
+                    [&](const std::exception_ptr&) {
                         ++completion_calls;
                     },
                     true);
@@ -2596,7 +2596,7 @@ TEST_CASE("SharedRealm: async writes") {
 
                 table->create_object();
                 realm->async_commit_transaction(
-                    [&](std::exception_ptr) {
+                    [&](const std::exception_ptr&) {
                         ++completion_calls;
                     },
                     (i + 1) % 6 != 0);
@@ -2617,7 +2617,7 @@ TEST_CASE("SharedRealm: async writes") {
         realm->async_begin_transaction([&] {
             REQUIRE(table->size() == 2);
             table->create_object();
-            realm->async_commit_transaction([&](std::exception_ptr) {
+            realm->async_commit_transaction([&](const std::exception_ptr&) {
                 done = true;
             });
         });
@@ -2653,7 +2653,7 @@ TEST_CASE("SharedRealm: async writes") {
         realm->async_begin_transaction([&] {
             REQUIRE(table->size() == 5);
             table->create_object();
-            realm->async_commit_transaction([&](std::exception_ptr) {
+            realm->async_commit_transaction([&](const std::exception_ptr&) {
                 done = true;
             });
         });
@@ -2744,7 +2744,7 @@ TEST_CASE("Call run_async_completions after realm has been closed") {
     auto realm = Realm::get_shared_realm(config);
 
     realm->begin_transaction();
-    realm->async_commit_transaction([](std::exception_ptr) {});
+    realm->async_commit_transaction([](const std::exception_ptr&) {});
 
     std::vector<util::UniqueFunction<void()>> callbacks;
     {
@@ -2796,7 +2796,7 @@ TEST_CASE("SharedRealm: async writes on multiple threads") {
         Realm::get_shared_realm(config)->async_begin_transaction([=] {
             auto realm = Realm::get_shared_realm(config);
             realm->read_group().get_table(table_key)->create_object();
-            realm->async_commit_transaction([=](std::exception_ptr) {
+            realm->async_commit_transaction([=](const std::exception_ptr&) {
                 ++*completions_ptr;
             });
         });
@@ -2813,7 +2813,7 @@ TEST_CASE("SharedRealm: async writes on multiple threads") {
         auto realm = Realm::get_shared_realm(config);
         realm->begin_transaction();
         realm->read_group().get_table(table_key)->create_object();
-        realm->async_commit_transaction([=](std::exception_ptr) {
+        realm->async_commit_transaction([=](const std::exception_ptr&) {
             ++*completions_ptr;
         });
     };
@@ -2975,7 +2975,7 @@ TEST_CASE("SharedRealm: async_writes_2") {
         REQUIRE(write_nr == 1);
         ++write_nr;
         table->create_object().set(col, 45);
-        realm->async_commit_transaction([&](std::exception_ptr) {
+        realm->async_commit_transaction([&](const std::exception_ptr&) {
             REQUIRE(commit_nr == 0);
             ++commit_nr;
         });
@@ -2984,7 +2984,7 @@ TEST_CASE("SharedRealm: async_writes_2") {
         ++write_nr;
         auto o = table->get_object(0);
         o.set(col, o.get<int64_t>(col) + 37);
-        realm->async_commit_transaction([&](std::exception_ptr) {
+        realm->async_commit_transaction([&](const std::exception_ptr&) {
             ++commit_nr;
             done = true;
         });
@@ -3319,9 +3319,9 @@ TEST_CASE("SharedRealm: close()") {
         List list(realm, obj.get_linklist("list"));
         Object object(realm, obj);
 
-        auto obj_token = object.add_notification_callback([](CollectionChangeSet) {});
-        auto list_token = list.add_notification_callback([](CollectionChangeSet) {});
-        auto results_token = results.add_notification_callback([](CollectionChangeSet) {});
+        auto obj_token = object.add_notification_callback([](const CollectionChangeSet&) {});
+        auto list_token = list.add_notification_callback([](const CollectionChangeSet&) {});
+        auto results_token = results.add_notification_callback([](const CollectionChangeSet&) {});
 
         // Perform a dummy transaction to ensure the notifiers actually acquire
         // resources that need to be closed
@@ -3493,7 +3493,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     SECTION("did_change with async results") {
         r1->m_binding_context.reset(new Context(r1));
         Results results(r1, table->where());
-        auto token = results.add_notification_callback([&](CollectionChangeSet) {
+        auto token = results.add_notification_callback([&](const CollectionChangeSet&) {
             // Should not be called.
             REQUIRE(false);
         });
@@ -4213,11 +4213,11 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
         Results results1(r, table->where().greater_equal(col, 0));
         Results results2(r, table->where().less(col, 10));
 
-        auto token1 = results1.add_notification_callback([&](CollectionChangeSet) {
+        auto token1 = results1.add_notification_callback([&](const CollectionChangeSet&) {
             ++notification_calls;
         });
 
-        auto token2 = results2.add_notification_callback([&](CollectionChangeSet) {
+        auto token2 = results2.add_notification_callback([&](const CollectionChangeSet&) {
             ++notification_calls;
         });
 
@@ -4270,7 +4270,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
     SECTION("did_send() is skipped if the Realm is closed first") {
         Results results(r, table->where());
         bool do_close = true;
-        auto token = results.add_notification_callback([&](CollectionChangeSet) {
+        auto token = results.add_notification_callback([&](const CollectionChangeSet&) {
             if (do_close)
                 r->close();
         });
@@ -4374,7 +4374,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         auto realm = Realm::get_shared_realm(std::move(ref));
         Results results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object")->where());
         bool called = false;
-        auto token = results.add_notification_callback([&](CollectionChangeSet) {
+        auto token = results.add_notification_callback([&](const CollectionChangeSet&) {
             called = true;
         });
         util::EventLoop::main().run_until([&] {
@@ -4563,7 +4563,7 @@ TEST_CASE("Concurrent operations") {
                 // This will trigger an online compaction
                 // Before the fix, the probram would crash here next time around.
                 res.clear();
-                realm_1->async_commit_transaction([&](std::exception_ptr) {
+                realm_1->async_commit_transaction([&](const std::exception_ptr&) {
                     commit_1++;
                 });
             });
@@ -4573,7 +4573,7 @@ TEST_CASE("Concurrent operations") {
                 for (int i = 0; i < 100; i++) {
                     table->create_object().set("value", i);
                 }
-                realm_2->async_commit_transaction([&](std::exception_ptr) {
+                realm_2->async_commit_transaction([&](const std::exception_ptr&) {
                     commit_2++;
                 });
             });

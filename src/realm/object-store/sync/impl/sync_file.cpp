@@ -250,7 +250,7 @@ SyncFileManager::SyncFileManager(const app::AppConfig& config)
     util::try_make_dir(m_app_path);
 }
 
-std::string SyncFileManager::get_special_directory(std::string directory_name) const
+std::string SyncFileManager::get_special_directory(const std::string& directory_name) const
 {
     auto dir_path = file_path_by_appending_component(m_app_path, directory_name, util::FilePathType::Directory);
     util::try_make_dir(dir_path);

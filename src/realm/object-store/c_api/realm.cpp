@@ -187,7 +187,7 @@ RLM_API bool realm_async_commit(realm_t* realm, realm_async_commit_func_t callba
                                 realm_free_userdata_func_t userdata_free, bool allow_grouping,
                                 unsigned int* transaction_id)
 {
-    auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
+    auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}](const std::exception_ptr& err) {
         if (err) {
             try {
                 std::rethrow_exception(err);
@@ -328,7 +328,7 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
     });
 }
 
-CBindingContext& CBindingContext::get(SharedRealm realm)
+CBindingContext& CBindingContext::get(const SharedRealm& realm)
 {
     if (!realm->m_binding_context) {
         realm->m_binding_context.reset(new CBindingContext(realm));

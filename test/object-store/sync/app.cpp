@@ -65,7 +65,7 @@ using namespace Catch::Matchers;
 
 
 namespace {
-std::shared_ptr<User> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
+std::shared_ptr<User> log_in(const std::shared_ptr<App>& app, const AppCredentials& credentials = AppCredentials::anonymous())
 {
     if (auto transport = dynamic_cast<UnitTestTransport*>(app->config().transport.get())) {
         transport->set_provider_type(credentials.provider_as_string());
@@ -80,7 +80,7 @@ std::shared_ptr<User> log_in(std::shared_ptr<App> app, AppCredentials credential
     return user;
 }
 
-AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
+AppError failed_log_in(const std::shared_ptr<App>& app, const AppCredentials& credentials = AppCredentials::anonymous())
 {
     Optional<AppError> err;
     app->log_in_with_credentials(credentials, [&](std::shared_ptr<User> user, Optional<AppError> error) {
@@ -4671,7 +4671,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key
 
     SECTION("fetch api keys") {
         client.fetch_api_keys(logged_in_user,
-                              [&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
+                              [&](const std::vector<App::UserAPIKey>& user_api_keys, Optional<AppError> error) {
                                   REQUIRE_FALSE(error);
                                   CHECK(user_api_keys.size() == 2);
                                   for (auto user_api_key : user_api_keys) {
@@ -5043,7 +5043,7 @@ TEST_CASE("app: remove user", "[sync][app][user]") {
 
         Optional<AppError> error;
         app->remove_user(user, [&](Optional<AppError> err) {
-            error = err;
+            error = std::move(err);
         });
         CHECK(error->code() > 0);
         CHECK(app->all_users().size() == 0);
@@ -5082,7 +5082,7 @@ TEST_CASE("app: link_user", "[sync][app][user]") {
         });
 
         bool processed = false;
-        app->link_user(sync_user, custom_credentials, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
+        app->link_user(sync_user, custom_credentials, [&](const std::shared_ptr<SyncUser>& user, Optional<AppError> error) {
             CHECK(error->reason() == "The specified user is not logged in.");
             CHECK(!user);
             processed = true;

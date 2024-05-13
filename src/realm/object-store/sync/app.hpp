@@ -323,7 +323,7 @@ public:
 
     private:
         friend class App;
-        UsernamePasswordProviderClient(SharedApp app)
+        UsernamePasswordProviderClient(const SharedApp& app)
             : m_parent(app)
         {
             REALM_ASSERT(app);
@@ -600,7 +600,7 @@ private:
 
     void configure_backing_store(std::unique_ptr<MetadataStore> store) REQUIRES(!m_route_mutex);
 
-    std::string make_sync_route(util::Optional<std::string> ws_host_url = util::none) REQUIRES(m_route_mutex);
+    std::string make_sync_route(const util::Optional<std::string>& ws_host_url = util::none) REQUIRES(m_route_mutex);
     void configure_route(const std::string& host_url, const std::string& ws_host_url) REQUIRES(m_route_mutex);
     void update_hostname(const std::string& host_url, const std::string& ws_host_url, const std::string& new_base_url)
         REQUIRES(m_route_mutex);

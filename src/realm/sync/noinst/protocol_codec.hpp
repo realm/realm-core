@@ -683,7 +683,7 @@ public:
 
     static void make_pong(OutputBuffer&, milliseconds_type timestamp);
 
-    static void make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+    static void make_log_message(OutputBuffer& out, util::Logger::Level level, const std::string& message,
                                  session_ident_type sess_id = 0, std::optional<std::string> co_id = std::nullopt);
 
     // Messages received by the server.

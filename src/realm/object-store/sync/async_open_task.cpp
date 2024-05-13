@@ -23,13 +23,14 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+#include <utility>
 
 namespace realm {
 
 AsyncOpenTask::AsyncOpenTask(Private, std::shared_ptr<_impl::RealmCoordinator> coordinator,
                              std::shared_ptr<realm::SyncSession> session, bool db_first_open)
-    : m_coordinator(coordinator)
-    , m_session(session)
+    : m_coordinator(std::move(coordinator))
+    , m_session(std::move(session))
     , m_db_first_open(db_first_open)
 {
 }
@@ -43,7 +44,7 @@ void AsyncOpenTask::start(AsyncOpenCallback callback)
     lock.unlock();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_download_completion([callback = std::move(callback), self, this](Status status) mutable {
+    session->wait_for_download_completion([callback = std::move(callback), self, this](const Status& status) mutable {
         std::shared_ptr<_impl::RealmCoordinator> coordinator;
         {
             util::CheckedLockGuard lock(m_mutex);
@@ -109,7 +110,7 @@ void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
 }
 
 void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& callback,
-                                                       std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                                                       const std::shared_ptr<_impl::RealmCoordinator>& coordinator,
                                                        bool rerun_on_launch)
 {
     // Attaching the subscription initializer to the latest subscription that was committed.
@@ -134,7 +135,7 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& callb
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
         init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([self, coordinator, callback = std::move(callback)](
-                           StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
+                           const StatusWith<realm::sync::SubscriptionSet::State>& state) mutable {
                 self->async_open_complete(std::move(callback), coordinator, state.get_status());
             });
     }
@@ -144,7 +145,8 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& callb
 }
 
 void AsyncOpenTask::async_open_complete(AsyncOpenCallback&& callback,
-                                        std::shared_ptr<_impl::RealmCoordinator> coordinator, Status status)
+                                        const std::shared_ptr<_impl::RealmCoordinator>& coordinator,
+                                        const Status& status)
 {
     {
         util::CheckedLockGuard lock(m_mutex);
@@ -186,7 +188,7 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
     }();
 
     if (!pending_migration) {
-        wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
+        wait_for_bootstrap_or_complete(std::move(callback), coordinator, std::move(status));
         return;
     }
 
@@ -196,7 +198,7 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
     // The lifetime of the task is extended until the bootstrap completes.
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     session->wait_for_upload_completion(
-        [callback = std::move(callback), coordinator, session, self, this](Status status) mutable {
+        [callback = std::move(callback), coordinator, session, self, this](const Status& status) mutable {
             {
                 util::CheckedLockGuard lock(m_mutex);
                 if (!m_session)
@@ -210,15 +212,15 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
 
             auto migration_completed_callback = [callback = std::move(callback), coordinator = std::move(coordinator),
                                                  self](Status status) mutable {
-                self->wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
+                self->wait_for_bootstrap_or_complete(std::move(callback), coordinator, std::move(status));
             };
             SyncSession::Internal::migrate_schema(*session, std::move(migration_completed_callback));
         });
 }
 
 void AsyncOpenTask::wait_for_bootstrap_or_complete(AsyncOpenCallback&& callback,
-                                                   std::shared_ptr<_impl::RealmCoordinator> coordinator,
-                                                   Status status)
+                                                   const std::shared_ptr<_impl::RealmCoordinator>& coordinator,
+                                                   const Status& status)
 {
     auto config = coordinator->get_config();
     if (config.sync_config && config.sync_config->flx_sync_requested &&

@@ -230,17 +230,18 @@ struct SyncTestFile : TestFile {
         schema_mode = realm::SchemaMode::AdditiveExplicit;
     }
 
-    SyncTestFile(TestSyncManager&, std::string name = "", std::string user_name = "test");
+    SyncTestFile(TestSyncManager&, const std::string& name = "", const std::string& user_name = "test");
 #if REALM_APP_SERVICES
-    SyncTestFile(OfflineAppSession&, std::string name = "");
+    SyncTestFile(OfflineAppSession&, const std::string& name = "");
 #endif
-    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
+    SyncTestFile(const std::shared_ptr<realm::SyncUser>& user, const realm::bson::Bson& partition,
                  realm::util::Optional<realm::Schema> schema = realm::util::none);
-    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
+    SyncTestFile(const std::shared_ptr<realm::SyncUser>& user, const realm::bson::Bson& partition,
                  realm::util::Optional<realm::Schema> schema,
                  std::function<realm::SyncSessionErrorHandler>&& error_handler);
     SyncTestFile(TestSyncManager&, realm::bson::Bson partition, realm::Schema schema);
-    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema schema, realm::SyncConfig::FLXSyncEnabled);
+    SyncTestFile(const std::shared_ptr<realm::SyncUser>& user, const realm::Schema& schema,
+                 realm::SyncConfig::FLXSyncEnabled);
 };
 
 class TestSyncManager {

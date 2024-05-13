@@ -362,7 +362,7 @@ double Importer::parse_double(const char* col, bool* success, size_t* significan
 // Takes a row of payload and returns a vector of Realm types that can represent them. If a value can be represented
 // by multiple Realm types, it prioritizes Bool > Int > Float > Double > String. If Empty_as_string == true, then
 // empty strings turns into String type.
-std::vector<DataType> Importer::types(std::vector<std::string> v)
+std::vector<DataType> Importer::types(const std::vector<std::string>& v)
 {
     std::vector<DataType> res;
 

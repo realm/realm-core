@@ -25,10 +25,10 @@ namespace realm::c_api {
 
 class CBindingContext : public BindingContext {
 public:
-    static CBindingContext& get(SharedRealm realm);
+    static CBindingContext& get(const SharedRealm& realm);
 
     CBindingContext() = default;
-    CBindingContext(SharedRealm realm)
+    CBindingContext(const SharedRealm& realm)
         : BindingContext()
     {
         this->realm = realm;

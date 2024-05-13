@@ -2165,7 +2165,7 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col, bool has_path
     return nullptr;
 }
 
-std::unique_ptr<Subexpr> LinkChain::subquery(Query subquery)
+std::unique_ptr<Subexpr> LinkChain::subquery(const Query& subquery)
 {
     REALM_ASSERT(m_link_cols.size() > 0);
     auto col_key = m_link_cols.back();

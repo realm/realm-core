@@ -182,9 +182,9 @@ std::ostream& operator<<(std::ostream&, const Exception&);
 
 class Realm;
 /// Open a Realm at a given path, creating its files.
-bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out = nullptr);
+bool create_dummy_realm(const std::string& path, std::shared_ptr<Realm>* out = nullptr);
 std::vector<char> make_test_encryption_key(const char start = 0);
-void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
+void catch2_ensure_section_run_workaround(bool did_run_a_section, const std::string& section_name,
                                           util::FunctionRef<void()> func);
 
 std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp = {},

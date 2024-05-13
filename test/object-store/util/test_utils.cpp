@@ -78,7 +78,7 @@ std::ostream& operator<<(std::ostream& os, const Exception& e)
     return os;
 }
 
-bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
+bool create_dummy_realm(const std::string& path, std::shared_ptr<Realm>* out)
 {
     Realm::Config config;
     config.path = path;
@@ -107,7 +107,7 @@ std::vector<char> make_test_encryption_key(const char start)
 
 // FIXME: Catch2 limitation on old compilers (currently our android CI)
 // https://github.com/catchorg/Catch2/blob/master/docs/limitations.md#clangg----skipping-leaf-sections-after-an-exception
-void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
+void catch2_ensure_section_run_workaround(bool did_run_a_section, const std::string& section_name,
                                           util::FunctionRef<void()> func)
 {
     if (did_run_a_section) {

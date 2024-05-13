@@ -116,7 +116,7 @@ public:
 
     // Freeze a copy of this object in the context of the frozen Realm.
     // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
-    Object freeze(std::shared_ptr<Realm> frozen_realm) const;
+    Object freeze(const std::shared_ptr<Realm>& frozen_realm) const;
 
     // Returns whether or not this Object is frozen.
     bool is_frozen() const noexcept;

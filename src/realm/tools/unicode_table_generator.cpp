@@ -26,7 +26,7 @@ std::vector<std::string> tokenize(const char* src, char delim, bool want_empty_t
     return tokens;
 }
 
-int hex2int(std::string hex)
+int hex2int(const std::string& hex)
 {
     int x;
     std::stringstream ss;

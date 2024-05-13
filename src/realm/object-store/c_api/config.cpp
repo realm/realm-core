@@ -97,8 +97,8 @@ RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_m
 {
     if (func) {
         auto migration_func = [=](SharedRealm old_realm, SharedRealm new_realm, Schema& schema) {
-            realm_t r1{old_realm};
-            realm_t r2{new_realm};
+            realm_t r1{std::move(old_realm)};
+            realm_t r2{std::move(new_realm)};
             realm_schema_t sch{&schema};
             if (!(func)(userdata, &r1, &r2, &sch)) {
                 throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_user_code_error()};
@@ -121,7 +121,7 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t* confi
 {
     if (func) {
         auto init_func = [=](SharedRealm realm) {
-            realm_t r{realm};
+            realm_t r{std::move(realm)};
             if (!(func)(userdata, &r)) {
                 throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_user_code_error()};
             }

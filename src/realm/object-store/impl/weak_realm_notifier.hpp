@@ -57,7 +57,7 @@ public:
     {
         return realm == m_realm_key;
     }
-    bool is_cached_for_scheduler(std::shared_ptr<util::Scheduler> scheduler) const;
+    bool is_cached_for_scheduler(const std::shared_ptr<util::Scheduler>& scheduler) const;
     bool scheduler_is_on_thread() const;
 
     // Invoke m_realm.notify() on the Realm's thread via the scheduler.

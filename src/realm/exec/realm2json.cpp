@@ -85,7 +85,7 @@ int main(int argc, char const* argv[])
 
     std::string path = argv[argc - 1];
 
-    auto print = [&](realm::TransactionRef tr) {
+    auto print = [&](const realm::TransactionRef& tr) {
         if (output_schema) {
             tr->schema_to_json(std::cout);
         }

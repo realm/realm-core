@@ -83,7 +83,7 @@ inline std::string map_partial_to_reference_virt_path(const std::string& partial
 inline std::set<std::string> find_realm_files(const std::string& root_dir)
 {
     std::set<std::string> virt_paths;
-    auto handler = [&virt_paths](std::string, std::string virt_path) {
+    auto handler = [&virt_paths](const std::string&, std::string virt_path) {
         virt_paths.insert(std::move(virt_path)); // Throws
     };
     find_realm_files(root_dir, handler); // Throws

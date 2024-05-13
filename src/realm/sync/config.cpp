@@ -43,7 +43,7 @@ static_assert(std::is_same_v<sync::port_type, sync::network::Endpoint::port_type
 
 using ProtocolError = realm::sync::ProtocolError;
 
-SyncError::SyncError(Status orig_status, bool is_fatal, std::optional<std::string_view> server_log,
+SyncError::SyncError(const Status& orig_status, bool is_fatal, std::optional<std::string_view> server_log,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
     : status(orig_status.code(), format_sync_error_message(orig_status, server_log))
     , is_fatal(is_fatal)
@@ -68,7 +68,7 @@ bool SyncError::is_client_reset_requested() const
     return false;
 }
 
-SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition)
+SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, const bson::Bson& partition)
     : user(std::move(user))
     , partition_value(partition.to_string())
 {

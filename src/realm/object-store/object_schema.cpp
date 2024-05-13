@@ -50,7 +50,8 @@ ObjectSchema::ObjectSchema(std::string name, ObjectType table_type,
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                            std::initializer_list<Property> computed_properties, std::string name_alias)
-    : ObjectSchema(std::move(name), ObjectType::TopLevel, persisted_properties, computed_properties, name_alias)
+    : ObjectSchema(std::move(name), ObjectType::TopLevel, persisted_properties, computed_properties,
+                   std::move(name_alias))
 {
 }
 
@@ -61,7 +62,7 @@ ObjectSchema::ObjectSchema(std::string name, ObjectType table_type,
     , persisted_properties(persisted_properties)
     , computed_properties(computed_properties)
     , table_type(table_type)
-    , alias(name_alias)
+    , alias(std::move(name_alias))
 {
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {

@@ -63,7 +63,7 @@ class KeyPathMapping {
 public:
     KeyPathMapping() = default;
     // returns true if added, false if duplicate key already exists
-    bool add_mapping(ConstTableRef table, const std::string&, std::string alias);
+    bool add_mapping(ConstTableRef table, const std::string&, const std::string& alias);
     bool remove_mapping(ConstTableRef table, const std::string&);
     bool has_mapping(ConstTableRef table, const std::string& name) const;
     util::Optional<std::string> get_mapping(TableKey table_key, const std::string& name) const;

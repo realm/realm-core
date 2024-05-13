@@ -45,6 +45,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <utility>
 
 #ifdef _WIN32
 #include <io.h>
@@ -133,24 +134,25 @@ static const std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token"
 static const std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
 static const std::string fake_device_id = "123400000000000000000000";
 
-SyncTestFile::SyncTestFile(TestSyncManager& tsm, std::string name, std::string user_name)
+SyncTestFile::SyncTestFile(TestSyncManager& tsm, const std::string& name, const std::string& user_name)
     : SyncTestFile(tsm.fake_user(user_name), bson::Bson(name))
 {
 }
 
 #if REALM_APP_SERVICES
-SyncTestFile::SyncTestFile(OfflineAppSession& oas, std::string name)
+SyncTestFile::SyncTestFile(OfflineAppSession& oas, const std::string& name)
     : SyncTestFile(oas.make_user(), bson::Bson(name))
 {
 }
 #endif // REALM_APP_SERVICES
 
-SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition, util::Optional<Schema> schema)
+SyncTestFile::SyncTestFile(const std::shared_ptr<SyncUser>& user, const bson::Bson& partition,
+                           util::Optional<Schema> schema)
 {
     REALM_ASSERT(user);
     sync_config = std::make_shared<realm::SyncConfig>(user, partition);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+    sync_config->error_handler = [](const std::shared_ptr<SyncSession>&, const SyncError& error) {
         util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
                      error.status);
         abort();
@@ -160,7 +162,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
-SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
+SyncTestFile::SyncTestFile(const std::shared_ptr<SyncUser>& user, const bson::Bson& partition,
                            realm::util::Optional<realm::Schema> schema,
                            std::function<SyncSessionErrorHandler>&& error_handler)
 {
@@ -173,12 +175,13 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
-SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema _schema, SyncConfig::FLXSyncEnabled)
+SyncTestFile::SyncTestFile(const std::shared_ptr<realm::SyncUser>& user, const realm::Schema& _schema,
+                           SyncConfig::FLXSyncEnabled)
 {
     REALM_ASSERT(user);
     sync_config = std::make_shared<realm::SyncConfig>(user, SyncConfig::FLXSyncEnabled{});
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
+    sync_config->error_handler = [](const std::shared_ptr<SyncSession>& session, const SyncError& error) {
         util::format(std::cerr,
                      "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
                      error.status, session->path());
@@ -273,7 +276,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
         }
         std::lock_guard<std::mutex> lock(shared_state->mutex);
         shared_state->complete = true;
-        shared_state->status = s;
+        shared_state->status = std::move(s);
         shared_state->cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(shared_state->mutex);
@@ -515,7 +518,7 @@ std::shared_ptr<TestUser> TestSyncManager::fake_user(const std::string& name)
 
 #if REALM_APP_SERVICES
 OfflineAppSession::Config::Config(std::shared_ptr<realm::app::GenericNetworkTransport> t)
-    : transport(t)
+    : transport(std::move(t))
 {
 }
 

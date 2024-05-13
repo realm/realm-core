@@ -355,7 +355,7 @@ public:
     // Notify all subscription state change notification handlers on this subscription store with the
     // provided Status - this does not change the state of any pending subscriptions.
     // Does not necessarily need to be called from the event loop thread.
-    void notify_all_state_change_notifications(Status status) REQUIRES(!m_pending_notifications_mutex);
+    void notify_all_state_change_notifications(const Status& status) REQUIRES(!m_pending_notifications_mutex);
 
     // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
     // subscriptions. Must be called from the event loop thread to prevent data race issues
@@ -387,7 +387,7 @@ private:
 
     void process_notifications(State new_state, int64_t version, std::string_view error_str)
         REQUIRES(!m_pending_notifications_mutex);
-    void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
+    void supercede_prior_to(const TransactionRef& tr, int64_t version_id) const;
 
     Obj get_active(const Transaction& tr);
     SubscriptionSet get_refreshed(ObjKey, int64_t flx_version, std::optional<DB::VersionID> version = util::none);

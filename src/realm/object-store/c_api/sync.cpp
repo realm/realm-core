@@ -282,7 +282,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.compensating_writes = c_compensating_writes.data();
         c_error.compensating_writes_length = c_compensating_writes.size();
 
-        realm_sync_session_t c_session(session);
+        realm_sync_session_t c_session(std::move(session));
         handler(userdata.get(), &c_session, c_error);
     };
     config->error_handler = std::move(cb);
@@ -385,7 +385,7 @@ RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config
                                                                realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
-        realm_t r1{before_realm};
+        realm_t r1{std::move(before_realm)};
         if (!callback(userdata.get(), &r1)) {
             throw CallbackFailed{};
         }
@@ -400,7 +400,7 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
                   SharedRealm before_realm, ThreadSafeReference after_realm, bool did_recover) {
-        realm_t r1{before_realm};
+        realm_t r1{std::move(before_realm)};
         auto tsr = realm_t::thread_safe_reference(std::move(after_realm));
         if (!callback(userdata.get(), &r1, &tsr, did_recover)) {
             throw CallbackFailed{};
@@ -680,8 +680,8 @@ RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config)
 RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_async_open_task_completion_func_t done,
                                          realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) noexcept
 {
-    auto cb = [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](ThreadSafeReference realm,
-                                                                                       std::exception_ptr error) {
+    auto cb = [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+                  ThreadSafeReference realm, const std::exception_ptr& error) {
         if (error) {
             realm_async_error_t c_error(error);
             done(userdata.get(), nullptr, &c_error);
@@ -794,22 +794,27 @@ RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_ses
     return new realm_sync_session_connection_state_notification_token_t{(*session), token};
 }
 
+static util::UniqueFunction<void(Status)> wrap_completion(realm_sync_wait_for_completion_func_t done,
+                                                          realm_userdata_t userdata,
+                                                          realm_free_userdata_func_t userdata_free)
+{
+    return [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](const Status& s) {
+        if (!s.is_ok()) {
+            realm_error_t error = to_capi(s);
+            done(userdata.get(), &error);
+        }
+        else {
+            done(userdata.get(), nullptr);
+        }
+    };
+}
+
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,
                                                              realm_sync_wait_for_completion_func_t done,
                                                              realm_userdata_t userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
-    util::UniqueFunction<void(Status)> cb =
-        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
-            if (!s.is_ok()) {
-                realm_error_t error = to_capi(s);
-                done(userdata.get(), &error);
-            }
-            else {
-                done(userdata.get(), nullptr);
-            }
-        };
-    (*session)->wait_for_download_completion(std::move(cb));
+    (*session)->wait_for_download_completion(wrap_completion(done, userdata, userdata_free));
 }
 
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t* session,
@@ -817,17 +822,7 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
                                                            realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
-    util::UniqueFunction<void(Status)> cb =
-        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
-            if (!s.is_ok()) {
-                realm_error_t error = to_capi(s);
-                done(userdata.get(), &error);
-            }
-            else {
-                done(userdata.get(), nullptr);
-            }
-        };
-    (*session)->wait_for_upload_completion(std::move(cb));
+    (*session)->wait_for_upload_completion(wrap_completion(done, userdata, userdata_free));
 }
 
 RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,

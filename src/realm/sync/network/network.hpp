@@ -2843,21 +2843,21 @@ void Resolver::async_resolve(Query query, H&& handler)
 
 inline Resolver::Query::Query(std::string service_port, int init_flags)
     : m_flags{init_flags}
-    , m_service{service_port}
+    , m_service{std::move(service_port)}
 {
 }
 
 inline Resolver::Query::Query(const StreamProtocol& prot, std::string service_port, int init_flags)
     : m_flags{init_flags}
     , m_protocol{prot}
-    , m_service{service_port}
+    , m_service{std::move(service_port)}
 {
 }
 
 inline Resolver::Query::Query(std::string host_name, std::string service_port, int init_flags)
     : m_flags{init_flags}
-    , m_host{host_name}
-    , m_service{service_port}
+    , m_host{std::move(host_name)}
+    , m_service{std::move(service_port)}
 {
 }
 
@@ -2865,8 +2865,8 @@ inline Resolver::Query::Query(const StreamProtocol& prot, std::string host_name,
                               int init_flags)
     : m_flags{init_flags}
     , m_protocol{prot}
-    , m_host{host_name}
-    , m_service{service_port}
+    , m_host{std::move(host_name)}
+    , m_service{std::move(service_port)}
 {
 }
 

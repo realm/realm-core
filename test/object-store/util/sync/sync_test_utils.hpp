@@ -39,6 +39,7 @@
 #include <catch2/matchers/catch_matchers_templated.hpp>
 
 #include <chrono>
+#include <utility>
 #include <vector>
 
 // disable the tests that rely on having baas available on the network
@@ -151,7 +152,7 @@ struct AutoVerifiedEmailCredentials : app::AppCredentials {
 AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 // Log in the user again using the AutoVerifiedEmailCredentials returned
 // when calling create_user_and_log_in()
-void log_in_user(app::SharedApp app, app::AppCredentials creds);
+void log_in_user(app::SharedApp app, const app::AppCredentials& creds);
 
 #endif // REALM_APP_SERVICES
 
@@ -223,14 +224,14 @@ public:
 
 struct SocketProviderError {
     SocketProviderError(sync::HTTPStatus code, std::string message = "")
-        : SocketProviderError(static_cast<int>(code), message)
+        : SocketProviderError(static_cast<int>(code), std::move(message))
     {
     }
 
     SocketProviderError(int code, std::string message = "")
         : status_code(code)
         , was_clean(code == 101)
-        , body(message)
+        , body(std::move(message))
     {
     }
 
@@ -238,7 +239,7 @@ struct SocketProviderError {
     SocketProviderError(WebSocketError error, std::string message = "")
         : was_clean(false)
         , ws_error(error)
-        , body(message)
+        , body(std::move(message))
     {
     }
 

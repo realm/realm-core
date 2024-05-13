@@ -521,7 +521,7 @@ void DescriptorOrdering::append_distinct(DistinctDescriptor distinct)
     }
 }
 
-void DescriptorOrdering::append_limit(LimitDescriptor limit)
+void DescriptorOrdering::append_limit(const LimitDescriptor& limit)
 {
     if (limit.is_valid()) {
         m_descriptors.emplace_back(new LimitDescriptor(limit));

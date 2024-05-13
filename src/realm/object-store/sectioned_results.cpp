@@ -373,11 +373,11 @@ size_t ResultsSection::size()
 NotificationToken ResultsSection::add_notification_callback(SectionedResultsNotificationCallback&& callback,
                                                             std::optional<KeyPathArray> key_path_array) &
 {
-    return m_parent->add_notification_callback_for_section(m_key, std::move(callback), key_path_array);
+    return m_parent->add_notification_callback_for_section(m_key, std::move(callback), std::move(key_path_array));
 }
 
 SectionedResults::SectionedResults(Results results, SectionKeyFunc section_key_func)
-    : m_results(results)
+    : m_results(std::move(results))
     , m_callback(std::move(section_key_func))
 {
 }

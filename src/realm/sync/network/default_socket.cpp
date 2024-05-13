@@ -18,7 +18,7 @@ namespace {
 class DefaultWebSocketImpl final : public DefaultWebSocket, public Config {
 public:
     DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
-                         std::mt19937_64& random, const std::string user_agent,
+                         std::mt19937_64& random, const std::string& user_agent,
                          std::unique_ptr<WebSocketObserver> observer, WebSocketEndpoint&& endpoint)
         : m_logger_ptr{logger_ptr}
         , m_network_logger{*m_logger_ptr}
@@ -376,7 +376,7 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
     // TODO handle proxy authorization
 
     m_proxy_client.emplace(*this, m_logger_ptr);
-    auto handler = [this](HTTPResponse response, std::error_code ec) {
+    auto handler = [this](const HTTPResponse& response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
             m_network_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
             constexpr bool was_clean = false;
@@ -589,7 +589,7 @@ void DefaultSocketProvider::event_loop()
 
     // We update the state to Running from inside the event loop so that start() is blocked until
     // the event loop is actually ready to receive work.
-    m_service.post([this, my_generation = ++m_event_loop_generation](Status status) {
+    m_service.post([this, my_generation = ++m_event_loop_generation](const Status& status) {
         if (status == ErrorCodes::OperationAborted) {
             return;
         }

@@ -186,7 +186,7 @@ public:
     {
         return true;
     }
-    void add_table(std::string table_name)
+    void add_table(const std::string& table_name)
     {
         m_target_table = table_name.substr(1, table_name.size() - 2);
     }
@@ -403,7 +403,7 @@ class LinkAggrNode : public AggrNode {
 public:
     LinkAggrNode(PropertyNode* node, int t, std::string id)
         : AggrNode(node, t)
-        , prop_name(id)
+        , prop_name(std::move(id))
     {
     }
 
@@ -420,7 +420,7 @@ public:
 
     SubqueryNode(PropertyNode* node, std::string var_name, QueryNode* query)
         : prop(node)
-        , variable_name(var_name)
+        , variable_name(std::move(var_name))
         , subquery(query)
     {
     }
@@ -541,7 +541,7 @@ public:
     GeoWithinNode(PropertyNode* left, std::string arg)
     {
         prop = left;
-        argument = arg;
+        argument = std::move(arg);
     }
     Query visit(ParserDriver*) override;
 #else
@@ -566,7 +566,7 @@ public:
 
     PostOpNode(std::string op_literal, OpType type)
         : op_type(type)
-        , op_name(op_literal)
+        , op_name(std::move(op_literal))
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);

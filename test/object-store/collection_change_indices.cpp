@@ -445,7 +445,7 @@ TEST_CASE("collection_change: calculate() sorted", "[collection change]") {
     }
 
     SECTION("reports inserts/deletes for simple reorderings") {
-        auto calc = [&](std::vector<size_t> old_rows, std::vector<size_t> new_rows) {
+        auto calc = [&](const std::vector<size_t>& old_rows, const std::vector<size_t>& new_rows) {
             return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, none_modified);
         };
 

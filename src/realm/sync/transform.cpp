@@ -454,7 +454,7 @@ public:
             diff_field(n, ss.str());
         }
 
-        void diff_field(StringData name, std::string value)
+        void diff_field(StringData name, const std::string& value)
         {
             std::stringstream ss;
             ss << name << "=";
@@ -671,7 +671,7 @@ struct TransformerImpl {
         transform_prepended_major(num_prepended);
     }
 
-    void prepend_major(Instruction instr)
+    void prepend_major(const Instruction& instr)
     {
         const Instruction* begin = &instr;
         const Instruction* end = begin + 1;
@@ -694,7 +694,7 @@ struct TransformerImpl {
         REALM_ASSERT(m_minor_end == m_minor_side.end());
     }
 
-    void prepend_minor(Instruction instr)
+    void prepend_minor(const Instruction& instr)
     {
         const Instruction* begin = &instr;
         const Instruction* end = begin + 1;

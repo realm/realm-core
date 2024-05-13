@@ -170,7 +170,7 @@ Subscription::Subscription(util::Optional<std::string> name, std::string object_
 
 SubscriptionSet::SubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, const Transaction& tr, const Obj& obj,
                                  MakingMutableCopy making_mutable_copy)
-    : m_mgr(mgr)
+    : m_mgr(std::move(mgr))
     , m_cur_version(tr.get_version())
     , m_version(obj.get_primary_key().get_int())
     , m_obj_key(obj.get_key())
@@ -182,7 +182,7 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, const Tra
 }
 
 SubscriptionSet::SubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, int64_t version, SupersededTag)
-    : m_mgr(mgr)
+    : m_mgr(std::move(mgr))
     , m_version(version)
     , m_state(State::Superseded)
 {
@@ -274,7 +274,7 @@ const Subscription* SubscriptionSet::find(const Query& query) const
 }
 
 MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, TransactionRef tr, Obj obj)
-    : SubscriptionSet(mgr, *tr, obj, MakingMutableCopy{true})
+    : SubscriptionSet(std::move(mgr), *tr, obj, MakingMutableCopy{true})
     , m_tr(std::move(tr))
     , m_obj(obj)
 {
@@ -782,7 +782,7 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions()
     return subscriptions_to_recover;
 }
 
-void SubscriptionStore::notify_all_state_change_notifications(Status status)
+void SubscriptionStore::notify_all_state_change_notifications(const Status& status)
 {
     util::CheckedUniqueLock lk(m_pending_notifications_mutex);
     auto to_finish = std::move(m_pending_notifications);
@@ -907,7 +907,7 @@ SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Trans
     return ret;
 }
 
-void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const
+void SubscriptionStore::supercede_prior_to(const TransactionRef& tr, int64_t version_id) const
 {
     auto sub_sets = tr->get_table(m_sub_set_table);
     Query remove_query(sub_sets);

@@ -471,7 +471,7 @@ TEST_CASE("migration: Automatic", "[migration]") {
                 {"object", {{"value", PropertyType::Int}}},
             };
             auto realm = Realm::get_shared_realm(config);
-            realm->update_schema(schema, 5, [](SharedRealm, SharedRealm, Schema&) {
+            realm->update_schema(schema, 5, [](const SharedRealm&, const SharedRealm&, Schema&) {
                 REQUIRE(false);
             });
         }
@@ -483,7 +483,7 @@ TEST_CASE("migration: Automatic", "[migration]") {
             Schema schema2 = add_table(schema1, {"second object", {{"value", PropertyType::Int}}});
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema1, 1);
-            realm->update_schema(schema2, 1, [](SharedRealm, SharedRealm, Schema&) {
+            realm->update_schema(schema2, 1, [](const SharedRealm&, const SharedRealm&, Schema&) {
                 REQUIRE(false);
             });
         }
@@ -495,7 +495,7 @@ TEST_CASE("migration: Automatic", "[migration]") {
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 0);
             bool called = false;
-            realm->update_schema(schema, 5, [&](SharedRealm, SharedRealm, Schema&) {
+            realm->update_schema(schema, 5, [&](const SharedRealm&, const SharedRealm&, Schema&) {
                 called = true;
             });
             REQUIRE(called);
@@ -1599,7 +1599,7 @@ TEST_CASE("migration: Automatic", "[migration]") {
         };
 
         auto apply_renames = [&](std::initializer_list<Rename> renames) -> MigrationFunction {
-            return [=](SharedRealm, SharedRealm realm, Schema& schema) {
+            return [=](const SharedRealm&, const SharedRealm& realm, Schema& schema) {
                 for (auto rename : renames) {
                     ObjectStore::rename_property(realm->read_group(), schema, rename.object_type, rename.old_name,
                                                  rename.new_name);

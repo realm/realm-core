@@ -280,8 +280,8 @@ static void make_non_blocking(int fd)
 #endif
 #endif
 
-void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name,
-                                          std::string tmp_path)
+void InterprocessCondVar::set_shared_part(SharedPart& shared_part, const std::string& base_path,
+                                          const std::string& condvar_name, const std::string& tmp_path)
 {
     close();
     m_shared_part = &shared_part;

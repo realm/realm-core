@@ -21,6 +21,7 @@
 #include <realm/version.hpp>
 
 #include <numeric>
+#include <utility>
 
 using namespace realm;
 using namespace realm::util;
@@ -721,7 +722,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
         auto require_change = [&] {
             auto token = link_set.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change = std::move(c);
             });
             advance_and_notify(*r);
             return token;
@@ -729,7 +730,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = link_set.add_notification_callback([&, first](CollectionChangeSet) mutable {
+            auto token = link_set.add_notification_callback([&, first](const CollectionChangeSet&) mutable {
                 REQUIRE(first);
                 first = false;
             });
@@ -906,7 +907,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             auto require_change_filter_table2_value = [&] {
                 auto token = link_set.add_notification_callback(
                     [&](CollectionChangeSet c) {
-                        collection_change_set_with_filter_on_table2_value = c;
+                        collection_change_set_with_filter_on_table2_value = std::move(c);
                     },
                     key_path_array_table2_value);
                 advance_and_notify(*r);
@@ -916,7 +917,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             auto require_change_filter_table2_value2 = [&] {
                 auto token = link_set.add_notification_callback(
                     [&](CollectionChangeSet c) {
-                        collection_change_set_with_filter_on_table2_value2 = c;
+                        collection_change_set_with_filter_on_table2_value2 = std::move(c);
                     },
                     key_path_array_table2_value2);
                 advance_and_notify(*r);
@@ -935,7 +936,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             SECTION("some callbacks have filters") {
                 auto require_change_no_filter = [&] {
                     auto token = link_set.add_notification_callback([&](CollectionChangeSet c) {
-                        collection_change_set_without_filter = c;
+                        collection_change_set_without_filter = std::move(c);
                     });
                     advance_and_notify(*r);
                     return token;
@@ -975,7 +976,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 auto require_change = [&] {
                     auto token = link_set.add_notification_callback(
                         [&](CollectionChangeSet c) {
-                            collection_change_set_with_filter_on_table2_value = c;
+                            collection_change_set_with_filter_on_table2_value = std::move(c);
                         },
                         key_path_array_table2_value);
                     advance_and_notify(*r);
@@ -985,7 +986,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 auto require_no_change = [&] {
                     bool first = true;
                     auto token = link_set.add_notification_callback(
-                        [&, first](CollectionChangeSet) mutable {
+                        [&, first](const CollectionChangeSet&) mutable {
                             REQUIRE(first);
                             first = false;
                         },
@@ -1017,7 +1018,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 auto shallow_require_change = [&] {
                     auto token = link_set.add_notification_callback(
                         [&](CollectionChangeSet c) {
-                            change = c;
+                            change = std::move(c);
                         },
                         KeyPathArray());
                     advance_and_notify(*r);
@@ -1027,7 +1028,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 auto shallow_require_no_change = [&] {
                     bool first = true;
                     auto token = link_set.add_notification_callback(
-                        [&first](CollectionChangeSet) mutable {
+                        [&first](const CollectionChangeSet&) mutable {
                             REQUIRE(first);
                             first = false;
                         },
@@ -1426,7 +1427,7 @@ TEST_CASE("set with mixed links", "[set]") {
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
     auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
-        local_changes = c;
+        local_changes = std::move(c);
     });
     advance_and_notify(*r);
 

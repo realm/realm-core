@@ -27,7 +27,7 @@ namespace realm::_impl {
 class CopyReplication : public Replication {
 public:
     CopyReplication(TransactionRef tr)
-        : m_tr(tr)
+        : m_tr(std::move(tr))
     {
     }
     using version_type = _impl::History::version_type;
