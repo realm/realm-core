@@ -19,7 +19,7 @@
 #ifndef REALM_BSON_INDEXED_MAP_HPP
 #define REALM_BSON_INDEXED_MAP_HPP
 
-#include <stdio.h>
+#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <vector>

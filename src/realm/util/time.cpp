@@ -1,4 +1,4 @@
-#include <time.h>
+#include <ctime>
 #include <stdexcept>
 #include <iomanip>
 #include <chrono>

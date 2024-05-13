@@ -2,7 +2,7 @@
 #ifndef REALM_UTIL_SCRATCH_ALLOCATOR_HPP
 #define REALM_UTIL_SCRATCH_ALLOCATOR_HPP
 
-#include <stddef.h>
+#include <cstddef>
 #include <new>
 #include <memory>
 

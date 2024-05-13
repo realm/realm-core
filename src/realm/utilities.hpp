@@ -24,7 +24,7 @@
 #include <cstdio>
 #include <algorithm>
 #include <functional>
-#include <time.h>
+#include <ctime>
 
 #ifdef _WIN32
 

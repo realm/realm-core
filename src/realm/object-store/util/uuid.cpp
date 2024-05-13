@@ -22,7 +22,7 @@
 #include <array>
 #include <functional>
 #include <random>
-#include <stdio.h>
+#include <cstdio>
 
 namespace {
 

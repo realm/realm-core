@@ -2,7 +2,7 @@
 #ifndef REALM_UTIL_RANDOM_HPP
 #define REALM_UTIL_RANDOM_HPP
 
-#include <stddef.h>
+#include <cstddef>
 #include <limits>
 #include <array>
 #include <random>

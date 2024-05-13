@@ -1,6 +1,6 @@
 #include "realm/util/cli_args.hpp"
 #include <string>
-#include <errno.h>
+#include <cerrno>
 #include <algorithm>
 
 namespace realm::util {

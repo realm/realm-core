@@ -28,7 +28,7 @@
 #endif
 #include <windows.h>
 #else
-#include <ctype.h>
+#include <cctype>
 #endif
 
 namespace realm {

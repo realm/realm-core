@@ -33,7 +33,7 @@
 #include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 
-#include <string.h>
+#include <cstring>
 #include <unordered_set>
 
 using namespace realm;

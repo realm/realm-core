@@ -19,7 +19,7 @@
 #ifndef REALM_DATA_TYPE_HPP
 #define REALM_DATA_TYPE_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <realm/util/to_string.hpp>
 #include <realm/util/features.h>
 

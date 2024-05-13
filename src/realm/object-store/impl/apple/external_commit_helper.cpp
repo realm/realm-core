@@ -23,7 +23,7 @@
 #include <realm/util/fifo_helper.hpp>
 
 #include <asl.h>
-#include <assert.h>
+#include <cassert>
 #include <fcntl.h>
 #include <sstream>
 #include <sys/event.h>

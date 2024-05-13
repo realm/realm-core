@@ -2,8 +2,8 @@
 #ifndef REALM_SYNC_PERMISSIONS_HPP
 #define REALM_SYNC_PERMISSIONS_HPP
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 namespace realm::sync {
 

@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <ostream>
 #include <cctype>   // std::isxdigit
-#include <stdlib.h> // strtoull
+#include <cstdlib> // strtoull
 
 using namespace realm;
 using namespace realm::sync;

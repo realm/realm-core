@@ -27,8 +27,8 @@
 #include <array>
 #include <memory>
 #include <system_error>
-#include <stdint.h>
-#include <stddef.h>
+#include <cstdint>
+#include <cstddef>
 #include <string>
 #include <vector>
 
