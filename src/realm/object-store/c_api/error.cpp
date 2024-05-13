@@ -14,7 +14,6 @@ namespace realm::c_api {
 
 ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     : m_err(none)
-    , m_message_buf()
     , m_user_code_error(nullptr)
 {
     assign(ptr);

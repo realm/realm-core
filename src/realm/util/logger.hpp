@@ -342,7 +342,6 @@ public:
     StderrLogger() noexcept = default;
 
     StderrLogger(Level level) noexcept
-        : Logger()
     {
         set_level_threshold(level);
     }
@@ -674,8 +673,7 @@ inline ThreadSafeLogger::ThreadSafeLogger(const std::shared_ptr<Logger>& base_lo
 
 // Construct a LocalThresholdLogger using the current log level value from the parent
 inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>& base_logger)
-    : Logger()
-    , m_chained_logger{base_logger}
+    : m_chained_logger{base_logger}
 {
     for (size_t i = 0; i < LogCategory::nb_categories; i++) {
         set_level_threshold(i, get_level_threshold(*base_logger, i));
@@ -684,8 +682,7 @@ inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>&
 
 // Construct a LocalThresholdLogger using the provided log level threshold value
 inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>& base_logger, Level threshold)
-    : Logger()
-    , m_chained_logger{base_logger}
+    : m_chained_logger{base_logger}
 {
     // Verify the passed in shared ptr is not null
     REALM_ASSERT(m_chained_logger);

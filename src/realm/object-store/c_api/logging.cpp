@@ -36,8 +36,7 @@ static_assert(realm_log_level_e(Logger::Level::off) == RLM_LOG_LEVEL_OFF);
 class CLogger : public realm::util::Logger {
 public:
     CLogger(UserdataPtr userdata, realm_log_func_t log_callback)
-        : Logger()
-        , m_userdata(std::move(userdata))
+        : m_userdata(std::move(userdata))
         , m_log_callback(log_callback)
     {
     }

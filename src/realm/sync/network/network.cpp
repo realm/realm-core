@@ -713,7 +713,7 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
 inline Service::IoReactor::IoReactor()
     : m_kevent_buffer{make_kevent_buffer()} // Throws
     , m_kqueue_fd{make_kqueue_fd()}         // Throws
-    , m_wakeup_pipe{}                       // Throws
+
 {
     struct kevent event;
     EV_SET(&event, m_wakeup_pipe.wait_fd(), EVFILT_READ, EV_ADD, 0, 0, nullptr);
@@ -1325,7 +1325,7 @@ public:
 
     Impl(Service& s)
         : service{s}
-        , io_reactor{} // Throws
+
     {
     }
 

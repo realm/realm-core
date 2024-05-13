@@ -264,7 +264,7 @@ public:
 
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
-    mutable ColKey m_condition_column_key = ColKey(); // Column of search criteria
+    mutable ColKey m_condition_column_key; // Column of search criteria
 
     double m_dD;       // Average row distance between each local match at current position
     double m_dT = 1.0; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0
@@ -274,7 +274,7 @@ public:
     size_t m_matches = 0;
 
 protected:
-    ConstTableRef m_table = ConstTableRef();
+    ConstTableRef m_table;
     const Cluster* m_cluster = nullptr;
     QueryStateBase* m_state = nullptr;
 

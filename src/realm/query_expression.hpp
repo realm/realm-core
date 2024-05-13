@@ -1396,8 +1396,7 @@ private:
 class ConstantMixedList : public Value<Mixed> {
 public:
     ConstantMixedList(size_t nb_values)
-        : Value()
-        , m_buffer(nb_values)
+        : m_buffer(nb_values)
     {
         this->init(true, nb_values);
     }
@@ -1428,8 +1427,7 @@ private:
 class ConstantStringValue : public Value<StringData> {
 public:
     ConstantStringValue(const StringData& string)
-        : Value()
-        , m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
+        : m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
     {
         if (m_string)
             set(0, *m_string);
@@ -1442,8 +1440,7 @@ public:
 
 private:
     ConstantStringValue(const ConstantStringValue& other)
-        : Value()
-        , m_string(other.m_string)
+        : m_string(other.m_string)
     {
         if (m_string)
             set(0, *m_string);
@@ -1455,8 +1452,7 @@ private:
 class ConstantBinaryValue : public Value<BinaryData> {
 public:
     ConstantBinaryValue(const BinaryData& bin)
-        : Value()
-        , m_buffer(bin)
+        : m_buffer(bin)
     {
         if (m_buffer.data())
             set(0, BinaryData(m_buffer.data(), m_buffer.size()));
@@ -1469,8 +1465,7 @@ public:
 
 private:
     ConstantBinaryValue(const ConstantBinaryValue& other)
-        : Value()
-        , m_buffer(other.m_buffer)
+        : m_buffer(other.m_buffer)
     {
         if (m_buffer.data())
             set(0, BinaryData(m_buffer.data(), m_buffer.size()));
@@ -1483,8 +1478,7 @@ private:
 class ConstantGeospatialValue : public Value<Geospatial> {
 public:
     ConstantGeospatialValue(const Geospatial& geo)
-        : Value()
-        , m_geospatial(geo)
+        : m_geospatial(geo)
     {
         if (geo.get_type() != Geospatial::Type::Invalid) {
             set(0, Mixed{&m_geospatial});
@@ -1498,8 +1492,7 @@ public:
 
 private:
     ConstantGeospatialValue(const ConstantGeospatialValue& other)
-        : Value()
-        , m_geospatial(other.m_geospatial)
+        : m_geospatial(other.m_geospatial)
     {
         if (m_geospatial.get_type() != Geospatial::Type::Invalid) {
             set(0, Mixed{&m_geospatial});

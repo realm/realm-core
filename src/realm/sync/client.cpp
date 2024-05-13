@@ -2067,7 +2067,6 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}               // DEPRECATED
     , m_proxy_config{std::move(proxy_config)}                             // DEPRECATED
     , m_reconnect_info{reconnect_info}
-    , m_session_history{}
     , m_ident{ident}
     , m_server_endpoint{std::move(endpoint)}
     , m_authorization_header_name{authorization_header_name} // DEPRECATED

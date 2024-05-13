@@ -155,7 +155,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_socket_provider{std::move(config.socket_provider)}
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
-    , m_random{}
+
 {
     // FIXME: Would be better if seeding was up to the application.
     util::seed_prng_nondeterministically(m_random); // Throws

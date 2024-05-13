@@ -100,7 +100,7 @@ private:
         ErrorInfo(ErrorCodes::Error code, std::string&& reason);
     };
 
-    util::bind_ptr<ErrorInfo> m_error = {};
+    util::bind_ptr<ErrorInfo> m_error;
 };
 
 
