@@ -465,8 +465,7 @@ private:
         }
         ~MemBuffer()
         {
-            if (addr)
-                delete[] addr;
+            delete[] addr;
         }
 
         MemBuffer(MemBuffer&& other) noexcept
