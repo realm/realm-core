@@ -79,9 +79,9 @@ public:
     Object(const std::shared_ptr<Realm>& r, ObjLink link);
 
     Object(Object const&);
-    Object(Object&&);
+    Object(Object&&) noexcept;
     Object& operator=(Object const&);
-    Object& operator=(Object&&);
+    Object& operator=(Object&&) noexcept;
 
     ~Object();
 

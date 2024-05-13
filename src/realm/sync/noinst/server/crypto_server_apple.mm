@@ -24,8 +24,8 @@ struct PKey::Impl {
 
 PKey::PKey() : m_impl(std::make_unique<Impl>()) {}
 
-PKey::PKey(PKey &&) = default;
-PKey &PKey::operator=(PKey &&) = default;
+PKey::PKey(PKey &&) noexcept = default;
+PKey &PKey::operator=(PKey &&) noexcept = default;
 
 PKey::~PKey() = default;
 

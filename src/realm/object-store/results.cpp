@@ -109,8 +109,8 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 
 Results::Results(const Results&) = default;
 Results& Results::operator=(const Results&) = default;
-Results::Results(Results&&) = default;
-Results& Results::operator=(Results&&) = default;
+Results::Results(Results&&) noexcept = default;
+Results& Results::operator=(Results&&) noexcept = default;
 
 Results::Mode Results::get_mode() const noexcept
 {

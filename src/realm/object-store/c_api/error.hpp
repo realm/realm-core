@@ -36,8 +36,8 @@ public:
     ErrorStorage(const ErrorStorage& other);
     ErrorStorage& operator=(const ErrorStorage& other);
 
-    ErrorStorage(ErrorStorage&& other);
-    ErrorStorage& operator=(ErrorStorage&& other);
+    ErrorStorage(ErrorStorage&& other) noexcept;
+    ErrorStorage& operator=(ErrorStorage&& other) noexcept;
 
     bool operator==(const ErrorStorage& other) const noexcept;
 

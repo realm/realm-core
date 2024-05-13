@@ -41,8 +41,8 @@ struct NotificationToken {
     NotificationToken(std::shared_ptr<_impl::CollectionNotifier> notifier, uint64_t token);
     ~NotificationToken();
 
-    NotificationToken(NotificationToken&&);
-    NotificationToken& operator=(NotificationToken&&);
+    NotificationToken(NotificationToken&&) noexcept;
+    NotificationToken& operator=(NotificationToken&&) noexcept;
 
     NotificationToken(NotificationToken const&) = delete;
     NotificationToken& operator=(NotificationToken const&) = delete;

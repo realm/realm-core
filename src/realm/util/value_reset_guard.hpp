@@ -9,7 +9,7 @@ template <class T, class U>
 class ValueResetGuard {
 public:
     ValueResetGuard(T& var, U val);
-    ValueResetGuard(ValueResetGuard&&);
+    ValueResetGuard(ValueResetGuard&&) noexcept;
     ~ValueResetGuard();
 
 private:
@@ -42,7 +42,7 @@ inline ValueResetGuard<T, U>::ValueResetGuard(T& var, U val)
 }
 
 template <class T, class U>
-inline ValueResetGuard<T, U>::ValueResetGuard(ValueResetGuard&& other)
+inline ValueResetGuard<T, U>::ValueResetGuard(ValueResetGuard&& other) noexcept
     : m_var{other.m_var}
     , m_val{std::move(other.m_val)}
 {

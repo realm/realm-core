@@ -31,7 +31,7 @@ struct CAPIScheduler : Scheduler {
     realm_work_queue m_queue;
 
     CAPIScheduler() = default;
-    CAPIScheduler(CAPIScheduler&& other)
+    CAPIScheduler(CAPIScheduler&& other) noexcept
         : m_userdata(std::exchange(other.m_userdata, nullptr))
         , m_free(std::exchange(other.m_free, nullptr))
         , m_notify(std::exchange(other.m_notify, nullptr))

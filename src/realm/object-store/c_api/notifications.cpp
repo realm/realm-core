@@ -9,7 +9,7 @@ struct ObjectNotificationsCallback {
     realm_on_object_change_func_t m_on_change = nullptr;
 
     ObjectNotificationsCallback() = default;
-    ObjectNotificationsCallback(ObjectNotificationsCallback&& other)
+    ObjectNotificationsCallback(ObjectNotificationsCallback&& other) noexcept
         : m_userdata(std::exchange(other.m_userdata, nullptr))
         , m_on_change(std::exchange(other.m_on_change, nullptr))
     {
@@ -29,7 +29,7 @@ struct CollectionNotificationsCallback {
     realm_on_collection_change_func_t m_on_change = nullptr;
 
     CollectionNotificationsCallback() = default;
-    CollectionNotificationsCallback(CollectionNotificationsCallback&& other)
+    CollectionNotificationsCallback(CollectionNotificationsCallback&& other) noexcept
         : m_userdata(std::exchange(other.m_userdata, nullptr))
         , m_on_change(std::exchange(other.m_on_change, nullptr))
     {
@@ -49,7 +49,7 @@ struct DictionaryNotificationsCallback {
     realm_on_dictionary_change_func_t m_on_change = nullptr;
 
     DictionaryNotificationsCallback() = default;
-    DictionaryNotificationsCallback(DictionaryNotificationsCallback&& other)
+    DictionaryNotificationsCallback(DictionaryNotificationsCallback&& other) noexcept
         : m_userdata(std::exchange(other.m_userdata, nullptr))
         , m_on_change(std::exchange(other.m_on_change, nullptr))
     {

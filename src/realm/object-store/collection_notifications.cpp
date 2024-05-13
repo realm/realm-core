@@ -35,9 +35,9 @@ NotificationToken::~NotificationToken()
     unregister();
 }
 
-NotificationToken::NotificationToken(NotificationToken&&) = default;
+NotificationToken::NotificationToken(NotificationToken&&) noexcept = default;
 
-NotificationToken& NotificationToken::operator=(realm::NotificationToken&& rgt)
+NotificationToken& NotificationToken::operator=(realm::NotificationToken&& rgt) noexcept
 {
     if (this != &rgt) {
         unregister();

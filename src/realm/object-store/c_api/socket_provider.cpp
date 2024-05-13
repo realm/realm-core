@@ -189,7 +189,7 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
     realm_sync_socket_websocket_free_func_t m_websocket_free = nullptr;
 
     CAPISyncSocketProvider() = default;
-    CAPISyncSocketProvider(CAPISyncSocketProvider&& other)
+    CAPISyncSocketProvider(CAPISyncSocketProvider&& other) noexcept
         : m_userdata(std::exchange(other.m_userdata, nullptr))
         , m_userdata_free(std::exchange(other.m_userdata_free, nullptr))
         , m_post(std::exchange(other.m_post, nullptr))

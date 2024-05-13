@@ -319,7 +319,7 @@ public:
     }
 
     Handle(Handle&&) = default;
-    Handle& operator=(Handle&& other)
+    Handle& operator=(Handle&& other) noexcept
     {
         reset();
         std::shared_ptr<T>::operator=(std::move(other));

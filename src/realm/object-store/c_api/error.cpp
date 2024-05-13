@@ -40,7 +40,7 @@ ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
     return *this;
 }
 
-ErrorStorage::ErrorStorage(ErrorStorage&& other)
+ErrorStorage::ErrorStorage(ErrorStorage&& other) noexcept
     : m_err(other.m_err)
     , m_message_buf(std::move(other.m_message_buf))
     , m_user_code_error(other.m_user_code_error)
@@ -51,7 +51,7 @@ ErrorStorage::ErrorStorage(ErrorStorage&& other)
     other.m_err.reset();
 }
 
-ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)
+ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other) noexcept
 {
     m_err = other.m_err;
     m_message_buf = std::move(other.m_message_buf);

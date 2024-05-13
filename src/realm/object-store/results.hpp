@@ -69,8 +69,8 @@ public:
     ~Results();
 
     // Results is copyable and moveable
-    Results(Results&&);
-    Results& operator=(Results&&);
+    Results(Results&&) noexcept;
+    Results& operator=(Results&&) noexcept;
     Results(const Results&);
     Results& operator=(const Results&);
 

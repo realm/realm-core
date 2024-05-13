@@ -71,8 +71,8 @@ Collection::Collection(std::shared_ptr<Realm>&& r, CollectionBasePtr&& coll, Pro
 Collection::~Collection() = default;
 Collection::Collection(const Collection&) = default;
 Collection& Collection::operator=(const Collection&) = default;
-Collection::Collection(Collection&&) = default;
-Collection& Collection::operator=(Collection&&) = default;
+Collection::Collection(Collection&&) noexcept = default;
+Collection& Collection::operator=(Collection&&) noexcept = default;
 
 bool Collection::is_valid() const
 {

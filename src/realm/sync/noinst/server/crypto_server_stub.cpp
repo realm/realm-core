@@ -10,8 +10,8 @@ PKey::PKey()
     throw std::runtime_error("PKey not implemented");
 }
 
-PKey::PKey(PKey&&) = default;
-PKey& PKey::operator=(PKey&&) = default;
+PKey::PKey(PKey&&) noexcept = default;
+PKey& PKey::operator=(PKey&&) noexcept = default;
 
 PKey::~PKey() = default;
 

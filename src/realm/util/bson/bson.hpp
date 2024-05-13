@@ -278,7 +278,7 @@ public:
     using IndexedMap<Bson>::end;
 
     BsonDocument() = default;
-    BsonDocument(BsonDocument&& other)
+    BsonDocument(BsonDocument&& other) noexcept
         : IndexedMap<Bson>(std::move(other))
     {
     }

@@ -30,9 +30,9 @@
 namespace realm::object_store {
 
 Set::Set(const Set&) = default;
-Set::Set(Set&&) = default;
+Set::Set(Set&&) noexcept = default;
 Set& Set::operator=(const Set&) = default;
-Set& Set::operator=(Set&&) = default;
+Set& Set::operator=(Set&&) noexcept = default;
 
 Query Set::get_query() const
 {

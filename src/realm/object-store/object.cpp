@@ -156,9 +156,9 @@ Object::Object(const std::shared_ptr<Realm>& r, ObjLink link)
 Object::Object() = default;
 Object::~Object() = default;
 Object::Object(Object const&) = default;
-Object::Object(Object&&) = default;
+Object::Object(Object&&) noexcept = default;
 Object& Object::operator=(Object const&) = default;
-Object& Object::operator=(Object&&) = default;
+Object& Object::operator=(Object&&) noexcept = default;
 
 NotificationToken Object::add_notification_callback(CollectionChangeCallback callback,
                                                     std::optional<KeyPathArray> key_path_array) &

@@ -26,8 +26,8 @@ struct CryptoError : std::runtime_error {
 /// the OpenSSL library.
 class PKey {
 public:
-    PKey(PKey&&);
-    PKey& operator=(PKey&&);
+    PKey(PKey&&) noexcept;
+    PKey& operator=(PKey&&) noexcept;
     ~PKey();
 
     /// Load RSA public key from \a pemfile.

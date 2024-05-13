@@ -130,8 +130,8 @@ protected:
 
     Collection(const Collection&);
     Collection& operator=(const Collection&);
-    Collection(Collection&&);
-    Collection& operator=(Collection&&);
+    Collection(Collection&&) noexcept;
+    Collection& operator=(Collection&&) noexcept;
 
     void validate(const Obj&) const;
 

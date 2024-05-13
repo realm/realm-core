@@ -90,7 +90,7 @@ public:
     };
 
     ~MongoCollection() = default;
-    MongoCollection(MongoCollection&&) = default;
+    MongoCollection(MongoCollection&&) noexcept = default;
     MongoCollection(const MongoCollection&) = default;
     MongoCollection& operator=(const MongoCollection& v) = default;
     MongoCollection& operator=(MongoCollection&&) = default;

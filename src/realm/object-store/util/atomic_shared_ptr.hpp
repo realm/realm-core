@@ -59,7 +59,7 @@ public:
         : m_ptr(std::atomic_load(&ptr.m_ptr))
     {
     }
-    AtomicSharedPtr(AtomicSharedPtr&& ptr)
+    AtomicSharedPtr(AtomicSharedPtr&& ptr) noexcept
         : m_ptr(std::atomic_exchange(&ptr.m_ptr, {}))
     {
     }
@@ -72,7 +72,7 @@ public:
         return *this;
     }
 
-    AtomicSharedPtr& operator=(AtomicSharedPtr&& ptr)
+    AtomicSharedPtr& operator=(AtomicSharedPtr&& ptr) noexcept
     {
         std::atomic_store(&m_ptr, std::atomic_exchange(&ptr.m_ptr, {}));
         return *this;
@@ -106,7 +106,7 @@ public:
         std::lock_guard<std::mutex> lock(ptr.m_mutex);
         m_ptr = ptr.m_ptr;
     }
-    AtomicSharedPtr(AtomicSharedPtr&& ptr)
+    AtomicSharedPtr(AtomicSharedPtr&& ptr) noexcept
     {
         std::lock_guard<std::mutex> lock(ptr.m_mutex);
         m_ptr = std::move(ptr.m_ptr);
@@ -125,7 +125,7 @@ public:
         return *this;
     }
 
-    AtomicSharedPtr& operator=(AtomicSharedPtr&& ptr)
+    AtomicSharedPtr& operator=(AtomicSharedPtr&& ptr) noexcept
     {
         std::lock(m_mutex, ptr.m_mutex);
         m_ptr = std::move(ptr.m_ptr);

@@ -45,8 +45,8 @@ using namespace _impl;
 
 List::List(const List&) = default;
 List& List::operator=(const List&) = default;
-List::List(List&&) = default;
-List& List::operator=(List&&) = default;
+List::List(List&&) noexcept = default;
+List& List::operator=(List&&) noexcept = default;
 
 Query List::get_query() const
 {

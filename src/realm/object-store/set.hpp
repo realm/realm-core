@@ -46,8 +46,8 @@ public:
 
     Set(const Set&);
     Set& operator=(const Set&);
-    Set(Set&&);
-    Set& operator=(Set&&);
+    Set(Set&&) noexcept;
+    Set& operator=(Set&&) noexcept;
 
     Query get_query() const;
     ConstTableRef get_table() const;

@@ -46,8 +46,8 @@ public:
 
     List(const List&);
     List& operator=(const List&);
-    List(List&&);
-    List& operator=(List&&);
+    List(List&&) noexcept;
+    List& operator=(List&&) noexcept;
 
     Query get_query() const;
     ConstTableRef get_table() const;
