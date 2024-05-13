@@ -889,17 +889,13 @@ struct MergeUtils {
 
         switch (left.type) {
             case Type::Null:
-                return true;
             case Type::Erased:
-                return true;
             case Type::Set:
-                return true;
             case Type::List:
-                return true;
             case Type::Dictionary:
-                return true;
             case Type::ObjectValue:
                 return true;
+
             case Type::GlobalKey:
                 return left.data.key == right.data.key;
             case Type::Int:
@@ -1482,10 +1478,8 @@ DEFINE_NESTED_MERGE(Instruction::Update)
     if (auto next_element = is_prefix_of(outer, inner)) {
         //  If this is a collection in mixed, we will allow the inner instruction
         //  to pass so long as it references the proper type (list or dictionary).
-        if (outer.value.type == Type::List && mpark::holds_alternative<uint32_t>(*next_element)) {
-            return;
-        }
-        else if (outer.value.type == Type::Dictionary && mpark::holds_alternative<InternString>(*next_element)) {
+        if ((outer.value.type == Type::List && mpark::holds_alternative<uint32_t>(*next_element)) ||
+            (outer.value.type == Type::Dictionary && mpark::holds_alternative<InternString>(*next_element)) {
             return;
         }
         inner_side.discard();
