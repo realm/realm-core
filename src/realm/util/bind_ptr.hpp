@@ -303,20 +303,17 @@ bool operator>=(T*, const bind_ptr<U>&) noexcept;
 /// \sa bind_ptr
 class RefCountBase {
 public:
-    RefCountBase() noexcept
-        : m_ref_count(0)
-    {
-    }
+    RefCountBase() noexcept {}
     virtual ~RefCountBase() noexcept
     {
         REALM_ASSERT(m_ref_count == 0);
     }
 
-    RefCountBase(const RefCountBase&)
-        : m_ref_count(0)
+    RefCountBase(const RefCountBase&) noexcept
     {
+        // note: does not copy ref count
     }
-    void operator=(const RefCountBase&) {}
+    void operator=(const RefCountBase&) noexcept {}
 
 protected:
     void bind_ptr() const noexcept
@@ -330,7 +327,7 @@ protected:
     }
 
 private:
-    mutable unsigned long m_ref_count;
+    mutable unsigned long m_ref_count = 0;
 
     template <class>
     friend class bind_ptr;
@@ -344,20 +341,17 @@ private:
 /// \sa bind_ptr
 class AtomicRefCountBase {
 public:
-    AtomicRefCountBase() noexcept
-        : m_ref_count(0)
-    {
-    }
+    AtomicRefCountBase() noexcept {}
     virtual ~AtomicRefCountBase() noexcept
     {
         REALM_ASSERT(m_ref_count == 0);
     }
 
-    AtomicRefCountBase(const AtomicRefCountBase&)
-        : m_ref_count(0)
+    AtomicRefCountBase(const AtomicRefCountBase&) noexcept
     {
+        // note: does not copy ref count
     }
-    void operator=(const AtomicRefCountBase&) {}
+    void operator=(const AtomicRefCountBase&) noexcept {}
 
 protected:
     // FIXME: Operators ++ and -- as used below use
@@ -374,7 +368,7 @@ protected:
     }
 
 private:
-    mutable std::atomic<unsigned long> m_ref_count;
+    mutable std::atomic<unsigned long> m_ref_count{0};
 
     template <class>
     friend class bind_ptr;

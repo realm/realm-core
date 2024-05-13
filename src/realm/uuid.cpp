@@ -80,7 +80,6 @@ bool UUID::is_valid_string(StringData str) noexcept
 }
 
 UUID::UUID(StringData init)
-    : m_bytes{}
 {
     if (!is_valid_string(init)) {
         throw InvalidUUIDString{

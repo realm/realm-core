@@ -3815,7 +3815,6 @@ ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> p
     , m_file_access_cache{m_config.max_open_files, logger, *this, config.encryption_key} // Throws
     , m_worker{*this}                                                                    // Throws
     , m_acceptor{get_service()}
-    , m_server_protocol{}       // Throws
     , m_compress_memory_arena{} // Throws
 {
     if (m_config.ssl) {

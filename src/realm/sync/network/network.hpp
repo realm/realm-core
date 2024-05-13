@@ -158,13 +158,14 @@ public:
     int protocol() const;
     int family() const;
 
-    StreamProtocol();
-    ~StreamProtocol() noexcept {}
+    StreamProtocol() = default;
 
 private:
-    int m_family;
-    int m_socktype;
-    int m_protocol;
+    // Allow both IPv4 and IPv6
+    int m_family = AF_UNSPEC;
+    // Or SOCK_DGRAM for UDP
+    int m_socktype = SOCK_STREAM;
+    int m_protocol = 0; // Any protocol
 
     friend class Service;
     friend class SocketBase;
@@ -181,7 +182,6 @@ public:
     friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const Address&);
 
     Address();
-    ~Address() noexcept {}
 
 private:
     using ip_v4_type = in_addr;
@@ -219,7 +219,6 @@ public:
     Endpoint();
     Endpoint(const StreamProtocol&, port_type);
     Endpoint(const Address&, port_type);
-    ~Endpoint() noexcept {}
 
     using data_type = sockaddr;
     data_type* data();
@@ -257,7 +256,6 @@ public:
 
     List() noexcept = default;
     List(List&&) noexcept = default;
-    ~List() noexcept = default;
 
     List& operator=(List&&) noexcept = default;
 
@@ -1464,15 +1462,6 @@ inline int StreamProtocol::family() const
 inline int StreamProtocol::protocol() const
 {
     return m_protocol;
-}
-
-inline StreamProtocol::StreamProtocol()
-    : m_family{AF_UNSPEC}
-    , // Allow both IPv4 and IPv6
-    m_socktype{SOCK_STREAM}
-    ,             // Or SOCK_DGRAM for UDP
-    m_protocol{0} // Any protocol
-{
 }
 
 // ---------------- Address ----------------

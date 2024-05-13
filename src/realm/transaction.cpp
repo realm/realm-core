@@ -880,7 +880,6 @@ public:
     NodeTree(size_t evac_limit, size_t work_limit)
         : m_evac_limit(evac_limit)
         , m_work_limit(int64_t(work_limit))
-        , m_moved(0)
     {
     }
     ~NodeTree()
@@ -940,7 +939,7 @@ public:
 private:
     size_t m_evac_limit;
     int64_t m_work_limit;
-    size_t m_moved;
+    size_t m_moved = 0;
 };
 
 

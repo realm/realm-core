@@ -135,7 +135,7 @@ public:
 
 private:
     ArrayUnsigned m_offsets;
-    size_t m_my_offset;
+    size_t m_my_offset = 0;
 
     void move(BPlusTreeNode* new_node, size_t ndx, int64_t offset_adj) override;
     void set_offset(size_t offs)
@@ -261,7 +261,6 @@ BPlusTreeInner::BPlusTreeInner(BPlusTreeBase* tree)
     : BPlusTreeNode(tree)
     , Array(tree->get_alloc())
     , m_offsets(tree->get_alloc())
-    , m_my_offset(0)
 {
     m_offsets.set_parent(this, 0);
 }

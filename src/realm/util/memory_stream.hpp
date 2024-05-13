@@ -28,17 +28,16 @@ namespace realm::util {
 
 class MemoryInputStreambuf : public std::streambuf {
 public:
-    MemoryInputStreambuf();
-    ~MemoryInputStreambuf() noexcept;
+    MemoryInputStreambuf() noexcept = default;
 
     /// Behavior is undefined if the size of the specified buffer exceeds
     /// PTRDIFF_MAX.
     void set_buffer(const char* begin, const char* end) noexcept;
 
 private:
-    const char* m_begin;
-    const char* m_end;
-    const char* m_curr;
+    const char* m_begin = nullptr;
+    const char* m_end = nullptr;
+    const char* m_curr = nullptr;
 
     int_type underflow() override;
     int_type uflow() override;
@@ -53,8 +52,7 @@ private:
 
 class MemoryOutputStreambuf : public std::streambuf {
 public:
-    MemoryOutputStreambuf();
-    ~MemoryOutputStreambuf() noexcept;
+    MemoryOutputStreambuf() noexcept = default;
 
     /// Behavior is undefined if the size of the specified buffer exceeds
     /// PTRDIFF_MAX.
@@ -67,8 +65,7 @@ public:
 
 class MemoryInputStream : public std::istream {
 public:
-    MemoryInputStream();
-    ~MemoryInputStream() noexcept;
+    MemoryInputStream() noexcept;
 
     /// \{ Behavior is undefined if the size of the specified buffer exceeds
     /// PTRDIFF_MAX.
@@ -86,8 +83,7 @@ private:
 
 class MemoryOutputStream : public std::ostream {
 public:
-    MemoryOutputStream();
-    ~MemoryOutputStream() noexcept;
+    MemoryOutputStream() noexcept;
 
     /// \{ Behavior is undefined if the size of the specified buffer exceeds
     /// PTRDIFF_MAX.
@@ -106,15 +102,6 @@ private:
 
 // Implementation
 
-inline MemoryInputStreambuf::MemoryInputStreambuf()
-    : m_begin(nullptr)
-    , m_end(nullptr)
-    , m_curr(nullptr)
-{
-}
-
-inline MemoryInputStreambuf::~MemoryInputStreambuf() noexcept {}
-
 inline void MemoryInputStreambuf::set_buffer(const char* b, const char* e) noexcept
 {
     m_begin = b;
@@ -122,10 +109,6 @@ inline void MemoryInputStreambuf::set_buffer(const char* b, const char* e) noexc
     m_curr = b;
 }
 
-
-inline MemoryOutputStreambuf::MemoryOutputStreambuf() {}
-
-inline MemoryOutputStreambuf::~MemoryOutputStreambuf() noexcept {}
 
 inline void MemoryOutputStreambuf::set_buffer(char* b, char* e) noexcept
 {
@@ -138,12 +121,10 @@ inline size_t MemoryOutputStreambuf::size() const noexcept
 }
 
 
-inline MemoryInputStream::MemoryInputStream()
+inline MemoryInputStream::MemoryInputStream() noexcept
     : std::istream(&m_streambuf)
 {
 }
-
-inline MemoryInputStream::~MemoryInputStream() noexcept {}
 
 inline void MemoryInputStream::set_buffer(const char* b, const char* e) noexcept
 {
@@ -174,12 +155,10 @@ inline void MemoryInputStream::set_c_string(const char* c_str) noexcept
 }
 
 
-inline MemoryOutputStream::MemoryOutputStream()
+inline MemoryOutputStream::MemoryOutputStream() noexcept
     : std::ostream(&m_streambuf)
 {
 }
-
-inline MemoryOutputStream::~MemoryOutputStream() noexcept {}
 
 inline void MemoryOutputStream::set_buffer(char* b, char* e) noexcept
 {

@@ -46,10 +46,7 @@ public:
     explicit UUID(StringData);
 
     /// Constructs a  UUID with all zero bytes
-    UUID() noexcept
-        : m_bytes{}
-    {
-    }
+    UUID() noexcept = default;
 
     explicit UUID(const UUIDBytes& raw) noexcept
         : m_bytes(raw)

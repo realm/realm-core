@@ -287,7 +287,6 @@ struct ProtocolErrorInfo {
         : raw_error_code(error_code)
         , message(msg)
         , is_fatal(is_fatal)
-        , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
         , server_requests_action(Action::NoAction)
     {

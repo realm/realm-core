@@ -42,7 +42,7 @@ public:
     ref_type write_array(const char* data, size_t size, uint32_t checksum) override;
 
 private:
-    ref_type m_next_ref;
+    ref_type m_next_ref = 0;
     std::ostream& m_out;
 
     void do_write(const char* data, size_t size);
@@ -52,8 +52,7 @@ private:
 // Implementation:
 
 inline OutputStream::OutputStream(std::ostream& out)
-    : m_next_ref(0)
-    , m_out(out)
+    : m_out(out)
 {
 }
 

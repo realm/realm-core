@@ -1014,7 +1014,6 @@ bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& i
         AllowsNullsResolver(InstructionApplier* applier, const Instruction::PathInstruction& instr,
                             const std::string_view& instr_name)
             : PathResolver(applier, instr, instr_name)
-            , m_allows_nulls(false)
         {
         }
         Status on_list_index(LstBase&, uint32_t) override
@@ -1044,7 +1043,7 @@ bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& i
         }
 
     private:
-        bool m_allows_nulls;
+        bool m_allows_nulls = false;
     };
     return AllowsNullsResolver(this, instr, instr_name).allows_nulls();
 }

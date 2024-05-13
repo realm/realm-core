@@ -4259,7 +4259,6 @@ public:
     SubQueryCount(const SubQueryCount& other)
         : m_query(other.m_query)
         , m_link_map(other.m_link_map)
-        , m_initialized(false)
     {
     }
 
