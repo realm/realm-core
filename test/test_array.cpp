@@ -1814,53 +1814,69 @@ TEST(UpperBoundCorrectness)
 
 TEST(ParallelSearchEqualMatch)
 {
-    uint64_t buff[2] = {0, 0};
-    constexpr size_t width = 1;
-    constexpr size_t size = 128;
-    constexpr int64_t key = -1;
-    BfIterator it(buff, 0, width, width, 0);
-    for (size_t i = 0; i < size; ++i) {
-        it.set_value(1); // this is equivalent to set it to -1
-        ++it;
-    }
-    it.move(0);
-    for (size_t i = 0; i < size; ++i) {
-        auto v = sign_extend_value(width, *it);
-        CHECK_EQUAL(v, -1);
-        ++it;
-    }
-    const auto mask = 1ULL << (width - 1);
-    const auto msb = populate(width, mask);
-    const auto search_vector = populate(width, key);
+    std::mt19937_64 gen64;
+    constexpr size_t buflen = 4;
+    uint64_t buff[buflen];
+    std::vector<int64_t> values;
+    for (size_t width = 1; width <= 64; width++) {
+        const size_t size = (buflen * 64) / width;
+        const uint64_t bit_mask = (1ULL << width) - 1;
 
-    static auto vector_compare_eq = [](auto msb, auto a, auto b) {
-        return find_all_fields_EQ(msb, a, b);
-    };
+        values.resize(size);
+        BfIterator it(buff, 0, width, width, 0);
+        for (size_t i = 0; i < size; ++i) {
+            uint64_t u_val = gen64() & bit_mask;
+            int64_t val = sign_extend_value(width, u_val);
+            values[i] = val;
+            it.set_value(val);
+            ++it;
+        }
+        it.move(0);
+        for (size_t i = 0; i < size; ++i) {
+            auto v = sign_extend_value(width, *it);
+            CHECK_EQUAL(v, values[i]);
+            ++it;
+        }
 
-    size_t start = 0;
-    const auto end = size;
-    std::vector<size_t> parallel_result;
-    while (start < end) {
-        start = parallel_subword_find(vector_compare_eq, buff, size_t{0}, width, msb, search_vector, start, end);
-        if (start != end)
-            parallel_result.push_back(start);
-        start += 1;
+        std::sort(values.begin(), values.end());
+        auto last = std::unique(values.begin(), values.end());
+        for (auto val = values.begin(); val != last; val++) {
+            const auto mask = 1ULL << (width - 1);
+            const auto msb = populate(width, mask);
+            const auto search_vector = populate(width, *val);
+
+            // perform the check with a normal iteration
+            size_t start = 0;
+            const auto end = size;
+            std::vector<size_t> linear_scan_result;
+            while (start < end) {
+                it.move(start);
+                const auto sv = sign_extend_value(width, *it);
+                if (sv == *val)
+                    linear_scan_result.push_back(start);
+                ++start;
+            }
+
+            // Now use the optimized version
+            static auto vector_compare_eq = [](auto msb, auto a, auto b) {
+                return find_all_fields_EQ(msb, a, b);
+            };
+
+            start = 0;
+            std::vector<size_t> parallel_result;
+            while (start < end) {
+                start =
+                    parallel_subword_find(vector_compare_eq, buff, size_t{0}, width, msb, search_vector, start, end);
+                if (start != end)
+                    parallel_result.push_back(start);
+                start += 1;
+            }
+
+            CHECK(!parallel_result.empty());
+            CHECK(!linear_scan_result.empty());
+            CHECK_EQUAL(linear_scan_result, parallel_result);
+        }
     }
-
-    // perform the same check but with a normal iteration
-    start = 0;
-    std::vector<size_t> linear_scan_result;
-    while (start < end) {
-        it.move(start);
-        const auto sv = sign_extend_value(width, *it);
-        if (sv == key)
-            linear_scan_result.push_back(start);
-        ++start;
-    }
-
-    CHECK(!parallel_result.empty());
-    CHECK(!linear_scan_result.empty());
-    CHECK_EQUAL(linear_scan_result, parallel_result);
 }
 
 TEST(ParallelSearchEqualNoMatch)
