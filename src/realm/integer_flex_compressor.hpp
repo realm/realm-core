@@ -87,7 +87,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     const auto starting_bit = offset + b * ndx_w;
     const auto total_bits = starting_bit + ndx_w * range;
     const auto bit_per_it = num_bits_for_width(ndx_w);
-    const auto ndx_mask = (1ULL << ndx_w) - 1; // c.bitmask_ndx();
+    const auto ndx_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - ndx_w);
     const auto values_per_word = num_fields_for_width(ndx_w);
 
     // this is very important, x4 faster pre-allocating the array

@@ -215,13 +215,13 @@ inline uint64_t IntegerCompressor::ndx_msb() const
 inline uint64_t IntegerCompressor::bitmask_v() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    return (1ULL << m_v_width) - 1;
+    return 0xFFFFFFFFFFFFFFFFULL >> (64 - m_v_width);
 }
 
 inline uint64_t IntegerCompressor::bitmask_ndx() const
 {
     REALM_ASSERT_DEBUG(is_flex());
-    return (1ULL << m_ndx_width) - 1;
+    return 0xFFFFFFFFFFFFFFFFULL >> (64 - m_ndx_width);
 }
 
 inline int64_t IntegerCompressor::get(size_t ndx) const

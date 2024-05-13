@@ -72,7 +72,7 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     const auto sign_mask = c.v_mask();
     const auto starting_bit = b * v_w;
     const auto total_bits = starting_bit + (v_w * range);
-    const auto mask = (1ULL << v_w) - 1;
+    const auto mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - v_w);
     const auto bit_per_it = num_bits_for_width(v_w);
     const auto values_per_word = num_fields_for_width(v_w);
 
