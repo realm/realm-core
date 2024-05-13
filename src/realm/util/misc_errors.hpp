@@ -21,10 +21,7 @@
 
 #include <system_error>
 
-
-namespace realm {
-namespace util {
-namespace error {
+namespace realm::util::error {
 
 enum misc_errors {
     unknown = 1,
@@ -33,9 +30,7 @@ enum misc_errors {
 std::error_code make_error_code(misc_errors);
 const std::error_category& misc_error_category();
 
-} // namespace error
-} // namespace util
-} // namespace realm
+} // namespace realm::util::error
 
 namespace std {
 

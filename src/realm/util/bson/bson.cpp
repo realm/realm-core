@@ -22,8 +22,7 @@
 #include <sstream>
 #include <algorithm>
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 Bson::~Bson() noexcept
 {
@@ -808,5 +807,4 @@ bool accept(util::Span<const char> json) noexcept
     return Json::accept(json);
 }
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson

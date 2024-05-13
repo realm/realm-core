@@ -3,15 +3,13 @@
 
 #include <string>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 // FIXME: These functions ought to be moved to <realm/util/file.hpp> in the
 // realm-core repository.
 std::string load_file(const std::string& path);
 std::string load_file_and_chomp(const std::string& path);
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_LOAD_FILE_HPP

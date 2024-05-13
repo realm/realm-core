@@ -19,8 +19,7 @@
 #ifndef REALM_BSON_MIN_KEY_HPP
 #define REALM_BSON_MIN_KEY_HPP
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 /// MinKey will always be the smallest value when comparing to other BSON types
 struct MinKey {
@@ -38,7 +37,6 @@ inline bool operator!=(const MinKey&, const MinKey&) noexcept
     return false;
 }
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson
 
 #endif /* REALM_BSON_MIN_KEY_HPP */

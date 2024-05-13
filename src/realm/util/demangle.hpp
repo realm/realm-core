@@ -4,9 +4,7 @@
 #include <typeinfo>
 #include <string>
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 
 /// Demangle the specified C++ ABI identifier.
 ///
@@ -30,8 +28,6 @@ inline std::string get_type_name(const T& v)
     return demangle(typeid(v).name());
 }
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_DEMANGLE_HPP

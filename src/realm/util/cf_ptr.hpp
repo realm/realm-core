@@ -25,8 +25,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 template <class Ref>
 class CFPtr {
@@ -99,9 +98,7 @@ CFPtr<Ref> retainCF(Ref ptr)
     CFRetain(ptr);
     return CFPtr<Ref>(ptr);
 }
-} // namespace util
-} // namespace realm
-
+} // namespace realm::util
 
 #endif // REALM_PLATFORM_APPLE
 

@@ -3,9 +3,7 @@
 
 #include <string>
 
-
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// Get a description of the current system platform.
 ///
@@ -76,7 +74,6 @@ inline std::string get_library_cpu_arch()
     return "unknown";
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_PLATFORM_INFO_HPP

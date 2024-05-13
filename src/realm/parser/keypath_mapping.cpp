@@ -23,8 +23,7 @@
 
 #include <functional>
 
-namespace realm {
-namespace query_parser {
+namespace realm::query_parser {
 
 using namespace realm::util;
 
@@ -138,5 +137,4 @@ std::string KeyPathMapping::translate(const LinkChain& link_chain, std::string_v
     return translate(table, std::string{identifier});
 }
 
-} // namespace query_parser
-} // namespace realm
+} // namespace realm::query_parser

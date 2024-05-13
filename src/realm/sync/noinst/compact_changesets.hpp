@@ -4,8 +4,7 @@
 
 #include <realm/sync/changeset.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 /// Compact changesets by removing redundant instructions.
 ///
@@ -35,7 +34,6 @@ namespace _impl {
 /// other threads.
 void compact_changesets(realm::sync::Changeset* changesets, size_t num_changesets);
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_NOINST_COMPACT_CHANGESETS_HPP

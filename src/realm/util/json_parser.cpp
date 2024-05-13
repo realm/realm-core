@@ -48,8 +48,7 @@ size_t convert_utf32_to_utf8(unsigned int utf32, char* p) noexcept
 
 } // anonymous namespace
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 const char* JSONParser::ErrorCategory::name() const noexcept
 {
@@ -189,5 +188,4 @@ StringData JSONParser::Event::unescape_string(char* buffer) const noexcept
     return StringData(buffer, o);
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util

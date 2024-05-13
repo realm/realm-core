@@ -18,9 +18,7 @@
 #include <realm/util/input_stream.hpp>
 #include <realm/util/overload.hpp>
 
-namespace realm {
-
-namespace sync {
+namespace realm::sync {
 
 #define REALM_FOR_EACH_INSTRUCTION_TYPE(X)                                                                           \
     X(AddTable)                                                                                                      \
@@ -1171,7 +1169,6 @@ inline void Instruction::erase(size_t idx)
     vec.erase(vec.begin() + idx);
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_IMPL_INSTRUCTIONS_HPP

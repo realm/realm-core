@@ -24,8 +24,7 @@
 #include <istream>
 #include <ostream>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 class MemoryInputStreambuf : public std::streambuf {
 public:
@@ -199,7 +198,6 @@ inline size_t MemoryOutputStream::size() const noexcept
     return m_streambuf.size();
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_MEMORY_STREAM_HPP

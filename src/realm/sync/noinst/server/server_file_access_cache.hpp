@@ -13,8 +13,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 /// This class maintains a list of open Realm files ordered according to the
 /// time when they were last accessed.
@@ -249,7 +248,6 @@ inline ServerFileAccessCache::File::File(const Slot& slot)
     }
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_NOINST_SERVER_FILE_ACCESS_CACHE_HPP

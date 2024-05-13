@@ -8,8 +8,7 @@
 
 #include <realm/sync/changeset.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 /// The ChangesetIndex is responsible for keeping track of exactly which
 /// instructions touch which objects. It does this by recording ranges of
@@ -302,7 +301,6 @@ inline bool is_container_instruction(const sync::Instruction& instr) noexcept
            mpark::holds_alternative<Instruction::ArrayErase>(v) || mpark::holds_alternative<Instruction::Clear>(v);
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_NOINST_CHANGESET_INDEX_HPP

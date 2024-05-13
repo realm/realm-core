@@ -37,9 +37,7 @@
 #define REALM_CONDVAR_EMULATION
 #endif
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 
 /// Condition variable for use in synchronization monitors.
 /// This condition variable uses emulation based on named pipes
@@ -234,9 +232,6 @@ private:
 
 // Implementation:
 
-
-} // namespace util
-} // namespace realm
-
+} // namespace realm::util
 
 #endif

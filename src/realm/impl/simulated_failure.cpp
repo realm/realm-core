@@ -240,14 +240,11 @@ std::string ErrorCategory::message(int value) const
 
 } // unnamed namespace
 
-
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 std::error_code make_error_code(SimulatedFailure::FailureType failure_type) noexcept
 {
     return std::error_code(failure_type, g_error_category);
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl

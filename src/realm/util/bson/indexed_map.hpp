@@ -24,8 +24,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 /// A map type that orders based on insertion order.
 template <typename T>
@@ -269,7 +268,6 @@ void IndexedMap<T>::pop_back()
     m_map.erase(last_key);
 }
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson
 
 #endif /* REALM_BSON_INDEXED_MAP_HPP */

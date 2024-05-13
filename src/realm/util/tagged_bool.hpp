@@ -21,8 +21,7 @@
 
 #include <type_traits>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 // A type factory which defines a type which is implicitly convertable to and
 // from `bool`, but not to other TaggedBool types
 //
@@ -74,6 +73,6 @@ private:
     bool m_value;
 };
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
+
 #endif // REALM_OS_UTIL_TAGGED_BOOL_HPP

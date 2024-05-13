@@ -568,8 +568,7 @@ void advance_with_notifications(BindingContext* context, const std::shared_ptr<T
 
 } // anonymous namespace
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 UnsupportedSchemaChange::UnsupportedSchemaChange()
     : std::logic_error(
@@ -641,5 +640,4 @@ void parse(Transaction& tr, TransactionChangeInfo& info, VersionID::version_type
 }
 
 } // namespace transaction
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl

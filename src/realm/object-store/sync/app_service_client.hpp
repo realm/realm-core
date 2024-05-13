@@ -25,8 +25,7 @@
 
 #include <string>
 
-namespace realm {
-namespace app {
+namespace realm::app {
 class User;
 struct AppError;
 
@@ -94,7 +93,6 @@ public:
         util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) = 0;
 };
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
 #endif /* APP_SERVICE_CLIENT_HPP */

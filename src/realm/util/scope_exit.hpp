@@ -21,8 +21,7 @@
 
 #include <optional>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 template <class H>
 class ScopeExit {
@@ -67,7 +66,6 @@ ScopeExit<typename std::remove_reference<H>::type> make_scope_exit(H&& handler) 
     return ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler));
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_SCOPE_EXIT_HPP

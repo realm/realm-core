@@ -6,8 +6,7 @@
 #include <realm/sync/noinst/server/crypto_server.hpp>
 #include <realm/sync/noinst/server/permissions.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 struct AccessControl {
     /// Opens the Realm database at path \a db_path and initializes this
@@ -48,7 +47,6 @@ private:
     std::unique_ptr<Impl> m_impl;
 };
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_ACCESS_CONTROL_HPP

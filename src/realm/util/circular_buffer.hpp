@@ -15,8 +15,7 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/backtrace.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// \brief A container backed by a "circular buffer".
 ///
@@ -1069,7 +1068,6 @@ inline void swap(CircularBuffer<T>& a, CircularBuffer<T>& b) noexcept
     a.swap(b);
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_CIRCULAR_BUFFER_HPP

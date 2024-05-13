@@ -47,10 +47,7 @@ std::string misc_category::message(int value) const
 
 } // anonymous namespace
 
-
-namespace realm {
-namespace util {
-namespace error {
+namespace realm::util::error {
 
 std::error_code make_error_code(misc_errors err)
 {
@@ -63,6 +60,4 @@ const std::error_category& misc_error_category()
     return misc_category;
 }
 
-} // namespace error
-} // namespace util
-} // namespace realm
+} // namespace realm::util::error

@@ -28,8 +28,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 class CollectionChangeBuilder : public CollectionChangeSet {
 public:
@@ -74,7 +73,6 @@ private:
 
     void verify();
 };
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_COLLECTION_CHANGE_BUILDER_HPP

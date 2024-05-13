@@ -13,9 +13,7 @@
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
 
-
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 struct VirtualPathComponents {
     bool is_valid = false;
@@ -119,7 +117,6 @@ void find_realm_files(const std::string& root_dir, H handler)
     scan_dir(root_dir, ""); // Throws
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_NOINST_SERVER_DIR_HPP

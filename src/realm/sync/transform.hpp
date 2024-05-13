@@ -6,8 +6,7 @@
 #include <realm/sync/instructions.hpp>
 #include <realm/sync/protocol.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 struct Changeset;
 
@@ -259,7 +258,6 @@ inline RemoteChangeset::RemoteChangeset(version_type rv, version_type lv, Chunke
 {
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_TRANSFORM_HPP

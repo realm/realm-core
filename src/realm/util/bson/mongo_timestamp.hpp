@@ -21,8 +21,7 @@
 
 #include <cstdint>
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 struct MongoTimestamp {
     MongoTimestamp(uint32_t seconds, uint32_t increment)
@@ -45,7 +44,6 @@ struct MongoTimestamp {
     uint32_t increment;
 };
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson
 
 #endif /* datetime_hpp */

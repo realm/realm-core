@@ -31,8 +31,7 @@
 
 #include <realm/object-store/sync/impl/apple/system_configuration.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 enum NetworkReachabilityStatus { NotReachable, ReachableViaWiFi, ReachableViaWWAN };
 
@@ -57,8 +56,7 @@ private:
     util::UniqueFunction<void(const NetworkReachabilityStatus)> m_change_handler;
 };
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // NETWORK_REACHABILITY_AVAILABLE
 

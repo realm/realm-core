@@ -7,8 +7,7 @@
 
 #include <realm/sync/protocol.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 inline sync::milliseconds_type realtime_clock_now() noexcept
 {
@@ -27,7 +26,6 @@ inline sync::milliseconds_type monotonic_clock_now() noexcept
     return sync::milliseconds_type(millis_since_epoch);
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_IMPL_CLOCK_HPP

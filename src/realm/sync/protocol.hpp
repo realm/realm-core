@@ -12,9 +12,7 @@
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
-
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 // Protocol versions:
 //
@@ -461,7 +459,6 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
     return o << "Invalid error action: " << int64_t(action);
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_PROTOCOL_HPP

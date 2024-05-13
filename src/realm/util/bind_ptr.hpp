@@ -28,9 +28,7 @@
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 
-
-namespace realm {
-namespace util {
+namespace realm::util {
 
 class bind_ptr_base {
 public:
@@ -505,8 +503,6 @@ bool operator>=(T* a, const bind_ptr<U>& b) noexcept
     return b <= a;
 }
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_BIND_PTR_HPP

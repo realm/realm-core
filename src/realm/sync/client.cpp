@@ -21,8 +21,7 @@
 #include <realm/util/value_reset_guard.hpp>
 #include <realm/version.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 namespace {
 using namespace realm::util;
@@ -2312,5 +2311,4 @@ std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)
     REALM_TERMINATE("Invalid Proxy Type object.");
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

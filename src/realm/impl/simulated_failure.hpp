@@ -29,8 +29,7 @@
 #define REALM_ENABLE_SIMULATED_FAILURE
 #endif
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 class SimulatedFailure : public RuntimeError {
 public:
@@ -123,8 +122,7 @@ private:
 
 std::error_code make_error_code(SimulatedFailure::FailureType) noexcept;
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 namespace std {
 
@@ -135,9 +133,7 @@ struct is_error_code_enum<realm::_impl::SimulatedFailure::FailureType> {
 
 } // namespace std
 
-namespace realm {
-namespace _impl {
-
+namespace realm::_impl {
 
 // Implementation
 
@@ -251,7 +247,6 @@ inline SimulatedFailure::RandomPrimeGuard::~RandomPrimeGuard() noexcept
     unprime(m_type);
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_IMPL_SIMULATED_FAILURE_HPP

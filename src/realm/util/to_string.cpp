@@ -41,8 +41,7 @@ void quoted(std::ostream& out, T&& str, ...)
 }
 } // namespace
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 Printable::Printable(StringData value)
     : m_type(Type::String)
@@ -147,5 +146,4 @@ std::string format(const char* fmt, std::initializer_list<Printable> values)
     return ss.str();
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util

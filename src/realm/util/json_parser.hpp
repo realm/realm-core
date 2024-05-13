@@ -8,8 +8,7 @@
 
 #include <realm/string_data.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// A JSON parser that neither allocates heap memory nor throws exceptions.
 ///
@@ -124,8 +123,7 @@ private:
 
 std::error_condition make_error_condition(JSONParser::Error e);
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 namespace std {
 template <>
@@ -134,8 +132,7 @@ struct is_error_condition_enum<realm::util::JSONParser::Error> {
 };
 } // namespace std
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// Implementation:
 
@@ -529,7 +526,6 @@ OS& operator<<(OS& os, const JSONParser::Event& e)
     }
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_JSON_PARSER_HPP

@@ -15,9 +15,7 @@ YY_DECL;
 #undef TRUE
 #undef IN
 
-namespace realm {
-
-namespace query_parser {
+namespace realm::query_parser {
 
 class ParserNode {
 public:
@@ -734,6 +732,6 @@ Query ParserDriver::simple_query(CompareType op, ColKey col_key, T val)
 
 std::string check_escapes(const char* str);
 
-} // namespace query_parser
-} // namespace realm
+} // namespace realm::query_parser
+
 #endif // ! DRIVER_HH

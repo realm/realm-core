@@ -26,9 +26,7 @@
 #include <string>
 #include <vector>
 
-namespace realm {
-
-namespace app {
+namespace realm::app {
 class AppServiceClient;
 class User;
 struct AppError;
@@ -463,7 +461,6 @@ private:
     std::string m_data_buffer;
 };
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
 #endif /* mongo_collection_h */

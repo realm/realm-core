@@ -22,8 +22,7 @@
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/util/uri.hpp>
 
-namespace realm {
-namespace app {
+namespace realm::app {
 
 using namespace bson;
 template <typename T>
@@ -587,5 +586,4 @@ void WatchStream::feed_sse(ServerSentEvent sse)
         // Ignore other event types
     }
 }
-} // namespace app
-} // namespace realm
+} // namespace realm::app

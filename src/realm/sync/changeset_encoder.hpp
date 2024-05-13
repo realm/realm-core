@@ -4,8 +4,7 @@
 
 #include <realm/sync/changeset.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 struct ChangesetEncoder {
     using Buffer = util::AppendBuffer<char>;
@@ -104,7 +103,6 @@ inline void encode_changeset(const Changeset& changeset, ChangesetEncoder::Buffe
     swap(encoder.buffer(), out_buffer);
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_CHANGESET_ENCODER_HPP

@@ -3,8 +3,7 @@
 
 #include <utility>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 template <class T, class U>
 class ValueResetGuard {
@@ -76,7 +75,6 @@ inline ValueResetGuard<T, U> make_temp_assign(T& var, U val_1, U val_2)
     return make_value_reset_guard(var, std::move(val_2));
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_VALUE_RESET_GUARD_HPP

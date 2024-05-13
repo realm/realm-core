@@ -9,8 +9,7 @@
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 using UserIdent = std::string;
 using AppIdent = std::string;
@@ -83,7 +82,6 @@ inline bool AccessToken::expired(std::chrono::system_clock::time_point now) cons
     return now > std::chrono::system_clock::time_point{std::chrono::seconds{expires}};
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_ACCESS_TOKEN_HPP

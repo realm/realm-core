@@ -27,8 +27,7 @@
 
 #define REALM_TERMINATE(msg) realm::util::terminate((msg), __FILE__, __LINE__)
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
                               std::initializer_list<Printable> = {}) noexcept;
@@ -53,7 +52,6 @@ REALM_NORETURN void terminate_with_info(const char* assert_message, int line, co
 }
 // LCOV_EXCL_STOP
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_TERMINATE_HPP

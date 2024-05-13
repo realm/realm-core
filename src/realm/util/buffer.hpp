@@ -30,9 +30,7 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <memory>
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 
 /// A simple buffer concept that owns a region of memory and knows its
 /// size.
@@ -297,8 +295,6 @@ inline Buffer<T> AppendBuffer<T>::release() noexcept
     return std::move(m_buffer);
 }
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_BUFFER_HPP

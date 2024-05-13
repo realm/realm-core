@@ -128,8 +128,7 @@ const char* Timestamp::to_string(std::array<char, 32>& buffer) const
     return buffer.data();
 }
 
-namespace util {
-namespace serializer {
+namespace util::serializer {
 
 template <>
 std::string print_value<>(BinaryData data)
@@ -454,6 +453,6 @@ std::string SerialisationState::describe_expression_type(util::Optional<Expressi
     return "";
 }
 
-} // namespace serializer
-} // namespace util
+} // namespace util::serializer
+
 } // namespace realm

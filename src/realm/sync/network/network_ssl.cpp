@@ -128,10 +128,7 @@ OpensslInit::~OpensslInit()
 
 } // unnamed namespace
 
-
-namespace realm {
-namespace sync {
-namespace network {
+namespace realm::sync::network {
 namespace ssl {
 
 ErrorCategory error_category;
@@ -1452,6 +1449,4 @@ bool Stream::ssl_shutdown(std::error_code&, Want&) noexcept
 
 
 } // namespace ssl
-} // namespace network
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync::network

@@ -19,8 +19,7 @@
 #include <realm/util/bson/regular_expression.hpp>
 #include <numeric>
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 RegularExpression::RegularExpression(const std::string& pattern, const std::string& options)
     : m_pattern(pattern)
@@ -79,5 +78,4 @@ std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& opt
     return out;
 }
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson

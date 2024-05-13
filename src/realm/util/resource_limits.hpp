@@ -1,9 +1,7 @@
 #ifndef REALM_UTIL_RESOURCE_LIMITS_HPP
 #define REALM_UTIL_RESOURCE_LIMITS_HPP
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 
 enum class Resource {
     /// The maximum size, in bytes, of the core file produced when the memory
@@ -57,8 +55,6 @@ long get_soft_rlimit(Resource);
 void set_soft_rlimit(Resource, long value);
 //@}
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_RESOURCE_LIMITS_HPP

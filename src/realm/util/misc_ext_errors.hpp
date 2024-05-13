@@ -3,8 +3,7 @@
 
 #include <system_error>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// FIXME: The intention is that this enum will be merged into, and subsumed by
 /// util::MiscErrors in `<realm/util/misc_errors.hpp>` in the core library.
@@ -38,8 +37,7 @@ inline std::error_code make_error_code(MiscExtErrors err)
     return std::error_code(int(err), misc_ext_error_category);
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 namespace std {
 

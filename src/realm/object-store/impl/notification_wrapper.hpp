@@ -21,8 +21,7 @@
 
 #include <realm/object-store/collection_notifications.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 // A wrapper that stores a value and an associated notification token.
 // The point of this type is to keep the notification token alive
@@ -46,7 +45,6 @@ private:
     NotificationToken m_token;
 };
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_OS_NOTIFICATION_WRAPPER_HPP

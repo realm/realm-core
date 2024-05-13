@@ -17,9 +17,7 @@ std::atomic<unsigned int> g_counter{0};
 
 } // unnamed namespace
 
-
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 void get_extra_seed_entropy(unsigned int& extra_entropy_1, unsigned int& extra_entropy_2,
                             unsigned int& extra_entropy_3)
@@ -37,5 +35,4 @@ void get_extra_seed_entropy(unsigned int& extra_entropy_1, unsigned int& extra_e
     extra_entropy_3 = ++g_counter;
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl

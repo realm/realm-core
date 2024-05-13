@@ -49,8 +49,7 @@ T create_and_seed_engine()
 
 } // unnamed namespace
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 std::string uuid_string()
 {
@@ -77,5 +76,4 @@ std::string uuid_string()
     return std::string(uuid_formatted.data(), uuid_formatted.size() - 1);
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util

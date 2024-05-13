@@ -62,8 +62,7 @@
 #define NO_THREAD_SAFETY_ANALYSIS REALM_THREAD_ANNOTATION_ATTRIBUTE__(no_thread_safety_analysis)
 #define ASSERT_CAPABILITY(x) REALM_THREAD_ANNOTATION_ATTRIBUTE__(assert_capability(x))
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 // std::unique_lock with thread safety annotations
 class SCOPED_CAPABILITY CheckedUniqueLock {
@@ -218,7 +217,6 @@ inline std::unique_lock<std::mutex> CheckedOptionalMutex::lock() const
     return m_mutex ? std::unique_lock<std::mutex>(*m_mutex) : std::unique_lock<std::mutex>();
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_OS_CHECKED_MUTEX_HPP

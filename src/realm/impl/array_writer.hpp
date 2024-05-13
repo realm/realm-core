@@ -21,8 +21,7 @@
 
 #include <realm/alloc.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 class ArrayWriterBase {
 public:
@@ -36,7 +35,6 @@ public:
     virtual ref_type write_array(const char* data, size_t size, uint32_t checksum) = 0;
 };
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_ARRAY_WRITER_HPP

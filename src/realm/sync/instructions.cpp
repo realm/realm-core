@@ -4,11 +4,8 @@
 using namespace realm;
 using namespace realm::_impl;
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 const InternString InternString::npos = InternString{uint32_t(-1)};
 
-
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

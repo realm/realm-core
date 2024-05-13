@@ -23,8 +23,7 @@
 #include <string>
 #include <unordered_set>
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 /// Provides regular expression capabilities for pattern matching strings in queries.
 /// MongoDB uses Perl compatible regular expressions (i.e. "PCRE") version 8.42 with UTF-8 support.
@@ -80,7 +79,6 @@ inline RegularExpression::Option operator&(const RegularExpression::Option& lhs,
 
 std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& option);
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson
 
 #endif /* REALM_BSON_REGULAR_EXPRESSION_HPP */

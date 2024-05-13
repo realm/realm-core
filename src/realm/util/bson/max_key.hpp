@@ -19,8 +19,7 @@
 #ifndef REALM_BSON_MAX_KEY_HPP
 #define REALM_BSON_MAX_KEY_HPP
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 /// MaxKey will always be the greatest value when comparing to other BSON types
 struct MaxKey {
@@ -38,7 +37,6 @@ inline bool operator!=(const MaxKey&, const MaxKey&) noexcept
     return false;
 }
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson
 
 #endif /* REALM_BSON_MAX_KEY_HPP */

@@ -8,8 +8,7 @@
 #include <realm/binary_data.hpp>
 #include <realm/util/buffer.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 struct CryptoError : std::runtime_error {
     CryptoError(const std::string& message)
@@ -69,7 +68,6 @@ private:
     std::unique_ptr<Impl> m_impl;
 };
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_CRYPTO_SERVER_HPP

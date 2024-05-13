@@ -28,8 +28,7 @@
 
 #include <realm/util/safe_int_ops.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 template <class T>
 std::string hex_dump(const T* data, size_t size, const char* separator = " ", int min_digits = -1)
@@ -48,7 +47,6 @@ std::string hex_dump(const T* data, size_t size, const char* separator = " ", in
     return out.str();
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_HEX_DUMP_HPP

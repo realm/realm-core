@@ -27,8 +27,7 @@
 
 #include <tuple>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 struct Changeset;
 
@@ -194,7 +193,6 @@ inline void InstructionApplier::apply(const Changeset& log)
     apply(*this, log); // Throws
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_IMPL_INSTRUCTION_APPLIER_HPP

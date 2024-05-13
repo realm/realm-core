@@ -3,8 +3,7 @@
 #include <realm/sync/transform.hpp> // TransformError
 #include <realm/list.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 void SyncReplication::reset()
 {
@@ -821,5 +820,4 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     instr.path.push_back(ndx);
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

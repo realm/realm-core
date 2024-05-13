@@ -15,18 +15,13 @@
 #ifndef REALM_SYNC_HISTORY_HPP
 #define REALM_SYNC_HISTORY_HPP
 
-
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 struct ObjectIDHistoryState;
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
-
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 struct VersionInfo {
     /// Realm snapshot version.
@@ -85,7 +80,6 @@ inline void map_changeset_timestamp(timestamp_type timestamp, std::time_t& secon
     nanoseconds = long(millis_since_epoch % 1000 * 1000000L);
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_HISTORY_HPP

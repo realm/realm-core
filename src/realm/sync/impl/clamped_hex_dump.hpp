@@ -5,8 +5,7 @@
 #include <realm/util/hex_dump.hpp>
 #include <realm/binary_data.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 /// Limit the amount of dumped data to 1024 bytes. For use in connection with
 /// logging.
@@ -24,7 +23,6 @@ inline std::string clamped_hex_dump(BinaryData blob, std::size_t max_size = 1024
     return str;
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_IMPL_CLAMPED_HEX_DUMP_HPP

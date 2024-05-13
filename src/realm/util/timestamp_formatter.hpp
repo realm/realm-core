@@ -11,9 +11,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/memory_stream.hpp>
 
-
-namespace realm {
-namespace util {
+namespace realm::util {
 
 class TimestampFormatter {
 public:
@@ -81,7 +79,6 @@ inline auto TimestampFormatter::format(std::chrono::time_point<B> time) -> strin
     return format(time_2, nanoseconds); // Throws
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_TIMESTAMP_FORMATTER_HPP

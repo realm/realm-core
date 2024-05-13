@@ -25,9 +25,7 @@
 #include <functional>
 #include <algorithm>
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 
 /// PriorityQueue corresponds exactly to `std::priority_queue`, but has the extra feature
 /// of allowing iteration and erasure of elements in the queue.
@@ -298,7 +296,6 @@ void PriorityQueue<T, Container, Compare>::swap(PriorityQueue& other)
     swap(m_queue, other.m_queue);
     swap(compare(), other.compare());
 }
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_PRIORITY_QUEUE_HPP

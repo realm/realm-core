@@ -3,9 +3,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/enum.hpp>
 
-
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 EnumMapper::EnumMapper(const util::EnumAssoc* map, bool ignore_case)
 {
@@ -40,5 +38,4 @@ bool EnumMapper::parse(const std::string& string, int& value, bool ignore_case) 
     return true;
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl

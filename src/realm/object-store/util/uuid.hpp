@@ -21,13 +21,11 @@
 
 #include <string>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 // Generate a random UUID and return its formatted string representation.
 std::string uuid_string();
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_OS_UTIL_UUID_HPP

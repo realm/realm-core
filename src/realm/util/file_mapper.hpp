@@ -28,8 +28,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 struct FileAttributes {
     FileDesc fd;
@@ -201,6 +200,6 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;
 
 size_t round_up_to_page_size(size_t size) noexcept;
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
+
 #endif

@@ -23,9 +23,7 @@
 #include <realm/sync/instructions.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 
-namespace realm {
-namespace sync {
-
+namespace realm::sync {
 
 class SyncReplication : public Replication {
 public:
@@ -198,7 +196,6 @@ private:
     bool m_was_short_circuited;
 };
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_IMPL_INSTRUCTION_REPLICATION_HPP

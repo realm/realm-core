@@ -45,9 +45,7 @@
 
 #include <atomic>
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 
 /// A separate thread of execution.
 ///
@@ -805,8 +803,6 @@ void store_atomic(T& t_ref, T value, std::memory_order order)
     atomic_store_explicit(t_ptr, value, order);
 }
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_THREAD_HPP

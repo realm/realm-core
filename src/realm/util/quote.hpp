@@ -4,8 +4,7 @@
 #include <locale>
 #include <string_view>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 template <class C, class T>
 struct Quote {
@@ -152,8 +151,6 @@ quote:
     return out;
 }
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_QUOTE_HPP

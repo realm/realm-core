@@ -22,8 +22,7 @@
 #include <cstddef>
 #include <realm/util/span.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// The digest functions calculate the message digest of the input in \param
 /// in_buffer of size \param in_buffer_size . The digest is placed in \param
@@ -41,7 +40,6 @@ void sha256(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buf
 void hmac_sha224(Span<const uint8_t> in_buffer, Span<uint8_t, 28> out_buffer, Span<const uint8_t, 32> key);
 void hmac_sha256(Span<const uint8_t> in_buffer, Span<uint8_t, 32> out_buffer, Span<const uint8_t, 32> key);
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_SHA_CRYPTO_HPP

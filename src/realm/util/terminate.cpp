@@ -110,8 +110,7 @@ void (*termination_notification_callback)(const char*) noexcept = nullptr;
 
 } // unnamed namespace
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 // LCOV_EXCL_START
 REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
@@ -153,5 +152,4 @@ REALM_NORETURN void terminate_with_info(const char* message, const char* file, l
 }
 // LCOV_EXCL_STOP
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util

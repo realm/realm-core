@@ -23,8 +23,7 @@
 #include <iosfwd>
 #include <stdexcept>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// Backtrace encapsulates a stack trace, usually as captured by `backtrace()`
 /// and `backtrace_symbols()` (or platform-specific equivalents).
@@ -212,8 +211,7 @@ using invalid_argument = ExceptionWithBacktrace<std::invalid_argument>;
 using out_of_range = ExceptionWithBacktrace<std::out_of_range>;
 using logic_error = ExceptionWithBacktrace<std::logic_error>;
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 inline std::ostream& operator<<(std::ostream& os, const realm::util::Backtrace& bt)
 {

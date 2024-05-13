@@ -16,8 +16,7 @@
 #include <realm/sync/noinst/server/crypto_server.hpp>
 #include <realm/sync/client.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 // FIXME: Currently this exception is only used when the server runs out of
 // file descriptors at connection accept.
@@ -369,7 +368,6 @@ public:
     }
 };
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_SERVER_HPP

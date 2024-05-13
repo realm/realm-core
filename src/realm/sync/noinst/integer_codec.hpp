@@ -9,9 +9,7 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/assert.hpp>
 
-
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 struct Bid128 {
     uint64_t w[2];
@@ -232,7 +230,6 @@ std::size_t decode_int(const char* buffer, std::size_t size, T& value) noexcept
     return 0; // Failure
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_NOINST_INTEGER_CODEC_HPP

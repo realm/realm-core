@@ -5,9 +5,7 @@
 #include <realm/util/assert.hpp>
 #include <csignal>
 
-
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// \brief Block all signals from being delivered to the instantiating thread.
 ///
@@ -52,7 +50,6 @@ inline SignalBlocker::~SignalBlocker() noexcept
 #endif
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_SIGNAL_BLOCKER_HPP

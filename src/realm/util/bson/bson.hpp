@@ -33,8 +33,7 @@
 #include <realm/uuid.hpp>
 #include <ostream>
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 class BsonDocument;
 class BsonArray;
@@ -485,7 +484,6 @@ std::ostream& operator<<(std::ostream& out, const Bson& b);
 Bson parse(util::Span<const char> json);
 bool accept(util::Span<const char> json) noexcept;
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson
 
 #endif // REALM_BSON_HPP

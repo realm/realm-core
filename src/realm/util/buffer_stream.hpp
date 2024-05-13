@@ -24,9 +24,7 @@
 
 #include <realm/util/span.hpp>
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 
 template <class C, class T = std::char_traits<C>, class A = std::allocator<C>>
 class BasicResettableExpandableOutputStreambuf : public std::basic_stringbuf<C, T, A> {
@@ -172,7 +170,6 @@ inline util::Span<const C> BasicResettableExpandableBufferOutputStream<C, T, A>:
     return util::Span<const C>(m_streambuf.data(), m_streambuf.size());
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_BUFFER_STREAM_HPP

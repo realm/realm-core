@@ -26,8 +26,7 @@
 
 #include <realm/util/backtrace.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 template <class K, class V, class Container = std::vector<std::pair<K, V>>, class Cmp = std::less<>>
 struct FlatMap {
@@ -221,7 +220,6 @@ private:
     Container m_data;
 };
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_FLAT_MAP_HPP

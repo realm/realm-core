@@ -3,8 +3,7 @@
 
 #include <chrono>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 class Clock {
 public:
@@ -18,7 +17,6 @@ public:
     virtual time_point now() const noexcept = 0;
 };
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_CLOCK_HPP

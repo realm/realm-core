@@ -5,9 +5,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/timestamp_formatter.hpp>
 
-
-namespace realm {
-namespace util {
+namespace realm::util {
 
 class TimestampStderrLogger : public Logger {
 public:
@@ -23,8 +21,6 @@ private:
     TimestampFormatter m_formatter;
 };
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_TIMESTAMP_LOGGER_HPP

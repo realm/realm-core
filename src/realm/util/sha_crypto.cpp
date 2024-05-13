@@ -178,8 +178,7 @@ void hmac(Span<const uint8_t> in_buffer, Span<uint8_t, digest_length> out_buffer
 #endif
 } // namespace
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 void sha1(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buffer)
 {
@@ -258,5 +257,4 @@ void hmac_sha256(Span<const uint8_t> in_buffer, Span<uint8_t, 32> out_buffer, Sp
 #endif
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util

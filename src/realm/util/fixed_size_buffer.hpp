@@ -23,8 +23,7 @@
 #include <cstddef>
 #include <stdexcept>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// This is a buffer with a fixed size. You can only insert elements.
 /// When the number of elements inserted matches the size of the buffer,
@@ -128,8 +127,6 @@ private:
     size_t m_ndx;
 };
 
-} // namespace util
-} // namespace realm
-
+} // namespace realm::util
 
 #endif /* REALM_UTIL_FIXED_SIZE_BUFFER_HPP */

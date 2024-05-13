@@ -5,8 +5,7 @@
 
 using namespace realm::sync;
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 #if REALM_DEBUG
 static bool compare_ranges(const Changeset::Range& left, const Changeset::Range& right)
@@ -538,6 +537,4 @@ void ChangesetIndex::add_instruction_at(Ranges& ranges, Changeset& changeset, Ch
     }
 }
 
-
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl

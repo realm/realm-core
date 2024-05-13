@@ -7,8 +7,7 @@
 
 #include <type_traits>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 using InternStrings = std::vector<StringBufferRange>;
 
@@ -627,8 +626,7 @@ inline bool Changeset::operator!=(const Changeset& that) const noexcept
     return !(*this == that);
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 namespace std {
 

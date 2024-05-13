@@ -28,9 +28,7 @@
 
 #include <realm/impl/array_writer.hpp>
 
-namespace realm {
-namespace _impl {
-
+namespace realm::_impl {
 
 class OutputStream : public ArrayWriterBase {
 public:
@@ -66,8 +64,6 @@ inline size_t OutputStream::get_ref_of_next_array() const noexcept
     return m_next_ref;
 }
 
-
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_IMPL_OUTPUT_STREAM_HPP

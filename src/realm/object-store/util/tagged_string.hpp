@@ -22,8 +22,7 @@
 #include <type_traits>
 #include <string>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 // A type factory which defines a type which is implicitly convertable to and
 // from `std::string`, but not to other TaggedString types
 //
@@ -73,6 +72,6 @@ private:
     std::string m_value;
 };
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
+
 #endif // REALM_OS_UTIL_TAGGED_STRING_HPP
