@@ -1820,7 +1820,7 @@ TEST(ParallelSearchEqualMatch)
     std::vector<int64_t> values;
     for (size_t width = 1; width <= 64; width++) {
         const size_t size = (buflen * 64) / width;
-        const uint64_t bit_mask = (1ULL << width) - 1;
+        const uint64_t bit_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - width); // (1ULL << width) - 1;
 
         values.resize(size);
         BfIterator it(buff, 0, width, width, 0);
