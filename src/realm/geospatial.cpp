@@ -290,7 +290,7 @@ GeoRegion& Geospatial::get_region() const
 {
     if (!m_region)
         m_region = std::make_unique<GeoRegion>(*this);
-    return *m_region.get();
+    return *m_region;
 }
 
 std::string Geospatial::to_string() const

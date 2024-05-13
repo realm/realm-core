@@ -1363,7 +1363,7 @@ void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) con
 
 void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags */, size_t offset) const
 {
-    if (m_encryption_key.get()) {
+    if (m_encryption_key) {
         // encryption enabled - this is not supported - see explanation in alloc_slab.cpp
         REALM_ASSERT(false);
     }
@@ -1393,7 +1393,7 @@ void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /
 void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
                       size_t offset) const
 {
-    if (m_encryption_key.get()) {
+    if (m_encryption_key) {
         // encryption enabled - we shouldn't be here, all memory was allocated by reserve
         REALM_ASSERT_RELEASE(false);
     }
@@ -1409,7 +1409,7 @@ void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMap
 
 void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileMapping*& mapping) const
 {
-    if (m_encryption_key.get()) {
+    if (m_encryption_key) {
         // encrypted file - just mmap it, the encryption layer handles if the mapping extends beyond eof
         return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset, mapping);
     }

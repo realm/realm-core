@@ -52,7 +52,7 @@ static void enumerate_strings(realm::SharedRealm realm, double threshold)
                     std::unique_ptr<realm::DescriptorOrdering> distinct =
                         std::make_unique<realm::DescriptorOrdering>();
                     distinct->append_distinct(realm::DistinctDescriptor({{col_key}}));
-                    size_t uniques = t->where().count(*distinct.get());
+                    size_t uniques = t->where().count(*distinct);
                     double utilization = uniques / double(table_size);
                     realm::util::format(std::cout, "contains %1 unique values (%2%%) ", uniques, utilization * 100.0);
                     std::cout << std::flush;
