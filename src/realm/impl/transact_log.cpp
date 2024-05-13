@@ -56,7 +56,7 @@ void TransactLogEncoder::encode_string(StringData string)
 }
 
 REALM_NORETURN
-void TransactLogParser::parser_error() const
+void TransactLogParser::parser_error()
 {
     throw Exception(ErrorCodes::BadChangeset, "Bad transaction log");
 }

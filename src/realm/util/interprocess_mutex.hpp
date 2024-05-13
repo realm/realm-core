@@ -108,7 +108,7 @@ public:
     void unlock();
 
     /// Attempt to check if the mutex is valid (only relevant if not emulating)
-    bool is_valid() noexcept;
+    static bool is_valid() noexcept;
 
 #if REALM_ROBUST_MUTEX_EMULATION
     constexpr static bool is_robust_on_this_platform = true; // we're faking it!

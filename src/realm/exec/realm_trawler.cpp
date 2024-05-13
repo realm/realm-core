@@ -942,23 +942,23 @@ public:
         return true;
     }
 
-    bool erase_class(realm::TableKey)
+    static bool erase_class(realm::TableKey)
     {
         return true;
     }
 
-    bool rename_class(realm::TableKey)
+    static bool rename_class(realm::TableKey)
     {
         return true;
     }
 
-    bool create_object(realm::ObjKey key)
+    static bool create_object(realm::ObjKey key)
     {
         std::cout << "Create object: " << key << std::endl;
         return true;
     }
 
-    bool remove_object(realm::ObjKey key)
+    static bool remove_object(realm::ObjKey key)
     {
         std::cout << "Remove object: " << key << std::endl;
         return true;
@@ -970,25 +970,25 @@ public:
         return true;
     }
 
-    bool collection_set(size_t ndx)
+    static bool collection_set(size_t ndx)
     {
         std::cout << "Collection set at " << ndx << std::endl;
         return true;
     }
 
-    bool collection_insert(size_t ndx)
+    static bool collection_insert(size_t ndx)
     {
         std::cout << "Collection insert at " << ndx << std::endl;
         return true;
     }
 
-    bool dictionary_clear(size_t)
+    static bool dictionary_clear(size_t)
     {
         std::cout << "Dictionary clear " << std::endl;
         return true;
     }
 
-    bool set_link_type(realm::ColKey)
+    static bool set_link_type(realm::ColKey)
     {
         return true;
     }
@@ -999,12 +999,12 @@ public:
         return true;
     }
 
-    bool erase_column(realm::ColKey)
+    static bool erase_column(realm::ColKey)
     {
         return true;
     }
 
-    bool rename_column(realm::ColKey)
+    static bool rename_column(realm::ColKey)
     {
         return true;
     }
@@ -1015,25 +1015,25 @@ public:
         return true;
     }
 
-    bool collection_move(size_t from_link_ndx, size_t to_link_ndx)
+    static bool collection_move(size_t from_link_ndx, size_t to_link_ndx)
     {
         std::cout << "List move from " << from_link_ndx << " to " << to_link_ndx << std::endl;
         return true;
     }
 
-    bool collection_erase(size_t ndx)
+    static bool collection_erase(size_t ndx)
     {
         std::cout << "Collection erase at " << ndx << std::endl;
         return true;
     }
 
-    bool collection_clear(size_t old_list_size)
+    static bool collection_clear(size_t old_list_size)
     {
         std::cout << "Collection clear. Old size: " << old_list_size << std::endl;
         return true;
     }
 
-    bool typed_link_change(realm::ColKey, realm::TableKey)
+    static bool typed_link_change(realm::ColKey, realm::TableKey)
     {
         return true;
     }

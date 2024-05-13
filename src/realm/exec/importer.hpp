@@ -116,7 +116,7 @@ private:
     std::vector<DataType> types(std::vector<std::string> v);
     size_t tokenize(std::vector<std::vector<std::string>>& payload, size_t records);
     std::vector<DataType> detect_scheme(std::vector<std::vector<std::string>> payload, size_t begin, size_t end);
-    std::vector<DataType> lowest_common(std::vector<DataType> types1, std::vector<DataType> types2);
+    static std::vector<DataType> lowest_common(std::vector<DataType> types1, std::vector<DataType> types2);
 
     char src[2 * chunk_size]; // .csv input buffer
     size_t m_top;             // points at top of buffer

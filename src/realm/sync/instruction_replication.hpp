@@ -110,7 +110,7 @@ private:
     // table should be emitted.
     bool select_table(const Table&);
 
-    REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
+    REALM_NORETURN static void unsupported_instruction(); // Throws TransformError
 
     // Returns true and populates m_last_class_name if instructions for the
     // owning table should be emitted.
@@ -118,7 +118,7 @@ private:
 
     InternString emit_class_name(StringData table_name);
     InternString emit_class_name(const Table& table);
-    Instruction::Payload::Type get_payload_type(DataType) const;
+    static Instruction::Payload::Type get_payload_type(DataType);
 
     Instruction::Payload as_payload(Mixed value);
     Instruction::Payload as_payload(const CollectionBase& collection, Mixed value);

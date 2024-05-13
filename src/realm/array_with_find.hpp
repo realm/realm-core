@@ -144,8 +144,8 @@ public:
     int64_t
     find_gtlt_magic(int64_t v) const; // Compute magic constant needed for searching for value 'v' using bit hacks
 
-    size_t first_set_bit(uint32_t v) const;
-    size_t first_set_bit64(int64_t v) const;
+    static size_t first_set_bit(uint32_t v);
+    static size_t first_set_bit64(int64_t v);
 
     // Find value greater/less in 64-bit chunk - only works for positive values
     template <bool gt, size_t width>

@@ -103,7 +103,7 @@ private:
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"
     // followed by the class name.
-    Subscription make_subscription(const std::string& object_class_name, const std::string& rql_query_string);
+    static Subscription make_subscription(const std::string& object_class_name, const std::string& rql_query_string);
 
     DBRef m_db;
 

@@ -37,7 +37,7 @@ struct AnyContext {
     {
         return util::any_cast<T>(wrapper);
     }
-    bool is_null(const std::any& wrapper)
+    static bool is_null(const std::any& wrapper)
     {
         if (!wrapper.has_value()) {
             return true;
@@ -47,7 +47,7 @@ struct AnyContext {
         }
         return false;
     }
-    bool is_list(const std::any& wrapper)
+    static bool is_list(const std::any& wrapper)
     {
         if (!wrapper.has_value()) {
             return false;
@@ -57,7 +57,7 @@ struct AnyContext {
         }
         return false;
     }
-    DataType get_type_of(const std::any& wrapper)
+    static DataType get_type_of(const std::any& wrapper)
     {
         const std::type_info& type{wrapper.type()};
         if (type == typeid(int64_t) || type == typeid(int)) {

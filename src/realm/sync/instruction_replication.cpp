@@ -148,7 +148,7 @@ InternString SyncReplication::emit_class_name(const Table& table)
     return emit_class_name(table.get_name());
 }
 
-Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) const
+Instruction::Payload::Type SyncReplication::get_payload_type(DataType type)
 {
     using Type = Instruction::Payload::Type;
     switch (type) {
@@ -695,7 +695,7 @@ void SyncReplication::link_list_nullify(const Lst<ObjKey>& view, size_t ndx)
     }
 }
 
-void SyncReplication::unsupported_instruction() const
+void SyncReplication::unsupported_instruction()
 {
     throw realm::sync::TransformError{"Unsupported instruction"};
 }

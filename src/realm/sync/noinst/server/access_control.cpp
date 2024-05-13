@@ -54,8 +54,7 @@ util::Optional<AccessToken> AccessControl::verify_access_token(StringData signed
     return util::none;
 }
 
-bool AccessControl::can(const AccessToken& token, Privilege permission,
-                        const RealmFileIdent& realm_file) const noexcept
+bool AccessControl::can(const AccessToken& token, Privilege permission, const RealmFileIdent& realm_file) noexcept
 {
     if (token.path && *token.path != realm_file) {
         return false;
@@ -64,7 +63,7 @@ bool AccessControl::can(const AccessToken& token, Privilege permission,
     return (token.access & p) == p;
 }
 
-bool AccessControl::can(const AccessToken& token, unsigned int mask, const RealmFileIdent& realm_file) const noexcept
+bool AccessControl::can(const AccessToken& token, unsigned int mask, const RealmFileIdent& realm_file) noexcept
 {
     if (token.path && *token.path != realm_file) {
         return false;
@@ -80,7 +79,7 @@ AccessToken::Verifier& AccessControl::verifier() const noexcept
 // This is_admin() function is more complicated than it should be due to
 // the current format of the tokens and behavior of ROS.
 // This function can be simplified with new a token format.
-bool AccessControl::is_admin(const AccessToken& token) const noexcept
+bool AccessControl::is_admin(const AccessToken& token) noexcept
 {
     if (token.admin_field)
         return token.admin;

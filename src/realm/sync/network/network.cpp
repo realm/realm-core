@@ -1345,7 +1345,7 @@ public:
         m_completed_operations.clear();
     }
 
-    void report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler> handler)
+    static void report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler> handler)
     {
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
         m_event_loop_metrics_timer.emplace(service);
@@ -2337,7 +2337,7 @@ void SocketBase::set_option(opt_enum opt, const void* value_data, std::size_t va
 }
 
 
-void SocketBase::map_option(opt_enum opt, int& level, int& option_name) const
+void SocketBase::map_option(opt_enum opt, int& level, int& option_name)
 {
     switch (opt) {
         case opt_ReuseAddr:

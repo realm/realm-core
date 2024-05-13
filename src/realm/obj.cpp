@@ -1092,17 +1092,17 @@ std::string Obj::get_id() const
     return ostr.str();
 }
 
-Path Obj::get_short_path() const noexcept
+Path Obj::get_short_path() noexcept
 {
     return {};
 }
 
-ColKey Obj::get_col_key() const noexcept
+ColKey Obj::get_col_key() noexcept
 {
     return {};
 }
 
-StablePath Obj::get_stable_path() const noexcept
+StablePath Obj::get_stable_path() noexcept
 {
     return {};
 }

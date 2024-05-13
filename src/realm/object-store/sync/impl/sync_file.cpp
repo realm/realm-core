@@ -271,7 +271,7 @@ void SyncFileManager::remove_user_realms(const std::string& user_id) const
     util::try_remove_dir_recursive(user_path);
 }
 
-bool SyncFileManager::remove_realm(const std::string& absolute_path) const
+bool SyncFileManager::remove_realm(const std::string& absolute_path)
 {
     REALM_ASSERT(absolute_path.length() > 0);
     bool success = true;
@@ -285,7 +285,7 @@ bool SyncFileManager::remove_realm(const std::string& absolute_path) const
     return success;
 }
 
-bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::string& new_path) const
+bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::string& new_path)
 {
     REALM_ASSERT(old_path.length() > 0);
     try {

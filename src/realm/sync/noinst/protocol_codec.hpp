@@ -174,26 +174,29 @@ public:
 
     /// Messages sent by the client.
 
-    void make_pbs_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
-                               const std::string& server_path, const std::string& signed_user_token,
-                               bool need_client_file_ident, bool is_subserver);
+    static void make_pbs_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                                      const std::string& server_path, const std::string& signed_user_token,
+                                      bool need_client_file_ident, bool is_subserver);
 
-    void make_flx_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
-                               const nlohmann::json& json_data, const std::string& signed_user_token,
-                               bool need_client_file_ident, bool is_subserver);
+    static void make_flx_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
+                                      const nlohmann::json& json_data, const std::string& signed_user_token,
+                                      bool need_client_file_ident, bool is_subserver);
 
-    void make_pbs_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
-                                const SyncProgress& progress);
+    static void make_pbs_ident_message(OutputBuffer&, session_ident_type session_ident,
+                                       SaltedFileIdent client_file_ident, const SyncProgress& progress);
 
-    void make_flx_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
-                                const SyncProgress& progress, int64_t query_version, std::string_view query_body);
+    static void make_flx_ident_message(OutputBuffer&, session_ident_type session_ident,
+                                       SaltedFileIdent client_file_ident, const SyncProgress& progress,
+                                       int64_t query_version, std::string_view query_body);
 
-    void make_query_change_message(OutputBuffer&, session_ident_type, int64_t version, std::string_view query_body);
+    static void make_query_change_message(OutputBuffer&, session_ident_type, int64_t version,
+                                          std::string_view query_body);
 
-    void make_json_error_message(OutputBuffer&, session_ident_type, int error_code, std::string_view error_body);
+    static void make_json_error_message(OutputBuffer&, session_ident_type, int error_code,
+                                        std::string_view error_body);
 
-    void make_test_command_message(OutputBuffer&, session_ident_type session, request_ident_type request_ident,
-                                   std::string_view body);
+    static void make_test_command_message(OutputBuffer&, session_ident_type session, request_ident_type request_ident,
+                                          std::string_view body);
 
     class UploadMessageBuilder {
     public:
@@ -216,11 +219,11 @@ public:
 
     UploadMessageBuilder make_upload_message_builder();
 
-    void make_unbind_message(OutputBuffer&, session_ident_type session_ident);
+    static void make_unbind_message(OutputBuffer&, session_ident_type session_ident);
 
-    void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
+    static void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
 
-    void make_ping(OutputBuffer&, milliseconds_type timestamp, milliseconds_type rtt);
+    static void make_ping(OutputBuffer&, milliseconds_type timestamp, milliseconds_type rtt);
 
     std::string compressed_hex_dump(BinaryData blob);
 
@@ -649,12 +652,12 @@ public:
 
     // Messages sent by the server to the client
 
-    void make_ident_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
-                            file_ident_type client_file_ident, salt_type client_file_ident_salt);
+    static void make_ident_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                                   file_ident_type client_file_ident, salt_type client_file_ident_salt);
 
-    void make_alloc_message(OutputBuffer&, session_ident_type session_ident, file_ident_type file_ident);
+    static void make_alloc_message(OutputBuffer&, session_ident_type session_ident, file_ident_type file_ident);
 
-    void make_unbound_message(OutputBuffer&, session_ident_type session_ident);
+    static void make_unbound_message(OutputBuffer&, session_ident_type session_ident);
 
 
     struct ChangesetInfo {
@@ -664,23 +667,24 @@ public:
         std::size_t original_size;
     };
 
-    void make_download_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
-                               version_type download_server_version, version_type download_client_version,
-                               version_type latest_server_version, salt_type latest_server_version_salt,
-                               version_type upload_client_version, version_type upload_server_version,
-                               std::uint_fast64_t downloadable_bytes, std::size_t num_changesets, const char* body,
-                               std::size_t uncompressed_body_size, std::size_t compressed_body_size,
-                               bool body_is_compressed, util::Logger&);
+    static void make_download_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                                      version_type download_server_version, version_type download_client_version,
+                                      version_type latest_server_version, salt_type latest_server_version_salt,
+                                      version_type upload_client_version, version_type upload_server_version,
+                                      std::uint_fast64_t downloadable_bytes, std::size_t num_changesets,
+                                      const char* body, std::size_t uncompressed_body_size,
+                                      std::size_t compressed_body_size, bool body_is_compressed, util::Logger&);
 
-    void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
+    static void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
 
-    void make_error_message(int protocol_version, OutputBuffer&, sync::ProtocolError error_code, const char* message,
-                            std::size_t message_size, bool try_again, session_ident_type session_ident);
+    static void make_error_message(int protocol_version, OutputBuffer&, sync::ProtocolError error_code,
+                                   const char* message, std::size_t message_size, bool try_again,
+                                   session_ident_type session_ident);
 
-    void make_pong(OutputBuffer&, milliseconds_type timestamp);
+    static void make_pong(OutputBuffer&, milliseconds_type timestamp);
 
-    void make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
-                          session_ident_type sess_id = 0, std::optional<std::string> co_id = std::nullopt);
+    static void make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+                                 session_ident_type sess_id = 0, std::optional<std::string> co_id = std::nullopt);
 
     // Messages received by the server.
 
@@ -895,7 +899,7 @@ public:
         }
     }
 
-    void insert_single_changeset_download_message(OutputBuffer&, const ChangesetInfo&, util::Logger&);
+    static void insert_single_changeset_download_message(OutputBuffer&, const ChangesetInfo&, util::Logger&);
 
 private:
     // clang-format off

@@ -180,7 +180,7 @@ struct VersionList {
         return (uint32_t)(&rc - data());
     }
 
-    void free_entry(ReadCount* rc) noexcept
+    static void free_entry(ReadCount* rc) noexcept
     {
         rc->current_top = rc->filesize = -1ULL; // easy to recognize in debugger
         rc->deactivate();
@@ -668,7 +668,7 @@ private:
             m_local_readers.resize(new_size, VersionList::ReadCount{});
     }
 
-    void populate_read_lock(ReadLockInfo& read_lock, VersionList::ReadCount& r, ReadLockInfo::Type type)
+    static void populate_read_lock(ReadLockInfo& read_lock, VersionList::ReadCount& r, ReadLockInfo::Type type)
     {
         ++field_for_type(r, type);
         read_lock.m_type = type;

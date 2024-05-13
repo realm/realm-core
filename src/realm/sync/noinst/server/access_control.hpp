@@ -34,11 +34,11 @@ struct AccessControl {
     /// the permissions are granted.
     ///
     /// NOTE: This method is thread-safe.
-    bool can(const AccessToken&, Privilege, const RealmFileIdent&) const noexcept;
-    bool can(const AccessToken&, unsigned int mask, const RealmFileIdent&) const noexcept;
+    static bool can(const AccessToken&, Privilege, const RealmFileIdent&) noexcept;
+    static bool can(const AccessToken&, unsigned int mask, const RealmFileIdent&) noexcept;
     //@}
 
-    bool is_admin(const AccessToken&) const noexcept;
+    static bool is_admin(const AccessToken&) noexcept;
 
     AccessToken::Verifier& verifier() const noexcept;
 

@@ -104,7 +104,7 @@ private:
     }
 
     void set_width(uint8_t width);
-    uint8_t bit_width(uint64_t value);
+    static uint8_t bit_width(uint64_t value);
 
     void _set(size_t ndx, uint8_t width, uint64_t value);
     uint64_t _get(size_t ndx, uint8_t width) const;

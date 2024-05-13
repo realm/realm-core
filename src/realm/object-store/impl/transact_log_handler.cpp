@@ -224,7 +224,7 @@ class TransactLogValidationMixin {
 
     REALM_NORETURN
     REALM_NOINLINE
-    void schema_error()
+    static void schema_error()
     {
         throw _impl::UnsupportedSchemaChange();
     }
@@ -243,72 +243,72 @@ public:
     }
 
     // Removing or renaming things while a Realm is open is never supported
-    bool erase_class(TableKey)
+    static bool erase_class(TableKey)
     {
         schema_error();
     }
-    bool rename_class(TableKey)
+    static bool rename_class(TableKey)
     {
         schema_error();
     }
-    bool erase_column(ColKey)
+    static bool erase_column(ColKey)
     {
         schema_error();
     }
-    bool rename_column(ColKey)
+    static bool rename_column(ColKey)
     {
         schema_error();
     }
 
     // Additive changes and reorderings are supported
-    bool insert_group_level_table(TableKey)
+    static bool insert_group_level_table(TableKey)
     {
         return true;
     }
-    bool insert_column(ColKey)
+    static bool insert_column(ColKey)
     {
         return true;
     }
-    bool set_link_type(ColKey)
+    static bool set_link_type(ColKey)
     {
         return true;
     }
 
     // Non-schema changes are all allowed
     void parse_complete() {}
-    bool create_object(ObjKey)
+    static bool create_object(ObjKey)
     {
         return true;
     }
-    bool remove_object(ObjKey)
+    static bool remove_object(ObjKey)
     {
         return true;
     }
-    bool collection_set(size_t)
+    static bool collection_set(size_t)
     {
         return true;
     }
-    bool collection_insert(size_t)
+    static bool collection_insert(size_t)
     {
         return true;
     }
-    bool collection_erase(size_t)
+    static bool collection_erase(size_t)
     {
         return true;
     }
-    bool collection_clear(size_t)
+    static bool collection_clear(size_t)
     {
         return true;
     }
-    bool collection_move(size_t, size_t)
+    static bool collection_move(size_t, size_t)
     {
         return true;
     }
-    bool collection_swap(size_t, size_t)
+    static bool collection_swap(size_t, size_t)
     {
         return true;
     }
-    bool typed_link_change(ColKey, TableKey)
+    static bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
@@ -318,11 +318,11 @@ public:
 // A transaction log handler that just validates that all operations made are
 // ones supported by the object store
 struct TransactLogValidator : public TransactLogValidationMixin {
-    bool modify_object(ColKey, ObjKey)
+    static bool modify_object(ColKey, ObjKey)
     {
         return true;
     }
-    bool select_collection(ColKey, ObjKey, const StablePath&)
+    static bool select_collection(ColKey, ObjKey, const StablePath&)
     {
         return true;
     }

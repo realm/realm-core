@@ -148,7 +148,7 @@ public:
     }
 
 private:
-    bool comp(std::string_view a, std::string_view b) const noexcept
+    static bool comp(std::string_view a, std::string_view b) noexcept
     {
         auto cmp = [](char lhs, char rhs) {
             return std::tolower(lhs, std::locale::classic()) < std::tolower(rhs, std::locale::classic());

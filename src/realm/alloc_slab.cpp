@@ -1529,7 +1529,7 @@ const SlabAlloc::Chunks& SlabAlloc::get_free_read_only() const
 }
 
 
-size_t SlabAlloc::find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept
+size_t SlabAlloc::find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) noexcept
 {
     size_t end_of_block = start_pos + free_chunk_size;
     size_t alloc_pos = start_pos;

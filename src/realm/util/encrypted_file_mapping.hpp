@@ -129,19 +129,19 @@ private:
     };
     std::vector<PageState> m_page_state;
     // little helpers:
-    inline void clear(PageState& ps, int p)
+    static inline void clear(PageState& ps, int p)
     {
         ps = PageState(ps & ~p);
     }
-    inline bool is_not(PageState& ps, int p)
+    static inline bool is_not(PageState& ps, int p)
     {
         return (ps & p) == 0;
     }
-    inline bool is(PageState& ps, int p)
+    static inline bool is(PageState& ps, int p)
     {
         return (ps & p) != 0;
     }
-    inline void set(PageState& ps, int p)
+    static inline void set(PageState& ps, int p)
     {
         ps = PageState(ps | p);
     }

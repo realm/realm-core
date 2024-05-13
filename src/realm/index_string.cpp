@@ -325,7 +325,7 @@ int64_t IndexArray::index_string(const Mixed& value, InternalFindResult& result_
 
 
 void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& result, const IntegerColumn& rows,
-                                   const ClusterColumn& column) const
+                                   const ClusterColumn& column)
 {
     // optimization for the most common case, where all the strings under a given subindex are equal
     Mixed first = column.get_value(ObjKey(*rows.cbegin()));
@@ -363,7 +363,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& 
 
 
 void IndexArray::from_list_all(const Mixed& value, std::vector<ObjKey>& result, const IntegerColumn& rows,
-                               const ClusterColumn& column) const
+                               const ClusterColumn& column)
 {
     if (column.full_word()) {
         result.reserve(rows.size());

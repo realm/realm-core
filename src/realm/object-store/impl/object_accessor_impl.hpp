@@ -70,8 +70,8 @@ public:
     // value present. The property is identified both by the name of the
     // property and its index within the ObjectScehma's persisted_properties
     // array.
-    util::Optional<std::any> value_for_property(std::any& dict, const Property& prop,
-                                                size_t /* property_index */) const
+    static util::Optional<std::any> value_for_property(std::any& dict, const Property& prop,
+                                                       size_t /* property_index */)
     {
 #if REALM_ENABLE_GEOSPATIAL
         if (auto geo = std::any_cast<Geospatial>(&dict)) {
@@ -102,7 +102,7 @@ public:
     //
     // This implementation does not support default values; see the default
     // value tests for an example of one which does.
-    util::Optional<std::any> default_value_for_property(ObjectSchema const&, Property const&) const
+    static util::Optional<std::any> default_value_for_property(ObjectSchema const&, Property const&)
     {
         return util::none;
     }
@@ -123,7 +123,7 @@ public:
     }
 
     // Determine if `value` boxes the same Set as `set`
-    bool is_same_set(object_store::Set const& set, std::any const& value)
+    static bool is_same_set(object_store::Set const& set, std::any const& value)
     {
         if (auto set2 = std::any_cast<object_store::Set>(&value))
             return set == *set2;
@@ -131,7 +131,7 @@ public:
     }
 
     // Determine if `value` boxes the same List as `list`
-    bool is_same_list(List const& list, std::any const& value)
+    static bool is_same_list(List const& list, std::any const& value)
     {
         if (auto list2 = std::any_cast<List>(&value))
             return list == *list2;
@@ -139,7 +139,7 @@ public:
     }
 
     // Determine if `value` boxes the same Dictionary as `dict`
-    bool is_same_dictionary(const object_store::Dictionary& dict, const std::any& value)
+    static bool is_same_dictionary(const object_store::Dictionary& dict, const std::any& value)
     {
         if (auto dict2 = std::any_cast<object_store::Dictionary>(&value))
             return dict == *dict2;
@@ -147,94 +147,94 @@ public:
     }
 
     // Convert from core types to the boxed type
-    std::any box(BinaryData v) const
+    static std::any box(BinaryData v)
     {
         return std::string(v);
     }
-    std::any box(List v) const
+    static std::any box(List v)
     {
         return v;
     }
-    std::any box(object_store::Set s) const
+    static std::any box(object_store::Set s)
     {
         return s;
     }
-    std::any box(object_store::Dictionary v) const
+    static std::any box(object_store::Dictionary v)
     {
         return v;
     }
 
-    std::any box(Object v) const
+    static std::any box(Object v)
     {
         return v;
     }
-    std::any box(Results v) const
+    static std::any box(Results v)
     {
         return v;
     }
-    std::any box(StringData v) const
+    static std::any box(StringData v)
     {
         return std::string(v);
     }
-    std::any box(Timestamp v) const
+    static std::any box(Timestamp v)
     {
         return v;
     }
-    std::any box(bool v) const
+    static std::any box(bool v)
     {
         return v;
     }
-    std::any box(double v) const
+    static std::any box(double v)
     {
         return v;
     }
-    std::any box(float v) const
+    static std::any box(float v)
     {
         return v;
     }
-    std::any box(int64_t v) const
+    static std::any box(int64_t v)
     {
         return v;
     }
-    std::any box(ObjectId v) const
+    static std::any box(ObjectId v)
     {
         return v;
     }
-    std::any box(Decimal v) const
+    static std::any box(Decimal v)
     {
         return v;
     }
-    std::any box(UUID v) const
+    static std::any box(UUID v)
     {
         return v;
     }
-    std::any box(util::Optional<bool> v) const
+    static std::any box(util::Optional<bool> v)
     {
         return v;
     }
-    std::any box(util::Optional<double> v) const
+    static std::any box(util::Optional<double> v)
     {
         return v;
     }
-    std::any box(util::Optional<float> v) const
+    static std::any box(util::Optional<float> v)
     {
         return v;
     }
-    std::any box(util::Optional<int64_t> v) const
+    static std::any box(util::Optional<int64_t> v)
     {
         return v;
     }
-    std::any box(util::Optional<ObjectId> v) const
+    static std::any box(util::Optional<ObjectId> v)
     {
         return v;
     }
-    std::any box(util::Optional<UUID> v) const
+    static std::any box(util::Optional<UUID> v)
     {
         return v;
     }
     std::any box(Obj) const;
 
-    std::any box(Mixed v) const
+    static std::any box(Mixed v)
     {
         return v;
     }
@@ -261,15 +261,15 @@ public:
 
     Obj create_embedded_object();
 
-    bool is_null(std::any const& v) const noexcept
+    static bool is_null(std::any const& v) noexcept
     {
         return !v.has_value();
     }
-    std::any null_value() const noexcept
+    static std::any null_value() noexcept
     {
         return {};
     }
-    util::Optional<std::any> no_value() const noexcept
+    static util::Optional<std::any> no_value() noexcept
     {
         return {};
     }
@@ -280,7 +280,7 @@ public:
     void did_change() {}
 
     // Get a string representation of the given value for use in error messages.
-    std::string print(std::any const&) const
+    static std::string print(std::any const&)
     {
         return "not implemented";
     }
@@ -288,7 +288,7 @@ public:
     // Cocoa allows supplying fewer values than there are properties when
     // creating objects using an array of values. Other bindings should not
     // mimick this behavior so just return false here.
-    bool allow_missing(std::any const&) const
+    static bool allow_missing(std::any const&)
     {
         return false;
     }

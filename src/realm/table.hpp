@@ -139,10 +139,10 @@ public:
     bool is_asymmetric() const noexcept; // true if table is asymmetric
     Type get_table_type() const noexcept;
     size_t get_column_count() const noexcept;
-    DataType get_column_type(ColKey column_key) const;
+    static DataType get_column_type(ColKey column_key);
     StringData get_column_name(ColKey column_key) const;
     StringData get_column_name(StableIndex) const;
-    ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
+    static ColumnAttrMask get_column_attr(ColKey column_key) noexcept;
     DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKey get_column_key(StableIndex) const noexcept;
@@ -201,7 +201,7 @@ public:
         return add_column(target, name, {CollectionType::Dictionary}, key_type);
     }
 
-    CollectionType get_collection_type(ColKey col_key) const;
+    static CollectionType get_collection_type(ColKey col_key);
 
     void remove_columns();
     void remove_column(ColKey col_key);
@@ -469,8 +469,6 @@ public:
     TableView find_all_double(ColKey col_key, double value) const;
     TableView find_all_string(ColKey col_key, StringData value);
     TableView find_all_string(ColKey col_key, StringData value) const;
-    TableView find_all_binary(ColKey col_key, BinaryData value);
-    TableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
     TableView find_all_null(ColKey col_key) const;
 
@@ -828,7 +826,7 @@ private:
     void detach(LifeCycleCookie) noexcept;
     void fully_detach() noexcept;
 
-    ColumnType get_real_column_type(ColKey col_key) const noexcept;
+    static ColumnType get_real_column_type(ColKey col_key) noexcept;
 
     uint64_t get_sync_file_id() const noexcept;
 
@@ -1219,17 +1217,17 @@ inline ColKey Table::get_column_key(StableIndex index) const noexcept
     return m_leaf_ndx2colkey[index.get_index().val];
 }
 
-inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
+inline ColumnType Table::get_real_column_type(ColKey col_key) noexcept
 {
     return col_key.get_type();
 }
 
-inline DataType Table::get_column_type(ColKey column_key) const
+inline DataType Table::get_column_type(ColKey column_key)
 {
     return DataType(column_key.get_type());
 }
 
-inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
+inline ColumnAttrMask Table::get_column_attr(ColKey column_key) noexcept
 {
     return column_key.get_attrs();
 }

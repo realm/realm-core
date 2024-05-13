@@ -130,81 +130,81 @@ public:
     /// to find on the `InstructionHandler`.
 
     // No selection needed:
-    bool select_table(TableKey)
+    static bool select_table(TableKey)
     {
         return true;
     }
-    bool select_collection(ColKey, ObjKey, const StablePath&)
+    static bool select_collection(ColKey, ObjKey, const StablePath&)
     {
         return true;
     }
-    bool insert_group_level_table(TableKey)
+    static bool insert_group_level_table(TableKey)
     {
         return true;
     }
-    bool erase_class(TableKey)
+    static bool erase_class(TableKey)
     {
         return true;
     }
-    bool rename_class(TableKey)
+    static bool rename_class(TableKey)
     {
         return true;
     }
-    bool typed_link_change(ColKey, TableKey)
+    static bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
 
     // Must have table selected:
-    bool create_object(ObjKey)
+    static bool create_object(ObjKey)
     {
         return true;
     }
-    bool remove_object(ObjKey)
+    static bool remove_object(ObjKey)
     {
         return true;
     }
-    bool modify_object(ColKey, ObjKey)
+    static bool modify_object(ColKey, ObjKey)
     {
         return true;
     }
 
     // Must have descriptor selected:
-    bool insert_column(ColKey)
+    static bool insert_column(ColKey)
     {
         return true;
     }
-    bool erase_column(ColKey)
+    static bool erase_column(ColKey)
     {
         return true;
     }
-    bool rename_column(ColKey)
+    static bool rename_column(ColKey)
     {
         return true;
     }
-    bool set_link_type(ColKey)
+    static bool set_link_type(ColKey)
     {
         return true;
     }
 
     // Must have collection selected:
-    bool collection_set(size_t)
+    static bool collection_set(size_t)
     {
         return true;
     }
-    bool collection_insert(size_t)
+    static bool collection_insert(size_t)
     {
         return true;
     }
-    bool collection_move(size_t, size_t)
+    static bool collection_move(size_t, size_t)
     {
         return true;
     }
-    bool collection_erase(size_t)
+    static bool collection_erase(size_t)
     {
         return true;
     }
-    bool collection_clear(size_t)
+    static bool collection_clear(size_t)
     {
         return true;
     }
@@ -294,7 +294,7 @@ private:
     template <class T>
     size_t max_size(T);
 
-    size_t max_size_list()
+    static size_t max_size_list()
     {
         return 0;
     }
@@ -357,7 +357,7 @@ private:
     const char* m_input_end;
     std::string m_string_buffer;
 
-    REALM_COLD REALM_NORETURN void parser_error() const;
+    REALM_COLD REALM_NORETURN static void parser_error();
 
     template <class InstructionHandler>
     void parse_one(InstructionHandler&);
@@ -1001,67 +1001,67 @@ public:
     }
 
     // Default no-op implementations of all of the mutation instructions
-    bool insert_group_level_table(TableKey)
+    static bool insert_group_level_table(TableKey)
     {
         return false;
     }
-    bool erase_class(TableKey)
+    static bool erase_class(TableKey)
     {
         return false;
     }
-    bool rename_class(TableKey)
+    static bool rename_class(TableKey)
     {
         return false;
     }
-    bool insert_column(ColKey)
+    static bool insert_column(ColKey)
     {
         return false;
     }
-    bool erase_column(ColKey)
+    static bool erase_column(ColKey)
     {
         return false;
     }
-    bool rename_column(ColKey)
+    static bool rename_column(ColKey)
     {
         return false;
     }
-    bool set_link_type(ColKey)
+    static bool set_link_type(ColKey)
     {
         return false;
     }
-    bool create_object(ObjKey)
+    static bool create_object(ObjKey)
     {
         return false;
     }
-    bool remove_object(ObjKey)
+    static bool remove_object(ObjKey)
     {
         return false;
     }
-    bool collection_set(size_t)
+    static bool collection_set(size_t)
     {
         return false;
     }
-    bool collection_clear(size_t)
+    static bool collection_clear(size_t)
     {
         return false;
     }
-    bool collection_erase(size_t)
+    static bool collection_erase(size_t)
     {
         return false;
     }
-    bool collection_insert(size_t)
+    static bool collection_insert(size_t)
     {
         return false;
     }
-    bool collection_move(size_t, size_t)
+    static bool collection_move(size_t, size_t)
     {
         return false;
     }
-    bool modify_object(ColKey, ObjKey)
+    static bool modify_object(ColKey, ObjKey)
     {
         return false;
     }
-    bool typed_link_change(ColKey, TableKey)
+    static bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }

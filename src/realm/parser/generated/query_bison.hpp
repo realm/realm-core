@@ -2564,8 +2564,8 @@ switch (yykind)
     typedef unsigned char state_type;
 
     /// The arguments of the error message.
-    int yy_syntax_error_arguments_ (const context& yyctx,
-                                    symbol_kind_type yyarg[], int yyargn) const;
+    static int yy_syntax_error_arguments_ (const context& yyctx,
+                                    symbol_kind_type yyarg[], int yyargn) ;
 
     /// Generate an error message.
     /// \param yyctx     the context in which the error occurred.

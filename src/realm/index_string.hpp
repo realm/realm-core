@@ -97,11 +97,11 @@ private:
     int64_t from_list(const Mixed& value, InternalFindResult& result_ref, const IntegerColumn& key_values,
                       const ClusterColumn& column) const;
 
-    void from_list_all(const Mixed& value, std::vector<ObjKey>& result, const IntegerColumn& rows,
-                       const ClusterColumn& column) const;
+    static void from_list_all(const Mixed& value, std::vector<ObjKey>& result, const IntegerColumn& rows,
+                              const ClusterColumn& column);
 
-    void from_list_all_ins(StringData value, std::vector<ObjKey>& result, const IntegerColumn& rows,
-                           const ClusterColumn& column) const;
+    static void from_list_all_ins(StringData value, std::vector<ObjKey>& result, const IntegerColumn& rows,
+                                  const ClusterColumn& column);
 
     template <IndexMethod method>
     int64_t index_string(const Mixed& value, InternalFindResult& result_ref, const ClusterColumn& column) const;

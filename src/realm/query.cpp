@@ -1130,7 +1130,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
                 node = pn;
                 LeafType leaf(m_table.unchecked_ptr()->get_alloc());
 
-                auto f = [column_key, &leaf, &node, &st, this](const Cluster* cluster) {
+                auto f = [column_key, &leaf, &node, &st](const Cluster* cluster) {
                     size_t e = cluster->node_size();
                     node->set_cluster(cluster);
                     cluster->init_leaf(column_key, &leaf);
@@ -1155,7 +1155,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
     }
 }
 
-size_t Query::find_best_node(ParentNode* pn) const
+size_t Query::find_best_node(ParentNode* pn)
 {
     auto score_compare = [](const ParentNode* a, const ParentNode* b) {
         return a->cost() < b->cost();
@@ -1173,7 +1173,7 @@ size_t Query::find_best_node(ParentNode* pn) const
  **************************************************************************************************************/
 
 void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
-                               ArrayPayload* source_column) const
+                               ArrayPayload* source_column)
 {
     // Number of matches to find in best condition loop before breaking out to probe other conditions. Too low value
     // gives too many constant time overheads everywhere in the query engine. Too high value makes it adapt less
@@ -1464,7 +1464,7 @@ void Query::do_find_all(QueryStateBase& st) const
                 // no index on best node (and likely no index at all), descend B+-tree
                 node = pn;
 
-                auto f = [&node, &st, this](const Cluster* cluster) {
+                auto f = [&node, &st](const Cluster* cluster) {
                     size_t e = cluster->node_size();
                     node->set_cluster(cluster);
                     st.m_key_offset = cluster->get_offset();
@@ -1579,7 +1579,7 @@ size_t Query::do_count(size_t limit) const
             node = pn;
             QueryStateCount st(limit);
 
-            auto f = [&node, &st, this](const Cluster* cluster) {
+            auto f = [&node, &st](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 node->set_cluster(cluster);
                 st.m_key_offset = cluster->get_offset();

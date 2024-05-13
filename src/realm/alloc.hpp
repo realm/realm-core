@@ -253,8 +253,8 @@ protected:
     char* translate_less_critical(RefTranslation*, ref_type ref) const noexcept;
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) = 0;
     Allocator() noexcept;
-    size_t get_section_index(size_t pos) const noexcept;
-    inline size_t get_section_base(size_t index) const noexcept;
+    static size_t get_section_index(size_t pos) noexcept;
+    static inline size_t get_section_base(size_t index) noexcept;
 
 
     // The following counters are used to ensure accessor refresh,
@@ -530,12 +530,12 @@ inline void Allocator::free_(MemRef mem) noexcept
     free_(mem.get_ref(), mem.get_addr());
 }
 
-inline size_t Allocator::get_section_base(size_t index) const noexcept
+inline size_t Allocator::get_section_base(size_t index) noexcept
 {
     return index << section_shift; // 64MB chunks
 }
 
-inline size_t Allocator::get_section_index(size_t pos) const noexcept
+inline size_t Allocator::get_section_index(size_t pos) noexcept
 {
     return pos >> section_shift; // 64Mb chunks
 }

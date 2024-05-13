@@ -499,7 +499,7 @@ void Table::nullify_links(CascadeState& cascade_state)
     }
 }
 
-CollectionType Table::get_collection_type(ColKey col_key) const
+CollectionType Table::get_collection_type(ColKey col_key)
 {
     if (col_key.is_list()) {
         return CollectionType::List;
@@ -1900,16 +1900,6 @@ TableView Table::find_all_string(ColKey col_key, StringData value)
 TableView Table::find_all_string(ColKey col_key, StringData value) const
 {
     return const_cast<Table*>(this)->find_all_string(col_key, value);
-}
-
-TableView Table::find_all_binary(ColKey, BinaryData)
-{
-    throw Exception(ErrorCodes::IllegalOperation, "Table::find_all_binary not supported");
-}
-
-TableView Table::find_all_binary(ColKey col_key, BinaryData value) const
-{
-    return const_cast<Table*>(this)->find_all_binary(col_key, value);
 }
 
 TableView Table::find_all_null(ColKey col_key)

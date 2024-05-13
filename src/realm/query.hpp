@@ -361,9 +361,9 @@ private:
     template <typename T>
     void aggregate(QueryStateBase& st, ColKey column_key) const;
 
-    size_t find_best_node(ParentNode* pn) const;
-    void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
-                            ArrayPayload* source_column) const;
+    static size_t find_best_node(ParentNode* pn);
+    static void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
+                                   ArrayPayload* source_column);
 
     void do_find_all(QueryStateBase& st) const;
     size_t do_count(size_t limit = size_t(-1)) const;

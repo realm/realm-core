@@ -629,13 +629,13 @@ void InterRealmValueConverter::copy_dictionary_in_mixed(const Dictionary& src_di
     }
 }
 
-bool InterRealmValueConverter::is_collection(Mixed mixed) const
+bool InterRealmValueConverter::is_collection(Mixed mixed)
 {
     REALM_ASSERT_DEBUG(!mixed.is_type(type_Set));
     return mixed.is_type(type_List, type_Dictionary);
 }
 
-CollectionType InterRealmValueConverter::to_collection_type(Mixed mixed) const
+CollectionType InterRealmValueConverter::to_collection_type(Mixed mixed)
 {
     const auto mixed_type = mixed.get_type();
     if (mixed_type == type_List)

@@ -60,7 +60,7 @@ bool ArrayWithFind::find(int cond, int64_t value, size_t start, size_t end, size
     return false;
 }
 
-size_t ArrayWithFind::first_set_bit(uint32_t v) const
+size_t ArrayWithFind::first_set_bit(uint32_t v)
 {
     // (v & -v) is UB when v is INT_MIN
     if (int32_t(v) == std::numeric_limits<int32_t>::min())
@@ -70,7 +70,7 @@ size_t ArrayWithFind::first_set_bit(uint32_t v) const
     return MultiplyDeBruijnBitPosition[(uint32_t((v & -int32_t(v)) * 0x077CB531U)) >> 27];
 }
 
-size_t ArrayWithFind::first_set_bit64(int64_t v) const
+size_t ArrayWithFind::first_set_bit64(int64_t v)
 {
     unsigned int v0 = unsigned(v);
     if (v0 != 0)

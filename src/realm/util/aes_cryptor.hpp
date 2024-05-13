@@ -115,7 +115,7 @@ private:
     bool check_hmac(const void* data, size_t len, const std::array<uint8_t, 28>& hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept;
     iv_table& get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mode = IVLookupMode::UseCache) noexcept;
-    void handle_error();
+    static void handle_error();
 };
 
 struct ReaderInfo {

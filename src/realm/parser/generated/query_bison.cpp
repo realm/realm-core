@@ -2450,7 +2450,7 @@ namespace yy {
 
   int
   parser::yy_syntax_error_arguments_ (const context& yyctx,
-                                                 symbol_kind_type yyarg[], int yyargn) const
+                                                 symbol_kind_type yyarg[], int yyargn) 
   {
     /* There are many possibilities here to consider:
        - If this state is a consistent state with a default action, then

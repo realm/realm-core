@@ -58,7 +58,7 @@ public:
     {
         Array::set_parent(parent, ndx_in_parent);
     }
-    bool is_null(size_t) const
+    static bool is_null(size_t)
     {
         return false;
     }

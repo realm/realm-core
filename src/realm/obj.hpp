@@ -69,9 +69,9 @@ public:
     // you should use get_fat_path() or traverse_path() instead (see below).
     FullPath get_path() const;
     std::string get_id() const;
-    Path get_short_path() const noexcept;
-    ColKey get_col_key() const noexcept;
-    StablePath get_stable_path() const noexcept;
+    static Path get_short_path() noexcept;
+    static ColKey get_col_key() noexcept;
+    static StablePath get_stable_path() noexcept;
     void add_index(Path& path, const CollectionParent::Index& ndx) const;
 
     TableRef get_table() const noexcept

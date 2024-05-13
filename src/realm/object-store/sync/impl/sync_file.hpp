@@ -92,10 +92,10 @@ public:
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
-    bool remove_realm(const std::string& absolute_path) const;
+    static bool remove_realm(const std::string& absolute_path);
 
     /// Copy the Realm file at the location `old_path` to the location of `new_path`.
-    bool copy_realm_file(const std::string& old_path, const std::string& new_path) const;
+    static bool copy_realm_file(const std::string& old_path, const std::string& new_path);
 
     /// Return the path for the metadata Realm files.
     std::string metadata_path() const;

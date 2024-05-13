@@ -538,8 +538,8 @@ public:
     Service& get_service() noexcept;
 
     /// @{ \brief Resolve the specified query to one or more endpoints.
-    Endpoint::List resolve(const Query&);
-    Endpoint::List resolve(const Query&, std::error_code&);
+    static Endpoint::List resolve(const Query&);
+    static Endpoint::List resolve(const Query&, std::error_code&);
     /// @}
 
     /// \brief Perform an asynchronous resolve operation.
@@ -750,7 +750,7 @@ protected:
 
     void get_option(opt_enum, void* value_data, std::size_t& value_size, std::error_code&) const;
     void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code&);
-    void map_option(opt_enum, int& level, int& option_name) const;
+    static void map_option(opt_enum, int& level, int& option_name);
 
     friend class Acceptor;
 };
@@ -1172,8 +1172,8 @@ private:
     std::error_code finalize_async_connect(std::error_code& ec) noexcept;
 
     // See Service::BasicStreamOps for details on these these 6 functions.
-    void do_init_read_async(std::error_code&, Want&) noexcept;
-    void do_init_write_async(std::error_code&, Want&) noexcept;
+    static void do_init_read_async(std::error_code&, Want&) noexcept;
+    static void do_init_write_async(std::error_code&, Want&) noexcept;
     std::size_t do_read_some_sync(char* buffer, std::size_t size, std::error_code&) noexcept;
     std::size_t do_write_some_sync(const char* data, std::size_t size, std::error_code&) noexcept;
     std::size_t do_read_some_async(char* buffer, std::size_t size, std::error_code&, Want&) noexcept;

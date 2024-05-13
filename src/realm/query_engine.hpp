@@ -257,7 +257,7 @@ public:
     }
 
     constexpr static size_t c_threshold_of_conditions_overwhelming_index = 100;
-    bool num_conditions_may_need_combination_counts(size_t num_total_conditions)
+    static bool num_conditions_may_need_combination_counts(size_t num_total_conditions)
     {
         return num_total_conditions >= c_threshold_of_conditions_overwhelming_index;
     }
@@ -1889,7 +1889,7 @@ public:
 protected:
     std::optional<IndexEvaluator> m_index_evaluator;
 
-    inline BinaryData str_to_bin(const StringData& s) noexcept
+    static inline BinaryData str_to_bin(const StringData& s) noexcept
     {
         return BinaryData(s.data(), s.size());
     }

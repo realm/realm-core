@@ -68,8 +68,8 @@ private:
                                       size_t ndx_dst) const;
     bool check_if_dictionary_elements_match(const Dictionary& src_list, const Dictionary& dst_list,
                                             StringData key) const;
-    bool is_collection(Mixed) const;
-    CollectionType to_collection_type(Mixed) const;
+    static bool is_collection(Mixed);
+    static CollectionType to_collection_type(Mixed);
 
     TableRef m_dst_link_table;
     ConstTableRef m_src_table;

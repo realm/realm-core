@@ -366,7 +366,7 @@ private:
     REALM_NORETURN static void init_failed(int);
     REALM_NORETURN static void attr_init_failed(int);
     REALM_NORETURN static void destroy_failed(int) noexcept;
-    void handle_wait_error(int error);
+    static void handle_wait_error(int error);
 };
 
 

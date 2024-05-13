@@ -940,7 +940,7 @@ private:
         return true;
     }
 
-    std::pair<WebSocketError, std::string_view> parse_close_message(const char* data, size_t size)
+    static std::pair<WebSocketError, std::string_view> parse_close_message(const char* data, size_t size)
     {
         uint16_t error_code;
         std::string_view error_message;

@@ -390,16 +390,16 @@ protected:
     char* do_translate(ref_type) const noexcept override;
 
     /// Returns the first section boundary *above* the given position.
-    size_t get_upper_section_boundary(size_t start_pos) const noexcept;
+    static size_t get_upper_section_boundary(size_t start_pos) noexcept;
 
     /// Returns the section boundary at or above the given size
-    size_t align_size_to_section_boundary(size_t size) const noexcept;
+    static size_t align_size_to_section_boundary(size_t size) noexcept;
 
     /// Returns the first section boundary *at or below* the given position.
-    size_t get_lower_section_boundary(size_t start_pos) const noexcept;
+    static size_t get_lower_section_boundary(size_t start_pos) noexcept;
 
     /// Returns true if the given position is at a section boundary
-    bool matches_section_boundary(size_t pos) const noexcept;
+    static bool matches_section_boundary(size_t pos) noexcept;
 
     /// Actually compute the starting offset of a section. Only used to initialize
     /// a table of predefined results, which are then used by get_section_base().
@@ -408,7 +408,7 @@ protected:
     /// Find a possible allocation of 'request_size' that will fit into a section
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
-    size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
+    static size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) noexcept;
 
     void schedule_refresh_of_outdated_encrypted_pages();
 
@@ -521,18 +521,18 @@ private:
     };
 
     // simple helper functions for accessing/navigating blocks and betweenblocks (TM)
-    BetweenBlocks* bb_before(FreeBlock* entry) const
+    static BetweenBlocks* bb_before(FreeBlock* entry)
     {
         return reinterpret_cast<BetweenBlocks*>(entry) - 1;
     }
-    BetweenBlocks* bb_after(FreeBlock* entry) const
+    static BetweenBlocks* bb_after(FreeBlock* entry)
     {
         auto bb = bb_before(entry);
         size_t sz = bb->block_after_size;
         char* addr = reinterpret_cast<char*>(entry) + sz;
         return reinterpret_cast<BetweenBlocks*>(addr);
     }
-    FreeBlock* block_before(BetweenBlocks* bb) const
+    static FreeBlock* block_before(BetweenBlocks* bb)
     {
         size_t sz = bb->block_before_size;
         if (sz <= 0)
@@ -540,13 +540,13 @@ private:
         char* addr = reinterpret_cast<char*>(bb) - sz;
         return reinterpret_cast<FreeBlock*>(addr);
     }
-    FreeBlock* block_after(BetweenBlocks* bb) const
+    static FreeBlock* block_after(BetweenBlocks* bb)
     {
         if (bb->block_after_size <= 0)
             return nullptr;
         return reinterpret_cast<FreeBlock*>(bb + 1);
     }
-    int size_from_block(FreeBlock* entry) const
+    static int size_from_block(FreeBlock* entry)
     {
         return bb_before(entry)->block_after_size;
     }
@@ -577,15 +577,15 @@ private:
     // create a single free chunk with "BetweenBlocks" at both ends and a
     // single free chunk between them. This free chunk will be of size:
     //   slab_size - 2 * sizeof(BetweenBlocks)
-    FreeBlock* slab_to_entry(const Slab& slab, ref_type ref_start);
+    static FreeBlock* slab_to_entry(const Slab& slab, ref_type ref_start);
 
     // breaking/merging of blocks
-    FreeBlock* get_prev_block_if_mergeable(FreeBlock* block);
-    FreeBlock* get_next_block_if_mergeable(FreeBlock* block);
+    static FreeBlock* get_prev_block_if_mergeable(FreeBlock* block);
+    static FreeBlock* get_next_block_if_mergeable(FreeBlock* block);
     // break 'block' to give it 'new_size'. Return remaining block.
     // If the block is too small to split, return nullptr.
-    FreeBlock* break_block(FreeBlock* block, int new_size);
-    FreeBlock* merge_blocks(FreeBlock* first, FreeBlock* second);
+    static FreeBlock* break_block(FreeBlock* block, int new_size);
+    static FreeBlock* merge_blocks(FreeBlock* first, FreeBlock* second);
 
     // Values of each used bit in m_flags
     enum {
@@ -801,12 +801,12 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
     return ref < slab.ref_end;
 }
 
-inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) const noexcept
+inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) noexcept
 {
     return get_section_base(1 + get_section_index(start_pos));
 }
 
-inline size_t SlabAlloc::align_size_to_section_boundary(size_t size) const noexcept
+inline size_t SlabAlloc::align_size_to_section_boundary(size_t size) noexcept
 {
     if (matches_section_boundary(size))
         return size;
@@ -814,12 +814,12 @@ inline size_t SlabAlloc::align_size_to_section_boundary(size_t size) const noexc
         return get_upper_section_boundary(size);
 }
 
-inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noexcept
+inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) noexcept
 {
     return get_section_base(get_section_index(start_pos));
 }
 
-inline bool SlabAlloc::matches_section_boundary(size_t pos) const noexcept
+inline bool SlabAlloc::matches_section_boundary(size_t pos) noexcept
 {
     auto boundary = get_lower_section_boundary(pos);
     return pos == boundary;

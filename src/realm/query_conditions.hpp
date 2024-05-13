@@ -294,11 +294,11 @@ struct Equal {
         return (v1null && v2null) || (!v1null && !v2null && v1 == v2);
     }
     static const int condition = cond_Equal;
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool can_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         return (v >= lbound && v <= ubound);
     }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool will_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         return (v == 0 && ubound == 0 && lbound == 0);
     }
@@ -336,11 +336,11 @@ struct NotEqual {
 
 
     static const int condition = cond_NotEqual;
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool can_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         return !(v == 0 && ubound == 0 && lbound == 0);
     }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool will_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         return (v > ubound || v < lbound);
     }
@@ -806,12 +806,12 @@ struct Greater {
         return false;
     }
 
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool can_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(lbound);
         return ubound > v;
     }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool will_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(ubound);
         return lbound > v;
@@ -836,14 +836,14 @@ struct None {
         REALM_ASSERT(false);
         return false;
     }
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool can_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(lbound);
         static_cast<void>(ubound);
         static_cast<void>(v);
         return true;
     }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool will_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(lbound);
         static_cast<void>(ubound);
@@ -870,14 +870,14 @@ struct NotNull {
         REALM_ASSERT(false);
         return false;
     }
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool can_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(lbound);
         static_cast<void>(ubound);
         static_cast<void>(v);
         return true;
     }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool will_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(lbound);
         static_cast<void>(ubound);
@@ -914,12 +914,12 @@ struct Less {
         return false;
     }
     static const int condition = cond_Less;
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool can_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(ubound);
         return lbound < v;
     }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    static bool will_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         static_cast<void>(lbound);
         return ubound < v;

@@ -64,7 +64,7 @@ public:
     }
     Mixed get_any(size_t ndx) const override;
 
-    bool is_null(size_t) const
+    static bool is_null(size_t)
     {
         return false;
     }

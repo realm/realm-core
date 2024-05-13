@@ -489,7 +489,7 @@ void ChangesetIndex::verify() const
     }
 }
 
-bool ChangesetIndex::ranges_cover(const Ranges& ranges, Changeset& log, Changeset::const_iterator it) const
+bool ChangesetIndex::ranges_cover(const Ranges& ranges, Changeset& log, Changeset::const_iterator it)
 {
     auto outer = ranges.find(&log);
     if (outer == ranges.end())

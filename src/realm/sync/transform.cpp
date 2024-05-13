@@ -480,8 +480,8 @@ public:
         instr.visit(reflector);
     }
 
-    bool print_diff(std::ostream& os, bool print_unmodified, const Instruction& before, const Changeset& before_log,
-                    Side& side) const
+    static bool print_diff(std::ostream& os, bool print_unmodified, const Instruction& before,
+                           const Changeset& before_log, Side& side)
     {
         if (side.was_discarded) {
             print_instr(os, before, before_log);
@@ -534,7 +534,7 @@ public:
         }
     }
 
-    void pad_or_ellipsis(std::ostream& os, const std::string& str, int width) const
+    static void pad_or_ellipsis(std::ostream& os, const std::string& str, int width)
     {
         // FIXME: Does not work with UTF-8.
         if (str.size() > size_t(width)) {
@@ -797,7 +797,7 @@ struct TransformerImpl {
         }
     }
 
-    void merge_instructions(MajorSide& left, MinorSide& right);
+    static void merge_instructions(MajorSide& left, MinorSide& right);
 };
 
 void MajorSide::set_next_changeset(Changeset* changeset) noexcept
@@ -1038,7 +1038,7 @@ struct MergeUtils {
     // shorter path than the right, and the entire left path is the initial
     // sequence of the right.
 
-    bool is_prefix_of(const Instruction::ObjectInstruction&, const Instruction::TableInstruction&) const noexcept
+    static bool is_prefix_of(const Instruction::ObjectInstruction&, const Instruction::TableInstruction&) noexcept
     {
         // Right side is a schema instruction.
         return false;
@@ -1055,8 +1055,8 @@ struct MergeUtils {
     //  * is_prefix_of(field1.123.field2, field1.123.field2.456) = 456
     //  * is_prefix_of(field1.123.field2, field1.123.field3.456) = {}
 
-    std::optional<Instruction::Path::Element> is_prefix_of(const Instruction::PathInstruction&,
-                                                           const Instruction::TableInstruction&) const noexcept
+    static std::optional<Instruction::Path::Element> is_prefix_of(const Instruction::PathInstruction&,
+                                                                  const Instruction::TableInstruction&) noexcept
     {
         // Path instructions can never be full prefixes of table-level instructions. Note that this also covers
         // ObjectInstructions.
@@ -1094,7 +1094,7 @@ struct MergeUtils {
         return false;
     }
 
-    bool is_container_prefix_of(const Instruction::PathInstruction&, const Instruction::TableInstruction&) const
+    static bool is_container_prefix_of(const Instruction::PathInstruction&, const Instruction::TableInstruction&)
     {
         return false;
     }
@@ -1104,8 +1104,8 @@ struct MergeUtils {
     //
     // Note that this will only be used in the context of array indices, because
     // those are the only path components that are modified during OT.
-    uint32_t& corresponding_index_in_path(const Instruction::PathInstruction& left,
-                                          Instruction::PathInstruction& right) const
+    static uint32_t& corresponding_index_in_path(const Instruction::PathInstruction& left,
+                                                 Instruction::PathInstruction& right)
     {
         REALM_ASSERT(left.path.size() != 0);
         REALM_ASSERT(left.path.size() < right.path.size());
@@ -1117,16 +1117,16 @@ struct MergeUtils {
         return mpark::get<uint32_t>(right.path[index]);
     }
 
-    uint32_t& corresponding_index_in_path(const Instruction::PathInstruction&,
-                                          const Instruction::TableInstruction&) const
+    static uint32_t& corresponding_index_in_path(const Instruction::PathInstruction&,
+                                                 const Instruction::TableInstruction&)
     {
         // A path instruction can never have a shorter path than something that
         // isn't a PathInstruction.
         REALM_UNREACHABLE();
     }
 
-    void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx,
-                           const uint32_t& move_to_ndx) const noexcept
+    static void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx,
+                                  const uint32_t& move_to_ndx) noexcept
     {
         if (get_ndx == move_from_ndx) {
             // CONFLICT: Update of a moved element.

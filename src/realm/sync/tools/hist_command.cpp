@@ -210,7 +210,7 @@ public:
         InternString property;
         const Payload* payload;
 
-        bool is_modification() const noexcept
+        static bool is_modification() noexcept
         {
             return true;
         }

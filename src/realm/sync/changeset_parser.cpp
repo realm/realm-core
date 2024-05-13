@@ -83,8 +83,8 @@ struct State {
 
     BinaryData read_buffer(size_t size);
 
-    REALM_NORETURN void parser_error(std::string_view complaint); // Throws
-    REALM_NORETURN void parser_error()
+    REALM_NORETURN static void parser_error(std::string_view complaint); // Throws
+    REALM_NORETURN static void parser_error()
     {
         parser_error("Bad input");
     } // Throws

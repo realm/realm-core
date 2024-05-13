@@ -666,7 +666,7 @@ private:
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
-    void recycle_table_accessor(Table*);
+    static void recycle_table_accessor(Table*);
 
     void detach_table_accessors() noexcept; // Idempotent
 

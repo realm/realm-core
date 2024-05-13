@@ -97,12 +97,12 @@ struct ChangesetIndex {
 
     struct RangeIterator;
 
-    RangeIterator erase_instruction(RangeIterator);
+    static RangeIterator erase_instruction(RangeIterator);
 
 #if REALM_DEBUG
     void print(std::ostream&) const;
     void verify() const;
-    bool ranges_cover(const Ranges&, Changeset&, Changeset::const_iterator) const;
+    static bool ranges_cover(const Ranges&, Changeset&, Changeset::const_iterator);
 #endif // REALM_DEBUG
 
     // If ndx is inside or one-beyond the last range in `ranges`, that range is

@@ -117,7 +117,7 @@ private:
     // Returns true unless EOF was reached.
     bool peek_char(char& out_c) noexcept;
     bool peek_token(Token& out_t) noexcept;
-    bool is_whitespace(Token t) noexcept;
+    static bool is_whitespace(Token t) noexcept;
     void skip_whitespace() noexcept;
 };
 
