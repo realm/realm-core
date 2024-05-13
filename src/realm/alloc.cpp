@@ -62,7 +62,7 @@ public:
 
     MemRef do_realloc(ref_type, char* addr, size_t old_size, size_t new_size) override
     {
-        char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
+        char* new_addr = static_cast<char*>(::realloc(addr, new_size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
             // LCOV_EXCL_START
             REALM_ASSERT_DEBUG(errno == ENOMEM);

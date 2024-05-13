@@ -55,7 +55,7 @@ inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
         reinterpret_cast<uint32_t*>(m_data)[ndx] = uint32_t(value);
     }
     else {
-        reinterpret_cast<uint64_t*>(m_data)[ndx] = uint64_t(value);
+        reinterpret_cast<uint64_t*>(m_data)[ndx] = value;
     }
 }
 

@@ -129,9 +129,8 @@ void ArrayString::add(StringData value)
             static_cast<ArrayBigBlobs*>(m_arr)->add_string(value);
             break;
         case Type::enum_strings: {
-            auto a = static_cast<Array*>(m_arr);
-            size_t ndx = a->size();
-            a->add(0);
+            size_t ndx = m_arr->size();
+            m_arr->add(0);
             set(ndx, value);
             break;
         }
@@ -157,7 +156,7 @@ void ArrayString::set(size_t ndx, StringData value)
                 m_string_enum_values->add(value);
                 res = sz;
             }
-            static_cast<Array*>(m_arr)->set(ndx, res);
+            m_arr->set(ndx, res);
             break;
         }
     }
@@ -176,7 +175,7 @@ void ArrayString::insert(size_t ndx, StringData value)
             static_cast<ArrayBigBlobs*>(m_arr)->insert_string(ndx, value);
             break;
         case Type::enum_strings: {
-            static_cast<Array*>(m_arr)->insert(ndx, 0);
+            m_arr->insert(ndx, 0);
             set(ndx, value);
         }
     }
@@ -251,7 +250,7 @@ void ArrayString::erase(size_t ndx)
             static_cast<ArrayBigBlobs*>(m_arr)->erase(ndx);
             break;
         case Type::enum_strings:
-            static_cast<Array*>(m_arr)->erase(ndx);
+            m_arr->erase(ndx);
             break;
     }
 }
@@ -293,7 +292,7 @@ void ArrayString::clear()
             static_cast<ArrayBigBlobs*>(m_arr)->clear();
             break;
         case Type::enum_strings:
-            static_cast<Array*>(m_arr)->clear();
+            m_arr->clear();
             break;
     }
 }

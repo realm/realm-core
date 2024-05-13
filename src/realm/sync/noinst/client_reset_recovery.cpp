@@ -1157,9 +1157,8 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& ins
             REALM_ASSERT(index != uint32_t(-1));
             size_t lst_size = list.size();
             uint32_t translated_from, translated_to;
-            bool allowed_to_move =
-                m_recovery_applier->m_lists.at(m_list_path)
-                    .move(static_cast<uint32_t>(index), m_instr.ndx_2, lst_size, translated_from, translated_to);
+            bool allowed_to_move = m_recovery_applier->m_lists.at(m_list_path)
+                                       .move(index, m_instr.ndx_2, lst_size, translated_from, translated_to);
             if (allowed_to_move) {
                 m_instr.prior_size = static_cast<uint32_t>(lst_size);
                 m_instr.path.back() = translated_from;
@@ -1189,8 +1188,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
         Status on_list_index(LstBase& list, uint32_t index) override
         {
             uint32_t translated_index;
-            bool allowed_to_delete =
-                m_recovery_applier->m_lists.at(m_list_path).remove(static_cast<uint32_t>(index), translated_index);
+            bool allowed_to_delete = m_recovery_applier->m_lists.at(m_list_path).remove(index, translated_index);
             if (allowed_to_delete) {
                 m_instr.prior_size = static_cast<uint32_t>(list.size());
                 m_instr.path.back() = translated_index;

@@ -50,7 +50,7 @@ void TransactLogEncoder::encode_string(StringData string)
 {
     size_t max_required_bytes = max_enc_bytes_per_int + string.size();
     char* ptr = reserve(max_required_bytes); // Throws
-    ptr = encode(ptr, size_t(string.size()));
+    ptr = encode(ptr, string.size());
     ptr = std::copy(string.data(), string.data() + string.size(), ptr);
     advance(ptr);
 }

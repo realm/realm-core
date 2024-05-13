@@ -653,7 +653,7 @@ ref_type BPlusTreeInner::insert_bp_node(size_t child_ndx, ref_type new_sibling_r
         // parent to be split. Since this is not possible during
         // 'append', we can safely assume that the parent node is on
         // the general form.
-        new_split_offset = size_t(elem_ndx_offset + state.split_size);
+        new_split_offset = elem_ndx_offset + state.split_size;
         new_split_size = get_tree_size() + 1;
 
         move(&new_sibling, new_ref_ndx, (new_split_offset - 1));                // Strips off tree size

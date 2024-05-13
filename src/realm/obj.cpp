@@ -1227,7 +1227,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
                   is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     if (recurse)
-        const_cast<Table*>(m_table.unchecked_ptr())->remove_recursive(state);
+        m_table.unchecked_ptr()->remove_recursive(state);
 
     return *this;
 }
@@ -1506,7 +1506,7 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
     }
 
     if (recurse)
-        const_cast<Table*>(m_table.unchecked_ptr())->remove_recursive(state);
+        m_table.unchecked_ptr()->remove_recursive(state);
 
     return *this;
 }

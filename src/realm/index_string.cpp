@@ -661,7 +661,7 @@ void IndexArray::index_string_all(const Mixed& value, std::vector<ObjKey>& resul
 
 static void get_all_keys_below(std::set<int64_t>& result, ref_type ref, Allocator& alloc)
 {
-    const char* sub_header = alloc.translate(ref_type(ref));
+    const char* sub_header = alloc.translate(ref);
     const bool sub_isindex = NodeHeader::get_context_flag_from_header(sub_header);
 
     if (sub_isindex) {

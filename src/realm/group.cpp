@@ -266,15 +266,9 @@ size_t Group::key2ndx_checked(TableKey key) const
         if (tbl && tbl->get_key() == key)
             return idx;
     }
-    // The notion of a const group as it is now, is not really
-    // useful. It is linked to a distinction between a read
-    // and a write transaction. This distinction is no longer
-    // a compile time aspect (it's not const anymore)
-    Allocator* alloc = const_cast<SlabAlloc*>(&m_alloc);
     if (m_tables.is_attached() && idx < m_tables.size()) {
         RefOrTagged rot = m_tables.get_as_ref_or_tagged(idx);
-        if (rot.is_ref() && rot.get_as_ref() && (Table::get_key_direct(*alloc, rot.get_as_ref()) == key)) {
-
+        if (rot.is_ref() && rot.get_as_ref() && (Table::get_key_direct(m_alloc, rot.get_as_ref()) == key)) {
             return idx;
         }
     }
@@ -957,7 +951,7 @@ auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> Histo
         }
         info.type = history_type;
         info.version = history_schema_version;
-        Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(*m_group))};
+        Array history{_impl::GroupFriend::get_alloc(*m_group)};
         history.init_from_ref(history_ref);
         info.ref = history.write(out, deep, only_if_modified); // Throws
     }
@@ -1209,7 +1203,7 @@ size_t Group::get_used_space() const noexcept
     size_t used_space = (size_t(m_top.get(2)) >> 1);
 
     if (m_top.size() > 4) {
-        Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
+        Array free_lengths(m_alloc);
         free_lengths.init_from_ref(ref_type(m_top.get(4)));
         used_space -= size_t(free_lengths.get_sum());
     }

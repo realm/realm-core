@@ -580,7 +580,7 @@ void TransactLogEncoder::append_string_instr(Instruction instr, StringData strin
     char* ptr = reserve(max_required_bytes); // Throws
     *ptr++ = char(instr);
     ptr = encode(ptr, int(type_String));
-    ptr = encode(ptr, size_t(string.size()));
+    ptr = encode(ptr, string.size());
     ptr = std::copy(string.data(), string.data() + string.size(), ptr);
     advance(ptr);
 }

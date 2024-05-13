@@ -802,7 +802,7 @@ std::unique_ptr<ClusterNode> ClusterTree::get_node(ArrayParent* parent, size_t n
 
     std::unique_ptr<ClusterNode> node;
 
-    char* child_header = static_cast<char*>(m_alloc.translate(ref));
+    char* child_header = m_alloc.translate(ref);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         node = std::make_unique<Cluster>(0, m_alloc, *this);
@@ -882,7 +882,7 @@ void ClusterTree::enumerate_string_column(ColKey col_key)
 
     // Store key strings in spec
     size_t spec_ndx = m_owner->colkey2spec_ndx(col_key);
-    const_cast<Spec*>(&m_owner->m_spec)->upgrade_string_to_enum(spec_ndx, keys.get_ref());
+    m_owner->m_spec.upgrade_string_to_enum(spec_ndx, keys.get_ref());
 
     // Replace column in all clusters
     update(upgrade);
