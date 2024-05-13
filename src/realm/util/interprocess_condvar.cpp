@@ -215,7 +215,6 @@ void notify_fd(int fd)
         // size of the buffer, which is not a likely scenario)
         REALM_ASSERT_EX(ret == -1 && errno == EAGAIN, errno);
         millisleep(1);
-        continue;
     }
 }
 

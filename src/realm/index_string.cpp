@@ -357,8 +357,6 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& 
             }
         }
     }
-
-    return;
 }
 
 

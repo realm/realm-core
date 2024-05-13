@@ -904,7 +904,6 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
         }
         ++progress_index;
     }
-    return;
 }
 
 void EncryptedFileMapping::flush() noexcept

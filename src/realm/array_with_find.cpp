@@ -30,8 +30,6 @@ void ArrayWithFind::find_all(IntegerColumn* result, int64_t value, size_t col_of
 
     QueryStateFindAll state(*result);
     REALM_TEMPEX2(find_optimized, Equal, m_array.m_width, (value, begin, end, col_offset, &state));
-
-    return;
 }
 
 

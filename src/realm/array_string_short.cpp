@@ -166,7 +166,6 @@ void ArrayStringShort::insert(size_t ndx, StringData value)
 
     // Set new value
     set(ndx, value);
-    return;
 }
 
 void ArrayStringShort::erase(size_t ndx)

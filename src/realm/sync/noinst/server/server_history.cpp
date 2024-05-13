@@ -454,7 +454,6 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
                              ic.upload_cursor.client_version, ic.upload_cursor.last_integrated_server_version,
                              hex_dump); // Throws
                 ++changeset_ndx;
-                continue;
             }
         }
 
