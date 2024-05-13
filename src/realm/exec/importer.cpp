@@ -461,10 +461,10 @@ nextrecord:
     if (src[m_curpos] == 0)
         goto end;
 
-    payload.push_back(std::vector<std::string>());
+    payload.emplace_back();
 
 nextfield:
-    payload.back().push_back("");
+    payload.back().emplace_back("");
 
     if (src[m_curpos] == 0)
         goto end;

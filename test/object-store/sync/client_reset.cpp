@@ -2345,18 +2345,14 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {{dict_key, Mixed{values[0]}}});
         }
         SECTION("modify complex") {
-            std::map<std::string, Mixed> local;
-            local.emplace(std::make_pair("adam", Mixed(values[0])));
-            local.emplace(std::make_pair("bernie", Mixed(values[0])));
-            local.emplace(std::make_pair("david", Mixed(values[0])));
-            local.emplace(std::make_pair("eric", Mixed(values[0])));
-            local.emplace(std::make_pair("frank", Mixed(values[1])));
-            std::map<std::string, Mixed> remote;
-            remote.emplace(std::make_pair("adam", Mixed(values[0])));
-            remote.emplace(std::make_pair("bernie", Mixed(values[1])));
-            remote.emplace(std::make_pair("carl", Mixed(values[0])));
-            remote.emplace(std::make_pair("david", Mixed(values[1])));
-            remote.emplace(std::make_pair("frank", Mixed(values[0])));
+            Mixed m0(values[0]);
+            Mixed m1(values[1]);
+            std::map<std::string, Mixed> local = {
+                {"adam", m0}, {"bernie", m0}, {"david", m0}, {"eric", m0}, {"frank", m1},
+            };
+            std::map<std::string, Mixed> remote = {
+                {"adam", m0}, {"bernie", m1}, {"carl", m0}, {"david", m1}, {"frank", m0},
+            };
             reset_dictionary(std::move(local), std::move(remote));
         }
         SECTION("empty remote") {
@@ -2707,10 +2703,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         std::vector<util::Optional<int64_t>> actual;
         for (auto obj : links) {
             if (obj.is_null(valid_pk_name)) {
-                actual.push_back(util::none);
+                actual.emplace_back(util::none);
             }
             else {
-                actual.push_back(obj.get<Int>(valid_pk_name));
+                actual.emplace_back(obj.get<Int>(valid_pk_name));
             }
         }
         if (sorted) {

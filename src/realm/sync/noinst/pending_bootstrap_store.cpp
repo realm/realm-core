@@ -242,7 +242,7 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
     size_t bytes_so_far = 0;
     for (size_t idx = 0; idx < changeset_list.size() && bytes_so_far < limit_in_bytes; ++idx) {
         auto cur_changeset = changeset_list.get_object(idx);
-        ret.changeset_data.push_back(util::AppendBuffer<char>());
+        ret.changeset_data.emplace_back();
         auto& uncompressed_buffer = ret.changeset_data.back();
 
         auto compressed_changeset_data = cur_changeset.get<BinaryData>(m_changeset_data);

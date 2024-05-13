@@ -341,7 +341,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& 
         size_t sz = result.size() + rows.size();
         result.reserve(sz);
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-            result.push_back(ObjKey(*it));
+            result.emplace_back(*it);
         }
         return;
     }
@@ -369,7 +369,7 @@ void IndexArray::from_list_all(const Mixed& value, std::vector<ObjKey>& result, 
     if (column.full_word()) {
         result.reserve(rows.size());
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-            result.push_back(ObjKey(*it));
+            result.emplace_back(*it);
         }
 
         return;
@@ -394,7 +394,7 @@ void IndexArray::from_list_all(const Mixed& value, std::vector<ObjKey>& result, 
     size_t sz = result.size() + (upper - lower);
     result.reserve(sz);
     for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
-        result.push_back(ObjKey(*it));
+        result.emplace_back(*it);
     }
 }
 

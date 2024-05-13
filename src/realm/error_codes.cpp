@@ -498,7 +498,7 @@ std::vector<std::pair<std::string_view, ErrorCodes::Error>> ErrorCodes::get_erro
 {
     std::vector<std::pair<std::string_view, ErrorCodes::Error>> ret;
     for (auto it : string_to_error_code) {
-        ret.emplace_back(std::make_pair(it.name, it.code));
+        ret.emplace_back(it.name, it.code);
     }
     return ret;
 }

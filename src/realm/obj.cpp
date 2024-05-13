@@ -1047,15 +1047,15 @@ FullPath Obj::get_path() const
                     size_t ndx = find_link_value_in_collection(dict, obj, next_col_key, get_link());
                     REALM_ASSERT(ndx != realm::not_found);
                     result = dict.get_path();
-                    result.path_from_top.push_back(dict.get_key(ndx).get_string());
+                    result.path_from_top.emplace_back(dict.get_key(ndx).get_string());
                 }
                 else {
                     result = obj.get_path();
                     if (result.path_from_top.empty()) {
-                        result.path_from_top.push_back(next_col_key);
+                        result.path_from_top.emplace_back(next_col_key);
                     }
                     else {
-                        result.path_from_top.push_back(obj.get_table()->get_column_name(next_col_key));
+                        result.path_from_top.emplace_back(obj.get_table()->get_column_name(next_col_key));
                     }
                 }
 

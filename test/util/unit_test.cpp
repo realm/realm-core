@@ -75,7 +75,7 @@ public:
 
     void begin(const TestContext& context) override
     {
-        m_results.emplace(std::make_pair(context.get_test_name(), TestResult{}));
+        m_results.emplace(context.get_test_name(), TestResult{});
     }
 
     void fail(const TestContext& context, const char*, long, const std::string&) override

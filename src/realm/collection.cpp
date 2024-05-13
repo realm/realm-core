@@ -169,7 +169,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
                         });
                     }
                     else if (end_of_path) {
-                        ctrl.matches.back().push_back(Mixed());
+                        ctrl.matches.back().emplace_back();
                     }
                     return;
                 }

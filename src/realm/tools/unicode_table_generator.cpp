@@ -16,7 +16,7 @@ std::vector<std::string> tokenize(const char* src, char delim, bool want_empty_t
             size_t len = (d) ? d - src : strlen(src);
 
             if (len || want_empty_tokens)
-                tokens.push_back(std::string(src, len)); // capture token
+                tokens.emplace_back(src, len); // capture token
 
             if (d)
                 src += len + 1;

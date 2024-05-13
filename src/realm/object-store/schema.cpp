@@ -227,8 +227,7 @@ void Schema::validate(SchemaValidationMode validation_mode) const
     };
 
     for (auto it = find_next_duplicate(cbegin()); it != cend(); it = find_next_duplicate(++it)) {
-        exceptions.push_back(
-            ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
+        exceptions.emplace_back("Type '%1' appears more than once in the schema.", it->name);
     }
 
     for (auto const& object : *this) {

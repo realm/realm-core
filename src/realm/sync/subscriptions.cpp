@@ -198,7 +198,7 @@ void SubscriptionSet::load_from_database(const Obj& obj)
     auto sub_list = obj.get_linklist(mgr->m_sub_set_subscriptions);
     m_subs.clear();
     for (size_t idx = 0; idx < sub_list.size(); ++idx) {
-        m_subs.push_back(Subscription(mgr.get(), sub_list.get_object(idx)));
+        m_subs.emplace_back(mgr.get(), sub_list.get_object(idx));
     }
 }
 

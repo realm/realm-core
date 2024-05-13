@@ -81,10 +81,10 @@ public:
             else if (prop.name == Geospatial::c_geo_point_coords_col_name) {
                 std::vector<std::any> coords;
                 auto&& point = geo->get<GeoPoint>(); // throws
-                coords.push_back(point.longitude);
-                coords.push_back(point.latitude);
+                coords.emplace_back(point.longitude);
+                coords.emplace_back(point.latitude);
                 if (point.has_altitude()) {
-                    coords.push_back(*point.get_altitude());
+                    coords.emplace_back(*point.get_altitude());
                 }
                 return coords;
             }
