@@ -340,16 +340,15 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& 
 
         size_t sz = result.size() + rows.size();
         result.reserve(sz);
-        for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-            result.emplace_back(*it);
-        }
+        for (int64_t row : rows)
+            result.emplace_back(row);
         return;
     }
 
     // special case for very long strings, where they might have a common prefix and end up in the
     // same subindex column, but still not be identical
-    for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-        ObjKey key = ObjKey(*it);
+    for (int64_t row : rows) {
+        ObjKey key = ObjKey(row);
         Mixed val = column.get_value(key);
         if (val.is_type(type_String)) {
             auto upper_str = case_map(val.get_string(), true);
@@ -368,10 +367,8 @@ void IndexArray::from_list_all(const Mixed& value, std::vector<ObjKey>& result, 
 {
     if (column.full_word()) {
         result.reserve(rows.size());
-        for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-            result.emplace_back(*it);
-        }
-
+        for (int64_t row : rows)
+            result.emplace_back(row);
         return;
     }
 

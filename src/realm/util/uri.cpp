@@ -224,8 +224,8 @@ std::string util::uri_percent_encode(const std::string& unescaped)
     escaped.fill('0');
     escaped << std::hex;
 
-    for (size_t i = 0; i < unescaped.size(); ++i) {
-        const unsigned char ch = static_cast<unsigned char>(unescaped[i]);
+    for (char i : unescaped) {
+        const unsigned char ch = static_cast<unsigned char>(i);
         if (is_unreserved(ch)) {
             escaped << ch;
         }

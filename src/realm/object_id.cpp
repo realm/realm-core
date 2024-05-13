@@ -63,10 +63,10 @@ ObjectId::ObjectId(StringData init) noexcept
     REALM_ASSERT(is_valid_str(init));
 
     size_t j = 0;
-    for (size_t i = 0; i < m_bytes.size(); i++) {
+    for (unsigned char& byte : m_bytes) {
         buf[0] = init[j++];
         buf[1] = init[j++];
-        m_bytes[i] = char(strtol(buf, nullptr, 16));
+        byte = char(strtol(buf, nullptr, 16));
     }
 }
 
@@ -116,8 +116,7 @@ std::string ObjectId::to_string() const
     char buffer[buffer_size];
     std::string ret;
     char* p = buffer;
-    for (size_t i = 0; i < m_bytes.size(); i++) {
-        auto c = m_bytes[i];
+    for (unsigned char c : m_bytes) {
         *p++ = hex_digits[c >> 4];
         *p++ = hex_digits[c & 0xf];
     }

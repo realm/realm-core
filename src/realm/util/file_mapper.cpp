@@ -318,8 +318,8 @@ namespace {
 size_t collect_total_workload() // must be called under lock
 {
     size_t total = 0;
-    for (auto i = mappings_by_file.begin(); i != mappings_by_file.end(); ++i) {
-        SharedFileInfo& info = *i->info;
+    for (auto& i : mappings_by_file) {
+        SharedFileInfo& info = *i.info;
         info.num_decrypted_pages = 0;
         for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
             info.num_decrypted_pages += (*it)->collect_decryption_count();
@@ -451,8 +451,7 @@ void reclaim_pages()
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {
-    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
-        mapping_and_addr& m = mappings_by_addr[i];
+    for (auto& m : mappings_by_addr) {
         if (m.addr == addr && m.size == size)
             return &m;
         REALM_ASSERT(m.addr != addr);

@@ -2164,8 +2164,8 @@ public:
             s = m_child->validate();
         if (s != "")
             return s;
-        for (size_t i = 0; i < m_conditions.size(); ++i) {
-            s = m_conditions[i]->validate();
+        for (const auto& condition : m_conditions) {
+            s = condition->validate();
             if (s != "")
                 return s;
         }

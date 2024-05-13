@@ -87,12 +87,12 @@ UUID::UUID(StringData init)
     }
 
     size_t j = 0;
-    for (size_t i = 0; i < m_bytes.size(); i++) {
+    for (unsigned char& byte : m_bytes) {
         if (j == hyphen_pos_0 || j == hyphen_pos_1 || j == hyphen_pos_2 || j == hyphen_pos_3) {
             j++;
         }
-        m_bytes[i] = parse_xdigit(init[j++]) << 4;
-        m_bytes[i] += parse_xdigit(init[j++]);
+        byte = parse_xdigit(init[j++]) << 4;
+        byte += parse_xdigit(init[j++]);
     }
 }
 
@@ -100,9 +100,9 @@ std::string UUID::to_string() const
 {
     std::string ret(null_uuid_string);
     size_t mod_ndx = 0;
-    for (size_t i = 0; i < m_bytes.size(); i++) {
-        ret[mod_ndx++] = hex_digits[m_bytes[i] >> 4];
-        ret[mod_ndx++] = hex_digits[m_bytes[i] & 0xf];
+    for (unsigned char byte : m_bytes) {
+        ret[mod_ndx++] = hex_digits[byte >> 4];
+        ret[mod_ndx++] = hex_digits[byte & 0xf];
         if (mod_ndx == hyphen_pos_0 || mod_ndx == hyphen_pos_1 || mod_ndx == hyphen_pos_2 ||
             mod_ndx == hyphen_pos_3) {
             ++mod_ndx;

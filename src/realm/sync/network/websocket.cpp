@@ -40,8 +40,8 @@ std::string make_random_sec_websocket_key(std::mt19937_64& random)
 {
     char random_bytes[16];
     std::uniform_int_distribution<> dis(std::numeric_limits<char>::min(), std::numeric_limits<char>::max());
-    for (int i = 0; i < 16; ++i) {
-        random_bytes[i] = dis(random);
+    for (char& random_byte : random_bytes) {
+        random_byte = dis(random);
     }
 
     char out_buffer[24];
@@ -230,8 +230,8 @@ size_t make_frame(bool fin, int opcode, bool mask, const char* payload, size_t p
     if (mask) {
         char masking_key[4];
         std::uniform_int_distribution<> dis(0, 255);
-        for (int i = 0; i < 4; ++i) {
-            masking_key[i] = dis(random);
+        for (char& i : masking_key) {
+            i = dis(random);
         }
         output[index++] = masking_key[0];
         output[index++] = masking_key[1];

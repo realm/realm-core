@@ -32,8 +32,7 @@ void LinkMap::set_base_table(ConstTableRef table)
     m_link_types.clear();
     m_only_unary_links = true;
 
-    for (size_t i = 0; i < m_link_column_keys.size(); i++) {
-        ColKey link_column_key = m_link_column_keys[i];
+    for (ColKey link_column_key : m_link_column_keys) {
         // Link column can be either LinkList or single Link
         ColumnType type = link_column_key.get_type();
         REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);

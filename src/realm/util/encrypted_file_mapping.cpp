@@ -637,8 +637,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
     // Precondition: this method must never be called for a page which
     // is already up to date.
     REALM_ASSERT(is_not(m_page_state[local_page_ndx], UpToDate));
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
+    for (auto m : m_file.mappings) {
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         if (m == this || !m->contains_page(page_ndx_in_file))
             continue;
@@ -712,8 +711,7 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
 
 void EncryptedFileMapping::mark_pages_for_IV_check()
 {
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
+    for (auto m : m_file.mappings) {
         for (size_t pg = m->get_start_index(); pg < m->get_end_index(); ++pg) {
             size_t local_page_ndx = pg - m->m_first_page;
             if (is(m->m_page_state[local_page_ndx], UpToDate) &&
@@ -733,8 +731,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
     REALM_ASSERT(is(m_page_state[local_page_ndx], UpToDate));
     // Go through all other mappings of this file and copy changes into those mappings
     size_t page_ndx_in_file = local_page_ndx + m_first_page;
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
+    for (auto m : m_file.mappings) {
         if (m != this && m->contains_page(page_ndx_in_file)) {
             size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
             if (is(m->m_page_state[shadow_local_page_ndx], UpToDate) ||
@@ -772,8 +769,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
                              static_cast<size_t>(1ULL << m_page_shift), m_observer))
         return;
 
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
+    for (auto m : m_file.mappings) {
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (m != this && m->contains_page(page_ndx_in_file) && is(m->m_page_state[shadow_mapping_local_ndx], Dirty)) {
             memcpy(m_validate_buffer.get(), m->page_addr(shadow_mapping_local_ndx),

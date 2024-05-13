@@ -218,8 +218,7 @@ void Changeset::print() const
 
 void Changeset::verify() const
 {
-    for (size_t i = 0; i < m_strings.size(); ++i) {
-        auto& range = m_strings.at(i);
+    for (auto range : m_strings) {
         REALM_ASSERT(range.offset <= m_string_buffer.size());
         REALM_ASSERT(range.offset + range.size <= m_string_buffer.size());
     }

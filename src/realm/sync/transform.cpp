@@ -2440,26 +2440,26 @@ void Transformer::merge_changesets(file_ident_type local_file_ident, util::Span<
         std::cerr << TERM_YELLOW << "\n=> PEER " << std::hex << local_file_ident
                   << " merging "
                      "changeset(s)/from peer(s):\n";
-        for (size_t i = 0; i < their_changesets.size(); ++i) {
-            std::cerr << "Changeset version " << std::dec << their_changesets[i].version << " from peer "
-                      << their_changesets[i].origin_file_ident << " at timestamp "
-                      << their_changesets[i].origin_timestamp << "\n";
+        for (auto& their_changeset : their_changesets) {
+            std::cerr << "Changeset version " << std::dec << their_changeset.version << " from peer "
+                      << their_changeset.origin_file_ident << " at timestamp " << their_changeset.origin_timestamp
+                      << "\n";
         }
         std::cerr << "Transforming through local changeset(s):\n";
-        for (size_t i = 0; i < our_changesets.size(); ++i) {
-            std::cerr << "Changeset version " << our_changesets[i]->version << " from peer "
-                      << our_changesets[i]->origin_file_ident << " at timestamp "
-                      << our_changesets[i]->origin_timestamp << "\n";
+        for (auto& our_changeset : our_changesets) {
+            std::cerr << "Changeset version " << our_changeset->version << " from peer "
+                      << our_changeset->origin_file_ident << " at timestamp " << our_changeset->origin_timestamp
+                      << "\n";
         }
 
-        for (size_t i = 0; i < our_changesets.size(); ++i) {
+        for (auto& our_changeset : our_changesets) {
             std::cerr << TERM_RED << "\nLOCAL (RECIPROCAL) CHANGESET BEFORE MERGE:\n" << TERM_RESET;
-            our_changesets[i]->print(std::cerr);
+            our_changeset->print(std::cerr);
         }
 
-        for (size_t i = 0; i < their_changesets.size(); ++i) {
+        for (const auto& their_changeset : their_changesets) {
             std::cerr << TERM_RED << "\nINCOMING CHANGESET BEFORE MERGE:\n" << TERM_RESET;
-            their_changesets[i].print(std::cerr);
+            their_changeset.print(std::cerr);
         }
 
         std::cerr << TERM_MAGENTA << "\nINCOMING CHANGESET INDEX:\n" << TERM_RESET;
@@ -2501,14 +2501,14 @@ void Transformer::merge_changesets(file_ident_type local_file_ident, util::Span<
 
 #if REALM_DEBUG // LCOV_EXCL_START
     if (trace) {
-        for (size_t i = 0; i < our_changesets.size(); ++i) {
+        for (auto& our_changeset : our_changesets) {
             std::cerr << TERM_CYAN << "\nRECIPROCAL CHANGESET AFTER MERGE:\n" << TERM_RESET;
-            our_changesets[i]->print(std::cerr);
+            our_changeset->print(std::cerr);
             std::cerr << '\n';
         }
-        for (size_t i = 0; i < their_changesets.size(); ++i) {
+        for (const auto& their_changeset : their_changesets) {
             std::cerr << TERM_CYAN << "INCOMING CHANGESET AFTER MERGE:\n" << TERM_RESET;
-            their_changesets[i].print(std::cerr);
+            their_changeset.print(std::cerr);
             std::cerr << '\n';
         }
     }

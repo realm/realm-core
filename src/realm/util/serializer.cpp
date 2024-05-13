@@ -337,8 +337,8 @@ std::string SerialisationState::get_variable_name(ConstTableRef table)
     while (true) {
         std::string guess = guess_prefix + add_char;
         bool found_duplicate = false;
-        for (size_t i = 0; i < subquery_prefix_list.size(); ++i) {
-            if (guess == subquery_prefix_list[i]) {
+        for (const auto& i : subquery_prefix_list) {
+            if (guess == i) {
                 found_duplicate = true;
                 break;
             }

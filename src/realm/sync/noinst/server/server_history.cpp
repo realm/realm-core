@@ -2274,14 +2274,14 @@ std::ostream& _impl::operator<<(std::ostream& out, const ServerHistory::HistoryC
     out << "\n";
 
     out << "history entries:\n";
-    for (std::size_t i = 0; i < hc.sync_history.size(); ++i) {
+    for (const auto& i : hc.sync_history) {
         out << "\n";
-        out << "  version_salt = " << hc.sync_history[i].version_salt << "\n";
-        out << "  client_file_ident = " << hc.sync_history[i].client_file_ident << "\n";
-        out << "  client_version = " << hc.sync_history[i].client_version << "\n";
-        out << "  timestamp = " << hc.sync_history[i].timestamp << "\n";
-        out << "  cumul_byte_size = " << hc.sync_history[i].cumul_byte_size << "\n";
-        const std::string& changeset = hc.sync_history[i].changeset;
+        out << "  version_salt = " << i.version_salt << "\n";
+        out << "  client_file_ident = " << i.client_file_ident << "\n";
+        out << "  client_version = " << i.client_version << "\n";
+        out << "  timestamp = " << i.timestamp << "\n";
+        out << "  cumul_byte_size = " << i.cumul_byte_size << "\n";
+        const std::string& changeset = i.changeset;
         out << "  changeset = " << util::hex_dump(changeset.data(), changeset.size()) << "\n";
         out << "\n";
     }

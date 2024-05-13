@@ -153,13 +153,21 @@ public:
     {
         return get(size() - 1);
     }
-    IntegerColumnIterator cbegin() const
+    IntegerColumnIterator begin() const
     {
         return IntegerColumnIterator(this, 0);
     }
-    IntegerColumnIterator cend() const
+    IntegerColumnIterator end() const
     {
         return IntegerColumnIterator(this, size());
+    }
+    IntegerColumnIterator cbegin() const
+    {
+        return begin();
+    }
+    IntegerColumnIterator cend() const
+    {
+        return end();
     }
 
     void dump_values(std::ostream& o, int level) const

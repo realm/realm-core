@@ -137,9 +137,9 @@ void ObjectChangeSet::merge(ObjectChangeSet&& other)
 void ObjectChangeSet::verify()
 {
 #ifdef REALM_DEBUG
-    for (auto it = m_deletions.begin(); it != m_deletions.end(); ++it) {
-        REALM_ASSERT(m_modifications.find(*it) == m_modifications.end());
-        REALM_ASSERT(m_insertions.find(*it) == m_insertions.end());
+    for (auto deletion : m_deletions) {
+        REALM_ASSERT(m_modifications.find(deletion) == m_modifications.end());
+        REALM_ASSERT(m_insertions.find(deletion) == m_insertions.end());
     }
 #endif
 }

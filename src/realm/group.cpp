@@ -1271,8 +1271,7 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
-    for (size_t i = 0; i < m_table_accessors.size(); ++i) {
-        auto table_accessor = m_table_accessors[i];
+    for (auto table_accessor : m_table_accessors) {
         if (table_accessor) {
             table_accessor->update_allocator_wrapper(writable);
         }

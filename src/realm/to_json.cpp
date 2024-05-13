@@ -53,8 +53,7 @@ void Group::to_json(std::ostream& out, JSONOutputMode output_mode) const
 
     auto keys = get_table_keys();
     bool first = true;
-    for (size_t i = 0; i < keys.size(); ++i) {
-        auto key = keys[i];
+    for (auto key : keys) {
         ConstTableRef table = get_table(key);
 
         if (!table->is_embedded()) {

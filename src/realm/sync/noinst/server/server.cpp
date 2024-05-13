@@ -4029,8 +4029,8 @@ void ServerImpl::handle_accept(std::error_code ec)
             REALM_ASSERT(ec != util::error::operation_aborted);
 
             // We close the reserved files to get a few extra file descriptors.
-            for (size_t i = 0; i < sizeof(m_reserved_files) / sizeof(m_reserved_files[0]); ++i) {
-                m_reserved_files[i].reset();
+            for (auto& reserved_file : m_reserved_files) {
+                reserved_file.reset();
             }
 
             // FIXME: There are probably errors that need to be treated

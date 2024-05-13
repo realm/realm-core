@@ -465,12 +465,11 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
 
     auto& col = m_columns[0];
     const auto& ck = col.col_key;
-    for (size_t i = 0; i < v.size(); i++) {
-        IndexPair& index = v[i];
+    for (IndexPair& index : v) {
         ObjKey key = index.key_for_object;
 
         if (!col.translated_keys.empty()) {
-            key = col.translated_keys[v[i].index_in_view];
+            key = col.translated_keys[index.index_in_view];
             if (!key) {
                 index.cached_value = Mixed();
                 continue;
@@ -598,11 +597,10 @@ bool DescriptorOrdering::will_apply_filter() const
 realm::util::Optional<size_t> DescriptorOrdering::get_min_limit() const
 {
     realm::util::Optional<size_t> min_limit;
-    for (auto it = m_descriptors.begin(); it != m_descriptors.end(); it++) {
-        if ((*it)->get_type() == DescriptorType::Limit) {
-            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(it->get());
-            REALM_ASSERT(limit);
-            min_limit = bool(min_limit) ? std::min(*min_limit, limit->get_limit()) : limit->get_limit();
+    for (const auto& descriptor : m_descriptors) {
+        if (descriptor->get_type() == DescriptorType::Limit) {
+            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(descriptor.get());
+            min_limit = min_limit ? std::min(*min_limit, limit->get_limit()) : limit->get_limit();
         }
     }
     return min_limit;

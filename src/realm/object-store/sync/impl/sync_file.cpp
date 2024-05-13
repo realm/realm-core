@@ -101,8 +101,7 @@ std::string make_percent_encoded_string(const std::string& raw_string)
 {
     std::string buffer;
     buffer.reserve(raw_string.size());
-    for (size_t i = 0; i < raw_string.size(); i++) {
-        unsigned char character = raw_string[i];
+    for (unsigned char character : raw_string) {
         if (character_is_unreserved(character)) {
             buffer.push_back(character);
         }

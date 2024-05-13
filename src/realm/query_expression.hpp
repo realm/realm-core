@@ -3544,8 +3544,8 @@ public:
         Value<int64_t> list_refs;
         m_list.get_lists(index, list_refs);
         std::vector<Int> sizes;
-        for (size_t i = 0; i < list_refs.size(); i++) {
-            ref_type list_ref = to_ref(list_refs[i].get_int());
+        for (auto& i : list_refs) {
+            ref_type list_ref = to_ref(i.get_int());
             if (list_ref) {
                 BPlusTree<T> list(alloc);
                 list.init_from_ref(list_ref);

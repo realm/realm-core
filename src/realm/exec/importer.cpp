@@ -369,18 +369,18 @@ std::vector<DataType> Importer::types(std::vector<std::string> v)
 {
     std::vector<DataType> res;
 
-    for (size_t t = 0; t < v.size(); t++) {
+    for (const auto& t : v) {
         bool i;
         bool d;
         bool f;
         bool b;
 
-        parse_integer<true>(v[t].c_str(), &i);
-        parse_double<true>(v[t].c_str(), &d);
-        parse_float<true>(v[t].c_str(), &f);
-        parse_bool<true>(v[t].c_str(), &b);
+        parse_integer<true>(t.c_str(), &i);
+        parse_double<true>(t.c_str(), &d);
+        parse_float<true>(t.c_str(), &f);
+        parse_bool<true>(t.c_str(), &b);
 
-        if (is_null(v[t].c_str()) && !Empty_as_string) {
+        if (is_null(t.c_str()) && !Empty_as_string) {
             // If Empty_as_string == false, then empty strings may be represented by any of 0/0.0/false
             i = true;
             d = true;
@@ -665,7 +665,7 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
     }
 
     do {
-        for (size_t row = 0; row < payload.size(); row++) {
+        for (auto& row : payload) {
 
             if (imported_rows == import_rows)
                 return imported_rows;
@@ -681,19 +681,19 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
 
                 switch (scheme[col]) {
                     case type_String:
-                        values.insert(*key, StringData(payload[row][col]));
+                        values.insert(*key, StringData(row[col]));
                         break;
                     case type_Int:
-                        values.insert(*key, parse_integer<true>(payload[row][col].c_str(), &success));
+                        values.insert(*key, parse_integer<true>(row[col].c_str(), &success));
                         break;
                     case type_Double:
-                        values.insert(*key, parse_double<true>(payload[row][col].c_str(), &success));
+                        values.insert(*key, parse_double<true>(row[col].c_str(), &success));
                         break;
                     case type_Float:
-                        values.insert(*key, parse_float<true>(payload[row][col].c_str(), &success));
+                        values.insert(*key, parse_float<true>(row[col].c_str(), &success));
                         break;
                     case type_Bool:
-                        values.insert(*key, parse_bool<true>(payload[row][col].c_str(), &success));
+                        values.insert(*key, parse_bool<true>(row[col].c_str(), &success));
                         break;
                     default:
                         REALM_ASSERT(false);
@@ -711,11 +711,11 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
                     std::stringstream sstm;
 
                     if (type_detection_rows > 0) {
-                        if (scheme[col] != type_String && is_null(payload[row][col].c_str()) && Empty_as_string)
+                        if (scheme[col] != type_String && is_null(row[col].c_str()) && Empty_as_string)
                             sstm << "Column " << col << " was auto detected to be of type "
                                  << DataTypeToText(scheme[col]) << " using the first " << type_detection_rows
                                  << " rows of CSV file, but in row " << imported_rows
-                                 << " of cvs file the field contained the NULL value '" << payload[row][col].c_str()
+                                 << " of cvs file the field contained the NULL value '" << row[col].c_str()
                                  << "'. Please increase the 'type_detection_rows' argument or set "
                                  << "Empty_as_string = false/void the -e flag to convert such fields to 0, 0.0 or "
                                     "false";
@@ -723,13 +723,13 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
                             sstm << "Column " << col << " was auto detected to be of type "
                                  << DataTypeToText(scheme[col]) << " using the first " << type_detection_rows
                                  << " rows of CSV file, but in row " << imported_rows
-                                 << " of cvs file the field contained '" << payload[row][col].c_str()
+                                 << " of cvs file the field contained '" << row[col].c_str()
                                  << "' which is of another type. Please increase the 'type_detection_rows' argument";
                     }
                     else
                         sstm << "Column " << col << " was specified to be of type " << DataTypeToText(scheme[col])
-                             << ", but in row " << imported_rows << " of cvs file,"
-                             << "the field contained '" << payload[row][col].c_str() << "' which is of another type";
+                             << ", but in row " << imported_rows << " of cvs file," << "the field contained '"
+                             << row[col].c_str() << "' which is of another type";
 
                     throw std::runtime_error(sstm.str());
                 }
