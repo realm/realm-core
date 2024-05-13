@@ -1016,7 +1016,7 @@ public:
         m_link_cols.pop_back();
         // Recalculate m_current_table
         m_current_table = m_base_table;
-        for (auto col : m_link_cols) {
+        for (const auto& col : m_link_cols) {
             m_current_table = m_current_table->get_opposite_table(col);
         }
     }

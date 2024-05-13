@@ -115,7 +115,7 @@ void Dictionary::insert_json(const std::string& key, const T& value)
         case Json::value_t::object: {
             insert_collection(key, CollectionType::Dictionary);
             auto dict = get_dictionary(key);
-            for (auto [k, v] : j.items()) {
+            for (const auto& [k, v] : j.items()) {
                 dict->insert_json(k, v);
             }
             break;
@@ -159,7 +159,7 @@ void Lst<Mixed>::add_json(const T& value)
         case Json::value_t::object: {
             insert_collection(sz, CollectionType::Dictionary);
             auto dict = get_dictionary(sz);
-            for (auto [k, v] : j.items()) {
+            for (const auto& [k, v] : j.items()) {
                 dict->insert_json(k, v);
             }
             break;
@@ -201,7 +201,7 @@ Obj& Obj::set_json(ColKey col_key, StringData json)
         case Json::value_t::object: {
             set_collection(col_key, CollectionType::Dictionary);
             Dictionary dict(*this, col_key);
-            for (auto [k, v] : j.items()) {
+            for (const auto& [k, v] : j.items()) {
                 dict.insert_json(k, v);
             }
             break;

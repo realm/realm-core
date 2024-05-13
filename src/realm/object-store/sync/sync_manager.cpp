@@ -86,7 +86,7 @@ void SyncManager::tear_down_for_testing()
         // prior to calling `tear_down_for_testing`.
         if (!no_sessions) {
             util::CheckedLockGuard lock(m_mutex);
-            for (auto session : m_sessions) {
+            for (const auto& session : m_sessions) {
                 m_logger_ptr->error("open session at path '%1'", session.first);
             }
         }
