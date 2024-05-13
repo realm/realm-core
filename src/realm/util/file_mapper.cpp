@@ -43,17 +43,14 @@
 #include <csignal>
 #include <sys/stat.h>
 #include <cstring>
-#include <atomic>
 #include <fstream>
 #include <sstream>
 #include <regex>
 #include <thread>
 
 #include <realm/util/file.hpp>
-#include <realm/util/errno.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
-#include <cstring> // for memset
 
 #if REALM_PLATFORM_APPLE
 #include <dispatch/dispatch.h>

@@ -25,7 +25,6 @@
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/set.hpp>
-#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>

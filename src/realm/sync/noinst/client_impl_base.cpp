@@ -21,7 +21,6 @@
 #include <realm/util/uri.hpp>
 #include <realm/version.hpp>
 
-#include <realm/sync/network/websocket.hpp> // Only for websocket::Error TODO remove
 
 #include <system_error>
 #include <sstream>

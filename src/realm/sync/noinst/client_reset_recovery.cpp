@@ -28,7 +28,6 @@
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
-#include <realm/sync/subscriptions.hpp>
 #include <realm/util/compression.hpp>
 #include <realm/util/flat_map.hpp>
 #include <realm/util/optional.hpp>

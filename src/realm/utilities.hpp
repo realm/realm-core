@@ -21,7 +21,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <cstdlib> // size_t
 #include <cstdio>
 #include <algorithm>
 #include <functional>

@@ -20,7 +20,6 @@
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
-#include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
 
 #include <algorithm>
