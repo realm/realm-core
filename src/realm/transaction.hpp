@@ -100,7 +100,7 @@ public:
 
     // direct handover of accessor instances
     Obj import_copy_of(const Obj& original);
-    TableRef import_copy_of(const ConstTableRef original);
+    TableRef import_copy_of(ConstTableRef original);
     LnkLst import_copy_of(const LnkLst& original);
     LnkSet import_copy_of(const LnkSet& original);
     LstBasePtr import_copy_of(const LstBase& original);

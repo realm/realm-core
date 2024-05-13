@@ -83,13 +83,13 @@ AuthProvider enum_from_provider_type(const IdentityProvider& provider);
 // Opaque credentials representing a specific Realm Object Server user.
 struct AppCredentials {
     // Construct and return credentials from a Facebook account token.
-    static AppCredentials facebook(const AppCredentialsToken access_token);
+    static AppCredentials facebook(AppCredentialsToken access_token);
 
     // Construct and return anonymous credentials
     static AppCredentials anonymous(bool reuse_anonymous_credentials = true);
 
     // Construct and return credentials from an Apple account token.
-    static AppCredentials apple(const AppCredentialsToken id_token);
+    static AppCredentials apple(AppCredentialsToken id_token);
 
     // Construct and return credentials from a google account token.
     static AppCredentials google(AuthCode&& id_token);
@@ -98,7 +98,7 @@ struct AppCredentials {
     static AppCredentials google(IdToken&& id_token);
 
     // Construct and return credentials from a jwt token.
-    static AppCredentials custom(const AppCredentialsToken token);
+    static AppCredentials custom(AppCredentialsToken token);
 
     // Construct and return credentials from a username and password.
     static AppCredentials username_password(std::string username, std::string password);

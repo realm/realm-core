@@ -516,7 +516,7 @@ protected:
     bool find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <size_t w>
-    int64_t get_universal(const char* const data, const size_t ndx) const;
+    int64_t get_universal(const char* data, size_t ndx) const;
 
 protected:
     /// Takes a 64-bit value and returns the minimum number of bits needed

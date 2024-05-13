@@ -48,7 +48,7 @@ struct RegularExpression {
     Option options() const;
 
 private:
-    static constexpr Option option_char_to_option(const char option);
+    static constexpr Option option_char_to_option(char option);
 
     friend std::ostream& operator<<(std::ostream& out, const Option& o);
     std::string m_pattern;

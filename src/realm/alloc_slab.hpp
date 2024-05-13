@@ -384,7 +384,7 @@ public:
 #endif
 
 protected:
-    MemRef do_alloc(const size_t size) override;
+    MemRef do_alloc(size_t size) override;
     MemRef do_realloc(ref_type, char*, size_t old_size, size_t new_size) override;
     void do_free(ref_type, char*) override;
     char* do_translate(ref_type) const noexcept override;

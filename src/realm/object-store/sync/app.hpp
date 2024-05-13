@@ -433,7 +433,7 @@ public:
     // Return the base url path used for Sync Session Websocket requests
     std::string get_ws_host_url() REQUIRES(!m_route_mutex);
 
-    static std::string create_ws_host_url(const std::string_view host_url);
+    static std::string create_ws_host_url(std::string_view host_url);
 
     // Get the default path for a Realm for the given configuration.
     // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
