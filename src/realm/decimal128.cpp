@@ -1535,7 +1535,7 @@ bool Decimal128::operator==(const Decimal128& rhs) const noexcept
     if (lhs_is_nan && rhs_is_nan) {
         return m_value.w[1] == rhs.m_value.w[1] && m_value.w[0] == rhs.m_value.w[0];
     }
-    return 0;
+    return false;
 }
 
 bool Decimal128::operator!=(const Decimal128& rhs) const noexcept
