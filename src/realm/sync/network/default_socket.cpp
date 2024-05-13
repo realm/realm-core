@@ -676,9 +676,7 @@ void DefaultSocketProvider::state_wait_for(std::unique_lock<std::mutex>& lock, S
 
     m_state_cv.wait(lock, [this, expected_state]() {
         // are we there yet?
-        if (m_state < expected_state)
-            return false;
-        return true;
+        return m_state >= expected_state;
     });
 }
 

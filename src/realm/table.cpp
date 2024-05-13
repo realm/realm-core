@@ -1112,7 +1112,7 @@ void Table::set_table_type(Type table_type, bool handle_backlinks)
 
 void Table::set_embedded(bool embedded, bool handle_backlinks)
 {
-    if (embedded == false) {
+    if (!embedded) {
         do_set_table_type(Type::TopLevel);
         return;
     }

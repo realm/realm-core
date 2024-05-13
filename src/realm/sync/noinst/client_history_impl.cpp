@@ -195,10 +195,7 @@ int ClientReplication::get_history_schema_version() const noexcept
 // Overriding member function in realm::Replication
 bool ClientReplication::is_upgradable_history_schema(int stored_schema_version) const noexcept
 {
-    if (stored_schema_version == 11) {
-        return true;
-    }
-    return false;
+    return stored_schema_version == 11;
 }
 
 

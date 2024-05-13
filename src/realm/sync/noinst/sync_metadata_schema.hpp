@@ -67,7 +67,7 @@ struct SyncMetadataColumn {
         : key_out(out)
         , name(name)
         , data_type(type_Link)
-        , is_optional(is_list ? false : true)
+        , is_optional(!is_list)
         , is_list(is_list)
         , target_table(target_table)
     {

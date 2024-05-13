@@ -1629,7 +1629,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 
     // Verify that the lock file is still attached. There is no attempt to guard against
     // a race between close() and compact().
-    if (is_attached() == false) {
+    if (!is_attached()) {
         throw Exception(ErrorCodes::IllegalOperation, m_db_path + ": compact must be done on an open/attached DB");
     }
     auto info = m_info;

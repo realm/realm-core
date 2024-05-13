@@ -130,10 +130,7 @@ bool Geospatial::is_geospatial(const TableRef table, ColKey link_col)
         return false;
     }
     ColKey coords_col = target->get_column_key(StringData(c_geo_point_coords_col_name));
-    if (!coords_col || !coords_col.is_list() || coords_col.get_type() != col_type_Double) {
-        return false;
-    }
-    return true;
+    return !(!coords_col || !coords_col.is_list() || coords_col.get_type() != col_type_Double);
 }
 
 std::optional<GeoPoint> Geospatial::point_from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)

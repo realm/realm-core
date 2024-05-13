@@ -2332,8 +2332,5 @@ bool _impl::operator==(const ServerHistory::HistoryContents& hc_1, const ServerH
             return false;
     }
 
-    if (hc_1.servers_client_file_ident != hc_2.servers_client_file_ident)
-        return false;
-
-    return true;
+    return hc_1.servers_client_file_ident == hc_2.servers_client_file_ident;
 }

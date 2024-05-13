@@ -237,10 +237,7 @@ bool Importer::parse_bool(const char* col, bool* success)
     }
 
     char lower = c | 32;
-    if (c == '1' || lower == 't' || lower == 'y')
-        return true;
-    else
-        return false;
+    return c == '1' || lower == 't' || lower == 'y';
 }
 
 // Convert string to float. Supports normal representation (1.234) and scientific (-4.43e6). Set can_fail = true if
