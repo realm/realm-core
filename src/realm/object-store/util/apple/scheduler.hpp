@@ -38,7 +38,7 @@ namespace realm::util {
 class RunLoopScheduler : public util::Scheduler {
 public:
     RunLoopScheduler(CFRunLoopRef run_loop = nullptr);
-    ~RunLoopScheduler();
+    ~RunLoopScheduler() override;
 
     void invoke(util::UniqueFunction<void()>&&) override;
 
@@ -154,7 +154,7 @@ public:
 class DispatchQueueScheduler : public util::Scheduler {
 public:
     DispatchQueueScheduler(dispatch_queue_t queue);
-    ~DispatchQueueScheduler();
+    ~DispatchQueueScheduler() override;
 
     void invoke(util::UniqueFunction<void()>&&) override;
 

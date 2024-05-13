@@ -201,7 +201,7 @@ public:
 
     TableView(TableView& source, Transaction* tr, PayloadPolicy mode);
 
-    ~TableView() = default;
+    ~TableView() override = default;
 
     TableRef get_parent() const noexcept
     {

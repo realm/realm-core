@@ -57,11 +57,11 @@ Bytef* to_bytef(const char* str)
 
 class ErrorCategoryImpl : public std::error_category {
 public:
-    const char* name() const noexcept override final
+    const char* name() const noexcept final
     {
         return "realm::util::compression::error";
     }
-    std::string message(int err) const override final
+    std::string message(int err) const final
     {
         using error = realm::util::compression::error;
         error e = error(err);
@@ -233,7 +233,7 @@ public:
         m_current_block = b.sub_span(m_strm.avail_in);
     }
 
-    ~DecompressInputStreamZlib()
+    ~DecompressInputStreamZlib() override
     {
         inflateEnd(&m_strm);
     }
@@ -319,7 +319,7 @@ public:
         m_strm.src_ptr = to_bytef(b.data());
     }
 
-    ~DecompressInputStreamLibCompression()
+    ~DecompressInputStreamLibCompression() override
     {
         compression_stream_destroy(&m_strm);
     }

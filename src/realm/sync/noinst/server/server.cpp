@@ -434,7 +434,7 @@ public:
 
     ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path, std::string real_path,
                bool disable_sync_to_disk);
-    ~ServerFile() noexcept;
+    ~ServerFile() noexcept override;
 
     void initialize();
     void activate();
@@ -714,7 +714,7 @@ public:
     void enqueue(ServerFile*);
 
     // Overriding members of ServerHistory::Context
-    std::mt19937_64& server_history_get_random() noexcept override final;
+    std::mt19937_64& server_history_get_random() noexcept final;
 
 private:
     ServerImpl& m_server;
@@ -972,7 +972,7 @@ public:
     void dec_byte_size_for_pending_downstream_changesets(std::size_t byte_size);
 
     // Overriding member functions in _impl::ServerHistory::Context
-    std::mt19937_64& server_history_get_random() noexcept override final;
+    std::mt19937_64& server_history_get_random() noexcept final;
 
 private:
     Server::Config m_config;
@@ -1109,7 +1109,7 @@ public:
         m_send_trigger = std::make_unique<Trigger<network::Service>>(&service, std::move(handler)); // Throws
     }
 
-    ~SyncConnection() noexcept;
+    ~SyncConnection() noexcept override;
 
     ServerImpl& get_server() noexcept
     {
@@ -1141,12 +1141,12 @@ public:
         return logger_ptr;
     }
 
-    std::mt19937_64& websocket_get_random() noexcept final override
+    std::mt19937_64& websocket_get_random() noexcept final
     {
         return m_server.get_random();
     }
 
-    bool websocket_binary_message_received(const char* data, size_t size) final override
+    bool websocket_binary_message_received(const char* data, size_t size) final
     {
         using sf = _impl::SimulatedFailure;
         if (sf::check_trigger(sf::sync_server__read_head)) {
@@ -1165,7 +1165,7 @@ public:
         return true;
     }
 
-    bool websocket_ping_message_received(const char* data, size_t size) final override
+    bool websocket_ping_message_received(const char* data, size_t size) final
     {
         if (REALM_LIKELY(!m_is_closing)) {
             m_last_activity_at = steady_clock_now();
@@ -1174,7 +1174,7 @@ public:
         return true;
     }
 
-    void async_write(const char* data, size_t size, websocket::WriteCompletionHandler handler) final override
+    void async_write(const char* data, size_t size, websocket::WriteCompletionHandler handler) final
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_write(data, size, std::move(handler)); // Throws
@@ -1184,7 +1184,7 @@ public:
         }
     }
 
-    void async_read(char* buffer, size_t size, websocket::ReadCompletionHandler handler) final override
+    void async_read(char* buffer, size_t size, websocket::ReadCompletionHandler handler) final
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_read(buffer, size, *m_read_ahead_buffer, std::move(handler)); // Throws
@@ -1194,8 +1194,7 @@ public:
         }
     }
 
-    void async_read_until(char* buffer, size_t size, char delim,
-                          websocket::ReadCompletionHandler handler) final override
+    void async_read_until(char* buffer, size_t size, char delim, websocket::ReadCompletionHandler handler) final
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_read_until(buffer, size, delim, *m_read_ahead_buffer,
@@ -1207,29 +1206,29 @@ public:
         }
     }
 
-    void websocket_read_error_handler(std::error_code ec) final override
+    void websocket_read_error_handler(std::error_code ec) final
     {
         read_error(ec);
     }
 
-    void websocket_write_error_handler(std::error_code ec) final override
+    void websocket_write_error_handler(std::error_code ec) final
     {
         write_error(ec);
     }
 
-    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view) final override
+    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view) final
     {
         // WebSocket class has already logged a message for this error
         close_due_to_error(ec); // Throws
     }
 
-    void websocket_protocol_error_handler(std::error_code ec) final override
+    void websocket_protocol_error_handler(std::error_code ec) final
     {
         logger.error("WebSocket protocol error (%1): %2", ec, ec.message()); // Throws
         close_due_to_error(ec);                                              // Throws
     }
 
-    void websocket_handshake_completion_handler(const HTTPHeaders&) final override
+    void websocket_handshake_completion_handler(const HTTPHeaders&) final
     {
         // This is not called since we handle HTTP request in handle_request_for_sync()
         REALM_TERMINATE("websocket_handshake_completion_handler should not have been called");
@@ -2217,7 +2216,7 @@ public:
     }
 
     // Overriding memeber function in FileIdentReceiver
-    void receive_file_ident(SaltedFileIdent file_ident) override final
+    void receive_file_ident(SaltedFileIdent file_ident) final
     {
         // Protocol state must be AllocatingIdent or WaitForUnbind
         if (!ident_message_received()) {

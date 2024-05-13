@@ -343,7 +343,7 @@ public:
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
-    ~WrappedAllocator() = default;
+    ~WrappedAllocator() override = default;
 
     void switch_underlying_allocator(Allocator& underlying_allocator)
     {
@@ -380,7 +380,7 @@ private:
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
         return result;
     }
-    virtual MemRef do_realloc(ref_type ref, char* addr, size_t old_size, size_t new_size) override
+    MemRef do_realloc(ref_type ref, char* addr, size_t old_size, size_t new_size) override
     {
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
@@ -389,17 +389,17 @@ private:
         return result;
     }
 
-    virtual void do_free(ref_type ref, char* addr) noexcept override
+    void do_free(ref_type ref, char* addr) noexcept override
     {
         return m_alloc->do_free(ref, addr);
     }
 
-    virtual char* do_translate(ref_type ref) const noexcept override
+    char* do_translate(ref_type ref) const noexcept override
     {
         return m_alloc->translate(ref);
     }
 
-    virtual void verify() const override
+    void verify() const override
     {
         m_alloc->verify();
     }

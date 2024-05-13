@@ -934,7 +934,7 @@ private:
 class File::Streambuf : public std::streambuf {
 public:
     explicit Streambuf(File*, size_t = 4096);
-    ~Streambuf() noexcept;
+    ~Streambuf() noexcept override;
 
     // Disable copying
     Streambuf(const Streambuf&) = delete;

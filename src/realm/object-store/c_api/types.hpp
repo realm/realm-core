@@ -151,7 +151,7 @@ struct realm_config : realm::c_api::WrapC, realm::RealmConfig {
     std::map<void*, realm_free_userdata_func_t> free_functions;
     realm_config(const realm_config&) = delete;
     realm_config& operator=(const realm_config&) = delete;
-    ~realm_config()
+    ~realm_config() override
     {
         for (auto& f : free_functions) {
             f.second(f.first);
@@ -166,7 +166,7 @@ struct realm_scheduler : realm::c_api::WrapC, std::shared_ptr<realm::util::Sched
     {
     }
 
-    realm_scheduler* clone() const
+    realm_scheduler* clone() const override
     {
         return new realm_scheduler{*this};
     }
@@ -580,7 +580,7 @@ struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
         , token(token)
     {
     }
-    ~realm_async_open_task_progress_notification_token();
+    ~realm_async_open_task_progress_notification_token() override;
     std::shared_ptr<realm::AsyncOpenTask> task;
     uint64_t token;
 };
@@ -592,7 +592,7 @@ struct realm_sync_session_connection_state_notification_token : realm::c_api::Wr
         , token(token)
     {
     }
-    ~realm_sync_session_connection_state_notification_token();
+    ~realm_sync_session_connection_state_notification_token() override;
     std::shared_ptr<realm::SyncSession> session;
     uint64_t token;
 };
@@ -662,7 +662,7 @@ struct realm_app_user_subscription_token : realm::c_api::WrapC {
         , token(std::move(token))
     {
     }
-    ~realm_app_user_subscription_token();
+    ~realm_app_user_subscription_token() override;
     std::shared_ptr<realm::app::User> user;
     Token token;
 };
@@ -888,7 +888,7 @@ public:
     {
     }
 
-    virtual ~CBindingThreadObserver() = default;
+    ~CBindingThreadObserver() override = default;
 
     void did_create_thread() override
     {

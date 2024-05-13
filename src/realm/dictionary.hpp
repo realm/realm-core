@@ -40,7 +40,7 @@ public:
     class Iterator;
 
     Dictionary() = default;
-    ~Dictionary();
+    ~Dictionary() override;
 
     Dictionary(const Obj& obj, ColKey col_key)
         : Dictionary(col_key, 1)

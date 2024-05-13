@@ -111,7 +111,7 @@ public:
 
 private:
     size_t calc_byte_len(size_t count, size_t width) const override;
-    virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept override;
+    size_t calc_item_count(size_t bytes, size_t width) const noexcept override;
 
     /// Calculate the total number of bytes needed for a basic array
     /// with the specified number of elements. This includes the size

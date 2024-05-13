@@ -122,7 +122,7 @@ public:
     // information to the group, if it is not already present (6th and 7th entry
     // in Group::m_top).
     GroupWriter(Transaction&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
-    ~GroupWriter();
+    ~GroupWriter() override;
 
     void set_versions(uint64_t current, TopRefMap& top_refs, bool any_num_unreachables) noexcept;
 

@@ -84,7 +84,7 @@ class SessionWrapper final : public util::AtomicRefCountBase, DB::CommitListener
 public:
     SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
                    Session::Config);
-    ~SessionWrapper() noexcept;
+    ~SessionWrapper() noexcept override;
 
     ClientReplication& get_replication() noexcept;
     ClientImpl& get_client() noexcept;

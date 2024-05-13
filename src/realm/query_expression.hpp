@@ -1059,7 +1059,7 @@ Query compare(const Subexpr2<Link>& left, null obj);
 template <>
 class Subexpr2<Link> : public Subexpr {
 public:
-    DataType get_type() const
+    DataType get_type() const override
     {
         return type_Link;
     }

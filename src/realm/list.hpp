@@ -55,7 +55,7 @@ class LstBase : public CollectionBase {
 public:
     using CollectionBase::CollectionBase;
 
-    virtual ~LstBase() = default;
+    ~LstBase() override = default;
     virtual LstBasePtr clone() const = 0;
     virtual DataType get_data_type() const noexcept = 0;
     virtual void set_null(size_t ndx) = 0;

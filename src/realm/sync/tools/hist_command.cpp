@@ -231,7 +231,7 @@ public:
     {
     }
 
-    bool eval(const InstrInfo& instr) const noexcept override final
+    bool eval(const InstrInfo& instr) const noexcept final
     {
         return (instr.type == m_type);
     }
@@ -291,13 +291,13 @@ public:
     {
     }
 
-    void reset(const Changeset& changeset) noexcept override final
+    void reset(const Changeset& changeset) noexcept final
     {
         ModifiesObjectExpr::reset(changeset);
         m_interned_property = changeset.find_string(m_property);
     }
 
-    bool eval(const InstrInfo& instr) const noexcept override final
+    bool eval(const InstrInfo& instr) const noexcept final
     {
         return (ModifiesObjectExpr::eval(instr) && instr.property && instr.property == m_interned_property);
     }
@@ -553,7 +553,7 @@ public:
         return true;
     }
 
-    bool next() override final
+    bool next() final
     {
         if (m_curr_version < m_end_version) {
             ++m_curr_version;
@@ -562,7 +562,7 @@ public:
         return false;
     }
 
-    version_type get_version() const override final
+    version_type get_version() const final
     {
         get_history_entry_index(); // Throws
         return m_curr_version;
@@ -613,7 +613,7 @@ public:
         return true;
     }
 
-    bool next() override final
+    bool next() final
     {
         if (m_next < m_end) {
             ++m_next;
@@ -710,34 +710,34 @@ protected:
 
 class NullSyncHistoryCursor : public RegularSyncHistoryCursor {
 public:
-    bool reciprocal(file_ident_type) override final
+    bool reciprocal(file_ident_type) final
     {
         return false;
     }
 
-    file_ident_type get_origin_file() const override final
+    file_ident_type get_origin_file() const final
     {
         get_history_entry_index(); // Throws
         return 0;
     }
 
-    timestamp_type get_origin_timestamp() const override final
+    timestamp_type get_origin_timestamp() const final
     {
         get_history_entry_index(); // Throws
         return 0;
     }
 
-    void print_info(std::ostream&) const override final
+    void print_info(std::ostream&) const final
     {
         get_history_entry_index(); // Throws
     }
 
-    void print_annotated_info(std::ostream&, TimestampFormatter&) const override final
+    void print_annotated_info(std::ostream&, TimestampFormatter&) const final
     {
         get_history_entry_index(); // Throws
     }
 
-    void get_changeset(util::AppendBuffer<char>&) const override final
+    void get_changeset(util::AppendBuffer<char>&) const final
     {
         get_history_entry_index(); // Throws
     }
@@ -746,31 +746,31 @@ public:
 
 class NullClientFilesCursor : public RegularClientFilesCursor {
 public:
-    LogicalClientType get_logical_client_type() const override final
+    LogicalClientType get_logical_client_type() const final
     {
         get_client_file_index(); // Throws
         return {};
     }
 
-    ClientType get_client_type() const override final
+    ClientType get_client_type() const final
     {
         get_client_file_index(); // Throws
         return {};
     }
 
-    std::time_t get_last_seen_timestamp() const override final
+    std::time_t get_last_seen_timestamp() const final
     {
         get_client_file_index(); // Throws
         return 0;
     }
 
-    version_type get_locked_version() const override final
+    version_type get_locked_version() const final
     {
         get_client_file_index(); // Throws
         return 0;
     }
 
-    void print_annotated_info(std::ostream&, TimestampFormatter&) const override final
+    void print_annotated_info(std::ostream&, TimestampFormatter&) const final
     {
         get_client_file_index(); // Throws
     }
@@ -845,7 +845,7 @@ public:
         m_last_version = current_snapshot_version;
     }
 
-    bool reciprocal(file_ident_type recip_file_ident) override final
+    bool reciprocal(file_ident_type recip_file_ident) final
     {
         if (recip_file_ident != 0) {
             std::cerr << "ERROR: Bad reciprocal file identifier (must be zero)\n"; // Throws
@@ -855,19 +855,19 @@ public:
         return true;
     }
 
-    file_ident_type get_origin_file() const override final
+    file_ident_type get_origin_file() const final
     {
         std::size_t index = get_history_entry_index(); // Throws
         return file_ident_type(m_origin_file_idents->get(index));
     }
 
-    timestamp_type get_origin_timestamp() const override final
+    timestamp_type get_origin_timestamp() const final
     {
         std::size_t index = get_history_entry_index(); // Throws
         return timestamp_type(m_origin_timestamps->get(index));
     }
 
-    void print_info(std::ostream& out) const override final
+    void print_info(std::ostream& out) const final
     {
         std::size_t index = get_history_entry_index(); // Throws
         version_type client_version = get_current_version();
@@ -881,7 +881,7 @@ public:
             << server_version << " " << changeset_size << "\n"; // Throws
     }
 
-    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const override final
+    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const final
     {
         std::size_t index = get_history_entry_index(); // Throws
         version_type client_version = get_current_version();
@@ -911,7 +911,7 @@ public:
             << changeset_size << "\n"; // Throws
     }
 
-    void get_changeset(util::AppendBuffer<char>& buffer) const override final
+    void get_changeset(util::AppendBuffer<char>& buffer) const final
     {
         std::size_t index = get_history_entry_index(); // Throws
         if (m_reciprocal) {
@@ -1042,7 +1042,7 @@ public:
         m_last_version = version_type(m_base_version + history_size);
     }
 
-    bool reciprocal(file_ident_type recip_file_ident) override final
+    bool reciprocal(file_ident_type recip_file_ident) final
     {
         // Size of fixed-size arrays
         std::size_t client_files_size = 8;
@@ -1105,21 +1105,21 @@ public:
         return true;
     }
 
-    file_ident_type get_origin_file() const override final
+    file_ident_type get_origin_file() const final
     {
         std::size_t index_1 = get_history_entry_index(); // Throws
         std::size_t index_2 = get_real_history_index(index_1);
         return file_ident_type(m_origin_files->get(index_2));
     }
 
-    timestamp_type get_origin_timestamp() const override final
+    timestamp_type get_origin_timestamp() const final
     {
         std::size_t index_1 = get_history_entry_index(); // Throws
         std::size_t index_2 = get_real_history_index(index_1);
         return timestamp_type(m_timestamps->get(index_2));
     }
 
-    void print_info(std::ostream& out) const override final
+    void print_info(std::ostream& out) const final
     {
         std::size_t index_1 = get_history_entry_index(); // Throws
         std::size_t index_2 = get_real_history_index(index_1);
@@ -1138,7 +1138,7 @@ public:
             << changeset_size << "\n"; // Throws
     }
 
-    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const override final
+    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const final
     {
         std::size_t index_1 = get_history_entry_index(); // Throws
         std::size_t index_2 = get_real_history_index(index_1);
@@ -1173,7 +1173,7 @@ public:
             << changeset_size << "\n"; // Throws
     }
 
-    void get_changeset(util::AppendBuffer<char>& buffer) const override final
+    void get_changeset(util::AppendBuffer<char>& buffer) const final
     {
         std::size_t index = get_history_entry_index(); // Throws
         if (m_reciprocal) {
@@ -1353,7 +1353,7 @@ public:
         }
     }
 
-    LogicalClientType get_logical_client_type() const override final
+    LogicalClientType get_logical_client_type() const final
     {
         std::size_t index = get_client_file_index(); // Throws
         if (REALM_UNLIKELY(index == 0))
@@ -1380,20 +1380,20 @@ public:
         return {};
     }
 
-    ClientType get_client_type() const override final
+    ClientType get_client_type() const final
     {
         std::size_t index = get_client_file_index(); // Throws
         return get_client_type(index);
     }
 
-    std::time_t get_last_seen_timestamp() const override final
+    std::time_t get_last_seen_timestamp() const final
     {
         std::size_t index = get_client_file_index(); // Throws
         std::int_fast64_t value = m_last_seen_timestamps->get(index);
         return std::time_t(value);
     }
 
-    version_type get_locked_version() const override final
+    version_type get_locked_version() const final
     {
         std::size_t index = get_client_file_index(); // Throws
         std::int_fast64_t value_1 = m_rh_base_versions->get(index);
@@ -1401,7 +1401,7 @@ public:
         return std::min(version_type(value_1), version_type(value_2));
     }
 
-    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const override final
+    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const final
     {
         std::size_t client_file_index = get_client_file_index();          // Throws
         SaltedFileIdent client_file_ident = get_client_file_ident();      // Throws

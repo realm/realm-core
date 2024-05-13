@@ -1880,14 +1880,14 @@ public:
     {
         set_is_complete(true);
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         bool orphaned = !m_resolver;
         REALM_ASSERT(orphaned);
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         m_resolver = nullptr;
     }
@@ -1913,14 +1913,14 @@ public:
     {
         set_is_complete(true);
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         bool orphaned = !m_timer;
         REALM_ASSERT(orphaned);
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         m_timer = nullptr;
     }
@@ -1939,14 +1939,14 @@ public:
         m_service{&service}
     {
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         REALM_ASSERT(in_use());
         REALM_ASSERT(!m_service);
         // Note: Potential suicide when `self` goes out of scope
         util::bind_ptr<TriggerExecOperBase> self{this, util::bind_ptr_base::adopt_tag{}};
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         REALM_ASSERT(m_service);
         m_service = nullptr;
@@ -1969,12 +1969,12 @@ public:
         m_service{service}
     {
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         // Service::recycle_post_oper() destroys this operation object
         Service::recycle_post_oper(m_service, this);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         REALM_ASSERT(false); // Never called
     }
@@ -1991,7 +1991,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         // Recycle the operation object before the handler is exceuted, such
         // that the memory is available for a new post operation that might be
@@ -2039,17 +2039,17 @@ public:
         : AsyncOper{size, false} // Second argument is `in_use`
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         // Must never be called
         REALM_ASSERT(false);
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         // Must never be called
         REALM_ASSERT(false);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         // Must never be called
         REALM_ASSERT(false);
@@ -2281,18 +2281,18 @@ public:
         , m_stream{&stream}
     {
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         bool orphaned = !m_stream;
         REALM_ASSERT(orphaned);
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         m_stream = nullptr;
     }
-    Descriptor& descriptor() noexcept override final
+    Descriptor& descriptor() noexcept final
     {
         return m_stream->lowest_layer().m_desc;
     }
@@ -2336,7 +2336,7 @@ public:
         }
         return want;
     }
-    Want advance() noexcept override final
+    Want advance() noexcept final
     {
         auto& s = *this;
         REALM_ASSERT(!s.is_complete());
@@ -2416,7 +2416,7 @@ public:
         }
         return want;
     }
-    Want advance() noexcept override final
+    Want advance() noexcept final
     {
         auto& s = *this;
         REALM_ASSERT(!s.is_complete());
@@ -2497,7 +2497,7 @@ public:
         }
         return want;
     }
-    Want advance() noexcept override final
+    Want advance() noexcept final
     {
         auto& s = *this;
         REALM_ASSERT(!s.is_complete());
@@ -2547,7 +2547,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         auto& s = *this;
         REALM_ASSERT(s.is_complete() || s.is_canceled());
@@ -2577,7 +2577,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         auto& s = *this;
         REALM_ASSERT(s.is_complete() || s.is_canceled());
@@ -2608,7 +2608,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         auto& s = *this;
         REALM_ASSERT(s.is_complete() || (s.is_canceled() && !s.m_error_code));
@@ -2798,7 +2798,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         REALM_ASSERT(is_canceled() || m_error_code || !m_endpoints.empty());
@@ -3039,7 +3039,7 @@ public:
         }
         return Want::write;
     }
-    Want advance() noexcept override final
+    Want advance() noexcept final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -3048,18 +3048,18 @@ public:
         set_is_complete(true);
         return Want::nothing;
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         bool orphaned = !m_socket;
         REALM_ASSERT(orphaned);
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         m_socket = nullptr;
     }
-    Service::Descriptor& descriptor() noexcept override final
+    Service::Descriptor& descriptor() noexcept final
     {
         return m_socket->m_desc;
     }
@@ -3077,7 +3077,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         bool orphaned = !m_socket;
@@ -3341,7 +3341,7 @@ public:
         m_acceptor->m_desc.ensure_nonblocking_mode(); // Throws
         return Want::read;
     }
-    Want advance() noexcept override final
+    Want advance() noexcept final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -3352,18 +3352,18 @@ public:
             set_is_complete(true); // Success or failure
         return want;
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         bool orphaned = !m_acceptor;
         REALM_ASSERT(orphaned);
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         m_acceptor = nullptr;
     }
-    Service::Descriptor& descriptor() noexcept override final
+    Service::Descriptor& descriptor() noexcept final
     {
         return m_acceptor->m_desc;
     }
@@ -3383,7 +3383,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         REALM_ASSERT(is_canceled() || m_error_code || m_socket.is_open());
@@ -3489,7 +3489,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         bool orphaned = !m_timer;
         Status status = Status::OK();

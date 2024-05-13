@@ -32,7 +32,7 @@ public:
         initiate_resolve();
     }
 
-    virtual ~DefaultWebSocketImpl() = default;
+    ~DefaultWebSocketImpl() override = default;
 
     void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
     {

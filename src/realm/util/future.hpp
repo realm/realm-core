@@ -275,7 +275,7 @@ struct SharedStateBase : public FutureRefCountable {
     SharedStateBase& operator=(const SharedStateBase&) = delete;
     SharedStateBase& operator=(SharedStateBase&&) = delete;
 
-    virtual ~SharedStateBase() = default;
+    ~SharedStateBase() override = default;
 
     // This is called by the future side.
     void wait() noexcept

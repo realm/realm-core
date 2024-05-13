@@ -22,8 +22,8 @@ namespace realm::_impl {
 
 class EmscriptenNetworkTransport final : public app::GenericNetworkTransport {
 public:
-    virtual void send_request_to_server(const app::Request& request,
-                                        util::UniqueFunction<void(const app::Response&)>&& completion_block) final;
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion_block) final;
 };
 
 } // namespace realm::_impl

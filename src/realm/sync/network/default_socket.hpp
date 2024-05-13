@@ -27,7 +27,7 @@ public:
         friend class DefaultSocketProvider;
 
         /// Cancels the timer and destroys the timer instance.
-        ~Timer() = default;
+        ~Timer() override = default;
 
         /// Cancel the timer immediately
         void cancel() override
@@ -53,7 +53,7 @@ public:
                           const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr,
                           AutoStart auto_start = AutoStart{true});
 
-    ~DefaultSocketProvider();
+    ~DefaultSocketProvider() override;
 
     // Start the event loop if it is not started already. Otherwise, do nothing.
     void start();
@@ -112,7 +112,7 @@ private:
 /// http response to be specified for testing.
 class DefaultWebSocket : public WebSocketInterface {
 public:
-    virtual ~DefaultWebSocket() = default;
+    ~DefaultWebSocket() override = default;
 
     virtual void force_handshake_response_for_testing(int status_code, std::string body = "") = 0;
 

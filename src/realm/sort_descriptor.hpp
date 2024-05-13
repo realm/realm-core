@@ -211,7 +211,7 @@ public:
     // empty or have one entry for each column index chain.
     SortDescriptor(std::vector<std::vector<ExtendedColumnKey>> column_indices, std::vector<bool> ascending = {});
     SortDescriptor() = default;
-    ~SortDescriptor() = default;
+    ~SortDescriptor() override = default;
     SortDescriptor(SortDescriptor&&) noexcept = default;
     SortDescriptor& operator=(SortDescriptor&&) noexcept = default;
     SortDescriptor(SortDescriptor const&) = default;
@@ -268,7 +268,7 @@ public:
     {
     }
     LimitDescriptor() = default;
-    ~LimitDescriptor() = default;
+    ~LimitDescriptor() override = default;
 
     bool is_valid() const noexcept override
     {
@@ -299,7 +299,7 @@ public:
     {
     }
     FilterDescriptor() = default;
-    ~FilterDescriptor() = default;
+    ~FilterDescriptor() override = default;
     FilterDescriptor(FilterDescriptor&&) noexcept = default;
     FilterDescriptor& operator=(FilterDescriptor&&) noexcept = default;
     FilterDescriptor(FilterDescriptor const&) = default;

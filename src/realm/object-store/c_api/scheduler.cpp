@@ -40,7 +40,7 @@ struct CAPIScheduler : Scheduler {
     {
     }
 
-    ~CAPIScheduler()
+    ~CAPIScheduler() override
     {
         if (m_free)
             m_free(m_userdata);

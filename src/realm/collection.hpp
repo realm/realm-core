@@ -70,7 +70,7 @@ protected:
     {
         return m_ref;
     }
-    void set_collection_ref(Index, ref_type, CollectionType) {}
+    void set_collection_ref(Index, ref_type, CollectionType) override {}
 };
 
 class Collection {

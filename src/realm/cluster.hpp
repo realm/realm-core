@@ -113,7 +113,7 @@ public:
     {
         m_keys.set_parent(this, 0);
     }
-    virtual ~ClusterNode() = default;
+    ~ClusterNode() override = default;
     void init_from_parent()
     {
         ref_type ref = get_ref_from_parent();

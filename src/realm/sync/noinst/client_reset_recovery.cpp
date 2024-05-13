@@ -1217,7 +1217,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::SetInsert& ins
             : RecoveryResolver(applier, instr, instr_name)
         {
         }
-        void on_set(SetBase&) {}
+        void on_set(SetBase&) override {}
     };
     static constexpr std::string_view instr_name("SetInsert");
     if (!check_links_exist(instr.value)) {

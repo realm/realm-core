@@ -1079,12 +1079,12 @@ public:
         m_size -= n;
     }
 
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) override final
+    void update_child_ref(std::size_t child_ndx, ref_type new_ref) final
     {
         m_cf_recip_hist_refs.set(child_ndx, new_ref); // Throws
     }
 
-    ref_type get_child_ref(std::size_t child_ndx) const noexcept override final
+    ref_type get_child_ref(std::size_t child_ndx) const noexcept final
     {
         return m_cf_recip_hist_refs.get(child_ndx);
     }
@@ -1117,13 +1117,12 @@ public:
     }
 
     version_type find_history_entry(version_type begin_version, version_type end_version,
-                                    HistoryEntry& entry) const noexcept override final
+                                    HistoryEntry& entry) const noexcept final
     {
         return m_history.find_history_entry(m_remote_file_ident, begin_version, end_version, entry);
     }
 
-    ChunkedBinaryData get_reciprocal_transform(version_type server_version,
-                                               bool& is_compressed) const noexcept override final
+    ChunkedBinaryData get_reciprocal_transform(version_type server_version, bool& is_compressed) const noexcept final
     {
         is_compressed = false;
         ChunkedBinaryData transform;
@@ -1133,7 +1132,7 @@ public:
         return entry.changeset;
     }
 
-    void set_reciprocal_transform(version_type server_version, BinaryData transform) override final
+    void set_reciprocal_transform(version_type server_version, BinaryData transform) final
     {
         m_recip_hist.set(server_version, transform); // Throws
     }

@@ -223,7 +223,7 @@ public:
     }
 
     User(Private, std::shared_ptr<app::App> app, std::string_view user_id);
-    ~User();
+    ~User() override;
 
     void update_backing_data(std::optional<UserData>&& data) REQUIRES(!m_mutex);
     void update_data_for_testing(util::FunctionRef<void(UserData&)>) REQUIRES(!m_mutex);

@@ -85,7 +85,7 @@ public:
     explicit App(Private, const AppConfig& config);
     App(App&&) noexcept = delete;
     App& operator=(App&&) noexcept = delete;
-    ~App();
+    ~App() override;
 
     const AppConfig& config() const
     {

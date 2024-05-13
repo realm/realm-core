@@ -12,7 +12,7 @@ struct AccessControl::Impl final : public AccessToken::Verifier {
     }
 
     // Overriding members of AccessToken::Verifier
-    bool verify(BinaryData access_token, BinaryData signature) const override final
+    bool verify(BinaryData access_token, BinaryData signature) const final
     {
         REALM_ASSERT(m_public_key);
         return m_public_key->verify(access_token, signature); // Throws

@@ -51,9 +51,9 @@ enum class Errors {
 
 class ErrorCategory : public std::error_category {
 public:
-    const char* name() const noexcept override final;
-    std::string message(int) const override final;
-    bool equivalent(const std::error_code&, int) const noexcept override final;
+    const char* name() const noexcept final;
+    std::string message(int) const final;
+    bool equivalent(const std::error_code&, int) const noexcept final;
 };
 
 /// The error category associated with \ref Errors. The name of this category is
@@ -86,8 +86,8 @@ namespace realm::sync::network {
 
 class OpensslErrorCategory : public std::error_category {
 public:
-    const char* name() const noexcept override final;
-    std::string message(int) const override final;
+    const char* name() const noexcept final;
+    std::string message(int) const final;
 };
 
 /// The error category associated with error codes produced by the third-party
@@ -96,8 +96,8 @@ extern OpensslErrorCategory openssl_error_category;
 
 class SecureTransportErrorCategory : public std::error_category {
 public:
-    const char* name() const noexcept override final;
-    std::string message(int) const override final;
+    const char* name() const noexcept final;
+    std::string message(int) const final;
 };
 
 /// The error category associated with error codes produced by Apple's
@@ -579,7 +579,7 @@ private:
 
 class ProtocolNotSupported : public std::exception {
 public:
-    const char* what() const noexcept override final;
+    const char* what() const noexcept final;
 };
 
 inline Context::Context()
@@ -650,7 +650,7 @@ public:
         m_stream->m_tcp_socket.m_desc.ensure_nonblocking_mode(); // Throws
         return advance();
     }
-    Want advance() noexcept override final
+    Want advance() noexcept final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -660,18 +660,18 @@ public:
         set_is_complete(want == Want::nothing);
         return want;
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         bool orphaned = !m_stream;
         REALM_ASSERT(orphaned);
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         m_stream = nullptr;
     }
-    Service::Descriptor& descriptor() noexcept override final
+    Service::Descriptor& descriptor() noexcept final
     {
         return m_stream->lowest_layer().m_desc;
     }
@@ -689,7 +689,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         REALM_ASSERT(is_complete() || is_canceled());
         bool orphaned = !m_stream;
@@ -718,7 +718,7 @@ public:
         m_stream->m_tcp_socket.m_desc.ensure_nonblocking_mode(); // Throws
         return advance();
     }
-    Want advance() noexcept override final
+    Want advance() noexcept final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -729,18 +729,18 @@ public:
             set_is_complete(true);
         return want;
     }
-    void recycle() noexcept override final
+    void recycle() noexcept final
     {
         bool orphaned = !m_stream;
         REALM_ASSERT(orphaned);
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override final
+    void orphan() noexcept final
     {
         m_stream = nullptr;
     }
-    Service::Descriptor& descriptor() noexcept override final
+    Service::Descriptor& descriptor() noexcept final
     {
         return m_stream->lowest_layer().m_desc;
     }
@@ -758,7 +758,7 @@ public:
         , m_handler{std::move(handler)}
     {
     }
-    void recycle_and_execute() override final
+    void recycle_and_execute() final
     {
         REALM_ASSERT(is_complete() || is_canceled());
         bool orphaned = !m_stream;

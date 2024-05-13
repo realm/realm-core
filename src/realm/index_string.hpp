@@ -123,7 +123,7 @@ class StringIndex : public SearchIndex {
 public:
     StringIndex(const ClusterColumn& target_column, Allocator&);
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, const ClusterColumn& target_column, Allocator&);
-    ~StringIndex() noexcept = default;
+    ~StringIndex() noexcept override = default;
 
     static bool type_supported(realm::DataType type)
     {

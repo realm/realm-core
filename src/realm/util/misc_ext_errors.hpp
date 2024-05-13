@@ -24,8 +24,8 @@ enum class MiscExtErrors {
 
 class MiscExtErrorCategory : public std::error_category {
 public:
-    const char* name() const noexcept override final;
-    std::string message(int) const override final;
+    const char* name() const noexcept final;
+    std::string message(int) const final;
 };
 
 /// The error category associated with MiscErrors. The name of this category is

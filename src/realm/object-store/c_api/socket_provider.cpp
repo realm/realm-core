@@ -24,7 +24,7 @@ public:
     }
 
     /// Cancels the timer and destroys the timer instance.
-    ~CAPITimer()
+    ~CAPITimer() override
     {
         // Make sure the timer is stopped, if not already
         m_timer_cancel(m_userdata, m_timer);
@@ -107,7 +107,7 @@ public:
     }
 
     /// Destroys the web socket instance.
-    ~CAPIWebSocket()
+    ~CAPIWebSocket() override
     {
         m_websocket_free(m_userdata, m_socket);
         realm_release(m_observer);
@@ -147,7 +147,7 @@ public:
         REALM_ASSERT_EX(m_observer, "WebSocketObserver cannot be null");
     }
 
-    ~CAPIWebSocketObserver() = default;
+    ~CAPIWebSocketObserver() override = default;
 
     void websocket_connected_handler(const std::string& protocol) final
     {
@@ -213,7 +213,7 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
         REALM_ASSERT(m_websocket_free);
     }
 
-    ~CAPISyncSocketProvider()
+    ~CAPISyncSocketProvider() override
     {
         if (m_userdata_free) {
             m_userdata_free(m_userdata);

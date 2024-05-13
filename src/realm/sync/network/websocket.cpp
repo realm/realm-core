@@ -1123,11 +1123,11 @@ const char* get_error_message(HttpError error_code)
 
 class HttpErrorCategory : public std::error_category {
 public:
-    const char* name() const noexcept override final
+    const char* name() const noexcept final
     {
         return "realm::sync::websocket::HttpError";
     }
-    std::string message(int error_code) const override final
+    std::string message(int error_code) const final
     {
         const char* msg = get_error_message(HttpError(error_code));
         if (!msg)

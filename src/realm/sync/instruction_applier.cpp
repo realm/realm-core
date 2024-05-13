@@ -532,7 +532,7 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
             , m_instr(instr)
         {
         }
-        Status on_property(Obj& obj, ColKey col)
+        Status on_property(Obj& obj, ColKey col) override
         {
             // Increment of object field.
             if (!obj.is_null(col)) {

@@ -158,7 +158,7 @@ public:
     explicit RealmCoordinator(Private);
     RealmCoordinator(const RealmCoordinator&) = delete;
     RealmCoordinator& operator=(const RealmCoordinator&) = delete;
-    ~RealmCoordinator();
+    ~RealmCoordinator() override;
 
     // Called by Realm's destructor to ensure the cache is cleaned up promptly
     // Do not call directly

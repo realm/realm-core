@@ -428,7 +428,7 @@ private:
     util::UniqueFunction<Handler> m_handler;
     HTTPResponse m_response;
 
-    std::error_code on_first_line(StringData line) override final
+    std::error_code on_first_line(StringData line) final
     {
         HTTPStatus status;
         StringData reason;
@@ -440,19 +440,19 @@ private:
         return HTTPParserError::MalformedResponse;
     }
 
-    void on_header(StringData key, StringData value) override final
+    void on_header(StringData key, StringData value) final
     {
         // FIXME: Multiple headers with the same key should show up as a
         // comma-separated list of their values, rather than overwriting.
         m_response.headers[std::string(key)] = std::string(value);
     }
 
-    void on_body(StringData body) override final
+    void on_body(StringData body) final
     {
         m_response.body = std::string(body);
     }
 
-    void on_complete(std::error_code ec) override final
+    void on_complete(std::error_code ec) final
     {
         auto handler = std::move(m_handler);
         m_handler = nullptr;
@@ -535,7 +535,7 @@ private:
     util::UniqueFunction<RespondHandler> m_respond_handler;
     HTTPRequest m_request;
 
-    std::error_code on_first_line(StringData line) override final
+    std::error_code on_first_line(StringData line) final
     {
         HTTPMethod method;
         StringData uri;
@@ -547,19 +547,19 @@ private:
         return HTTPParserError::MalformedRequest;
     }
 
-    void on_header(StringData key, StringData value) override final
+    void on_header(StringData key, StringData value) final
     {
         // FIXME: Multiple headers with the same key should show up as a
         // comma-separated list of their values, rather than overwriting.
         m_request.headers[std::string(key)] = std::string(value);
     }
 
-    void on_body(StringData body) override final
+    void on_body(StringData body) final
     {
         m_request.body = std::string(body);
     }
 
-    void on_complete(std::error_code ec) override final
+    void on_complete(std::error_code ec) final
     {
         // Deliberately not nullifying m_request_handler so that we can
         // check for invariants in async_send_response.

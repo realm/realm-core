@@ -78,7 +78,7 @@ public:
 
 class CompressMemoryArena : public Alloc {
 public:
-    void* alloc(size_t size) noexcept override final
+    void* alloc(size_t size) noexcept final
     {
         size_t offset = m_offset;
         size_t misalignment = offset % alignof(std::max_align_t);
@@ -94,7 +94,7 @@ public:
         return addr;
     }
 
-    void free(void*) noexcept override final
+    void free(void*) noexcept final
     {
         // No-op
     }

@@ -26,7 +26,7 @@ class Transaction : public Group {
 public:
     Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
     // convenience, so you don't need to carry a reference to the DB around
-    ~Transaction();
+    ~Transaction() override;
 
     DB::version_type get_version() const noexcept
     {

@@ -362,7 +362,7 @@ private:
 
 class Server::NoSupportedProtocolVersions : public std::exception {
 public:
-    const char* what() const noexcept override final
+    const char* what() const noexcept final
     {
         return "No supported protocol versions";
     }
