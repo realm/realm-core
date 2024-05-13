@@ -137,7 +137,6 @@ void SlabAlloc::detach(bool keep_file_open) noexcept
     purge_old_mappings(static_cast<uint64_t>(-1), 0);
     switch (m_attach_mode) {
         case attach_None:
-            break;
         case attach_UsersBuffer:
             break;
         case attach_OwnedBuffer:
