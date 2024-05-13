@@ -226,7 +226,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
 {
     return wrap_err([&]() {
         auto existing_query = list->get_query();
-        auto realm = list->get_realm();
+        const auto& realm = list->get_realm();
         auto table = list->get_table();
         auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
         auto combined = existing_query.and_query(query);
@@ -242,7 +242,7 @@ RLM_API realm_query_t* realm_query_parse_for_set(const realm_set_t* set, const c
 {
     return wrap_err([&]() {
         auto existing_query = set->get_query();
-        auto realm = set->get_realm();
+        const auto& realm = set->get_realm();
         auto table = set->get_table();
         auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
         auto combined = existing_query.and_query(query);
@@ -258,7 +258,7 @@ RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* resu
 {
     return wrap_err([&]() {
         auto existing_query = results->get_query();
-        auto realm = results->get_realm();
+        const auto& realm = results->get_realm();
         auto table = results->get_table();
         auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
         auto combined = existing_query.and_query(query);
@@ -462,7 +462,7 @@ RLM_API realm_query_t* realm_results_get_query(realm_results_t* results)
 {
     return wrap_err([&]() {
         auto query = results->get_query();
-        auto shared_realm = results->get_realm();
+        const auto& shared_realm = results->get_realm();
         auto ordering = query.get_ordering();
         return new realm_query_t{std::move(query), std::move(ordering), shared_realm};
     });

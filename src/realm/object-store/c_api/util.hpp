@@ -85,7 +85,7 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
 /// Check that a mixed value can be inserted in a list.
 inline void check_value_assignable(const realm::object_store::Collection& list, Mixed val)
 {
-    auto realm = list.get_realm();
+    const auto& realm = list.get_realm();
     auto table_key = list.get_parent_table_key();
     auto table = realm->read_group().get_table(table_key);
     auto col_key = list.get_parent_column_key();

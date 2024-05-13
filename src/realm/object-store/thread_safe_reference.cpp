@@ -148,7 +148,7 @@ public:
         , m_ordering(r.get_descriptor_ordering())
     {
         if (r.get_type() != PropertyType::Object) {
-            auto list = r.get_collection();
+            const auto& list = r.get_collection();
             REALM_ASSERT(list);
             m_key = list->get_owner_key();
             m_table_key = list->get_table()->get_key();
@@ -239,7 +239,7 @@ ThreadSafeReference& ThreadSafeReference::operator=(ThreadSafeReference&&) noexc
 template <typename T>
 ThreadSafeReference::ThreadSafeReference(T const& value)
 {
-    auto realm = value.get_realm();
+    const auto& realm = value.get_realm();
     realm->verify_thread();
     m_payload.reset(new PayloadImpl<T>(value));
 }
