@@ -512,7 +512,7 @@ inline TableView::TableView(TableView&& tv) noexcept
 
 inline TableView& TableView::operator=(TableView&& tv) noexcept
 {
-    m_table = std::move(tv.m_table);
+    m_table = tv.m_table;
 
     m_key_values = std::move(tv.m_key_values);
     m_query = std::move(tv.m_query);

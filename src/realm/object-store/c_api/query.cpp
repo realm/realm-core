@@ -454,7 +454,7 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
     return wrap_err([&]() {
         auto shared_realm = results->get_realm();
         auto obj = results->get<Obj>(index);
-        return new realm_object_t{Object{shared_realm, std::move(obj)}};
+        return new realm_object_t{Object{shared_realm, obj}};
     });
 }
 

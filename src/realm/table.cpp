@@ -472,7 +472,7 @@ void Table::remove_recursive(CascadeState& cascade_state)
             Obj obj = group->get_table_unchecked(l.origin_table)->try_get_object(l.origin_key);
             REALM_ASSERT_DEBUG(obj);
             if (obj) {
-                std::move(obj).nullify_link(l.origin_col_key, l.old_target_link);
+                obj.nullify_link(l.origin_col_key, l.old_target_link);
             }
         }
         cascade_state.m_to_be_nullified.clear();

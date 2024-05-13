@@ -1,6 +1,7 @@
 #ifndef REALM_UTIL_QUOTE_HPP
 #define REALM_UTIL_QUOTE_HPP
 
+#include <locale>
 #include <string_view>
 
 namespace realm {

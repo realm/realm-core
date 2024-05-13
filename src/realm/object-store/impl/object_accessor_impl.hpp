@@ -49,7 +49,7 @@ public:
         : realm(c.realm)
         , object_schema(prop.type == PropertyType::Object ? &*realm->schema().find(prop.object_type)
                                                           : c.object_schema)
-        , m_parent(std::move(parent))
+        , m_parent(parent)
         , m_property(&prop)
     {
     }

@@ -831,9 +831,9 @@ void MinorSide::prepend(InputIterator begin, InputIterator end)
     m_transformer.prepend_minor(std::move(begin), std::move(end));
 }
 
-REALM_NORETURN void throw_bad_merge(std::string msg)
+REALM_NORETURN void throw_bad_merge(const std::string& msg)
 {
-    throw sync::TransformError{std::move(msg)};
+    throw sync::TransformError{msg};
 }
 
 template <class... Params>

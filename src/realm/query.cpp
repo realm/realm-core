@@ -303,7 +303,7 @@ template <class Cond>
 struct MakeConditionNode<IntegerNode<ArrayInteger, Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, int64_t value)
     {
-        return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(std::move(value), col_key)};
+        return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(value, col_key)};
     }
 
     template <class T>
@@ -317,7 +317,7 @@ template <class Cond>
 struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, StringData value)
     {
-        return std::unique_ptr<ParentNode>{new StringNode<Cond>(std::move(value), col_key)};
+        return std::unique_ptr<ParentNode>{new StringNode<Cond>(value, col_key)};
     }
 
     static std::unique_ptr<ParentNode> make(ColKey col_key, null)
@@ -336,7 +336,7 @@ template <class Cond>
 struct MakeConditionNode<TimestampNode<Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, Timestamp value)
     {
-        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(std::move(value), col_key)};
+        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(value, col_key)};
     }
 
     // only enable certain template conditions of supported timestamp operations
@@ -1040,7 +1040,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
         throw IllegalOperation{"Column has no fulltext index"};
     }
 
-    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key)};
+    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(value, column_key)};
     add_node(std::move(node));
     return *this;
 }
@@ -1053,7 +1053,7 @@ Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_
     }
 
     auto lm = std::make_unique<LinkMap>(link_map);
-    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key, std::move(lm))};
+    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(value, column_key, std::move(lm))};
     add_node(std::move(node));
     return *this;
 }

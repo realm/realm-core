@@ -2,6 +2,7 @@
 #ifndef REALM_UTIL_SIGNAL_BLOCKER_HPP
 #define REALM_UTIL_SIGNAL_BLOCKER_HPP
 
+#include <realm/util/assert.hpp>
 #include <csignal>
 
 

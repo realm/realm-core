@@ -2374,10 +2374,6 @@ public:
         : m_link_map(link_map)
     {
     }
-    BacklinkCount(LinkMap&& link_map)
-        : m_link_map(std::move(link_map))
-    {
-    }
     BacklinkCount(ConstTableRef table, std::vector<ExtendedColumnKey>&& links = {})
         : m_link_map(table, std::move(links))
     {

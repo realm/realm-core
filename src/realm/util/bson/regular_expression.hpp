@@ -37,9 +37,9 @@ struct RegularExpression {
     {
     }
 
-    RegularExpression(const std::string pattern, const std::string& options);
+    RegularExpression(const std::string& pattern, const std::string& options);
 
-    RegularExpression(const std::string pattern, Option options);
+    RegularExpression(const std::string& pattern, Option options);
 
     RegularExpression(const RegularExpression&) = default;
     RegularExpression(RegularExpression&&) = default;

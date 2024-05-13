@@ -950,15 +950,12 @@ private:
 
 class ColKeys {
 public:
-    ColKeys(ConstTableRef&& t)
-        : m_table(std::move(t))
+    ColKeys(ConstTableRef t) noexcept
+        : m_table(t)
     {
     }
 
-    ColKeys()
-        : m_table(nullptr)
-    {
-    }
+    ColKeys() noexcept = default;
 
     size_t size() const
     {

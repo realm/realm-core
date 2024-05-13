@@ -856,7 +856,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
 
     bool new_batch = false;
     try {
-        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+        bootstrap_store->add_batch(query_version, maybe_progress, received_changesets, &new_batch);
     }
     catch (const LogicError& ex) {
         if (ex.code() == ErrorCodes::LimitExceeded) {
@@ -1568,7 +1568,7 @@ void SessionWrapper::refresh(std::string_view signed_access_token)
     REALM_ASSERT(m_initiated);
     REALM_ASSERT(!m_abandoned);
 
-    m_client.post([self = util::bind_ptr(this), token = std::string(signed_access_token)](Status status) {
+    m_client.post([self = util::bind_ptr(this), token = std::string(signed_access_token)](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())

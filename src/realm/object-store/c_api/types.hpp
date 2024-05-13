@@ -121,7 +121,7 @@ struct realm_async_error : realm::c_api::WrapC {
     }
 
     explicit realm_async_error(std::exception_ptr ep)
-        : error_storage(std::move(ep))
+        : error_storage(ep)
     {
     }
 

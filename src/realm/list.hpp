@@ -404,7 +404,7 @@ public:
 
     void add(Mixed value)
     {
-        insert(size(), std::move(value));
+        insert(size(), value);
     }
 
     template <typename T>

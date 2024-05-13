@@ -487,7 +487,7 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
                   std::ostream_iterator<std::string>(protocol_list, ", "));
     protocol_list << m_endpoint.protocols.back();
 
-    m_websocket.initiate_client_handshake(m_endpoint.path, std::move(host), protocol_list.str(),
+    m_websocket.initiate_client_handshake(m_endpoint.path, host, protocol_list.str(),
                                           std::move(headers)); // Throws
 }
 } // namespace

@@ -23,7 +23,7 @@ RLM_API realm_object_t* realm_get_object(const realm_t* realm, realm_class_key_t
         auto table_key = TableKey(tbl_key);
         auto table = shared_realm->read_group().get_table(table_key);
         auto obj = table->get_object(ObjKey(obj_key));
-        auto object = Object{shared_realm, std::move(obj)};
+        auto object = Object{shared_realm, obj};
         return new realm_object_t{std::move(object)};
     });
 }
@@ -37,7 +37,7 @@ RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_
             *class_key = obj.get_table()->get_key().value;
 
         if (parent)
-            *parent = new realm_object_t{Object{object->realm(), std::move(obj)}};
+            *parent = new realm_object_t{Object{object->realm(), obj}};
 
         return true;
     });
@@ -71,7 +71,7 @@ RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t* realm,
             if (out_found)
                 *out_found = true;
             auto obj = table->get_object(obj_key);
-            return new realm_object_t{Object{shared_realm, std::move(obj)}};
+            return new realm_object_t{Object{shared_realm, obj}};
         }
         else {
             if (out_found)
@@ -103,7 +103,7 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t ta
         }
 
         auto obj = table->create_object();
-        auto object = Object{shared_realm, std::move(obj)};
+        auto object = Object{shared_realm, obj};
         return new realm_object_t{std::move(object)};
     });
 }
@@ -136,7 +136,7 @@ RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* rea
             *did_create = false;
 
         auto obj = table->create_object_with_primary_key(pkval, did_create);
-        auto object = Object{shared_realm, std::move(obj)};
+        auto object = Object{shared_realm, obj};
         return new realm_object_t{std::move(object)};
     });
 }
@@ -363,7 +363,7 @@ RLM_API realm_list_t* realm_set_list(realm_object_t* object, realm_property_key_
         auto col_key = ColKey(col);
 
         obj.set_collection(col_key, CollectionType::List);
-        return new realm_list_t{List{object->get_realm(), std::move(obj), col_key}};
+        return new realm_list_t{List{object->get_realm(), obj, col_key}};
     });
 }
 
@@ -404,7 +404,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
-        return new realm_list_t{List{object->get_realm(), std::move(obj), col_key}};
+        return new realm_list_t{List{object->get_realm(), obj, col_key}};
     });
 }
 
@@ -423,7 +423,7 @@ RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t 
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
-        return new realm_set_t{object_store::Set{object->get_realm(), std::move(obj), col_key}};
+        return new realm_set_t{object_store::Set{object->get_realm(), obj, col_key}};
     });
 }
 
@@ -441,7 +441,7 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
-        return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), std::move(obj), col_key}};
+        return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), obj, col_key}};
     });
 }
 

@@ -1174,7 +1174,7 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
 }
 
 
-void Connection::disconnect(const SessionErrorInfo& info)
+void Connection::disconnect(SessionErrorInfo&& info)
 {
     // Cancel connect timeout watchdog
     m_connect_timer.reset();
@@ -1218,7 +1218,7 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
 
-    report_connection_state_change(ConnectionState::disconnected, info); // Throws
+    report_connection_state_change(ConnectionState::disconnected, std::move(info)); // Throws
     initiate_reconnect_wait();                                           // Throws
 }
 

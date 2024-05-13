@@ -227,7 +227,7 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
         if (!is_valid_key_type(spec.pk_type)) {
             unsupported_instruction();
         }
-        instr.type = std::move(spec);
+        instr.type = spec;
         emit(instr);
     }
 }

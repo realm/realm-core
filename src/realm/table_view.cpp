@@ -386,7 +386,7 @@ void TableView::distinct(DistinctDescriptor columns)
 
 void TableView::limit(LimitDescriptor lim)
 {
-    m_descriptor_ordering.append_limit(std::move(lim));
+    m_descriptor_ordering.append_limit(lim);
     do_sync();
 }
 

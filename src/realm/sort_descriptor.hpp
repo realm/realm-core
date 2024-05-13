@@ -148,6 +148,10 @@ public:
 class ColumnsDescriptor : public BaseDescriptor {
 public:
     ColumnsDescriptor() = default;
+    ColumnsDescriptor(ColumnsDescriptor&&) noexcept = default;
+    ColumnsDescriptor& operator=(ColumnsDescriptor&&) noexcept = default;
+    ColumnsDescriptor(ColumnsDescriptor const&) = default;
+    ColumnsDescriptor& operator=(ColumnsDescriptor const&) = default;
 
     // Create a descriptor for the given columns on the given table.
     // Each vector in `column_keys` represents a chain of columns, where
@@ -175,6 +179,10 @@ public:
         : ColumnsDescriptor(std::move(column_keys))
     {
     }
+    DistinctDescriptor(DistinctDescriptor&&) noexcept = default;
+    DistinctDescriptor& operator=(DistinctDescriptor&&) noexcept = default;
+    DistinctDescriptor(DistinctDescriptor const&) = default;
+    DistinctDescriptor& operator=(DistinctDescriptor const&) = default;
 
     std::unique_ptr<BaseDescriptor> clone() const override;
 
@@ -204,6 +212,10 @@ public:
     SortDescriptor(std::vector<std::vector<ExtendedColumnKey>> column_indices, std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
+    SortDescriptor(SortDescriptor&&) noexcept = default;
+    SortDescriptor& operator=(SortDescriptor&&) noexcept = default;
+    SortDescriptor(SortDescriptor const&) = default;
+    SortDescriptor& operator=(SortDescriptor const&) = default;
     std::unique_ptr<BaseDescriptor> clone() const override;
 
     bool need_indexpair() const noexcept override
@@ -288,6 +300,10 @@ public:
     }
     FilterDescriptor() = default;
     ~FilterDescriptor() = default;
+    FilterDescriptor(FilterDescriptor&&) noexcept = default;
+    FilterDescriptor& operator=(FilterDescriptor&&) noexcept = default;
+    FilterDescriptor(FilterDescriptor const&) = default;
+    FilterDescriptor& operator=(FilterDescriptor const&) = default;
 
     bool is_valid() const noexcept override
     {
@@ -311,9 +327,9 @@ class DescriptorOrdering : public util::AtomicRefCountBase {
 public:
     DescriptorOrdering() = default;
     DescriptorOrdering(const DescriptorOrdering&);
-    DescriptorOrdering(DescriptorOrdering&&) = default;
+    DescriptorOrdering(DescriptorOrdering&&) noexcept = default;
     DescriptorOrdering& operator=(const DescriptorOrdering&);
-    DescriptorOrdering& operator=(DescriptorOrdering&&) = default;
+    DescriptorOrdering& operator=(DescriptorOrdering&&) noexcept = default;
 
     void append_sort(SortDescriptor sort, SortDescriptor::MergeMode mode = SortDescriptor::MergeMode::prepend);
     void append_distinct(DistinctDescriptor distinct);

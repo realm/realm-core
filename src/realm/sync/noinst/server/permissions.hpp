@@ -3,6 +3,7 @@
 #define REALM_SYNC_PERMISSIONS_HPP
 
 #include <stddef.h>
+#include <stdint.h>
 
 namespace realm {
 namespace sync {

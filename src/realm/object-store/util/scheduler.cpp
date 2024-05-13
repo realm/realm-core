@@ -110,7 +110,7 @@ Scheduler::~Scheduler() = default;
 
 void Scheduler::set_default_factory(std::shared_ptr<Scheduler> (*factory)())
 {
-    s_factory = std::move(factory);
+    s_factory = factory;
 }
 
 std::shared_ptr<Scheduler> Scheduler::make_default()

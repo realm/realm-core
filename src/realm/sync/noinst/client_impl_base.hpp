@@ -87,7 +87,7 @@ template <typename ErrorType, typename RandomEngine>
 struct ErrorBackoffState {
     ErrorBackoffState() = default;
     explicit ErrorBackoffState(ResumptionDelayInfo default_delay_info, RandomEngine& random_engine)
-        : default_delay_info(std::move(default_delay_info))
+        : default_delay_info(default_delay_info)
         , m_random_engine(random_engine)
     {
     }
@@ -554,8 +554,8 @@ private:
     void close_due_to_client_side_error(Status, IsFatal is_fatal, ConnectionTerminationReason reason);
     void close_due_to_transient_error(Status status, ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
-    void involuntary_disconnect(const SessionErrorInfo& info, ConnectionTerminationReason reason);
-    void disconnect(const SessionErrorInfo& info);
+    void involuntary_disconnect(SessionErrorInfo&& info, ConnectionTerminationReason reason);
+    void disconnect(SessionErrorInfo&& info);
     void change_state_to_disconnected() noexcept;
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
@@ -1248,7 +1248,7 @@ inline ConnectionState ClientImpl::Connection::get_state() const noexcept
 }
 
 inline ClientImpl::ServerSlot::ServerSlot(ReconnectInfo reconnect_info)
-    : reconnect_info(std::move(reconnect_info))
+    : reconnect_info(reconnect_info)
 {
 }
 
@@ -1293,12 +1293,12 @@ inline void ClientImpl::Connection::voluntary_disconnect()
     disconnect(std::move(error_info)); // Throws
 }
 
-inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info,
+inline void ClientImpl::Connection::involuntary_disconnect(SessionErrorInfo&& info,
                                                            ConnectionTerminationReason reason)
 {
     REALM_ASSERT(!was_voluntary(reason));
     m_reconnect_info.update(reason, info.resumption_delay_interval);
-    disconnect(info); // Throws
+    disconnect(std::move(info)); // Throws
 }
 
 inline void ClientImpl::Connection::change_state_to_disconnected() noexcept

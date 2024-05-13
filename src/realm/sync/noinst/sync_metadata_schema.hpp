@@ -95,7 +95,7 @@ struct SyncMetadataTable {
         , name(name)
         , is_embedded(true)
         , pk_info(util::none)
-        , columns(std::move(columns))
+        , columns(columns)
     {
     }
 
@@ -104,8 +104,8 @@ struct SyncMetadataTable {
         : key_out(out)
         , name(name)
         , is_embedded(false)
-        , pk_info(std::move(pk_info))
-        , columns(std::move(columns))
+        , pk_info(pk_info)
+        , columns(columns)
     {
     }
 
@@ -114,7 +114,7 @@ struct SyncMetadataTable {
         , name(name)
         , is_embedded(false)
         , pk_info(util::none)
-        , columns(std::move(columns))
+        , columns(columns)
     {
     }
 };

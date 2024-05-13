@@ -628,6 +628,9 @@ public:
     Query(const StreamProtocol&, std::string host_name, std::string service_port,
           int init_flags = address_configured);
 
+    Query(Query&&) noexcept = default;
+    Query& operator=(Query&&) noexcept = default;
+
     ~Query() noexcept;
 
     int flags() const;

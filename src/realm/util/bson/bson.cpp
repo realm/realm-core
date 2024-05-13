@@ -521,8 +521,8 @@ std::string Bson::toJson() const
 namespace {
 
 struct BsonError : public std::runtime_error {
-    BsonError(std::string message)
-        : std::runtime_error(std::move(message))
+    BsonError(const std::string& message)
+        : std::runtime_error(message)
     {
     }
 };
@@ -724,7 +724,7 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          }
          if (!pattern || !options)
              throw BsonError("invalid extended json $binary");
-         return Bson(RegularExpression(std::move(*pattern), std::move(*options)));
+         return Bson(RegularExpression(*pattern, *options));
      }},
     {"$timestamp",
      +[](const Json& json) {

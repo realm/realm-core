@@ -100,7 +100,7 @@ AppCredentials::AppCredentials(AuthProvider provider,
 {
     (*m_payload)[kAppProviderKey] = provider_type_from_enum(provider);
     for (auto& [key, value] : values) {
-        (*m_payload)[key] = std::move(value);
+        (*m_payload)[key] = value;
     }
 }
 

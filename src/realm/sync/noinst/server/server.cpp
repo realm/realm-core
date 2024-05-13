@@ -1301,7 +1301,7 @@ public:
 
     void discard_session(session_ident_type) noexcept;
 
-    void send_log_message(util::Logger::Level level, const std::string&& message, session_ident_type sess_ident = 0,
+    void send_log_message(util::Logger::Level level, std::string&& message, session_ident_type sess_ident = 0,
                           std::optional<std::string> co_id = std::nullopt);
 
 private:
@@ -1656,7 +1656,7 @@ private:
                 read_error(ec); // Throws
                 return;
             }
-            handle_http_request(std::move(request)); // Throws
+            handle_http_request(request); // Throws
         };
         m_http_server.async_receive_request(std::move(handler)); // Throws
     }
@@ -1897,7 +1897,7 @@ private:
 
                 std::unique_ptr<SyncConnection> sync_conn = std::make_unique<SyncConnection>(
                     m_server, m_id, std::move(m_socket), std::move(m_ssl_stream), std::move(m_read_ahead_buffer),
-                    protocol_version, std::move(user_agent), std::move(m_remote_endpoint),
+                    protocol_version, user_agent, std::move(m_remote_endpoint),
                     get_appservices_request_id()); // Throws
                 SyncConnection& sync_conn_ref = *sync_conn;
                 m_server.add_sync_connection(m_id, std::move(sync_conn));
@@ -3129,7 +3129,7 @@ private:
         // Protocol state is now WaitForUnbindErr
     }
 
-    void send_log_message(util::Logger::Level level, const std::string&& message)
+    void send_log_message(util::Logger::Level level, std::string&& message)
     {
         if (m_connection.get_client_protocol_version() < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
             return logger.log(level, message.c_str());
@@ -4455,8 +4455,8 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
     sess.receive_error_message(session_ident, error_code, error_body); // Throws
 }
 
-void SyncConnection::send_log_message(util::Logger::Level level, const std::string&& message,
-                                      session_ident_type sess_ident, std::optional<std::string> co_id)
+void SyncConnection::send_log_message(util::Logger::Level level, std::string&& message, session_ident_type sess_ident,
+                                      std::optional<std::string> co_id)
 {
     if (get_client_protocol_version() < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
         return logger.log(level, message.c_str());

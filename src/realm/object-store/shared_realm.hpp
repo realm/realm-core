@@ -463,7 +463,7 @@ public:
     static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version,
                                          std::shared_ptr<_impl::RealmCoordinator> coordinator)
     {
-        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator), Private());
+        return std::make_shared<Realm>(std::move(config), version, std::move(coordinator), Private());
     }
 
     // Expose some internal functionality which isn't intended to be used directly

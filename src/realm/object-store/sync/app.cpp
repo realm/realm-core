@@ -1241,8 +1241,7 @@ void App::do_authenticated_request(HttpMethod method, std::string&& route, std::
     do_request(std::move(request), [token_type, user, completion = std::move(completion), self = shared_from_this()](
                                        std::unique_ptr<Request>&& request, const Response& response) mutable {
         if (auto error = AppUtils::check_for_errors(response)) {
-            self->handle_auth_failure(std::move(*error), std::move(request), response, user, token_type,
-                                      std::move(completion));
+            self->handle_auth_failure(*error, std::move(request), response, user, token_type, std::move(completion));
         }
         else {
             completion(response);
@@ -1273,7 +1272,7 @@ void App::handle_auth_failure(const AppError& error, std::unique_ptr<Request>&& 
     // Otherwise we may be able to request a new access token and have the request succeed with that
     refresh_access_token(user, false,
                          [self = shared_from_this(), request = std::move(request), completion = std::move(completion),
-                          response = std::move(response), user](Optional<AppError>&& error) mutable {
+                          response, user](Optional<AppError>&& error) mutable {
                              if (error) {
                                  // pass the error back up the chain
                                  completion(response);

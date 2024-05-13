@@ -2114,7 +2114,7 @@ TEST(Network_AsyncResolve_Basics)
         CHECK_GREATER(endpoints.size(), 0);
         was_called = true;
     };
-    resolver.async_resolve(query, std::move(handler));
+    resolver.async_resolve(std::move(query), std::move(handler));
     service.run();
     CHECK(was_called);
 }
@@ -2130,7 +2130,7 @@ TEST(Network_AsyncResolve_Cancellation)
         CHECK_EQUAL(error::operation_aborted, ec);
         was_called = true;
     };
-    resolver.async_resolve(query, std::move(handler));
+    resolver.async_resolve(std::move(query), std::move(handler));
     resolver.cancel();
     service.run();
     CHECK(was_called);

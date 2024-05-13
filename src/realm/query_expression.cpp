@@ -276,7 +276,7 @@ void Columns<Dictionary>::init_path(const PathElement* begin, const PathElement*
         if (begin->is_all()) {
             m_ctrl.path_only_unary_keys = false;
         }
-        m_ctrl.path.emplace_back(std::move(*begin));
+        m_ctrl.path.emplace_back(*begin);
         ++begin;
     }
     std::move(begin, end, std::back_inserter(m_ctrl.path));

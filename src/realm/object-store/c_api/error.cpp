@@ -17,7 +17,7 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     , m_message_buf()
     , m_user_code_error(nullptr)
 {
-    assign(std::move(ptr));
+    assign(ptr);
 }
 
 ErrorStorage::ErrorStorage(const ErrorStorage& other)
@@ -42,9 +42,9 @@ ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
 }
 
 ErrorStorage::ErrorStorage(ErrorStorage&& other)
-    : m_err(std::move(other.m_err))
+    : m_err(other.m_err)
     , m_message_buf(std::move(other.m_message_buf))
-    , m_user_code_error(std::move(other.m_user_code_error))
+    , m_user_code_error(other.m_user_code_error)
 {
     if (m_err) {
         m_err->message = m_message_buf.c_str();
@@ -54,9 +54,9 @@ ErrorStorage::ErrorStorage(ErrorStorage&& other)
 
 ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)
 {
-    m_err = std::move(other.m_err);
+    m_err = other.m_err;
     m_message_buf = std::move(other.m_message_buf);
-    m_user_code_error = std::move(other.m_user_code_error);
+    m_user_code_error = other.m_user_code_error;
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -207,7 +207,7 @@ ErrorStorage* ErrorStorage::get_thread_local()
 
 void set_last_exception(std::exception_ptr eptr)
 {
-    ErrorStorage::get_thread_local()->assign(std::move(eptr));
+    ErrorStorage::get_thread_local()->assign(eptr);
 }
 
 RLM_API bool realm_get_last_error(realm_error_t* err)

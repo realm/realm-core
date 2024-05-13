@@ -1313,7 +1313,7 @@ public:
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
             if (Obj obj = src_table.try_get_object(origin_key)) {
-                std::move(obj).nullify_link(src_col_key, target_link);
+                obj.nullify_link(src_col_key, target_link);
             }
             return;
         }

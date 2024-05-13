@@ -527,7 +527,7 @@ private:
             }
 
             cur_changeset.data = changeset_data;
-            message.changesets.push_back(std::move(cur_changeset)); // Throws
+            message.changesets.push_back(cur_changeset); // Throws
         }
 
         connection.receive_download_message(session_ident, message); // Throws
@@ -815,7 +815,7 @@ public:
                         logger.trace(util::LogCategory::changeset, "Changeset: %1",
                                      clamped_hex_dump(upload_changeset.changeset)); // Throws
                     }
-                    upload_changesets.push_back(std::move(upload_changeset)); // Throws
+                    upload_changesets.push_back(upload_changeset); // Throws
                 }
 
                 connection.receive_upload_message(session_ident, progress_client_version, progress_server_version,

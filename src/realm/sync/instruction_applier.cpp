@@ -14,9 +14,9 @@ constexpr static std::string_view
 constexpr static std::string_view
     s_wrong_collection_type_err("%1: Not a list or dictionary on field '%2' in class '%3'");
 
-REALM_NORETURN void throw_bad_transaction_log(std::string msg)
+REALM_NORETURN void throw_bad_transaction_log(const std::string& msg)
 {
-    throw BadChangesetError{std::move(msg)};
+    throw BadChangesetError{msg};
 }
 
 } // namespace
@@ -56,7 +56,7 @@ REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& m
                                                msg, m_log->version, m_log->last_integrated_remote_version,
                                                m_log->origin_file_ident, m_log->origin_timestamp));
     }
-    throw_bad_transaction_log(std::move(msg));
+    throw_bad_transaction_log(msg);
 }
 
 template <class... Params>

@@ -9,7 +9,7 @@ using util::TimestampStderrLogger;
 
 TimestampStderrLogger::TimestampStderrLogger(Config config, Level level)
     : Logger()
-    , m_formatter{std::move(config)}
+    , m_formatter{config}
 {
     set_level_threshold(level);
 }

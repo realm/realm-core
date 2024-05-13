@@ -389,7 +389,7 @@ private:
     void set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
-    void nullify_link(ColKey origin_col, ObjLink target_key) &&;
+    void nullify_link(ColKey origin_col, ObjLink target_key);
     template <class T>
     inline void set_spec(T&, ColKey);
     template <class ValueType>

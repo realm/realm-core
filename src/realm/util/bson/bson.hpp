@@ -84,7 +84,7 @@ public:
     Bson(realm::UUID) noexcept;
 
     Bson(const RegularExpression&) noexcept;
-    Bson(const std::vector<char>&) noexcept;
+    Bson(std::vector<char>) noexcept;
     Bson(const std::string&) noexcept;
     Bson(const BsonDocument&) noexcept;
     Bson(const BsonArray&) noexcept;
@@ -405,10 +405,10 @@ inline Bson::Bson(const RegularExpression& v) noexcept
     new (&regex_val) RegularExpression(v);
 }
 
-inline Bson::Bson(const std::vector<char>& v) noexcept
+inline Bson::Bson(std::vector<char> v) noexcept
 {
     m_type = Bson::Type::Binary;
-    new (&binary_val) std::vector<char>(v);
+    new (&binary_val) std::vector<char>(std::move(v));
 }
 
 inline Bson::Bson(const std::string& v) noexcept

@@ -1836,7 +1836,7 @@ inline void Obj::nullify_single_link<Mixed>(ColKey col, Mixed target)
     static_cast<void>(result);
 }
 
-void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
+void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
 {
     REALM_ASSERT(get_alloc().get_storage_version() == m_storage_version);
 

@@ -153,9 +153,7 @@ public:
     std::exception_ptr get_commit_exception() noexcept REQUIRES(!m_async_mutex)
     {
         util::CheckedLockGuard lck(m_async_mutex);
-        auto err = std::move(m_commit_exception);
-        m_commit_exception = nullptr;
-        return err;
+        return std::exchange(m_commit_exception, nullptr);
     }
 
     bool has_unsynced_commits() noexcept REQUIRES(!m_async_mutex)

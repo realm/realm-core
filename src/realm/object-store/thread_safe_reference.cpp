@@ -200,7 +200,7 @@ public:
             return Results(r, std::move(collection), m_ordering);
         }
         auto q = r->import_copy_of(*m_query, PayloadPolicy::Stay);
-        return Results(std::move(r), std::move(*q), m_ordering);
+        return Results(r, std::move(*q), m_ordering);
     }
 
 private:

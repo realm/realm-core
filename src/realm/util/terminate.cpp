@@ -134,14 +134,14 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 }
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
-                              std::initializer_list<Printable>&& values) noexcept
+                              std::initializer_list<Printable> values) noexcept
 {
-    terminate_with_info(message, file, line, nullptr, std::move(values));
+    terminate_with_info(message, file, line, nullptr, values);
 }
 
 REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
                                         const char* interesting_names,
-                                        std::initializer_list<Printable>&& values) noexcept
+                                        std::initializer_list<Printable> values) noexcept
 {
     std::stringstream ss;
     ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message;

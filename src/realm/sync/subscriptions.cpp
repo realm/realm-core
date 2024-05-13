@@ -276,7 +276,7 @@ const Subscription* SubscriptionSet::find(const Query& query) const
 MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, TransactionRef tr, Obj obj)
     : SubscriptionSet(mgr, *tr, obj, MakingMutableCopy{true})
     , m_tr(std::move(tr))
-    , m_obj(std::move(obj))
+    , m_obj(obj)
 {
 }
 
@@ -392,7 +392,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
         return sub.name == name;
     });
 
-    return insert_or_assign_impl(it, std::string{name}, std::move(table_name), std::move(query_str));
+    return insert_or_assign_impl(it, std::string{name}, table_name, std::move(query_str));
 }
 
 std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_assign(const Query& query)
@@ -403,7 +403,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
         return (!sub.name && sub.object_class_name == table_name && sub.query_string == query_str);
     });
 
-    return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
+    return insert_or_assign_impl(it, util::none, table_name, std::move(query_str));
 }
 
 void MutableSubscriptionSet::import(SubscriptionSet&& src_subs)

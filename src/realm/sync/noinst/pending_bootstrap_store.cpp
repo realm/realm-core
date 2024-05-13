@@ -227,15 +227,15 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
 
     if (!bootstrap_obj.is_null(m_progress)) {
         auto progress_obj = bootstrap_obj.get_linked_object(m_progress);
-        SyncProgress progress;
-        progress.latest_server_version.version = progress_obj.get<int64_t>(m_progress_latest_server_version);
-        progress.latest_server_version.salt = progress_obj.get<int64_t>(m_progress_latest_server_version_salt);
-        progress.download.server_version = progress_obj.get<int64_t>(m_progress_download_server_version);
-        progress.download.last_integrated_client_version =
+        ret.progress.emplace();
+        ret.progress->latest_server_version.version = progress_obj.get<int64_t>(m_progress_latest_server_version);
+        ret.progress->latest_server_version.salt = progress_obj.get<int64_t>(m_progress_latest_server_version_salt);
+        ret.progress->download.server_version = progress_obj.get<int64_t>(m_progress_download_server_version);
+        ret.progress->download.last_integrated_client_version =
             progress_obj.get<int64_t>(m_progress_download_client_version);
-        progress.upload.last_integrated_server_version = progress_obj.get<int64_t>(m_progress_upload_server_version);
-        progress.upload.client_version = progress_obj.get<int64_t>(m_progress_upload_client_version);
-        ret.progress = std::move(progress);
+        ret.progress->upload.last_integrated_server_version =
+            progress_obj.get<int64_t>(m_progress_upload_server_version);
+        ret.progress->upload.client_version = progress_obj.get<int64_t>(m_progress_upload_client_version);
     }
 
     auto changeset_list = bootstrap_obj.get_linklist(m_changesets);
@@ -330,7 +330,7 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
                        bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
     }
 
-    m_has_pending = (bootstrap_table->is_empty() == false);
+    m_has_pending = !bootstrap_table->is_empty();
 }
 
 } // namespace realm::sync

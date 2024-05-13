@@ -365,8 +365,8 @@ Lst<Mixed>& Lst<Mixed>::operator=(const Lst<Mixed>& other)
 Lst<Mixed>& Lst<Mixed>::operator=(Lst<Mixed>&& other) noexcept
 {
     if (this != &other) {
-        Base::operator=(std::move(other));
-        CollectionParent::operator=(std::move(other));
+        Base::operator=(other);
+        CollectionParent::operator=(other);
 
         m_tree = std::exchange(other.m_tree, nullptr);
         if (m_tree) {

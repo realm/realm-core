@@ -601,9 +601,9 @@ public:
 
         HTTPRequest req;
         req.method = HTTPMethod::Get;
-        req.path = std::move(request_uri);
+        req.path = request_uri;
         req.headers = std::move(headers);
-        req.headers["Host"] = std::move(host);
+        req.headers["Host"] = host;
         req.headers["Upgrade"] = "websocket";
         req.headers["Connection"] = "Upgrade";
         req.headers["Sec-WebSocket-Key"] = m_sec_websocket_key;

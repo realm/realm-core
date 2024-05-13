@@ -268,7 +268,7 @@ class ModifiesObjectExpr : public ModifiesClassExpr {
 public:
     ModifiesObjectExpr(std::string class_name, sync::instr::PrimaryKey object_id) noexcept
         : ModifiesClassExpr{std::move(class_name)}
-        , m_object_id{std::move(object_id)}
+        , m_object_id{object_id}
     {
     }
 
@@ -286,7 +286,7 @@ private:
 class ModifiesPropertyExpr : public ModifiesObjectExpr {
 public:
     ModifiesPropertyExpr(std::string class_name, sync::instr::PrimaryKey object_id, std::string property) noexcept
-        : ModifiesObjectExpr{std::move(class_name), std::move(object_id)}
+        : ModifiesObjectExpr{std::move(class_name), object_id}
         , m_property{std::move(property)}
     {
     }
@@ -312,7 +312,7 @@ class LinksToObjectExpr : public Expr {
 public:
     LinksToObjectExpr(std::string class_name, sync::instr::PrimaryKey object_id) noexcept
         : m_class_name{std::move(class_name)}
-        , m_object_id{std::move(object_id)}
+        , m_object_id{object_id}
     {
     }
 
@@ -1923,7 +1923,7 @@ int main(int argc, char* argv[])
             else if (std::strcmp(arg, "-O") == 0 || std::strcmp(arg, "--object") == 0) {
                 GlobalKey value;
                 if (get_parsed_value(value)) {
-                    object_id = std::move(value);
+                    object_id = value;
                     continue;
                 }
             }

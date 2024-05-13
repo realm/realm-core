@@ -282,7 +282,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.compensating_writes_length = c_compensating_writes.size();
 
         realm_sync_session_t c_session(session);
-        handler(userdata.get(), &c_session, std::move(c_error));
+        handler(userdata.get(), &c_session, c_error);
     };
     config->error_handler = std::move(cb);
 }
@@ -682,7 +682,7 @@ RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_as
     auto cb = [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](ThreadSafeReference realm,
                                                                                        std::exception_ptr error) {
         if (error) {
-            realm_async_error_t c_error(std::move(error));
+            realm_async_error_t c_error(error);
             done(userdata.get(), nullptr, &c_error);
         }
         else {
