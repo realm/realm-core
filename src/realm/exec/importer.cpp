@@ -400,9 +400,8 @@ std::vector<DataType> Importer::lowest_common(std::vector<DataType> types1, std:
         // All choices except for the last must be ||. The last must be &&
         if (types1[t] == type_String || types2[t] == type_String)
             res.push_back(type_String);
-        else if (types1[t] == type_Double || types2[t] == type_Double)
-            res.push_back(type_Double);
-        else if ((types1[t] == type_Float && types2[t] == type_Int) ||
+        else if ((types1[t] == type_Double || types2[t] == type_Double) ||
+                 (types1[t] == type_Float && types2[t] == type_Int) ||
                  (types2[t] == type_Float && types1[t] == type_Int)) {
             // This covers the special case where first values are integers and suddenly radix points occur. In this
             // case we must import as double, because a float may not be precise enough to hold the number of

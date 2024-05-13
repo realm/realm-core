@@ -489,18 +489,15 @@ void ClientHistory::integrate_server_changesets(
 
         // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
         // synthetic server version that represents synthetic changesets generated from state on the server.
-        if (batch_state == DownloadBatchState::LastInBatch && changesets_to_integrate.empty()) {
+        if (batch_state != DownloadBatchState::MoreToCome && changesets_to_integrate.empty()) {
             update_sync_progress(progress, downloadable_bytes, transact); // Throws
         }
         // Always update progress for download messages from steady state.
-        else if (batch_state == DownloadBatchState::SteadyState && !changesets_to_integrate.empty()) {
+        else if (batch_state == DownloadBatchState::SteadyState) {
             auto partial_progress = progress;
             partial_progress.download.server_version = last_changeset.remote_version;
             partial_progress.download.last_integrated_client_version = last_changeset.last_integrated_local_version;
             update_sync_progress(partial_progress, downloadable_bytes, transact); // Throws
-        }
-        else if (batch_state == DownloadBatchState::SteadyState && changesets_to_integrate.empty()) {
-            update_sync_progress(progress, downloadable_bytes, transact); // Throws
         }
         if (run_in_write_tr) {
             run_in_write_tr(transact, changesets_for_cb);

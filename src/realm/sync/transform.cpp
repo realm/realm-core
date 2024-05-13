@@ -1479,7 +1479,7 @@ DEFINE_NESTED_MERGE(Instruction::Update)
         //  If this is a collection in mixed, we will allow the inner instruction
         //  to pass so long as it references the proper type (list or dictionary).
         if ((outer.value.type == Type::List && mpark::holds_alternative<uint32_t>(*next_element)) ||
-            (outer.value.type == Type::Dictionary && mpark::holds_alternative<InternString>(*next_element)) {
+            (outer.value.type == Type::Dictionary && mpark::holds_alternative<InternString>(*next_element))) {
             return;
         }
         inner_side.discard();

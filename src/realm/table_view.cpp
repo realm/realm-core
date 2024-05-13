@@ -565,20 +565,9 @@ void TableView::apply_descriptors(const DescriptorOrdering& ordering)
 
 bool TableView::is_in_table_order() const
 {
-    if (!m_table) {
+    if (!m_table || m_collection_source || m_source_column_key || !m_query) {
         return false;
     }
-    else if (m_collection_source) {
-        return false;
-    }
-    else if (m_source_column_key) {
-        return false;
-    }
-    else if (!m_query) {
-        return false;
-    }
-    else {
-        m_query->m_table.check();
-        return m_query->produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
-    }
+    m_query->m_table.check();
+    return m_query->produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
 }

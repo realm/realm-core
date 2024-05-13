@@ -169,7 +169,6 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type)
         case type_Decimal:
             return Type::Decimal;
         case type_Link:
-            return Type::Link;
         case type_TypedLink:
             return Type::Link;
         case type_ObjectId:

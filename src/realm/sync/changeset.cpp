@@ -86,19 +86,15 @@ std::ostream& Changeset::print_value(std::ostream& os, const Instruction::Payloa
     auto& data = value.data;
     switch (value.type) {
         case Type::ObjectValue:
+        case Type::Erased:
+        case Type::Set:
+        case Type::List:
+        case Type::Dictionary:
+        case Type::Null:
             break;
+
         case Type::GlobalKey:
             os << data.key;
-            break;
-        case Type::Erased:
-            break;
-        case Type::Set:
-            break;
-        case Type::List:
-            break;
-        case Type::Dictionary:
-            break;
-        case Type::Null:
             break;
         case Type::Int:
             os << data.integer;

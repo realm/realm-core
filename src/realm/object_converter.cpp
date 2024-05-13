@@ -452,11 +452,9 @@ void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictio
 
         auto cmp = key_src.compare(key_dst);
         if (cmp == 0) {
-            if (src_any != dst_any) {
-                to_insert.push_back(src_ndx);
-            }
-            else if (is_collection(src_any) &&
-                     !check_if_dictionary_elements_match(src_dictionary, dst_dictionary, key_src.get_string())) {
+            if (src_any != dst_any ||
+                (is_collection(src_any) &&
+                 !check_if_dictionary_elements_match(src_dictionary, dst_dictionary, key_src.get_string()))) {
                 to_insert.push_back(src_ndx);
             }
             src_ndx += 1;

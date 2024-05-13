@@ -65,9 +65,9 @@ bool Version::has_feature(Feature feature)
     switch (feature) {
         case feature_Debug:
 #ifdef REALM_DEBUG
-            return true;
+            return true; // NOLINT
 #else
-            return false;
+            return false; // NOLINT
 #endif
 
         case feature_Replication:

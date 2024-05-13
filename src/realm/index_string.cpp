@@ -1875,12 +1875,6 @@ void StringIndex::node_add_key(ref_type ref)
 bool SortedListComparator::operator()(int64_t key_value, const Mixed& b) // used in lower_bound
 {
     Mixed a = m_column.get_value(ObjKey(key_value));
-    if (a.is_null() && !b.is_null())
-        return true;
-    else if (b.is_null() && !a.is_null())
-        return false;
-    else if (a.is_null() && b.is_null())
-        return false;
     return a.compare(b) < 0;
 }
 
@@ -1889,12 +1883,6 @@ bool SortedListComparator::operator()(int64_t key_value, const Mixed& b) // used
 bool SortedListComparator::operator()(const Mixed& a, int64_t key_value) // used in upper_bound
 {
     Mixed b = m_column.get_value(ObjKey(key_value));
-    if (a.is_null() && !b.is_null())
-        return true;
-    else if (b.is_null() && !a.is_null())
-        return false;
-    else if (a.is_null() && b.is_null())
-        return false;
     return a.compare(b) < 0;
 }
 

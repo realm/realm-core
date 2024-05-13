@@ -75,7 +75,7 @@ void ChangesetIndex::scan_changeset(Changeset& changeset)
             auto& p = *add_table_instr;
             schema_conflict_group(changeset.get_string(p.table));
         }
-        else if (instr.get_if<Instruction::EraseTable>()) {
+        else if (instr.get_if<Instruction::EraseTable>() || instr.get_if<Instruction::EraseColumn>()) {
             m_contains_destructive_schema_changes = true;
             clear();
             return;
@@ -89,11 +89,6 @@ void ChangesetIndex::scan_changeset(Changeset& changeset)
                 ConflictGroup& cg2 = schema_conflict_group(target_table);
                 merge_conflict_groups(cg, cg2);
             }
-        }
-        else if (instr.get_if<Instruction::EraseColumn>()) {
-            m_contains_destructive_schema_changes = true;
-            clear();
-            return;
         }
         else {
             GlobalID ids[2];

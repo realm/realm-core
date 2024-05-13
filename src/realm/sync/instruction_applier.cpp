@@ -271,7 +271,7 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
         case Type::Erased:
             return visitor(Instruction::Payload::Erased{});
         case Type::GlobalKey:
-            return visitor(realm::util::none); // FIXME: Not sure about this
+            REALM_UNREACHABLE(); // no longer used
         case Type::Null:
             return visitor(realm::util::none);
         case Type::Int:
@@ -483,12 +483,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             auto visitor = util::overload{
                 [&](Mixed value) {
-                    if (value.is_null()) {
-                        // FIXME: Separate handling of NULL is needed because
-                        // `Mixed::get_type()` asserts on NULL.
-                        dict.insert(key, value);
-                    }
-                    else if (value.get_type() == type_Link) {
+                    if (value.is_type(type_Link)) {
                         m_applier->bad_transaction_log("Update: Untyped links are not supported in dictionaries.");
                     }
                     else {
