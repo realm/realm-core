@@ -682,8 +682,8 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_hist_ref_ndx) {
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_modified, false);    // Throws
-            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                                     // Throws
+            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_modified, false); // Throws
+            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                                  // Throws
         }
     }
     if (top.size() > Group::s_evacuation_point_ndx) {
