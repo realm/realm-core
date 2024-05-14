@@ -114,7 +114,7 @@ std::optional<CollectionType> process_collection(const Property& property)
     else if (is_dictionary(property.type)) {
         return CollectionType::Dictionary;
     }
-    return {};
+    return std::nullopt;
 }
 
 ColKey add_column(Group& group, Table& table, Property const& property)

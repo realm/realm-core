@@ -847,7 +847,7 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
     Array node(alloc);
     node.init_from_ref(ref);
     REALM_ASSERT_DEBUG(node.has_refs());
-    TempArray written_node(node.size(), NodeHeader::type_InnerBptreeNode);
+    TempArray written_node(node.size(), NodeHeader::type_InnerBptreeNode, node.get_context_flag());
     for (unsigned j = 0; j < node.size(); ++j) {
         RefOrTagged rot = node.get_as_ref_or_tagged(j);
         if (rot.is_ref() && rot.get_as_ref()) {
