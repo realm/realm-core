@@ -1818,7 +1818,7 @@ TEST(ParallelSearchEqualMatch)
     constexpr size_t buflen = 4;
     uint64_t buff[buflen];
     std::vector<int64_t> values;
-    for (size_t width = 1; width <= 64; width++) {
+    for (uint8_t width = 1; width <= 64; width++) {
         const size_t size = (buflen * 64) / width;
         const uint64_t bit_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - width); // (1ULL << width) - 1;
 
