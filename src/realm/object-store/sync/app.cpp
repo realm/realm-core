@@ -760,7 +760,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
     }
 
     if (anon_user) {
-        emit_change_to_subscribers(*this);
+        emit_change_to_subscribers();
         completion(anon_user, util::none);
         return;
     }
@@ -853,7 +853,7 @@ void App::log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
                [self = shared_from_this(), completion = std::move(completion)](auto&&, const Response& response) {
                    auto error = AppUtils::check_for_errors(response);
                    if (!error) {
-                       self->emit_change_to_subscribers(*self);
+                       self->emit_change_to_subscribers();
                    }
                    if (completion) {
                        completion(error);
@@ -886,14 +886,16 @@ void App::switch_user(const std::shared_ptr<User>& user)
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         throw AppError(ErrorCodes::ClientUserNotLoggedIn, "User is no longer valid or is logged out");
     }
-    util::CheckedLockGuard lock(m_user_mutex);
-    if (!verify_user_present(user)) {
-        throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
-    }
+    {
+        util::CheckedLockGuard lock(m_user_mutex);
+        if (!verify_user_present(user)) {
+            throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
+        }
 
-    m_current_user = user.get();
-    m_metadata_store->set_current_user(user->user_id());
-    emit_change_to_subscribers(*this);
+        m_current_user = user.get();
+        m_metadata_store->set_current_user(user->user_id());
+    }
+    emit_change_to_subscribers();
 }
 
 void App::remove_user(const std::shared_ptr<User>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
@@ -952,7 +954,7 @@ void App::delete_user(const std::shared_ptr<User>& user, UniqueFunction<void(Opt
                 auto user_id = user->user_id();
                 user->detach_and_tear_down();
                 m_metadata_store->delete_user(*m_file_manager, user_id);
-                emit_change_to_subscribers(*self);
+                emit_change_to_subscribers();
             }
             completion(std::move(error));
         });
@@ -1469,6 +1471,14 @@ std::unique_ptr<Request> App::make_request(HttpMethod method, std::string&& url,
 PushClient App::push_notification_client(const std::string& service_name)
 {
     return PushClient(service_name, m_config.app_id, std::shared_ptr<AuthRequestClient>(shared_from_this(), this));
+}
+
+void App::emit_change_to_subscribers()
+{
+    // This wrapper is needed only to be able to add the `REQUIRES(!m_user_mutex)`
+    // annotation. Calling this function with the lock held leads to a deadlock
+    // if any of the listeners try to access us.
+    Subscribable<App>::emit_change_to_subscribers(*this);
 }
 
 // MARK: - UserProvider

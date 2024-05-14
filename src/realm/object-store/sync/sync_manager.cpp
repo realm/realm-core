@@ -142,7 +142,7 @@ void SyncManager::do_make_logger()
     REALM_ASSERT(m_logger_ptr);
 }
 
-const std::shared_ptr<util::Logger>& SyncManager::get_logger() const
+std::shared_ptr<util::Logger> SyncManager::get_logger() const
 {
     util::CheckedLockGuard lock(m_mutex);
     return m_logger_ptr;

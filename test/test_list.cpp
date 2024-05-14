@@ -841,11 +841,13 @@ TEST(List_NestedCollection_Links)
     auto origin = tr->add_table("origin");
     auto list_col = origin->add_column_list(type_Mixed, "any_list");
     auto any_col = origin->add_column(type_Mixed, "any");
+    auto any1_col = origin->add_column(type_Mixed, "any1");
     auto embedded_col = origin->add_column(*embedded, "sub");
 
     Obj target_obj1 = target->create_object();
     Obj target_obj2 = target->create_object();
     Obj target_obj3 = target->create_object();
+    Obj target_obj4 = target->create_object();
     Obj parent = origin->create_object();
     parent.create_and_set_linked_object(embedded_col);
     auto child_obj = parent.get_linked_object(embedded_col);
@@ -881,6 +883,8 @@ TEST(List_NestedCollection_Links)
         dict_any = o.get_dictionary(any_col);
         dict_any.insert("Godbye", target_obj1.get_link());
         CHECK_THROW_ANY(dict_any.insert("Wrong", child_obj.get_link()));
+        o.set_collection(any1_col, CollectionType::List);
+        o.get_list<Mixed>(any1_col).add(target_obj4.get_link());
 
         // Create link from a list nested in a collection nested in a Mixed property
         dict_any.insert_collection("List", CollectionType::List);
@@ -891,6 +895,7 @@ TEST(List_NestedCollection_Links)
         CHECK_EQUAL(target_obj1.get_backlink_count(), 2);
         CHECK_EQUAL(target_obj2.get_backlink_count(), 1);
         CHECK_EQUAL(target_obj3.get_backlink_count(), 1);
+        CHECK_EQUAL(target_obj4.get_backlink_count(), 1);
     };
 
     create_links();
@@ -921,15 +926,28 @@ TEST(List_NestedCollection_Links)
     CHECK_EQUAL(target_obj2.get_backlink_count(), 1);
     o.remove();
     CHECK_EQUAL(target_obj2.get_backlink_count(), 0);
+    CHECK_EQUAL(target_obj4.get_backlink_count(), 0);
     tr->commit_and_continue_as_read();
 
     create_links();
     // Clearing dictionary should remove links
     tr->promote_to_write();
     dict_any.clear();
-    tr->commit_and_continue_as_read();
     CHECK_EQUAL(target_obj1.get_backlink_count(), 1);
     CHECK_EQUAL(target_obj3.get_backlink_count(), 0);
+    o.remove();
+    tr->commit_and_continue_as_read();
+
+    create_links();
+    tr->promote_to_write();
+    // Removing the top object should remove all backlinks.
+    // This includes the links contained in the collections
+    // held by the any (dictionary) and any1 (list) properties.
+    o.remove();
+    CHECK_EQUAL(target_obj1.get_backlink_count(), 0);
+    CHECK_EQUAL(target_obj2.get_backlink_count(), 0);
+    CHECK_EQUAL(target_obj3.get_backlink_count(), 0);
+    CHECK_EQUAL(target_obj4.get_backlink_count(), 0);
 }
 
 TEST(List_NestedCollection_Unresolved)

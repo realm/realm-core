@@ -4112,6 +4112,42 @@ TEST(Parser_OrOfIn)
                  "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null} OR name IN {''}", 5);
 }
 
+TEST_TYPES(Parser_7642, std::true_type, std::false_type)
+{
+    Group g;
+    auto cars = g.add_table("class_Car");
+    auto col_make = cars->add_column(type_String, "make");
+    auto col_int = cars->add_column(type_Int, "value");
+    if (TEST_TYPE::value) {
+        cars->add_search_index(col_make);
+        cars->add_search_index(col_int);
+    }
+
+    cars->create_object().set(col_make, "Tesla").set(col_int, 123);
+    cars->create_object().set(col_make, "Ford").set(col_int, 456);
+    cars->create_object().set(col_make, "Audi").set(col_int, 789);
+    cars->create_object().set(col_make, "Chevy").set(col_int, 1000);
+
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
+    // do not compare to floats, and do not compare to floats/doubles that are not an exact integer
+    float nan_f = std::numeric_limits<float>::quiet_NaN();
+    float inf_f = std::numeric_limits<float>::infinity();
+    Vec args = Vec{456, 789.0f, 123.0, 789.10, 1000.1f};
+    verify_query(test_context, cars, "value IN $0", {args}, 3);
+    args.push_back(inf_f);
+    args.push_back(nan_f);
+    verify_query_sub(test_context, cars, "value == $0", args, 1);
+    verify_query_sub(test_context, cars, "value == $1", args, 1);
+    verify_query_sub(test_context, cars, "value == $2", args, 1);
+    verify_query_sub(test_context, cars, "value == $3", args, 0);
+    verify_query_sub(test_context, cars, "value == $4", args, 0);
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $5", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $6", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "NaN not supported for int"));
+}
+
 TEST(Parser_KeyPathSubstitution)
 {
     Group g;
