@@ -1650,7 +1650,7 @@ TEST(Array_cares_about)
         0x7fffffffffffff,   0xffffffffffffff,   0x1ffffffffffffff,  0x3ffffffffffffff,  0x7ffffffffffffff,
         0xfffffffffffffff,  0x1fffffffffffffff, 0x3fffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff};
     std::vector<uint64_t> res;
-    for (size_t i = 0; i <= 64; i++) {
+    for (uint8_t i = 0; i <= 64; i++) {
         res.push_back(cares_about(i));
     }
     CHECK_EQUAL(res, expected);
