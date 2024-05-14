@@ -5023,12 +5023,15 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         }
     };
 
+    enum BootstrapMode { None, SingleMessage, SingleMessageMulti, MultiMessage };
     enum TestState { not_ready, start, reconnect_received, downloading, downloaded, complete };
     TestingStateMachine<TestState> state_machina(TestState::not_ready);
     std::mutex callback_mutex;
     int64_t query_version = 0;
     bool did_client_reset = false;
-    size_t msg_count = 0;
+    BootstrapMode bootstrap_mode = BootstrapMode::None;
+    size_t download_msg_count = 0;
+    size_t bootstrap_msg_count = 0;
     bool role_change_bootstrap = false;
 
     auto logger = util::Logger::get_default_logger();
@@ -5037,6 +5040,11 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     /** TODO: Remove when switching to use Protocol version in RCORE-1972 */
     // Enable the role change bootstraps
     REQUIRE(app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
+    REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
+    REQUIRE(app_session.admin_api.patch_app_settings(app_session.server_app_id,
+                                                     {{"sync", {{"num_objects_before_bootstrap_flush", 1}}}}));
+    REQUIRE(app_session.admin_api.patch_app_settings(app_session.server_app_id,
+                                                     {{"sync", {{"download_loop_sleep_millis", 25}}}}));
 
     // Get the current rules so it can be updated during the test
     auto rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
@@ -5050,9 +5058,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
     auto config = harness.make_test_file();
 
-    config.sync_config->on_sync_client_event_hook = [&state_machina, &callback_mutex, &msg_count,
-                                                     &role_change_bootstrap, &query_version](
-                                                        std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
         state_machina.transition_with([&](TestState cur_state) -> std::optional<TestState> {
             if (cur_state == TestState::not_ready)
                 return std::nullopt;
@@ -5068,25 +5074,41 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                     REQUIRE_FALSE(data.error_info->is_fatal);
                     return TestState::reconnect_received;
 
-                // A bootstrap message was processed - used for multi-message or
-                // single message multi changeset bootstraps
-                case Event::BootstrapMessageProcessed: {
-                    REQUIRE(data.batch_state != BatchState::SteadyState);
-                    REQUIRE((cur_state == TestState::reconnect_received || cur_state == TestState::downloading));
-                    if (data.batch_state != BatchState::SteadyState) {
-                        std::lock_guard lock(callback_mutex);
-                        ++msg_count;
-                        if (data.query_version == query_version) {
-                            role_change_bootstrap = true;
-                        }
-                    }
+                case Event::DownloadMessageReceived: {
+                    std::lock_guard lock(callback_mutex);
                     // multi-message bootstrap in progress..
                     if (data.batch_state == BatchState::MoreToCome) {
+                        // More than 1 bootstrap message, always a multi-message
+                        ++download_msg_count;
+                        bootstrap_mode = BootstrapMode::MultiMessage;
                         return TestState::downloading;
                     }
                     // single bootstrap message or last message in the multi-message bootstrap
                     else if (data.batch_state == BatchState::LastInBatch) {
+                        ++download_msg_count;
+                        if (cur_state == TestState::reconnect_received) {
+                            // If reconnect error was last state, then bootstrap has only one message
+                            bootstrap_mode = BootstrapMode::SingleMessageMulti;
+                            // Must have 2 or more changesets in message to get here...
+                            REQUIRE(data.num_changesets > 1);
+                        }
                         return TestState::downloaded;
+                    }
+                    // single message/single changeset bootstraps are treated as a steady state download
+                    return std::nullopt;
+                }
+
+                // A bootstrap message was processed - used for multi-message or
+                // single message multi changeset bootstraps
+                case Event::BootstrapMessageProcessed: {
+                    REQUIRE(data.batch_state != BatchState::SteadyState);
+                    REQUIRE((cur_state == TestState::downloading || cur_state == TestState::downloaded));
+                    if (data.batch_state != BatchState::SteadyState) {
+                        std::lock_guard lock(callback_mutex);
+                        ++bootstrap_msg_count;
+                        if (data.query_version == query_version) {
+                            role_change_bootstrap = true;
+                        }
                     }
                     return std::nullopt;
                 }
@@ -5130,11 +5152,12 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     }
 
     auto update_perms_and_verify = [&](std::optional<nlohmann::json> doc_filter, size_t cnt_emps, size_t cnt_mgrs,
-                                       size_t cnt_dirs) {
+                                       size_t cnt_dirs, BootstrapMode expected_mode) {
         {
             std::lock_guard lock(callback_mutex);
             did_client_reset = false;
-            msg_count = 0;
+            bootstrap_msg_count = 0;
+            download_msg_count = 0;
             role_change_bootstrap = false;
             query_version = realm->get_active_subscription_set().version();
         }
@@ -5208,18 +5231,19 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         state_machina.transition_to(TestState::not_ready);
     };
     {
+        // SingleMessage, SingleMessageMulti, MultiMessage
         // Single message bootstrap - remove employees, keep mgrs/dirs
         nlohmann::json doc_filter = {{"role", {{"$in", {"manager", "director"}}}}};
-        update_perms_and_verify(doc_filter, 0, num_mgrs, num_dirs);
+        update_perms_and_verify(doc_filter, 0, num_mgrs, num_dirs, BootstrapMode::SingleMessage);
     }
     {
         // Multi-message bootstrap - add employeees, remove managers and directors
         nlohmann::json doc_filter = {{"role", "employee"}};
-        update_perms_and_verify(doc_filter, num_emps, 0, 0);
+        update_perms_and_verify(doc_filter, num_emps, 0, 0, BootstrapMode::MultiMessage);
     }
     {
         // Single message bootstrap - add back managers and directors
-        update_perms_and_verify(std::nullopt, num_emps, num_mgrs, num_dirs);
+        update_perms_and_verify(std::nullopt, num_emps, num_mgrs, num_dirs, , BootstrapMode::SingleMessageMulti);
     }
 }
 

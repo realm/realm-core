@@ -145,6 +145,7 @@ public:
 
     MigrationStatus get_migration_status(const std::string& app_id) const;
     nlohmann::json get_app_settings(const std::string& app_id) const;
+    bool patch_app_settings(const std::string& app_id, nlohmann::json&& new_settings) const;
 
     const std::string& admin_url() const noexcept
     {

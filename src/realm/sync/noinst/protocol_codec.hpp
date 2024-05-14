@@ -403,6 +403,7 @@ public:
 
     struct DownloadMessage {
         SyncProgress progress;
+        // For FLX sync, the query_version and last_in_batch are required to be provided
         std::optional<int64_t> query_version;
         std::optional<bool> last_in_batch;
         union {

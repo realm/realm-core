@@ -1891,7 +1891,6 @@ void Session::send_bind_message()
     session_ident_type session_ident = m_ident;
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
-    m_last_download_batch_state = DownloadBatchState::SteadyState;
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
@@ -2370,10 +2369,6 @@ Status Session::receive_download_message(const DownloadMessage& message)
     if (!is_flx || query_version > 0)
         enable_progress_notifications();
 
-    // If this is a PBS connection, then every download message is its own complete batch.
-    bool last_in_batch = is_flx ? *message.last_in_batch : true;
-    auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
-
     auto&& progress = message.progress;
     if (is_flx) {
         logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
@@ -2383,7 +2378,8 @@ Status Session::receive_download_message(const DownloadMessage& message)
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.progress_estimate, last_in_batch, query_version, message.changesets.size()); // Throws
+                     message.progress_estimate, *message.last_in_batch, query_version,
+                     message.changesets.size()); // Throws
     }
     else {
         logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
@@ -2416,10 +2412,8 @@ Status Session::receive_download_message(const DownloadMessage& message)
     // download message must have a remote version greater than (or equal to for FLX) this value.
     version_type last_remote_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    // If there are 2 or more changesets in this message, track whether or not the changesets all have the same
-    // download_server_version to help with determining if this is a single message server-initiated bootstrap or not.
-    bool same_remote_version = last_in_batch && message.changesets.size() > 1;
-    bool after_first_changeset = false;
+    version_type last_changeset_version = 0; // skips checking the first time through the loop
+    bool has_duplicate_changeset_versions = false;
 
     for (const RemoteChangeset& changeset : message.changesets) {
         // Check that per-changeset server version is strictly increasing since the last download server version,
@@ -2433,17 +2427,17 @@ Status Session::receive_download_message(const DownloadMessage& message)
                     util::format("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)",
                                  changeset.remote_version, last_remote_version, progress.download.server_version)};
         }
-        // Check to see if all the changesets in this LastInBatch=true message have the same remote_version
-        // If so, this is a server-initiated single message bootstrap
-        if (same_remote_version && after_first_changeset) {
-            // After the first changeset compare the previous changeset's server version to the current changeset
-            // server version. If they are different then this is definitely not a bootstrap message
-            same_remote_version = changeset.remote_version == last_remote_version;
+
+        if (last_changeset_version == changeset.remote_version) {
+            // last_changeset_version is 0 first time through the loop to prevent comparing the
+            // changeset remote_version to the download_server_version, which may lead to a false
+            // positive when checking for changesets with duplicate remote_version values
+            has_duplicate_changeset_versions = true;
         }
-        // Skip the first changeset, since `server_version` contains the incorrect value for this check
-        after_first_changeset = true;
+
         // Save the remote version for the current changeset to compare against the next changeset
         last_remote_version = changeset.remote_version;
+        last_changeset_version = changeset.remote_version;
 
         // Check that per-changeset last integrated client version is "weakly"
         // increasing.
@@ -2469,10 +2463,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
         }
     }
 
-    if (is_steady_state_download_message(batch_state, query_version, same_remote_version)) {
-        batch_state = DownloadBatchState::SteadyState;
-    }
-    m_last_download_batch_state = batch_state;
+    auto batch_state = derive_download_batch_state(message, has_duplicate_changeset_versions);
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
                                        batch_state, message.changesets.size());

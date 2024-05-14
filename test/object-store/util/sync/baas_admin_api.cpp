@@ -994,23 +994,15 @@ bool AdminAPISession::set_feature_flag(const std::string& app_id, const std::str
     return flag_response.empty();
 }
 
-bool AdminAPISession::get_feature_flag(const std::string& /*app_id*/, const std::string& /*flag_name*/) const
+bool AdminAPISession::get_feature_flag(const std::string& app_id, const std::string& flag_name) const
 {
-    /** TODO: Fix once an updated baasaas solution is in place
-    auto settings_json = get_app_settings(app_id);
-    // Format: {..., "features": {"enabled": ["<feature1-name>", "<feature2-name>", ...], ...}, ...}
-    if (auto features = settings_json.find("features");
-        features != settings_json.end() && features->is_object() && !features->empty()) {
-        if (auto enabled_list = features->find("enabled");
-            enabled_list != features->end() && enabled_list->is_array() && !enabled_list->empty()) {
-            for (auto& item : *enabled_list) {
-                if (item.is_string() && item.get<std::string>() == flag_name) {
-                    return true;
-                }
-            }
-        }
+    auto features = apps(APIFamily::Private)[app_id]["features"];
+    auto response = features.get_json();
+    if (auto feature_list = response["enabled"]; !feature_list.empty()) {
+        return std::find_if(feature_list.begin(), feature_list.end(), [&flag_name](const auto& feature) {
+                   return feature == flag_name;
+               }) != feature_list.end();
     }
-    */
     return false;
 }
 
@@ -1039,6 +1031,13 @@ nlohmann::json AdminAPISession::get_app_settings(const std::string& app_id) cons
 {
     auto settings_endpoint = apps(APIFamily::Private)[app_id]["settings"];
     return settings_endpoint.get_json();
+}
+
+bool AdminAPISession::patch_app_settings(const std::string& app_id, nlohmann::json&& json) const
+{
+    auto settings_endpoint = apps(APIFamily::Private)[app_id]["settings"];
+    auto response = settings_endpoint.patch_json(std::move(json));
+    return response.empty();
 }
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)

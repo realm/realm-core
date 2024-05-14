@@ -936,7 +936,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
-            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
+            // Close the write transaction before clearing the bootstrap store to avoid a deadlock because the
             // bootstrap store requires a write transaction itself.
             transact->close();
             bootstrap_store->clear();
@@ -1099,53 +1099,46 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     return call_debug_hook(data);
 }
 
-bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version,
-                                                   bool same_remote_versions)
+DownloadBatchState SessionImpl::derive_download_batch_state(const DownloadMessage& message,
+                                                            bool has_duplicate_changeset_versons)
 {
     // Should never be called if session is not active
     REALM_ASSERT_EX(m_state == State::Active, m_state);
-    // Query version should always be the same or increasing
-    REALM_ASSERT_3(query_version, >=, m_wrapper.m_flx_active_version);
 
-    // Return early if already steady state or PBS (doesn't use bootstraps)
-    if (batch_state == DownloadBatchState::SteadyState || !m_is_flx_sync_session) {
-        return true; // Steady state
+    // PBS download messages are always steady state
+    if (!m_is_flx_sync_session) {
+        return DownloadBatchState::SteadyState;
     }
 
     // Bootstrap messages (i.e. non-steady state) are identified by:
-    // * DownloadBatchState of MoreToCome
-    // * DownloadBatchState of LastInBatch, and
-    //   * first LastInBatch=true after one or more MoreToCome messages
-    //   * query_version greater than the active query_version
-    //   * LastInBatch=true message has 2 or more changesets and all have the same
-    //     remote_version
+    // * last_in_batch=false
+    // * last_in_batch=true, and
+    //   * previous messages received had last_in_batch=false
+    //   * query_version is greater than the active query_version
+    //   * 2 or more changesets in the message have the same remote version
 
-    // LastInBatch=False messages are always a bootstrap message
-    if (batch_state == DownloadBatchState::MoreToCome) {
-        return false; // Not steady state
+    // Query version should always be the same or increasing
+    REALM_ASSERT_3(message.query_version, >=, m_wrapper.m_flx_active_version);
+    // FLX download messages should always have a last_in_batch value
+    REALM_ASSERT_EX(message.last_in_batch, "FLX download message missing last_in_batch value");
+
+    // If last_in_batch=false, this is a multi-message bootstrap and there are more to come
+    if (!*message.last_in_batch) {
+        return DownloadBatchState::MoreToCome;
     }
 
-    // Messages with query_version greater than the active version are always a
-    // bootstrap message
-    if (query_version > m_wrapper.m_flx_active_version) {
-        return false; // Not steady state
+    // This download message is the last message of a bootstrap (or a single
+    // message bootstrap) if last_in_batch=true and one of the following applies:
+    // * The query_version is greater than the active query_version
+    // * A bootstrap is in progress (i.e. previous MoreToCome messages received)
+    // * Two or more changesets in the download message have the same remote version
+    if (message.query_version > m_wrapper.m_flx_active_version ||
+        m_wrapper.get_flx_pending_bootstrap_store()->has_pending() || has_duplicate_changeset_versons) {
+        return DownloadBatchState::LastInBatch;
     }
 
-    // If this is the first LastInBatch=true message after one or more
-    // LastInBatch=false messages, this is the end of a bootstrap
-    if (m_last_download_batch_state == DownloadBatchState::MoreToCome) {
-        return false; // Not steady state
-    }
-
-    // Otherwise, if this is a LastInBatch=true message whose query version matches
-    // the current active version and all the changesets in the message have the
-    // same remote version, then this is a server initiated single message bootstrap
-    if (same_remote_versions) {
-        return false; // Not steady state
-    }
-
-    // If none of the previous checks were successful, then this is a steady state msg
-    return true; // Steady state
+    // Otherwise, not a bootstrap message, process as a normal download message
+    return DownloadBatchState::SteadyState;
 }
 
 void SessionImpl::init_progress_handler()
