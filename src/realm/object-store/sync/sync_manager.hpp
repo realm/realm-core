@@ -138,7 +138,7 @@ public:
     }
 
     // Return the cached logger
-    const std::shared_ptr<util::Logger>& get_logger() const REQUIRES(!m_mutex);
+    std::shared_ptr<util::Logger> get_logger() const REQUIRES(!m_mutex);
 
     struct OnlyForTesting {
         friend class TestHelper;

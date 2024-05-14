@@ -624,10 +624,10 @@ private:
 
 class TempArray : public Array {
 public:
-    TempArray(size_t sz, Type type = Type::type_HasRefs)
+    TempArray(size_t sz, Type type = Type::type_HasRefs, bool cf = false)
         : Array(Allocator::get_default())
     {
-        create(type, false, sz);
+        create(type, cf, sz);
     }
     ~TempArray()
     {

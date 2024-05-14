@@ -80,24 +80,22 @@ protected:
         virtual ~PathResolver();
         virtual Status resolve();
 
-        virtual void on_property(Obj&, ColKey);
+        [[nodiscard]] virtual Status on_property(Obj&, ColKey);
         virtual void on_list(LstBase&);
         [[nodiscard]] virtual Status on_list_index(LstBase&, uint32_t);
         virtual void on_dictionary(Dictionary&);
         [[nodiscard]] virtual Status on_dictionary_key(Dictionary&, Mixed);
         virtual void on_set(SetBase&);
         virtual void on_error(const std::string&);
+        [[nodiscard]] virtual Status on_mixed_type_changed(const std::string&);
         virtual void on_column_advance(ColKey);
         virtual void on_dict_key_advance(StringData);
         [[nodiscard]] virtual Status on_list_index_advance(uint32_t);
         [[nodiscard]] virtual Status on_null_link_advance(StringData, StringData);
+        [[nodiscard]] virtual Status on_dict_key_not_found(StringData, StringData, StringData);
         [[nodiscard]] virtual Status on_begin(const util::Optional<Obj>& obj);
         virtual void on_finish();
         virtual StringData get_string(InternString);
-        const std::string_view& instruction_name() const noexcept
-        {
-            return m_instr_name;
-        }
 
     protected:
         [[nodiscard]] Status resolve_field(Obj& obj, InternString field);

@@ -239,16 +239,22 @@ TEST(Dictionary_TypedLinks)
         CHECK_EQUAL(lady.get_backlink_count(*persons, col_dict), 1);
         CHECK_EQUAL(lady.get_backlink(*persons, col_dict, 0), adam.get_key());
         CHECK_EQUAL(lady.get_backlink_count(), 1);
+        // make sure that inserting the same link again does nothing
+        CHECK_NOT(dict.insert("Pet", lady).second);
+        CHECK_EQUAL(lady.get_backlink_count(), 1);
         lady.remove();
         cmp(dict["Pet"], Mixed());
 
         // Reinsert lady
         lady = dogs->create_object_with_primary_key("lady");
         dict.insert("Pet", lady);
+        dict.insert("Pet", lady);
+        CHECK_EQUAL(lady.get_backlink_count(), 1);
         lady.invalidate(); // Make lady a tombstone :-(
         cmp(dict["Pet"], Mixed());
         lady = dogs->create_object_with_primary_key("lady");
         cmp(dict["Pet"], Mixed(lady.get_link()));
+        CHECK_EQUAL(lady.get_backlink_count(), 1);
 
         auto invalid_link = pluto.get_link();
         pluto.remove();
