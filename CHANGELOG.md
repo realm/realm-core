@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* `util::Thread` no longer has any functionality other than `get_name()` and `set_name()`. Use `std::thread` instead ([PR #7696](https://github.com/realm/realm-core/pull/7696)).
 
 ----------------------------------------------
 
