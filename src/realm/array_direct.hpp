@@ -185,9 +185,9 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
 }
 
 // An iterator for getting a 64 bit word from any (byte-address+bit-offset) address.
-class unaligned_word_iter {
+class UnalignedWordIter {
 public:
-    unaligned_word_iter(const uint64_t* data, size_t bit_offset)
+    UnalignedWordIter(const uint64_t* data, size_t bit_offset)
         : m_word_ptr(data + (bit_offset >> 6))
         , m_in_word_offset(bit_offset & 0x3F)
     {
@@ -240,23 +240,14 @@ private:
 //   value of the bitfield.
 // iterator useful for scanning arrays faster than by indexing each element
 // supports arrays of pairs by differentiating field size and step size.
-class bf_ref;
-class bf_iterator {
-    uint64_t* data_area = nullptr;
-    uint64_t* first_word_ptr = nullptr;
-    size_t field_position = 0;
-    uint8_t field_size = 0;
-    uint8_t step_size = 0; // may be different than field_size if used for arrays of pairs
-    size_t offset = 0;
-    uint64_t mask = 0;
-
+class BfIterator {
 public:
-    bf_iterator() = default;
-    bf_iterator(const bf_iterator&) = default;
-    bf_iterator(bf_iterator&&) = default;
-    bf_iterator& operator=(const bf_iterator&) = default;
-    bf_iterator& operator=(bf_iterator&&) = default;
-    bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
+    BfIterator() = default;
+    BfIterator(const BfIterator&) = default;
+    BfIterator(BfIterator&&) = default;
+    BfIterator& operator=(const BfIterator&) = default;
+    BfIterator& operator=(BfIterator&&) = default;
+    BfIterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
         : data_area(data_area)
         , field_size(static_cast<uint8_t>(field_size))
         , step_size(static_cast<uint8_t>(step_size))
@@ -317,6 +308,7 @@ public:
         // note: above shifts in zeroes above the bitfield
         return result;
     }
+
     void set_value(uint64_t value) const
     {
         const auto in_word_position = field_position & 0x3F;
@@ -366,44 +358,33 @@ public:
         return get_value();
     }
 
-    friend bool operator<(const bf_iterator&, const bf_iterator&);
+private:
+    friend bool operator<(const BfIterator&, const BfIterator&);
+    uint64_t* data_area = nullptr;
+    uint64_t* first_word_ptr = nullptr;
+    size_t field_position = 0;
+    uint8_t field_size = 0;
+    uint8_t step_size = 0; // may be different than field_size if used for arrays of pairs
+    size_t offset = 0;
+    uint64_t mask = 0;
 };
 
 
-inline bool operator<(const bf_iterator& a, const bf_iterator& b)
+inline bool operator<(const BfIterator& a, const BfIterator& b)
 {
     REALM_ASSERT(a.data_area == b.data_area);
     return a.field_position < b.field_position;
 }
 
-class bf_ref {
-    bf_iterator it;
-
-public:
-    inline bf_ref(bf_iterator& it)
-        : it(it)
-    {
-    }
-    inline operator uint64_t() const
-    {
-        return it.get_value();
-    }
-    uint64_t operator=(uint64_t value)
-    {
-        it.set_value(value);
-        return value;
-    }
-};
-
 inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t width)
 {
-    bf_iterator it(data_area, field_position, width, width, 0);
+    BfIterator it(data_area, field_position, width, width, 0);
     return *it;
 }
 
 inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t width, uint64_t value)
 {
-    bf_iterator it(data_area, field_position, width, width, 0);
+    BfIterator it(data_area, field_position, width, width, 0);
     it.set_value(value);
 }
 
@@ -466,7 +447,7 @@ constexpr uint8_t num_fields_table[65] = {0, 64, 32, 21, 16, 12, 10, 9, // 0-7
 constexpr uint8_t num_bits_table[65] = {64, 64, 64, 63, 64, 60, 60, 63, // 0-7
                                         64, 63, 60, 55, 60, 52, 56, 60, // 8-15
                                         64, 51, 54, 57, 60, 63, 44, 46, // 16-23
-                                        48, 50, 52, 54, 56, 58, 60, 64, // 24-31
+                                        48, 50, 52, 54, 56, 58, 60, 62, // 24-31
                                         64, 33, 34, 35, 36, 37, 38, 39, // 32-39
                                         40, 41, 42, 43, 44, 45, 46, 47, // 40-47
                                         48, 49, 50, 51, 52, 53, 54, 55, // 48-55
@@ -661,148 +642,6 @@ inline uint64_t find_all_fields_signed_GE(uint64_t MSBs, uint64_t A, uint64_t B)
     return find_all_fields_signed_LE(MSBs, B, A);
 }
 
-// find the first field which have MSB set (marks overflow after trial subtraction, or other
-// requested condition).
-struct find_field_desc {
-    uint8_t levels;
-    uint64_t m1;
-    uint64_t m2;
-    uint64_t m4;
-    uint64_t m8;
-    uint64_t m16;
-    uint64_t m32;
-};
-
-constexpr struct find_field_desc find_field_table[65] = {
-    /* 0 */ {0, 0, 0, 0, 0, 0},
-    /* 1 */
-    {6, 0xAAAAAAAAAAAAAAAA, 0xCCCCCCCCCCCCCCCC, 0xF0F0F0F0F0F0F0F0, 0xFF00FF00FF00FF00, 0xFFFF0000FFFF0000,
-     0xFFFFFFFF00000000},
-    /* 2 */
-    {5, 0xCCCCCCCCCCCCCCCC, 0xF0F0F0F0F0F0F0F0, 0xFF00FF00FF00FF00, 0xFFFF0000FFFF0000, 0xFFFFFFFF00000000, 0},
-    /* 3 */
-    {5, 0b0000'1110'0011'1000'1110'0011'1000'1110'0011'1000'1110'0011'1000'1110'0011'1000,
-     0b0000'1111'1100'0000'1111'1100'0000'1111'1100'0000'1111'1100'0000'1111'1100'0000,
-     0b1111'0000'0000'0000'1111'1111'1111'0000'0000'0000'1111'1111'1111'0000'0000'0000,
-     0b0000'0000'0000'0000'1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0},
-    /* 4 */
-    {4, 0xF0F0F0F0F0F0F0F0, 0xFF00FF00FF00FF00, 0xFFFF0000FFFF0000, 0xFFFFFFFF00000000, 0, 0},
-    /* 5 */
-    {4, 0b0000'1111'1000'0011'1110'0000'1111'1000'0011'1110'0000'1111'1000'0011'1110'0000,
-     0b0000'1111'1111'1100'0000'0000'1111'1111'1100'0000'0000'1111'1111'1100'0000'0000,
-     0b1111'0000'0000'0000'0000'0000'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0},
-    /* 6 */
-    {4, 0b0000'1111'1100'0000'1111'1100'0000'1111'1100'0000'1111'1100'0000'1111'1100'0000,
-     0b1111'0000'0000'0000'1111'1111'1111'0000'0000'0000'1111'1111'1111'0000'0000'0000,
-     0b0000'0000'0000'0000'1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0},
-    /* 7 */
-    {4, 0b1000'0000'1111'1110'0000'0011'1111'1000'0000'1111'1110'0000'0011'1111'1000'0000,
-     0b0000'0000'1111'1111'1111'1100'0000'0000'0000'1111'1111'1111'1100'0000'0000'0000,
-     0b0000'0000'1111'1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000,
-     0b1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0},
-    /* 8 */
-    {3, 0xFF00FF00FF00FF00, 0xFFFF0000FFFF0000, 0xFFFFFFFF00000000, 0, 0, 0},
-    /* 9 */
-    {3, 0b1000'0000'0011'1111'1110'0000'0000'1111'1111'1000'0000'0011'1111'1110'0000'0000,
-     0b0111'1111'1100'0000'0000'0000'0000'1111'1111'1111'1111'1100'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
-    /* 10 */
-    {3, 0b0000'1111'1111'1100'0000'0000'1111'1111'1100'0000'0000'1111'1111'1100'0000'0000,
-     0b1111'0000'0000'0000'0000'0000'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
-    /* 11 */
-    {3, 0b1111'1111'1000'0000'0000'1111'1111'1110'0000'0000'0011'1111'1111'1000'0000'0000,
-     0b0000'0000'0000'0000'0000'1111'1111'1111'1111'1111'1100'0000'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
-    /* 12 */
-    {3, 0b1111'0000'0000'0000'1111'1111'1111'0000'0000'0000'1111'1111'1111'0000'0000'0000,
-     0b0000'0000'0000'0000'1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
-    /* 13 */
-    {3, 0b1110'0000'0000'0000'1111'1111'1110'0000'0000'0011'1111'1111'1110'0000'0000'0000,
-     0b0000'0000'0000'0000'1111'1111'1111'1111'1111'1100'0000'0000'0000'0000'0000'0000,
-     0b1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
-    /* 14 */
-    {3, 0b0000'0000'1111'1111'1111'1100'0000'0000'0000'1111'1111'1111'1100'0000'0000'0000,
-     0b0000'0000'1111'1111'1111'1111'1111'1111'1111'0000'0000'0000'0000'0000'0000'0000,
-     0b1111'1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
-    /* 15 */
-    {3, 0b0000'1111'1111'1111'1110'0000'0000'0000'0011'1111'1111'1111'1000'0000'0000'0000,
-     0b0000'1111'1111'1111'1111'1111'1111'1111'1100'0000'0000'0000'0000'0000'0000'0000,
-     0b1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
-    /* 16 */
-    {2, 0xFFFF0000FFFF0000, 0xFFFFFFFF00000000, 0, 0, 0, 0},
-    /* 17 - as we're only interested in msb of each field we can simplify and use same pattern
-     for the next 4 entries */
-    {2, 0xF00000FFFFF00000, 0xFFFFFF0000000000, 0, 0, 0, 0},
-    /* 18 */
-    {2, 0xF00000FFFFF00000, 0xFFFFFF0000000000, 0, 0, 0, 0},
-    /* 19 */
-    {2, 0xF00000FFFFF00000, 0xFFFFFF0000000000, 0, 0, 0, 0},
-    /* 20 */
-    {2, 0xF00000FFFFF00000, 0xFFFFFF0000000000, 0, 0, 0, 0},
-    /* 21 - and next 4 */
-    {2, 0x0000FFFFFF000000, 0xFFFF000000000000, 0, 0, 0, 0},
-    /* 22 */
-    {2, 0x0000FFFFFF000000, 0xFFFF000000000000, 0, 0, 0, 0},
-    /* 23 */
-    {2, 0x0000FFFFFF000000, 0xFFFF000000000000, 0, 0, 0, 0},
-    /* 24 */
-    {2, 0x0000FFFFFF000000, 0xFFFF000000000000, 0, 0, 0, 0},
-    /* 25 - and 4 more */
-    {2, 0x00FFFFFFF0000000, 0xFF00000000000000, 0, 0, 0, 0},
-    /* 26 */
-    {2, 0x00FFFFFFF0000000, 0xFF00000000000000, 0, 0, 0, 0},
-    /* 27 */
-    {2, 0x00FFFFFFF0000000, 0xFF00000000000000, 0, 0, 0, 0},
-    /* 28 */
-    {2, 0x00FFFFFFF0000000, 0xFF00000000000000, 0, 0, 0, 0},
-    /* 29 - last 4 where multiple fields exist */
-    {1, 0xFFFFFFFF00000000, 0, 0, 0, 0, 0},
-    /* 30 */
-    {1, 0xFFFFFFFF00000000, 0, 0, 0, 0, 0},
-    /* 31 */
-    {1, 0xFFFFFFFF00000000, 0, 0, 0, 0, 0},
-    /* 32 */
-    {1, 0xFFFFFFFF00000000, 0, 0, 0, 0, 0},
-    /* 33 - from here to 64, there is only 1 possible result: 0 */
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0}};
-
-#if 1
 constexpr uint32_t inverse_width[65] = {
     65536 * 64 / 1, // never used
     65536 * 64 / 1,  65536 * 64 / 2,  65536 * 64 / 3,  65536 * 64 / 4,  65536 * 64 / 5,  65536 * 64 / 6,
@@ -852,61 +691,6 @@ inline size_t first_field_marked(size_t width, uint64_t vector)
     REALM_ASSERT_DEBUG(field == (lz / width));
     return field;
 }
-#endif
-#if 0
-inline int first_field_marked(int width, uint64_t vector)
-{
-    // isolate least significant bit
-    vector = vector & (~vector + 1);
-    const struct find_field_desc& desc = find_field_table[width];
-    int result = 0;
-    switch (desc.levels) {
-        // the following case entries are intended to fall through
-        // (this is a variant of Duff's Device)
-        // TODO: disable compiler warnings for it
-        case 6:
-            result |= (vector & desc.m32) ? 32 : 0;
-        case 5:
-            result |= (vector & desc.m16) ? 16 : 0;
-        case 4:
-            result |= (vector & desc.m8) ? 8 : 0;
-        case 3:
-            result |= (vector & desc.m4) ? 4 : 0;
-        case 2:
-            result |= (vector & desc.m2) ? 2 : 0;
-        case 1:
-            result |= (vector & desc.m1) ? 1 : 0;
-        default:
-            break;
-    }
-    return result;
-}
-#endif
-#if 0
-inline int first_field_marked(int width, uint64_t vector)
-{
-    // isolate least significant bit
-    vector = vector & (~vector + 1);
-    // directly compute position of set bit using table
-    const struct find_field_desc& desc = find_field_table[width];
-    return ((vector & desc.m1) ? 1 : 0) | ((vector & desc.m2) ? 2 : 0) | ((vector & desc.m4) ? 4 : 0) |
-           ((vector & desc.m8) ? 8 : 0) | ((vector & desc.m16) ? 16 : 0) | ((vector & desc.m32) ? 32 : 0);
-}
-#endif
-#if 0
-inline int first_field_marked(int width, uint64_t vector)
-{
-    int result = 0;
-    auto msb = 1ULL << (width - 1);
-    while (msb) {
-        if (vector & msb)
-            return result;
-        msb <<= width;
-        result++;
-    }
-    return -1;
-}
-#endif
 
 template <typename VectorCompare>
 size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
@@ -917,8 +701,8 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
     const size_t fast_scan_limit = 4 * bit_count_pr_iteration;
     // use signed to make it easier to ascertain correctness of loop condition below
     auto total_bit_count_left = (end - start) * width;
-    REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
-    unaligned_word_iter it(data, offset + start * width);
+    REALM_ASSERT_DEBUG(end >= start);
+    UnalignedWordIter it(data, offset + start * width);
     uint64_t found_vector = 0;
     while (total_bit_count_left >= fast_scan_limit) {
         // unrolling 2x

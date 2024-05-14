@@ -53,3 +53,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
 endif()
 target_include_directories(Bson PUBLIC .. ${PROJECT_BINARY_DIR}/src/external)
 target_compile_definitions(Bson INTERFACE BSON_STATIC)
+
+set_target_properties(Bson PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    COMPILE_WARNING_AS_ERROR Off)
