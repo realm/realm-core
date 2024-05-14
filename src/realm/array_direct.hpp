@@ -250,10 +250,10 @@ public:
     BfIterator(BfIterator&&) = default;
     BfIterator& operator=(const BfIterator&) = default;
     BfIterator& operator=(BfIterator&&) = default;
-    BfIterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
+    BfIterator(uint64_t* data_area, size_t initial_offset, uint8_t field_size, uint8_t step_size, size_t index)
         : data_area(data_area)
-        , field_size(static_cast<uint8_t>(field_size))
-        , step_size(static_cast<uint8_t>(step_size))
+        , field_size(field_size)
+        , step_size(step_size)
         , offset(initial_offset)
     {
         if (field_size < 64)

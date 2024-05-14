@@ -60,7 +60,7 @@ private:
 
 inline int64_t PackedCompressor::get(const IntegerCompressor& c, size_t ndx) const
 {
-    bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
+    BfIterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
     return sign_extend_field_by_mask(c.v_mask(), *it);
 }
 
@@ -79,7 +79,7 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     std::vector<int64_t> res;
     res.reserve(range);
 
-    unaligned_word_iter unaligned_data_iterator(data, starting_bit);
+    UnalignedWordIter unaligned_data_iterator(data, starting_bit);
     auto cnt_bits = starting_bit;
     while (cnt_bits + bit_per_it < total_bits) {
         auto word = unaligned_data_iterator.get(bit_per_it);
@@ -103,7 +103,7 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
 
 inline void PackedCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value) const
 {
-    bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
+    BfIterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
     it.set_value(value);
 }
 
@@ -215,7 +215,7 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
             return a < b;
     };
     const auto& c = arr.integer_compressor();
-    bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), start};
+    BfIterator it{c.data(), 0, c.v_width(), c.v_width(), start};
     for (; start < end; ++start) {
         it.move(start);
         const auto sv = sign_extend_field_by_mask(c.v_mask(), *it);

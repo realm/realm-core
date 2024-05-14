@@ -71,8 +71,8 @@ inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
     const auto ndx_w = c.ndx_width();
     const auto v_w = c.v_width();
     const auto data = c.data();
-    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
-    bf_iterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
+    BfIterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
+    BfIterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
     return sign_extend_field_by_mask(c.v_mask(), *data_iterator);
 }
 
@@ -94,8 +94,8 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     std::vector<int64_t> res;
     res.reserve(range);
 
-    unaligned_word_iter unaligned_ndx_iterator(data, starting_bit);
-    bf_iterator data_iterator{data, 0, v_w, v_w, 0};
+    UnalignedWordIter unaligned_ndx_iterator(data, starting_bit);
+    BfIterator data_iterator{data, 0, v_w, v_w, 0};
     auto cnt_bits = starting_bit;
     while (cnt_bits + bit_per_it < total_bits) {
         auto word = unaligned_ndx_iterator.get(bit_per_it);
@@ -144,8 +144,8 @@ void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t 
     const auto ndx_w = c.ndx_width();
     const auto v_w = c.v_width();
     const auto data = c.data();
-    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
-    bf_iterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
+    BfIterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
+    BfIterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
     data_iterator.set_value(value);
 }
 
@@ -223,8 +223,8 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     const auto v_w = c.v_width();
     const auto data = c.data();
     const auto mask = c.v_mask();
-    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, start};
-    bf_iterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
+    BfIterator ndx_iterator{data, offset, ndx_w, ndx_w, start};
+    BfIterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
     while (start < end) {
         const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
         if (cmp(sv, value) && !state->match(start + baseindex))

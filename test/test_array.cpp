@@ -1586,7 +1586,7 @@ TEST(DirectBitFields)
     uint64_t a[2];
     a[0] = a[1] = 0;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 0);
         auto it2(it);
         ++it2;
@@ -1600,7 +1600,7 @@ TEST(DirectBitFields)
     // reverse polarity
     a[0] = a[1] = -1ULL;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 127);
         auto it2(it);
         ++it2;
