@@ -16,36 +16,67 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifndef _WIN32
+#define __STDC_WANT_LIB_EXT1__ 1
+#include <string.h>
+#endif
+
+#include "assert.hpp"
+#include "sensitive_buffer.hpp"
+
 #ifdef _WIN32
 #include <Windows.h>
 #include <wincrypt.h>
 #pragma comment(lib, "crypt32.lib")
+#include <limits>
+#include <mutex>
 #else
-#define __STDC_WANT_LIB_EXT1__ 1
-
-#include <string.h>
 #include <sys/mman.h>
 #endif
-
-#include "sensitive_buffer.hpp"
-#include "assert.hpp"
 
 using namespace realm::util;
 
 #ifdef _WIN32
+/**
+ * Grow the minimum working set size of the process to the specified size.
+ */
+static void grow_working_size(size_t bytes)
+{
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+
+    SIZE_T minWorkingSetSize = 0, maxWorkingSetSize = 0;
+    BOOL ret = GetProcessWorkingSetSize(GetCurrentProcess(), &minWorkingSetSize, &maxWorkingSetSize);
+    REALM_ASSERT_RELEASE_EX(ret != 0 && "GetProcessWorkingSetSize", GetLastError());
+
+    REALM_ASSERT_RELEASE_EX(bytes <= std::numeric_limits<SIZE_T>::max());
+    minWorkingSetSize += (SIZE_T)bytes;
+    maxWorkingSetSize = std::max(minWorkingSetSize, maxWorkingSetSize);
+
+    ret = SetProcessWorkingSetSizeEx(GetCurrentProcess(), minWorkingSetSize, maxWorkingSetSize,
+                                     QUOTA_LIMITS_HARDWS_MIN_ENABLE | QUOTA_LIMITS_HARDWS_MAX_DISABLE);
+    REALM_ASSERT_RELEASE_EX(ret != 0 && "SetProcessWorkingSetSizeEx", GetLastError());
+}
+
 SensitiveBufferBase::SensitiveBufferBase(size_t size)
     : m_size(size_t(ceil((long double)size / CRYPTPROTECTMEMORY_BLOCK_SIZE) * CRYPTPROTECTMEMORY_BLOCK_SIZE))
 {
     m_buffer = VirtualAlloc(nullptr, m_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     REALM_ASSERT_RELEASE_EX(m_buffer != NULL && "VirtualAlloc()", GetLastError());
 
-    // TODO: locking enough pages requires us to increase the current process working set size.
-    // We use VirtualLock to prevent the memory range from being saved to swap, but since we're also using
-    // CryptProtectMemory() perhaps this isn't as necessary.
-    /*
-        BOOL ret = VirtualLock(m_buffer, m_size);
-        REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualLock()", GetLastError());
-    */
+    // locking enough pages requires us to increase the current process working set size.
+    // We use VirtualLock to prevent the memory range from being saved to swap
+    BOOL ret = VirtualLock(m_buffer, m_size);
+    if (ret == 0) {
+        DWORD err = GetLastError();
+
+        // Try to grow the working set if we have hit our quota.
+        REALM_ASSERT_RELEASE_EX(err == ERROR_WORKING_SET_QUOTA && "VirtualLock()", err);
+        grow_working_size(m_size);
+
+        ret = VirtualLock(m_buffer, m_size);
+        REALM_ASSERT_RELEASE_EX(ret != 0 && "grow_working_size() && VirtualLock()", GetLastError());
+    }
 }
 
 SensitiveBufferBase::~SensitiveBufferBase()
@@ -55,14 +86,11 @@ SensitiveBufferBase::~SensitiveBufferBase()
 
     secure_erase(m_buffer, m_size);
 
-    // See comment above.
-    /*
-        BOOL ret = VirtualUnlock(m_buffer, m_size);
-        REALM_ASSERT_RELEASE_EX(ret == TRUE && "VirtualUnlock()", GetLastError());
-    */
+    BOOL ret = VirtualUnlock(m_buffer, m_size);
+    REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualUnlock()", GetLastError());
 
-    BOOL ret = VirtualFree(m_buffer, 0, MEM_RELEASE);
-    REALM_ASSERT_RELEASE_EX(ret == TRUE && "VirtualFree()", GetLastError());
+    ret = VirtualFree(m_buffer, 0, MEM_RELEASE);
+    REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualFree()", GetLastError());
 
     m_buffer = nullptr;
 }
@@ -70,7 +98,7 @@ SensitiveBufferBase::~SensitiveBufferBase()
 void SensitiveBufferBase::protect() const
 {
     BOOL ret = CryptProtectMemory(m_buffer, DWORD(m_size), CRYPTPROTECTMEMORY_SAME_PROCESS);
-    REALM_ASSERT_RELEASE_EX(ret != 0 && "CryptProtectMemory()", GetLastError());
+    REALM_ASSERT_RELEASE_EX(ret == TRUE && "CryptProtectMemory()", GetLastError());
 }
 
 void SensitiveBufferBase::unprotect() const
