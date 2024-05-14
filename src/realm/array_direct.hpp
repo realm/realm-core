@@ -379,13 +379,13 @@ inline bool operator<(const BfIterator& a, const BfIterator& b)
     return a.field_position < b.field_position;
 }
 
-inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t width)
+inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, uint8_t width)
 {
     BfIterator it(data_area, field_position, width, width, 0);
     return *it;
 }
 
-inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t width, uint64_t value)
+inline void write_bitfield(uint64_t* data_area, size_t field_position, uint8_t width, uint64_t value)
 {
     BfIterator it(data_area, field_position, width, width, 0);
     it.set_value(value);
