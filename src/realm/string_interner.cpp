@@ -123,20 +123,12 @@ void StringInterner::rebuild_internal()
             REALM_ASSERT_DEBUG(found);
             m_decompressed_strings.pop_back();
         }
-        // m_decompressed_strings.resize(target_size);
-        // while (m_compressed_strings.size() > target_size) {
-        //    auto& c_str = m_compressed_strings.back();
-        //    auto it = m_compressed_string_map.find(c_str);
-        //    REALM_ASSERT_DEBUG(it != m_compressed_string_map.end());
-        //    m_compressed_string_map.erase(it);
-        //    m_compressed_strings.pop_back();
-        //}
         m_compressed_strings.resize(target_size);
         return;
     }
     // We need to add in any new strings:
     auto internal_size = m_compressed_strings.size();
-    // Precondition: determine leaf offset
+    // Determine leaf offset:
     size_t leaf_offset = 0;
     auto curr_entry = internal_size & ~0xFFULL;
     auto hi = curr_entry >> 8;
@@ -159,7 +151,7 @@ void StringInterner::rebuild_internal()
         leaf_offset += length;
         curr_entry++;
     }
-    // now add new strings
+    // now add new strings - leaf offset must have been set correct for this
     while (internal_size < target_size) {
         auto hi = internal_size >> 8;
         if (last_hi != hi) {
@@ -182,11 +174,7 @@ void StringInterner::rebuild_internal()
         }
         auto lo = internal_size & 0xFF;
         uint32_t hash = 0xFFFFFFFFULL & m_current_hash_leaf->get(lo);
-        // std::string s = m_compressor->decompress(cpr);
-        // StringData sd(s);
-        // REALM_ASSERT_DEBUG(hash == (0xFFFFFFFFULL & sd.hash()));
         m_compressed_strings.push_back(cpr);
-        // m_compressed_string_map[cpr] = id + 1;
         m_decompressed_strings.push_back(CachedString({0, hash, {}}));
         internal_size = m_compressed_strings.size();
         m_hash_to_id_map.insert(std::make_pair(hash, id));
@@ -225,21 +213,10 @@ StringID StringInterner::intern(StringData sd)
     // it's a new string
     bool learn = true;
     auto c_str = m_compressor->compress(sd, learn);
-    // auto it = m_compressed_string_map.find(c_str);
-    // auto it2 = m_hash_to_id_map.find(h);
-    // if (it != m_compressed_string_map.end()) {
-    //     // it's an already interned string
-    //     // TODO: Check among multiple that it is the right one
-    //     REALM_ASSERT_DEBUG(it2 != m_hash_to_id_map.end());
-    //     return it->second;
-    // }
-    //  REALM_ASSERT_DEBUG(it2 == m_hash_to_id_map.end());
-    //  it's a new string!
     m_compressed_strings.push_back(c_str);
     m_decompressed_strings.push_back({64, h, std::make_unique<std::string>(sd)});
     auto id = m_compressed_strings.size();
     m_hash_to_id_map.insert(std::make_pair(h, id));
-    // m_compressed_string_map[c_str] = id;
     size_t index = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     REALM_ASSERT_DEBUG(index == id - 1);
     // Create a new leaf if needed (limit number of entries to 256 pr leaf)
@@ -270,7 +247,6 @@ StringID StringInterner::intern(StringData sd)
         m_current_string_leaf->add(c);
     }
     m_current_hash_leaf->add(h);
-    // not needed:    m_current_leaf->update_parent();
     return id;
 }
 
@@ -291,12 +267,6 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
             return it_first->second;
         ++it_first;
     }
-    // bool dont_learn = false;
-    // auto c_str = m_compressor->compress(sd, dont_learn);
-    // auto it = m_compressed_string_map.find(c_str);
-    // if (it != m_compressed_string_map.end()) {
-    //     return it->second;
-    // }
     return {};
 }
 

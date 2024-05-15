@@ -80,7 +80,6 @@ private:
     ColKey m_col_key; // for validation
     std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
-    // std::unordered_map<CompressedString, size_t> m_compressed_string_map;
     std::unordered_multimap<uint32_t, uint64_t> m_hash_to_id_map;
     // At the moment we need to keep decompressed strings around if they've been
     // returned to the caller, since we're handing
