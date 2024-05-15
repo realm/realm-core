@@ -1749,6 +1749,7 @@ buildvariants:
     fetch_missing_dependencies: On
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
+    run_with_encryption: On
   tasks:
   - name: compile_test_and_package
   - name: long-running-tests
@@ -1767,6 +1768,7 @@ buildvariants:
     fetch_missing_dependencies: On
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
+    run_with_encryption: On
   tasks:
   - name: compile_test
 
@@ -1783,6 +1785,7 @@ buildvariants:
     fetch_missing_dependencies: On
     python3: "/cygdrive/c/python/python37/python.exe"
     disable_tests_against_baas: On
+    run_with_encryption: On
   tasks:
   - name: compile_local_tests
 
