@@ -2693,6 +2693,28 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(done == true);
     }
 
+    SECTION("open new realm with diffent schema while async transaction is in progress") {
+        realm->async_begin_transaction([&] {
+            done = true;
+        });
+
+        config.schema = Schema{
+            {"hotel",
+             {
+                 {"price", PropertyType::Int},
+                 {"city", PropertyType::String},
+             }},
+        };
+
+        try {
+            auto r2 = Realm::get_shared_realm(config);
+            REQUIRE(!r2);
+        }
+        catch (const Exception& e) {
+            REQUIRE(e.code() == ErrorCodes::WrongTransactionState);
+        }
+    }
+
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
     });

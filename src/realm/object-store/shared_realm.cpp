@@ -478,7 +478,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     });
 
     if (!in_transaction) {
-        transaction().promote_to_write();
+        constexpr bool nonblocking = true;
+        auto success = transaction().promote_to_write(nonblocking);
+        if (!success) {
+            throw LogicError(ErrorCodes::WrongTransactionState, "Could not create write transaction");
+        }
 
         // Beginning the write transaction may have advanced the version and left
         // us with nothing to do if someone else initialized the schema on disk

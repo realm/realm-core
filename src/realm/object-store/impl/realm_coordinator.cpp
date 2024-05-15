@@ -273,7 +273,13 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
         REALM_ASSERT(!version || realm->read_transaction_version() == *version);
         return realm;
     }
-    do_get_realm(std::move(config), realm, version, lock);
+    try {
+        do_get_realm(std::move(config), realm, version, lock);
+    }
+    catch (...) {
+        realm = nullptr;
+        throw;
+    }
     if (version) {
         realm->read_group();
     }
