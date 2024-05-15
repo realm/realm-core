@@ -248,17 +248,76 @@ std::string StringCompressor::decompress(CompressedString& c_str)
 
 int StringCompressor::compare(CompressedString& A, CompressedString& B)
 {
-    // TODO: Optimize
-    std::string a = decompress(A);
-    std::string b = decompress(B);
-    return a.compare(b);
+    auto A_ptr = A.data();
+    auto A_limit = A_ptr + A.size();
+    auto B_ptr = B.data();
+    auto B_limit = B_ptr + B.size();
+    while (A_ptr < A_limit && B_ptr < B_limit) {
+        auto code_A = *A_ptr++;
+        auto code_B = *B_ptr++;
+        if (code_A == code_B)
+            continue;
+        // symbols did not match:
+        // 1. both symbols are single characters
+        if (code_A < 256 && code_B < 256)
+            return code_B - code_A;
+        std::string a_str(code_A, 1);
+        auto str_A = std::string_view(code_A < 256 ? a_str : m_symbols[code_A - 256].expansion);
+        std::string b_str(code_B, 1);
+        auto str_B = std::string_view(code_B < 256 ? b_str : m_symbols[code_B - 256].expansion);
+        // to ensure comparison as StringData we need to convert the stringviews
+        StringData sd_a(str_A.data(), str_A.size());
+        StringData sd_b(str_B.data(), str_B.size());
+        REALM_ASSERT_DEBUG(sd_a != sd_b);
+        if (sd_a < sd_b)
+            return 1;
+        else
+            return -1;
+    }
+    // The compressed strings are identical or one is the prefix of the other
+    return B.size() - A.size();
+    // ^ a faster way of producing same positive / negative / zero as:
+    // if (A.size() < B.size())
+    //     return 1;
+    // if (A.size() > B.size())
+    //     return -1;
+    // return 0;
 }
 
 int StringCompressor::compare(StringData sd, CompressedString& B)
 {
-    // TODO: Optimize
-    std::string b = decompress(B);
-    return -b.compare(sd.data());
+    auto B_size = B.size();
+    // make sure comparisons are unsigned, even though StringData does not specify signedness
+    const unsigned char* A_ptr = reinterpret_cast<const unsigned char*>(sd.data());
+    auto A_limit = A_ptr + sd.size();
+    for (size_t i = 0; i < B_size; ++i) {
+        if (A_ptr == A_limit) {
+            // sd ended first, so B is bigger
+            return -1;
+        }
+        auto code = B[i];
+        if (code < 256) {
+            if (code < *A_ptr)
+                return 1;
+            if (code > *A_ptr)
+                return -1;
+            ++A_ptr;
+            continue;
+        }
+        auto& expansion = m_symbols[code - 256];
+        for (size_t disp = 0; disp < expansion.expansion.size(); ++disp) {
+            uint8_t c = expansion.expansion[disp];
+            if (c < *A_ptr)
+                return 1;
+            if (c > *A_ptr)
+                return -1;
+            ++A_ptr;
+        }
+    }
+    // if sd is longer than B, sd is the biggest string
+    if (A_ptr < A_limit)
+        return 1;
+    return 0;
 }
 
 
