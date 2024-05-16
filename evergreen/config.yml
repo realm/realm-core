@@ -431,6 +431,7 @@ functions:
         if ls crash-*> /dev/null 2>&1; then
           echo "Found crash file"
           mv crash-* realm-fuzzer-crash.txt
+          mv fuzz-test.realm fuzzer_realm.realm
         fi
 
   - command: s3.put
@@ -443,7 +444,20 @@ functions:
       bucket: mciuploads
       permissions: public-read
       content_type: text/plain
-      display_name: Fuzzer crash report
+      display_name: Crash input file
+      optional: true
+
+  - command: s3.put
+    params:
+      working_dir: realm-core/build/test/realm-fuzzer
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/build/test/realm-fuzzer/fuzzer_realm.realm'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/fuzzer_realm.realm'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/x-binary
+      display_name: Realm File 
       optional: true
 
   - command: shell.exec
@@ -451,6 +465,7 @@ functions:
       working_dir: realm-core/build/test/realm-fuzzer
       script: |-
         rm realm-fuzzer-crash.txt
+        mv fuzzer_realm.realm fuzz-test.realm
 
   "run hang analyzer":
   - command: shell.exec
