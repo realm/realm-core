@@ -704,12 +704,21 @@ app::Response AdminAPIEndpoint::get(const std::vector<std::pair<std::string, std
     return do_request(std::move(req));
 }
 
-app::Response AdminAPIEndpoint::del() const
+app::Response AdminAPIEndpoint::del(std::string body) const
 {
     app::Request req;
     req.method = app::HttpMethod::del;
     req.url = m_url;
+    req.body = std::move(body);
     return do_request(std::move(req));
+}
+
+nlohmann::json AdminAPIEndpoint::del_json(nlohmann::json body) const
+{
+    auto resp = del(body.dump());
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(),
+                    resp.http_status_code, resp.body);
+    return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
 nlohmann::json AdminAPIEndpoint::get_json(const std::vector<std::pair<std::string, std::string>>& params) const
@@ -1426,6 +1435,23 @@ AppCreateConfig minimal_app_config(const std::string& name, const Schema& schema
     };
 }
 
+nlohmann::json transform_service_role(const AppCreateConfig::ServiceRole& role_def)
+{
+    return {
+        {"name", role_def.name},
+        {"apply_when", role_def.apply_when},
+        {"document_filters",
+         {
+             {"read", role_def.document_filters.read},
+             {"write", role_def.document_filters.write},
+         }},
+        {"insert", role_def.insert_filter},
+        {"delete", role_def.delete_filter},
+        {"read", role_def.read},
+        {"write", role_def.write},
+    };
+}
+
 AppSession create_app(const AppCreateConfig& config)
 {
     auto session = AdminAPISession::login(config);
@@ -1564,36 +1590,11 @@ AppSession create_app(const AppCreateConfig& config)
     auto default_rule = services[mongo_service_id]["default_rule"];
     auto service_roles = nlohmann::json::array();
     if (config.service_roles.empty()) {
-        service_roles = nlohmann::json::array({{{"name", "default"},
-                                                {"apply_when", nlohmann::json::object()},
-                                                {"document_filters",
-                                                 {
-                                                     {"read", true},
-                                                     {"write", true},
-                                                 }},
-                                                {"read", true},
-                                                {"write", true},
-                                                {"insert", true},
-                                                {"delete", true}}});
+        service_roles.push_back(transform_service_role({"default"}));
     }
     else {
         std::transform(config.service_roles.begin(), config.service_roles.end(), std::back_inserter(service_roles),
-                       [](const AppCreateConfig::ServiceRole& role_def) {
-                           nlohmann::json ret{
-                               {"name", role_def.name},
-                               {"apply_when", role_def.apply_when},
-                               {"document_filters",
-                                {
-                                    {"read", role_def.document_filters.read},
-                                    {"write", role_def.document_filters.write},
-                                }},
-                               {"insert", role_def.insert_filter},
-                               {"delete", role_def.delete_filter},
-                               {"read", role_def.read},
-                               {"write", role_def.write},
-                           };
-                           return ret;
-                       });
+                       transform_service_role);
     }
 
     default_rule.post_json({{"roles", service_roles}});
