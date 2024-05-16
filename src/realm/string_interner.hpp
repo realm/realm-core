@@ -25,7 +25,7 @@
 
 #include <unordered_map>
 #include <vector>
-#include <deque>
+#include <mutex>
 
 template <>
 struct std::hash<CompressedString> {
@@ -51,6 +51,7 @@ class ArrayUnsigned;
 class Allocator;
 struct CachedString {
     uint8_t m_weight = 0;
+    uint32_t m_hash = 0;
     std::unique_ptr<std::string> m_decompressed;
 };
 
@@ -72,21 +73,22 @@ private:
     Array& m_parent; // need to be able to check if this is attached or not
     std::unique_ptr<Array> m_top;
     std::unique_ptr<Array> m_data;
-    std::unique_ptr<ArrayUnsigned> m_current_leaf;
+    std::unique_ptr<ArrayUnsigned> m_current_hash_leaf;
+    std::unique_ptr<ArrayUnsigned> m_current_string_leaf;
     void rebuild_internal();
 
-    ColKey m_col_key;
+    ColKey m_col_key; // for validation
     std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
-    std::unordered_map<CompressedString, size_t> m_compressed_string_map;
     bool null_seen = false;
+    std::unordered_multimap<uint32_t, uint64_t> m_hash_to_id_map;
     // At the moment we need to keep decompressed strings around if they've been
     // returned to the caller, since we're handing
     // out StringData references to their storage. This is a temporary solution.
-    // Further: access need to be lock free, so we can not decompress on demand,
-    // but must do so when the interner is created or updated_from_parent.
-    // This is also not a viable long term solution.
     std::vector<CachedString> m_decompressed_strings;
+    // Mutual exclusion is needed for frozen transactions only. Live objects are
+    // only used in single threaded contexts. For now, just use it always.
+    std::mutex m_mutex;
 };
 } // namespace realm
 
