@@ -349,6 +349,7 @@ private:
         remove_backlinks(get_owning_table(), origin_key, col, links, state);
     }
     void do_erase_key(size_t ndx, ColKey col, CascadeState& state);
+    void do_erase_mixed(size_t ndx, ColKey col, ObjKey key, CascadeState& state);
     void do_insert_key(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
     void do_insert_link(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
     void do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_value, ObjKey origin_key);

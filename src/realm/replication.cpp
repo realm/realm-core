@@ -199,6 +199,7 @@ void Replication::select_obj(ObjKey key)
         }
     }
     m_selected_obj = key;
+    m_selected_list = CollectionId();
 }
 
 void Replication::do_set(const Table* t, ColKey col_key, ObjKey key, _impl::Instruction variant)
