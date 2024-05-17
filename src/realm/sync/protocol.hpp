@@ -57,6 +57,9 @@ namespace sync {
 //      Server replaces 'downloadable_bytes' (which was always zero prior this version)
 //      with an estimated progress value (double from 0.0 to 1.0) for flx sessions
 //
+//   13 Support for syncing collections (lists and dictionaries) in Mixed columns and
+//      collections of Mixed
+//
 //  XX Changes:
 //     - TBD
 //
@@ -64,7 +67,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 12;
+    return 13;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
