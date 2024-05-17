@@ -37,25 +37,76 @@
 using namespace realm::util;
 
 #ifdef _WIN32
-/**
- * Grow the minimum working set size of the process to the specified size.
+
+/*
+ * try to lock allocated buffer, or grow working set size if default quota was reached
+ * make multiple attemps to handle multi-threaded allocation
  */
-static void grow_working_size(size_t bytes)
+static void lock_or_grow_working_size(void* buffer, size_t size)
 {
-    static std::mutex mutex;
-    std::lock_guard<std::mutex> lock(mutex);
+    BOOL res = 0;
+    DWORD err = 0;
+    for (int i = 0; i < 10; ++i) {
+        res = VirtualLock(buffer, size);
+        if (res != 0)
+            return; // success
 
-    SIZE_T minWorkingSetSize = 0, maxWorkingSetSize = 0;
-    BOOL ret = GetProcessWorkingSetSize(GetCurrentProcess(), &minWorkingSetSize, &maxWorkingSetSize);
-    REALM_ASSERT_RELEASE_EX(ret != 0 && "GetProcessWorkingSetSize", GetLastError());
+        // Try to grow the working set if we have hit our quota.
+        err = GetLastError();
+        REALM_ASSERT_RELEASE_EX(err == ERROR_WORKING_SET_QUOTA && "VirtualLock()", err);
 
-    REALM_ASSERT_RELEASE_EX(bytes <= std::numeric_limits<SIZE_T>::max());
-    minWorkingSetSize += (SIZE_T)bytes;
-    maxWorkingSetSize = std::max(minWorkingSetSize, maxWorkingSetSize);
+        static std::mutex mutex;
+        std::lock_guard<std::mutex> lock(mutex);
 
-    ret = SetProcessWorkingSetSizeEx(GetCurrentProcess(), minWorkingSetSize, maxWorkingSetSize,
-                                     QUOTA_LIMITS_HARDWS_MIN_ENABLE | QUOTA_LIMITS_HARDWS_MAX_DISABLE);
-    REALM_ASSERT_RELEASE_EX(ret != 0 && "SetProcessWorkingSetSizeEx", GetLastError());
+        struct WorkingSetLimits {
+            SIZE_T min_size = 0, max_size = 0;
+            const DWORDLONG mem_size = 0;
+        };
+        static std::optional<WorkingSetLimits> limits;
+        if (!limits) {
+            SIZE_T min_size = 0, max_size = 0;
+            BOOL ret = GetProcessWorkingSetSize(GetCurrentProcess(), &min_size, &max_size);
+            REALM_ASSERT_RELEASE_EX(ret != 0 && "GetProcessWorkingSetSize", GetLastError());
+            MEMORYSTATUSEX mem;
+            mem.dwLength = sizeof(mem);
+            GlobalMemoryStatusEx(&mem);
+            limits.emplace(WorkingSetLimits{min_size, max_size, mem.ullTotalPhys});
+        }
+
+        SIZE_T min_size = limits->min_size, max_size = limits->max_size;
+
+        // Initial default is 50 pages (or 204,800 bytes on systems with a 4K page size)
+        // for minimum working set and 345 for max (1,413,120 bytes on 4K page size)
+        // and it's easy to hit the quota even with 10 to 20 concurrent threads.
+        // Since we don't use VirtualAlloc with real page size and assign buffer to the portion
+        // of the allocated page (this'd complicate the logic significantly),
+        // simply try to double the limit a few times and attempt to lock the buffer again
+        // in case when multiple threads do the same. The min limit itself is pretty small,
+        // and the doc says that even this is not strictly guaranteed by the system, so
+        // there should be no harm in overcommiting expected min working set size
+        // In real tests: even with 128 threads on 16 cores system in 32bit app this loop
+        // may go through 4-5 iterations until the lock succeeds if the increment
+        // is just a multiple of a few pages, but with doubling of the limit
+        // it should succeed on the first try.
+        min_size *= 2;
+        max_size = std::max(4 * min_size, max_size);
+
+        // give up and don't try to ask the system to keep more than 90% memory resident in the process
+        if (max_size > 0.9 * limits->mem_size)
+            break;
+
+        BOOL ret = SetProcessWorkingSetSize(GetCurrentProcess(), min_size, max_size);
+        REALM_ASSERT_RELEASE_EX(ret != 0 && "SetProcessWorkingSetSizeEx", GetLastError());
+        limits->min_size = min_size;
+        limits->max_size = max_size;
+    }
+
+    // the loop above didn't succeed, provide some mem info and assert
+    MEMORYSTATUSEX mem;
+    mem.dwLength = sizeof(mem);
+    GlobalMemoryStatusEx(&mem);
+    REALM_ASSERT_RELEASE_EX(res != 0 && "VirtualLock()", err, mem.ullAvailPhys, mem.ullTotalPhys, mem.dwMemoryLoad,
+                            mem.ullAvailPageFile, mem.ullAvailVirtual);
 }
 
 SensitiveBufferBase::SensitiveBufferBase(size_t size)
@@ -64,19 +115,7 @@ SensitiveBufferBase::SensitiveBufferBase(size_t size)
     m_buffer = VirtualAlloc(nullptr, m_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     REALM_ASSERT_RELEASE_EX(m_buffer != NULL && "VirtualAlloc()", GetLastError());
 
-    // locking enough pages requires us to increase the current process working set size.
-    // We use VirtualLock to prevent the memory range from being saved to swap
-    BOOL ret = VirtualLock(m_buffer, m_size);
-    if (ret == 0) {
-        DWORD err = GetLastError();
-
-        // Try to grow the working set if we have hit our quota.
-        REALM_ASSERT_RELEASE_EX(err == ERROR_WORKING_SET_QUOTA && "VirtualLock()", err);
-        grow_working_size(m_size);
-
-        ret = VirtualLock(m_buffer, m_size);
-        REALM_ASSERT_RELEASE_EX(ret != 0 && "grow_working_size() && VirtualLock()", GetLastError());
-    }
+    lock_or_grow_working_size(m_buffer, m_size);
 }
 
 SensitiveBufferBase::~SensitiveBufferBase()
@@ -87,7 +126,7 @@ SensitiveBufferBase::~SensitiveBufferBase()
     secure_erase(m_buffer, m_size);
 
     BOOL ret = VirtualUnlock(m_buffer, m_size);
-    REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualUnlock()", GetLastError());
+    REALM_ASSERT_RELEASE_EX((ret != 0 || GetLastError() == ERROR_NOT_LOCKED) && "VirtualUnlock()", GetLastError());
 
     ret = VirtualFree(m_buffer, 0, MEM_RELEASE);
     REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualFree()", GetLastError());
@@ -97,6 +136,10 @@ SensitiveBufferBase::~SensitiveBufferBase()
 
 void SensitiveBufferBase::protect() const
 {
+    // MEMO even though we try to lock the page with the buffer, and that should prevent it to be swapped,
+    //      locking is not reliable and may fail under high demand in the system due to some opaque reason,
+    //      which we can't recover from, so use second layer to protect the buffer if it is swapped
+    //      note: look at attempt_to_lock where it's expected
     BOOL ret = CryptProtectMemory(m_buffer, DWORD(m_size), CRYPTPROTECTMEMORY_SAME_PROCESS);
     REALM_ASSERT_RELEASE_EX(ret == TRUE && "CryptProtectMemory()", GetLastError());
 }
