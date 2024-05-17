@@ -377,7 +377,7 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
                                  std::move(initialization_function));
         }
     }
-	catch (...) {
+    catch (...) {
         realm = nullptr;
         throw;
     }

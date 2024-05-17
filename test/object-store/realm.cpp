@@ -2694,8 +2694,7 @@ TEST_CASE("SharedRealm: async writes") {
     }
 
     SECTION("open new realm with diffent schema while async transaction is in progress") {
-        realm->async_begin_transaction([&] {
-        });
+        realm->async_begin_transaction([&] {});
 
         config.schema = Schema{
             {"hotel",
