@@ -4968,15 +4968,14 @@ TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
 TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstrap]") {
     const Schema person_schema{{"Person",
                                 {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                 {"age", PropertyType::Int | PropertyType::Nullable},
                                  {"role", PropertyType::String},
-                                 {"firstName", PropertyType::String},
-                                 {"lastName", PropertyType::String}}}};
+                                 {"firstName", PropertyType::String}}}};
 
-    constexpr size_t num_emps = 5000;
-    constexpr size_t num_mgrs = 200;
-    constexpr size_t num_dirs = 25;
+    constexpr size_t num_emps = 1000;
+    constexpr size_t num_mgrs = 50;
+    constexpr size_t num_dirs = 10;
     constexpr size_t num_total = num_emps + num_mgrs + num_dirs;
+
     auto fill_person_schema = [](SharedRealm realm, std::string role, size_t count) {
         CppContext c(realm);
         for (size_t i = 0; i < count; ++i) {
@@ -4987,16 +4986,22 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             auto obj = Object::create(c, realm, "Person",
                                       std::any(AnyDict{
                                           {"_id", ObjectId::gen()},
-                                          {"age", static_cast<int64_t>(i)},
                                           {"role", role},
                                           {"firstName", util::format("%1-%2", role, i)},
-                                          {"lastName", util::format("last-name-%1", i)},
                                       }));
         }
     };
 
     enum BootstrapMode { None, SingleMessage, SingleMessageMulti, MultiMessage };
     enum TestState { not_ready, start, reconnect_received, downloading, downloaded, complete };
+
+    struct ExpectedResults {
+        BootstrapMode bootstrap;
+        size_t emps;
+        size_t mgrs;
+        size_t dirs;
+    };
+
     TestingStateMachine<TestState> state_machina(TestState::not_ready);
     std::mutex callback_mutex;
     int64_t query_version = 0;
@@ -5005,106 +5010,107 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     size_t download_msg_count = 0;
     size_t bootstrap_msg_count = 0;
     bool role_change_bootstrap = false;
-
     auto logger = util::Logger::get_default_logger();
-    FLXSyncTestHarness harness("flx_role_change_bootstrap", {person_schema, {"role", "firstName", "lastName"}});
-    auto& app_session = harness.session().app_session();
-    /** TODO: Remove when switching to use Protocol version in RCORE-1972 */
-    // Enable the role change bootstraps
-    REQUIRE(app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
-    REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
-    auto app_settings = app_session.admin_api.get_app_settings(app_session.server_app_id);
-    std::cout << "APP SETTINGS: " << app_settings << std::endl;
 
-    REQUIRE(app_session.admin_api.patch_app_settings(app_session.server_app_id,
-                                                     {{"sync", {{"num_objects_before_bootstrap_flush", 200}}}}));
-    REQUIRE(app_session.admin_api.patch_app_settings(app_session.server_app_id,
-                                                     {{"sync", {{"download_loop_sleep_millis", 1500}}}}));
-    //    REQUIRE(app_session.admin_api.patch_app_settings(app_session.server_app_id,
-    //        {{"sync", {{"num_objects_before_bootstrap_flush", 0}}}}));
-    //    REQUIRE(app_session.admin_api.patch_app_settings(app_session.server_app_id,
-    //        {{"sync", {{"download_loop_sleep_millis", 0}}}}));
+    auto setup_harness = [&](FLXSyncTestHarness& harness, std::optional<size_t> num_objects = std::nullopt,
+                             std::optional<size_t> sleep_millis = std::nullopt) {
+        auto& app_session = harness.session().app_session();
+        /** TODO: Remove when switching to use Protocol version in RCORE-1972 */
+        // Enable the role change bootstraps
+        REQUIRE(
+            app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
+        REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
 
-    // Get the current rules so it can be updated during the test
-    auto rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
+        if (num_objects) {
+            REQUIRE(app_session.admin_api.patch_app_settings(
+                app_session.server_app_id, {{"sync", {{"num_objects_before_bootstrap_flush", *num_objects}}}}));
+        }
+        if (sleep_millis) {
+            REQUIRE(app_session.admin_api.patch_app_settings(
+                app_session.server_app_id, {{"sync", {{"download_loop_sleep_millis", *sleep_millis}}}}));
+        }
 
-    // Initialize the realm with some data
-    harness.load_initial_data([&fill_person_schema](SharedRealm realm) {
-        fill_person_schema(realm, "employee", num_emps);
-        fill_person_schema(realm, "manager", num_mgrs);
-        fill_person_schema(realm, "director", num_dirs);
-    });
-
-    auto config = harness.make_test_file();
-
-    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
-        state_machina.transition_with([&](TestState cur_state) -> std::optional<TestState> {
-            if (cur_state == TestState::not_ready)
-                return std::nullopt;
-
-            using BatchState = sync::DownloadBatchState;
-            using Event = SyncClientHookEvent;
-            switch (data.event) {
-                case Event::ErrorMessageReceived:
-                    REQUIRE(cur_state == TestState::start);
-                    REQUIRE(data.error_info);
-                    REQUIRE(data.error_info->raw_error_code == 200);
-                    REQUIRE(data.error_info->server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
-                    REQUIRE_FALSE(data.error_info->is_fatal);
-                    return TestState::reconnect_received;
-
-                case Event::DownloadMessageReceived: {
-                    std::lock_guard lock(callback_mutex);
-                    // multi-message bootstrap in progress..
-                    if (data.batch_state == BatchState::MoreToCome) {
-                        // More than 1 bootstrap message, always a multi-message
-                        ++download_msg_count;
-                        bootstrap_mode = BootstrapMode::MultiMessage;
-                        return TestState::downloading;
-                    }
-                    // single bootstrap message or last message in the multi-message bootstrap
-                    else if (data.batch_state == BatchState::LastInBatch) {
-                        ++download_msg_count;
-                        if (cur_state == TestState::reconnect_received) {
-                            // If reconnect error was last state, then bootstrap has only one message
-                            bootstrap_mode = BootstrapMode::SingleMessageMulti;
-                            // Must have 2 or more changesets in message to get here...
-                            REQUIRE(data.num_changesets > 1);
-                        }
-                        return TestState::downloaded;
-                    }
-                    // single message/single changeset bootstraps are treated as a steady state download
-                    return std::nullopt;
-                }
-
-                // A bootstrap message was processed - used for multi-message or
-                // single message multi changeset bootstraps
-                case Event::BootstrapMessageProcessed: {
-                    REQUIRE(data.batch_state != BatchState::SteadyState);
-                    REQUIRE((cur_state == TestState::downloading || cur_state == TestState::downloaded));
-                    if (data.batch_state != BatchState::SteadyState) {
-                        std::lock_guard lock(callback_mutex);
-                        ++bootstrap_msg_count;
-                        if (data.query_version == query_version) {
-                            role_change_bootstrap = true;
-                        }
-                    }
-                    return std::nullopt;
-                }
-                // The bootstrap has been received and processed
-                case Event::BootstrapProcessed:
-                    REQUIRE(cur_state == TestState::downloaded);
-                    return TestState::complete;
-                default:
-                    return std::nullopt;
-            }
+        // Initialize the realm with some data
+        harness.load_initial_data([&fill_person_schema](SharedRealm realm) {
+            fill_person_schema(realm, "employee", num_emps);
+            fill_person_schema(realm, "manager", num_mgrs);
+            fill_person_schema(realm, "director", num_dirs);
         });
-        return SyncClientHookAction::NoAction;
     };
 
-    config.sync_config->notify_before_client_reset = [&callback_mutex, &did_client_reset](std::shared_ptr<Realm>) {
-        std::lock_guard lock(callback_mutex);
-        did_client_reset = true;
+    auto setup_config_callbacks = [&](SyncTestFile& config) {
+        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
+                                                            const SyncClientHookData& data) {
+            state_machina.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+                if (cur_state == TestState::not_ready)
+                    return std::nullopt;
+
+                using BatchState = sync::DownloadBatchState;
+                using Event = SyncClientHookEvent;
+                switch (data.event) {
+                    case Event::ErrorMessageReceived:
+                        REQUIRE(cur_state == TestState::start);
+                        REQUIRE(data.error_info);
+                        REQUIRE(data.error_info->raw_error_code == 200);
+                        REQUIRE(data.error_info->server_requests_action ==
+                                sync::ProtocolErrorInfo::Action::Transient);
+                        REQUIRE_FALSE(data.error_info->is_fatal);
+                        return TestState::reconnect_received;
+
+                    case Event::DownloadMessageReceived: {
+                        std::lock_guard lock(callback_mutex);
+                        // multi-message bootstrap in progress..
+                        if (data.batch_state == BatchState::MoreToCome) {
+                            // More than 1 bootstrap message, always a multi-message
+                            ++download_msg_count;
+                            bootstrap_mode = BootstrapMode::MultiMessage;
+                            return TestState::downloading;
+                        }
+                        // single bootstrap message or last message in the multi-message bootstrap
+                        else if (data.batch_state == BatchState::LastInBatch) {
+                            ++download_msg_count;
+                            if (cur_state == TestState::reconnect_received) {
+                                // If reconnect error was last state, then bootstrap has only one message
+                                bootstrap_mode = BootstrapMode::SingleMessageMulti;
+                                // Must have 2 or more changesets in message to get here...
+                                REQUIRE(data.num_changesets > 1);
+                            }
+                            return TestState::downloaded;
+                        }
+                        // single message/single changeset bootstraps are treated as a steady state download
+                        return std::nullopt;
+                    }
+
+                    // A bootstrap message was processed - used for multi-message or
+                    // single message multi changeset bootstraps
+                    case Event::BootstrapMessageProcessed: {
+                        REQUIRE(data.batch_state != BatchState::SteadyState);
+                        REQUIRE((cur_state == TestState::downloading || cur_state == TestState::downloaded));
+                        if (data.batch_state != BatchState::SteadyState) {
+                            std::lock_guard lock(callback_mutex);
+                            ++bootstrap_msg_count;
+                            if (data.query_version == query_version) {
+                                role_change_bootstrap = true;
+                            }
+                        }
+                        return std::nullopt;
+                    }
+                    // The bootstrap has been received and processed
+                    case Event::BootstrapProcessed:
+                        REQUIRE(cur_state == TestState::downloaded);
+                        return TestState::complete;
+                    default:
+                        return std::nullopt;
+                }
+            });
+            return SyncClientHookAction::NoAction;
+        };
+
+        config.sync_config->notify_before_client_reset = [&callback_mutex,
+                                                          &did_client_reset](std::shared_ptr<Realm>) {
+            std::lock_guard lock(callback_mutex);
+            did_client_reset = true;
+        };
     };
 
     auto set_up_realm = [](SharedRealm realm, size_t expected_cnt) {
@@ -5126,27 +5132,27 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         REQUIRE(results.size() == expected_cnt);
     };
 
-    auto verify_records = [](SharedRealm check_realm, size_t cnt_emps, size_t cnt_mgrs, size_t cnt_dirs) {
+    auto verify_records = [](SharedRealm check_realm, ExpectedResults& expected) {
         // Validate the expected number of entries for each role type after the role change
         auto table = check_realm->read_group().get_table("class_Person");
-        REQUIRE(table->size() == (cnt_emps + cnt_mgrs + cnt_dirs));
+        REQUIRE(table->size() == (expected.emps + expected.mgrs + expected.dirs));
         auto role_col = table->get_column_key("role");
         auto table_query = Query(table).equal(role_col, "director").Or().equal(role_col, "manager");
         auto results = Results(check_realm, table_query);
-        CHECK(results.size() == (cnt_mgrs + cnt_dirs));
+        CHECK(results.size() == (expected.mgrs + expected.dirs));
         table_query = Query(table).equal(role_col, "employee");
         results = Results(check_realm, table_query);
-        CHECK(results.size() == cnt_emps);
+        CHECK(results.size() == expected.emps);
         table_query = Query(table).equal(role_col, "manager");
         results = Results(check_realm, table_query);
-        CHECK(results.size() == cnt_mgrs);
+        CHECK(results.size() == expected.mgrs);
         table_query = Query(table).equal(role_col, "director");
         results = Results(check_realm, table_query);
-        CHECK(results.size() == cnt_dirs);
+        CHECK(results.size() == expected.dirs);
     };
 
-    auto update_perms_and_verify = [&](nlohmann::json new_rules, SharedRealm check_realm, size_t cnt_emps,
-                                       size_t cnt_mgrs, size_t cnt_dirs, BootstrapMode expected_mode) {
+    auto update_perms_and_verify = [&](FLXSyncTestHarness& harness, SharedRealm check_realm, nlohmann::json new_rules,
+                                       ExpectedResults& expected) {
         {
             std::lock_guard lock(callback_mutex);
             did_client_reset = false;
@@ -5163,7 +5169,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
         // Update the permissions on the server - should send an error to the client to force
         // it to reconnect
-        logger->trace("New rule definitions: %1", new_rules);
+        logger->info("New rule definitions: %1", new_rules);
+        auto& app_session = harness.session().app_session();
         app_session.admin_api.update_default_rule(app_session.server_app_id, new_rules);
 
         // After updating the permissions (if they are different), the server should send an
@@ -5185,18 +5192,19 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             // By the time the MARK response is received and wait_for_download()
             // returns, the bootstrap should have already been applied.
             std::lock_guard lock(callback_mutex);
-            if (expected_mode == BootstrapMode::SingleMessageMulti || expected_mode == BootstrapMode::MultiMessage) {
-                REQUIRE(expected_mode == bootstrap_mode);
+            if (expected.bootstrap == BootstrapMode::SingleMessageMulti ||
+                expected.bootstrap == BootstrapMode::MultiMessage) {
+                REQUIRE(expected.bootstrap == bootstrap_mode);
                 REQUIRE(role_change_bootstrap);
                 REQUIRE(state_machina.get() == TestState::complete);
-                if (expected_mode == BootstrapMode::SingleMessageMulti) {
+                if (expected.bootstrap == BootstrapMode::SingleMessageMulti) {
                     REQUIRE(bootstrap_msg_count == 1);
                 }
-                else if (expected_mode == BootstrapMode::MultiMessage) {
+                else if (expected.bootstrap == BootstrapMode::MultiMessage) {
                     REQUIRE(bootstrap_msg_count > 1);
                 }
             }
-            else if (expected_mode == BootstrapMode::SingleMessage) {
+            else if (expected.bootstrap == BootstrapMode::SingleMessage) {
                 REQUIRE(bootstrap_mode == BootstrapMode::None);
                 REQUIRE(bootstrap_msg_count == 0);
                 REQUIRE(state_machina.get() == TestState::reconnect_received);
@@ -5211,44 +5219,81 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         wait_for_advance(*check_realm);
 
         // Validate the expected number of entries for each role type after the role change
-        verify_records(check_realm, cnt_emps, cnt_mgrs, cnt_dirs);
+        verify_records(check_realm, expected);
 
         // Reset the state machine to "not ready" before leaving
         state_machina.transition_to(TestState::not_ready);
     };
 
     SECTION("Role changes lead to objects in/out of view without client reset") {
-        // Get the current rules so it can be updated during the test
-        auto rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
-
-        auto update_role = [&rule](nlohmann::json doc_filter) {
+        auto update_role = [](nlohmann::json& rule, nlohmann::json doc_filter) {
             rule["roles"][0]["document_filters"]["read"] = doc_filter;
             rule["roles"][0]["document_filters"]["write"] = doc_filter;
         };
 
-        auto realm = Realm::get_shared_realm(config);
-        REQUIRE(!wait_for_download(*realm));
-        REQUIRE(!wait_for_upload(*realm));
-        set_up_realm(realm, num_total);
+        auto run_test = [&](nlohmann::json initial_rules, size_t intitial_cnt, nlohmann::json test_rules,
+                            ExpectedResults expected_results, std::optional<size_t> num_objects = std::nullopt,
+                            std::optional<size_t> sleep_millis = std::nullopt) {
+            // Set up the test harness with the provided initial rules
+            FLXSyncTestHarness harness("flx_role_change_bootstrap", {person_schema, {"role", "firstName"}});
+            setup_harness(harness, num_objects, sleep_millis);
 
-        {
+            // Get the current rules so it can be updated during the test
+            auto& app_session = harness.session().app_session();
+            auto default_rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
+            if (!initial_rules.empty()) {
+                update_role(default_rule, initial_rules);
+                logger->info("Initial rule definitions: %1", default_rule);
+                app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule);
+            }
+
+            // Set up and create a realm; wait for data sync
+            auto config = harness.make_test_file();
+            setup_config_callbacks(config);
+            auto realm = Realm::get_shared_realm(config);
+            REQUIRE(!wait_for_download(*realm));
+            REQUIRE(!wait_for_upload(*realm));
+            set_up_realm(realm, intitial_cnt);
+
+            // Single message bootstrap - remove employees, keep mgrs/dirs
+            update_role(default_rule, test_rules);
+            update_perms_and_verify(harness, realm, default_rule, expected_results);
+        };
+
+        SECTION("Single-message bootstrap") {
             // Single message bootstrap - remove employees, keep mgrs/dirs
             logger->info(">>>>> REMOVING EMPLOYEES");
-            update_role({{"role", {{"$in", {"manager", "director"}}}}});
-            update_perms_and_verify(rule, realm, 0, num_mgrs, num_dirs, BootstrapMode::SingleMessage);
+            run_test({}, num_total, {{"role", {{"$in", {"manager", "director"}}}}},
+                     {BootstrapMode::SingleMessage, 0, num_mgrs, num_dirs});
         }
-        {
+        SECTION("Multi-message bootstrap") {
             // Multi-message bootstrap - add employeees, remove managers and directors
             logger->info(">>>>> SWITCHING TO EMPLOYEES ONLY");
-            update_role({{"role", "employee"}});
-            update_perms_and_verify(rule, realm, num_emps, 0, 0, BootstrapMode::SingleMessageMulti);
+            run_test({{"role", {{"$in", {"manager", "director"}}}}}, num_mgrs + num_dirs, {{"role", "employee"}},
+                     {BootstrapMode::MultiMessage, num_emps, 0, 0}, 10);
         }
-        {
-            // Single message bootstrap - add back managers and directors
+        SECTION("Single-message/Multi-changeset bootstrap") {
+            // Single message/multi-changeset bootstrap - add back managers and directors
             logger->info(">>>>> SWITCHING BACK TO ALL");
-            update_role(true);
-            update_perms_and_verify(rule, realm, num_emps, num_mgrs, num_dirs, BootstrapMode::SingleMessageMulti);
+            run_test({{"role", "employee"}}, num_emps, true,
+                     {BootstrapMode::SingleMessageMulti, num_emps, num_mgrs, num_dirs}, 10, 2000);
         }
+        /*
+                {
+                    // Multi-message bootstrap - add employeees, remove managers and directors
+                    logger->info(">>>>> SWITCHING TO EMPLOYEES ONLY");
+                    update_role(default_rule, {{"role", "employee"}});
+                    expected_results = {BootstrapMode::MultiMessage, num_emps, 0, 0};
+                    update_perms_and_verify(harness, realm, default_rule, expected_results);
+                }
+                {
+                    // Single message bootstrap - add back managers and directors
+                    logger->info(">>>>> SWITCHING BACK TO ALL");
+                    update_role(default_rule, true);
+                    expected_results = {BootstrapMode::SingleMessageMulti, num_emps, num_mgrs, num_dirs};
+                    update_perms_and_verify(harness, realm, default_rule, expected_results);
+                }
+        */
     }
 }
 
