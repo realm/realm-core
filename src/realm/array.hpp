@@ -434,6 +434,7 @@ public:
     template <class cond>
     bool find(int64_t value, size_t start, size_t end, size_t baseIndex, QueryStateBase* state) const
     {
+        REALM_ASSERT_DEBUG(cond::condition >= 0 && cond::condition < cond_VTABLE_FINDER_COUNT);
         Finder finder = m_vtable->finder[cond::condition];
         return (this->*finder)(value, start, end, baseIndex, state);
     }

@@ -275,7 +275,7 @@ size_t ArrayMixed::find_first(Mixed value, size_t begin, size_t end) const noexc
     if (end == realm::npos)
         end = size();
 
-    if (is_compressed() && type == type_Int) {
+    if (is_compressed() && type == type_Int && Mixed::data_types_are_comparable(this->get_type(0), type_Int)) {
         // compressed array of integers in mixed, jump into proper implementation.
         return Array::find_first<Equal>(value.get_int(), begin, end);
     }

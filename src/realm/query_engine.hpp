@@ -182,6 +182,15 @@ public:
 
     virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
+    virtual bool is_compressed() const {
+        return false;
+    }
+    
+    virtual size_t find_range(size_t start, size_t end, std::vector<ParentNode*>, QueryStateBase*)
+    {
+        return not_found;
+    }
+    
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     virtual size_t find_all_local(size_t start, size_t end);
 
@@ -422,7 +431,78 @@ public:
         : BaseType(from)
     {
     }
-
+    
+    bool is_compressed() const override
+    {
+        return this->m_leaf->is_compressed();
+    }
+    
+    virtual size_t find_range(size_t start, size_t end, std::vector<ParentNode*> children, QueryStateBase* st) override
+    {
+        //if we are here, we have a range query for a compressed array.
+        const auto vs = this->m_leaf->get_all(start, end);
+        
+        //this is the first condition
+        auto node = (IntegerNode*)children[0];
+        const auto cond = node->get_condition();
+        const auto cond_value = node->get_condition_value();
+        
+        //TODO: the weights assigned during the query for this node are wrong at this point, because I am not
+        //considering local_matches etc, so it is very likely that something could be broken.
+        
+        size_t s = 0;
+        while(s < vs.size()) {
+            size_t matching_index = s;
+            for(; matching_index<vs.size(); ++matching_index)
+                if(cond(cond_value, vs[matching_index]))
+                    break; //found a match in position matching_index.
+            
+            //nothing was found, just return
+            if(matching_index == vs.size())
+                return not_found;
+            
+            //explore all the other query nodes
+            size_t node_matching = vs.size();
+            for(size_t j=1; j<children.size(); ++j) {
+                const auto child_node = (IntegerNode*)children[j]; //bad cast
+                const auto child_cond = child_node->get_condition();
+                const auto child_cond_value = child_node->get_condition_value();
+                
+                //find first match in [matching_index, end]
+                for(size_t k = matching_index; k<vs.size(); ++k)
+                    if(child_cond(child_cond_value, vs[k])) {
+                        node_matching = k;
+                        break;
+                    }
+                        
+                if(node_matching != matching_index) //there is no possible matching.
+                    break;
+            }
+            
+            if(node_matching == matching_index) {
+                //found 
+                bool cont = st->match(start + matching_index);
+                if (!cont) {
+                    return static_cast<size_t>(-1);
+                }
+            }
+            
+            s+=matching_index+1; //move starting point to next element that matched the first condition.
+        }
+        return not_found;
+    }
+    
+    TConditionFunction get_condition() const
+    {
+        return TConditionFunction{};
+    }
+    
+    TConditionValue get_condition_value() const
+    {
+        return this->m_value;
+    }
+    
+    
     size_t find_first_local(size_t start, size_t end) override
     {
         return this->m_leaf->template find_first<TConditionFunction>(this->m_value, start, end);
@@ -484,6 +564,19 @@ template <size_t linear_search_threshold, class LeafType, class NeedleContainer>
 static size_t find_all_haystack(LeafType& leaf, NeedleContainer& needles, size_t start, size_t end,
                                 QueryStateBase* state)
 {
+    
+    if constexpr (std::is_same_v<LeafType, ArrayInteger>) {
+        if (needles.size() >= linear_search_threshold && leaf.is_compressed()) {
+            const auto& values = leaf.get_all(start, end);
+            size_t ndx = start;
+            for (const auto& v : values) {
+                if (needles.count(v))
+                    return ndx;
+                ndx += 1;
+            }
+        }
+    }
+    
     if (needles.size() < linear_search_threshold) {
         for (size_t i = start; i < end; ++i) {
             auto element = leaf.get(i);
@@ -595,7 +688,7 @@ public:
 
         return s;
     }
-
+    
     size_t find_all_local(size_t start, size_t end) override
     {
         if (m_nb_needles) {
@@ -736,12 +829,29 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        for (size_t s = start; s < end; ++s) {
-            if (T v = m_leaf->get(s)) {
-                int64_t sz = v.size();
-                if (TConditionFunction()(sz, m_value))
-                    return s;
+        if constexpr(std::is_same_v<LeafType, ArrayInteger>)
+        {
+            if(m_leaf->is_compressed() && end - start >= 32)
+            {
+                auto values = m_leaf->get_all(start, end);
+                for(const auto v : values) {
+                    int64_t sz = v.size();
+                    if (TConditionFunction()(sz, m_value))
+                        return start;
+                    start++;
+                }
             }
+        }
+        else
+        {
+            for (size_t s = start; s < end; ++s) {
+                if (T v = m_leaf->get(s)) {
+                    int64_t sz = v.size();
+                    if (TConditionFunction()(sz, m_value))
+                        return s;
+                }
+            }
+            
         }
         return not_found;
     }
