@@ -273,13 +273,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
         REALM_ASSERT(!version || realm->read_transaction_version() == *version);
         return realm;
     }
-    try {
-        do_get_realm(std::move(config), realm, version, lock);
-    }
-    catch (...) {
-        realm = nullptr;
-        throw;
-    }
+    do_get_realm(std::move(config), realm, version, lock);
     if (version) {
         realm->read_group();
     }
@@ -367,19 +361,25 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
 #endif
 
-    // Cached frozen Realms need to initialize their schema before releasing
-    // the lock as otherwise they could be read from the cache on another thread
-    // before the schema initialization happens. They'll never perform a write
-    // transaction, so unlike with live Realms this is safe to do.
-    if (config.cache && version && schema) {
-        realm->update_schema(std::move(*schema));
-        schema.reset();
-    }
+    try {
+        // Cached frozen Realms need to initialize their schema before releasing
+        // the lock as otherwise they could be read from the cache on another thread
+        // before the schema initialization happens. They'll never perform a write
+        // transaction, so unlike with live Realms this is safe to do.
+        if (config.cache && version && schema) {
+            realm->update_schema(std::move(*schema));
+            schema.reset();
+        }
 
-    realm_lock.unlock_unchecked();
-    if (schema) {
-        realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
-                             std::move(initialization_function));
+        realm_lock.unlock_unchecked();
+        if (schema) {
+            realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
+                                 std::move(initialization_function));
+        }
+    }
+	catch (...) {
+        realm = nullptr;
+        throw;
     }
 
 #ifdef REALM_ENABLE_SYNC

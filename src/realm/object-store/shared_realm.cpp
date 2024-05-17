@@ -481,7 +481,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         constexpr bool nonblocking = true;
         auto success = transaction().promote_to_write(nonblocking);
         if (!success) {
-            throw LogicError(ErrorCodes::WrongTransactionState, "Could not create write transaction");
+            throw LogicError(ErrorCodes::WrongTransactionState, "Could not create write transaction for schema upgrade");
         }
 
         // Beginning the write transaction may have advanced the version and left

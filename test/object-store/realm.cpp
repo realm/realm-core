@@ -2695,7 +2695,6 @@ TEST_CASE("SharedRealm: async writes") {
 
     SECTION("open new realm with diffent schema while async transaction is in progress") {
         realm->async_begin_transaction([&] {
-            done = true;
         });
 
         config.schema = Schema{
@@ -2708,7 +2707,7 @@ TEST_CASE("SharedRealm: async writes") {
 
         try {
             auto r2 = Realm::get_shared_realm(config);
-            REQUIRE(!r2);
+            REQUIRE(!r2); // Should not reach here
         }
         catch (const Exception& e) {
             REQUIRE(e.code() == ErrorCodes::WrongTransactionState);
