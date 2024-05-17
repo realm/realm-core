@@ -42,6 +42,7 @@ std::optional<util::EncryptionKey> crypt_key(const char* raw_value, bool always)
         return util::EncryptionKey(raw_key);
     }
 #else
+    static_cast<void>(raw_value);
     static_cast<void>(always);
 #endif
     return std::nullopt;
