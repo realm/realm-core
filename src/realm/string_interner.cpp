@@ -24,7 +24,207 @@
 
 namespace realm {
 
-enum positions { Pos_Version, Pos_ColKey, Pos_Size, Pos_Compressor, Pos_Data, Top_Size };
+// helpers
+struct HashMapIter {
+    Array& m_array;
+    uint32_t hash_filter;
+    uint16_t index;
+    uint16_t left_to_search;
+    uint8_t hash_size;
+    HashMapIter(Array& array, uint32_t hash, uint8_t hash_size)
+        : m_array(array)
+        , hash_filter(hash)
+        , hash_size(hash_size)
+    {
+        set_index(0);
+    }
+    HashMapIter(Array& dummy)
+        : m_array(dummy)
+    {
+        left_to_search = 0;
+    }
+    inline uint32_t get()
+    {
+        return m_array.get(index) >> hash_size;
+    }
+    inline bool empty()
+    {
+        auto element = m_array.get(index);
+        return (element >> hash_size) == 0;
+    }
+    inline void set(uint64_t element)
+    {
+        m_array.set(index, element);
+    }
+    inline bool matches()
+    {
+        auto mask = 0xFFFFFFFFUL >> (32 - hash_size);
+        auto element = m_array.get(index);
+        return ((element & mask) == hash_filter) && (element >> hash_size);
+    }
+    inline bool is_valid()
+    {
+        return left_to_search != 0;
+    }
+    inline void set_index(int i, size_t search_limit = 16)
+    {
+        index = i;
+        left_to_search = std::min(m_array.size(), (size_t)search_limit);
+    }
+    void operator++()
+    {
+        if (is_valid()) {
+            left_to_search--;
+            index++;
+            if (index == m_array.size()) {
+                index = 0;
+            }
+        }
+    }
+};
+
+static void rehash(Array& from, Array& to, uint8_t hash_size)
+{
+    REALM_ASSERT_DEBUG(from.size() * 2 == to.size());
+
+    for (size_t i = 0; i < from.size(); ++i) {
+        auto entry = from.get(i);
+        if ((entry >> hash_size) == 0)
+            continue;
+        auto starting_index = entry & (to.size() - 1);
+        HashMapIter it(to, 0, hash_size);
+        it.set_index(starting_index);
+        while (!it.empty()) {
+            ++it;
+        }
+        REALM_ASSERT(it.is_valid());
+        it.set(entry);
+    }
+}
+
+static void add_to_hash_map(Array& node, uint32_t hash, uint32_t id, uint8_t hash_size)
+{
+    REALM_ASSERT(node.is_attached());
+    if (!node.has_refs()) {
+        // it's a leaf.
+        if (node.size() < 16) {
+            // it's a list with room to grow
+            node.add(((uint64_t)id << hash_size) | hash);
+            return;
+        }
+        if (node.size() == 16) {
+            // it's a full list, must be converted to a hash table
+            Array new_node(node.get_alloc());
+            new_node.create(NodeHeader::type_Normal, false, 32, 0);
+            new_node.set_parent(node.get_parent(), node.get_ndx_in_parent());
+            new_node.update_parent();
+            // transform existing list into hash table
+            rehash(node, new_node, hash_size);
+            node.destroy();
+            node.init_from_parent();
+        }
+        // it's a hash table. Grow if needed up till 1024 entries
+        while (node.size() < 1024) {
+            auto size = node.size();
+            auto start_index = hash & (size - 1);
+            HashMapIter it(node, 0, size);
+            it.set_index(start_index);
+            while (it.is_valid() && !it.empty()) {
+                ++it;
+            }
+            if (it.is_valid()) {
+                // found an empty spot within search range
+                it.set(((uint64_t)id << hash_size) | hash);
+                return;
+            }
+            if (node.size() >= 1024)
+                break;
+            // rehash into twice as big array
+            auto new_size = 2 * node.size();
+            Array new_node(node.get_alloc());
+            new_node.create(NodeHeader::type_Normal, false, new_size, 0);
+            new_node.set_parent(node.get_parent(), node.get_ndx_in_parent());
+            new_node.update_parent();
+            rehash(node, new_node, hash_size);
+            node.destroy();
+            node.init_from_parent();
+        }
+        // we ran out of space. Rewrite as a radix node with subtrees
+        Array new_node(node.get_alloc());
+        new_node.create(NodeHeader::type_HasRefs, false, 256, 0);
+        new_node.set_parent(node.get_parent(), node.get_ndx_in_parent());
+        new_node.update_parent();
+        for (size_t index = 0; index < node.size(); ++index) {
+            auto element = node.get(index);
+            auto hash = element & (0xFFFFFFFF >> (32 - hash_size));
+            auto string_id = element >> hash_size;
+            auto remaining_hash = hash >> 8;
+            add_to_hash_map(new_node, remaining_hash, string_id, hash_size - 8);
+        }
+        node.destroy();
+        node.init_from_parent();
+    }
+    // We have a radix node and need to insert into proper subtree
+    size_t index = hash & 0xFF;
+    auto rot = node.get_as_ref_or_tagged(index);
+    REALM_ASSERT(!rot.is_tagged());
+    if (rot.get_as_ref() == 0) {
+        // no subtree present, create an empty one
+        Array subtree(node.get_alloc());
+        subtree.set_parent(&node, index);
+        subtree.create(NodeHeader::type_Normal);
+        subtree.update_parent();
+        add_to_hash_map(subtree, hash >> 8, id, hash_size - 8);
+    }
+    else {
+        Array subtree(node.get_alloc());
+        subtree.set_parent(&node, index);
+        subtree.init_from_parent();
+        add_to_hash_map(subtree, hash >> 8, id, hash_size - 8);
+    }
+}
+
+static std::vector<uint32_t> hash_to_id(Array& node, uint32_t hash, uint8_t hash_size)
+{
+    std::vector<uint32_t> result;
+    REALM_ASSERT(node.is_attached());
+    if (!node.has_refs()) {
+        // it's a leaf - default is a list, search starts from index 0.
+        HashMapIter it(node, hash, hash_size);
+        if (node.size() > 16) {
+            // it is a hash table, so use hash to select index to start searching
+            // table size must be power of two!
+            size_t index = hash & (node.size() - 1);
+            it.set_index(index);
+        }
+        // collect all matching values within allowed range
+        while (it.is_valid()) {
+            if (it.matches()) {
+                result.push_back(it.get());
+            }
+            ++it;
+        }
+        return result;
+    }
+    else {
+        // it's a radix node
+        size_t index = hash & (node.size() - 1);
+        auto rot = node.get_as_ref_or_tagged(index);
+        REALM_ASSERT(rot.is_ref());
+        if (rot.get_as_ref() == 0) {
+            // no subtree, return empty vector
+            return result;
+        }
+        // descend into subtree
+        Array subtree(node.get_alloc());
+        subtree.set_parent(&node, index);
+        subtree.init_from_parent();
+        return hash_to_id(subtree, hash >> 8, hash_size - 8);
+    }
+}
+
+
+enum positions { Pos_Version, Pos_ColKey, Pos_Size, Pos_Compressor, Pos_Data, Pos_Map, Top_Size };
 
 StringInterner::StringInterner(Allocator& alloc, Array& parent, ColKey col_key, bool writable)
     : m_parent(parent)
@@ -37,6 +237,8 @@ StringInterner::StringInterner(Allocator& alloc, Array& parent, ColKey col_key, 
     m_top->set_parent(&parent, index);
     m_data = std::make_unique<Array>(alloc);
     m_data->set_parent(m_top.get(), Pos_Data);
+    m_hash_map = std::make_unique<Array>(alloc);
+    m_hash_map->set_parent(m_top.get(), Pos_Map);
     m_current_string_leaf = std::make_unique<ArrayUnsigned>(alloc);
     m_current_hash_leaf = std::make_unique<ArrayUnsigned>(alloc);
     m_col_key = col_key;
@@ -51,6 +253,7 @@ void StringInterner::update_from_parent(bool writable)
     if (valid_top) {
         m_top->update_from_parent();
         m_data->update_from_parent();
+        m_hash_map->update_from_parent();
     }
     else if (writable && valid_top_ref_spot) {
         m_top->create(NodeHeader::type_HasRefs, false, Top_Size, 0);
@@ -63,6 +266,10 @@ void StringInterner::update_from_parent(bool writable)
         m_data->set_parent(m_top.get(), Pos_Data);
         m_data->create(NodeHeader::type_HasRefs, false, 0);
         m_data->update_parent();
+        m_hash_map = std::make_unique<Array>(m_parent.get_alloc());
+        m_hash_map->set_parent(m_top.get(), Pos_Map);
+        m_hash_map->create(NodeHeader::type_Normal);
+        m_hash_map->update_parent();
         m_top->update_parent();
         valid_top = true;
     }
@@ -74,6 +281,7 @@ void StringInterner::update_from_parent(bool writable)
         m_hash_to_id_map.clear();
         m_top->detach(); // <-- indicates "dead" mode
         m_data->detach();
+        m_hash_map->detach();
         m_compressor.reset();
         return;
     }
@@ -217,6 +425,15 @@ StringID StringInterner::intern(StringData sd)
     m_decompressed_strings.push_back({64, h, std::make_unique<std::string>(sd)});
     auto id = m_compressed_strings.size();
     m_hash_to_id_map.insert(std::make_pair(h, id));
+    add_to_hash_map(*m_hash_map.get(), h, id, 32);
+    auto res = hash_to_id(*m_hash_map.get(), h, 32);
+    // validate result from hash map
+    bool match = false;
+    for (auto e : res) {
+        if (e == id)
+            match = true;
+    }
+    REALM_ASSERT(match);
     size_t index = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     REALM_ASSERT_DEBUG(index == id - 1);
     // Create a new leaf if needed (limit number of entries to 256 pr leaf)
