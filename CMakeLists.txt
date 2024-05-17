@@ -235,6 +235,11 @@ if(MSVC)
 
     # Prevent warnings abount non-existing .pdb files
     add_link_options($<$<CONFIG:Debug>:/ignore:4099>)
+
+    if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LARGEADDRESSAWARE")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /LARGEADDRESSAWARE")
+    endif()
 endif()
 
 if(UNIX)
