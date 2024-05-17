@@ -4969,7 +4969,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     const Schema person_schema{{"Person",
                                 {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"role", PropertyType::String},
-                                 {"firstName", PropertyType::String}}}};
+                                 {"firstName", PropertyType::String},
+                                 {"lastName", PropertyType::String}}}};
 
     constexpr size_t num_emps = 1000;
     constexpr size_t num_mgrs = 50;
@@ -4988,6 +4989,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                                           {"_id", ObjectId::gen()},
                                           {"role", role},
                                           {"firstName", util::format("%1-%2", role, i)},
+                                          {"lastName", util::format("last-name-%1", i)},
                                       }));
         }
     };
@@ -5031,7 +5033,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         }
 
         // Initialize the realm with some data
-        harness.load_initial_data([&fill_person_schema](SharedRealm realm) {
+        harness.load_initial_data([&](SharedRealm realm) {
             fill_person_schema(realm, "employee", num_emps);
             fill_person_schema(realm, "manager", num_mgrs);
             fill_person_schema(realm, "director", num_dirs);
@@ -5191,12 +5193,13 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         {
             // By the time the MARK response is received and wait_for_download()
             // returns, the bootstrap should have already been applied.
+            auto cur_state = state_machina.get(); // grab before locking callback_mutex
             std::lock_guard lock(callback_mutex);
             if (expected.bootstrap == BootstrapMode::SingleMessageMulti ||
                 expected.bootstrap == BootstrapMode::MultiMessage) {
                 REQUIRE(expected.bootstrap == bootstrap_mode);
                 REQUIRE(role_change_bootstrap);
-                REQUIRE(state_machina.get() == TestState::complete);
+                REQUIRE(cur_state == TestState::complete);
                 if (expected.bootstrap == BootstrapMode::SingleMessageMulti) {
                     REQUIRE(bootstrap_msg_count == 1);
                 }
@@ -5207,7 +5210,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             else if (expected.bootstrap == BootstrapMode::SingleMessage) {
                 REQUIRE(bootstrap_mode == BootstrapMode::None);
                 REQUIRE(bootstrap_msg_count == 0);
-                REQUIRE(state_machina.get() == TestState::reconnect_received);
+                REQUIRE(cur_state == TestState::reconnect_received);
             }
             // Make sure a client reset did not occur while waiting for the role change to
             // be applied
@@ -5235,7 +5238,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                             ExpectedResults expected_results, std::optional<size_t> num_objects = std::nullopt,
                             std::optional<size_t> sleep_millis = std::nullopt) {
             // Set up the test harness with the provided initial rules
-            FLXSyncTestHarness harness("flx_role_change_bootstrap", {person_schema, {"role", "firstName"}});
+            FLXSyncTestHarness harness("flx_role_change_bootstrap",
+                                       {person_schema, {"role", "firstName", "lastName"}});
             setup_harness(harness, num_objects, sleep_millis);
 
             // Get the current rules so it can be updated during the test
