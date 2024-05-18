@@ -94,10 +94,11 @@ static void rehash(Array& from, Array& to, uint8_t hash_size)
         auto starting_index = entry & (to.size() - 1);
         HashMapIter it(to, 0, hash_size);
         it.set_index(starting_index);
-        while (!it.empty()) {
+        while (it.is_valid() && !it.empty()) {
             ++it;
         }
         REALM_ASSERT(it.is_valid());
+        REALM_ASSERT(it.empty());
         it.set(entry);
     }
 }
@@ -127,7 +128,7 @@ static void add_to_hash_map(Array& node, uint32_t hash, uint32_t id, uint8_t has
         while (node.size() < 1024) {
             auto size = node.size();
             auto start_index = hash & (size - 1);
-            HashMapIter it(node, 0, size);
+            HashMapIter it(node, 0, hash_size);
             it.set_index(start_index);
             while (it.is_valid() && !it.empty()) {
                 ++it;
@@ -240,7 +241,6 @@ StringInterner::StringInterner(Allocator& alloc, Array& parent, ColKey col_key, 
     m_hash_map = std::make_unique<Array>(alloc);
     m_hash_map->set_parent(m_top.get(), Pos_Map);
     m_current_string_leaf = std::make_unique<ArrayUnsigned>(alloc);
-    m_current_hash_leaf = std::make_unique<ArrayUnsigned>(alloc);
     m_col_key = col_key;
     update_from_parent(writable);
 }
@@ -278,7 +278,6 @@ void StringInterner::update_from_parent(bool writable)
         m_compressor.reset();
         m_compressed_strings.clear();
         // m_compressed_string_map.clear();
-        m_hash_to_id_map.clear();
         m_top->detach(); // <-- indicates "dead" mode
         m_data->detach();
         m_hash_map->detach();
@@ -295,7 +294,6 @@ void StringInterner::update_from_parent(bool writable)
         m_compressed_strings.clear();
         // m_compressed_string_map.clear();
         m_decompressed_strings.clear();
-        m_hash_to_id_map.clear();
     }
     if (!m_compressor)
         m_compressor = std::make_unique<StringCompressor>(m_top->get_alloc(), *m_top, Pos_Compressor, writable);
@@ -304,7 +302,6 @@ void StringInterner::update_from_parent(bool writable)
     // rebuild internal structures......
     rebuild_internal();
     m_current_string_leaf->detach();
-    m_current_hash_leaf->detach();
 }
 
 void StringInterner::rebuild_internal()
@@ -315,22 +312,6 @@ void StringInterner::rebuild_internal()
         return;
     }
     if (target_size < m_compressed_strings.size()) {
-        // back out of new strings, which was never committed (after a rollback)
-        while (m_decompressed_strings.size() > target_size) {
-            auto& e = m_decompressed_strings.back();
-            auto it = m_hash_to_id_map.find(e.m_hash);
-            bool found = false;
-            while (it != m_hash_to_id_map.end() && it->first == e.m_hash) {
-                if (it->second == m_decompressed_strings.size()) {
-                    found = true;
-                    m_hash_to_id_map.erase(it);
-                    break;
-                }
-                ++it;
-            }
-            REALM_ASSERT_DEBUG(found);
-            m_decompressed_strings.pop_back();
-        }
         m_compressed_strings.resize(target_size);
         return;
     }
@@ -341,18 +322,12 @@ void StringInterner::rebuild_internal()
     auto curr_entry = internal_size & ~0xFFULL;
     auto hi = curr_entry >> 8;
     auto last_hi = hi;
-    m_current_string_leaf->set_parent(m_data.get(), hi * 2);
-    m_current_hash_leaf->set_parent(m_data.get(), hi * 2 + 1);
-    REALM_ASSERT_DEBUG(m_data->get_as_ref(hi * 2));
-    REALM_ASSERT_DEBUG(m_data->get_as_ref(hi * 2 + 1));
+    m_current_string_leaf->set_parent(m_data.get(), hi);
+    REALM_ASSERT_DEBUG(m_data->get_as_ref(hi));
     if (m_current_string_leaf->is_attached())
         m_current_string_leaf->update_from_parent();
     else
         m_current_string_leaf->init_from_ref(m_current_string_leaf->get_ref_from_parent());
-    if (m_current_hash_leaf->is_attached())
-        m_current_hash_leaf->update_from_parent();
-    else
-        m_current_hash_leaf->init_from_ref(m_current_hash_leaf->get_ref_from_parent());
     while (curr_entry < internal_size) {
         REALM_ASSERT_DEBUG(leaf_offset < m_current_string_leaf->size());
         size_t length = m_current_string_leaf->get(leaf_offset++);
@@ -364,15 +339,11 @@ void StringInterner::rebuild_internal()
         auto hi = internal_size >> 8;
         if (last_hi != hi) {
             last_hi = hi;
-            m_current_string_leaf->set_parent(m_data.get(), hi * 2);
-            m_current_hash_leaf->set_parent(m_data.get(), hi * 2 + 1);
-            REALM_ASSERT_DEBUG(m_data->get_as_ref(hi * 2));
-            REALM_ASSERT_DEBUG(m_data->get_as_ref(hi * 2 + 1));
+            m_current_string_leaf->set_parent(m_data.get(), hi);
+            REALM_ASSERT_DEBUG(m_data->get_as_ref(hi));
             m_current_string_leaf->update_from_parent();
-            m_current_hash_leaf->update_from_parent();
             leaf_offset = 0;
         }
-        StringID id = internal_size + 1;
         CompressedString cpr;
         REALM_ASSERT_DEBUG(leaf_offset < m_current_string_leaf->size());
         size_t length = 0xFFFF & m_current_string_leaf->get(leaf_offset++);
@@ -380,12 +351,9 @@ void StringInterner::rebuild_internal()
         while (length--) {
             cpr.push_back(0xFFFF & m_current_string_leaf->get(leaf_offset++));
         }
-        auto lo = internal_size & 0xFF;
-        uint32_t hash = 0xFFFFFFFFULL & m_current_hash_leaf->get(lo);
         m_compressed_strings.push_back(cpr);
-        m_decompressed_strings.push_back(CachedString({0, hash, {}}));
+        m_decompressed_strings.push_back(CachedString({0, {}}));
         internal_size = m_compressed_strings.size();
-        m_hash_to_id_map.insert(std::make_pair(hash, id));
     }
     // release old decompressed strings
     for (auto& e : m_decompressed_strings) {
@@ -411,49 +379,34 @@ StringID StringInterner::intern(StringData sd)
     if (sd.data() == nullptr)
         return 0;
     uint32_t h = sd.hash();
-    auto [it_first, it_last] = m_hash_to_id_map.equal_range(h);
-    while (it_first != it_last) {
-        auto& candidate = m_compressed_strings[it_first->second - 1];
-        if (m_compressor->compare(sd, candidate) == 0)
-            return it_first->second;
-        ++it_first;
+    auto candidates = hash_to_id(*m_hash_map.get(), h, 32);
+    for (auto& candidate : candidates) {
+        auto candidate_cpr = m_compressed_strings[candidate - 1];
+        if (m_compressor->compare(sd, candidate_cpr) == 0)
+            return candidate;
     }
     // it's a new string
     bool learn = true;
     auto c_str = m_compressor->compress(sd, learn);
     m_compressed_strings.push_back(c_str);
-    m_decompressed_strings.push_back({64, h, std::make_unique<std::string>(sd)});
+    m_decompressed_strings.push_back({64, std::make_unique<std::string>(sd)});
     auto id = m_compressed_strings.size();
-    m_hash_to_id_map.insert(std::make_pair(h, id));
     add_to_hash_map(*m_hash_map.get(), h, id, 32);
-    auto res = hash_to_id(*m_hash_map.get(), h, 32);
-    // validate result from hash map
-    bool match = false;
-    for (auto e : res) {
-        if (e == id)
-            match = true;
-    }
-    REALM_ASSERT(match);
     size_t index = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     REALM_ASSERT_DEBUG(index == id - 1);
     // Create a new leaf if needed (limit number of entries to 256 pr leaf)
     if (!m_current_string_leaf->is_attached() || (index & 0xFF) == 0) {
-        m_current_string_leaf->set_parent(m_data.get(), (index >> 8) * 2);
-        m_current_hash_leaf->set_parent(m_data.get(), (index >> 8) * 2 + 1);
+        m_current_string_leaf->set_parent(m_data.get(), index >> 8);
         if ((index & 0xFF) == 0) {
             m_current_string_leaf->create(0, 65535);
             m_data->add(m_current_string_leaf->get_ref());
-            m_current_hash_leaf->create(0, (2ULL << 32) - 1);
-            m_data->add(m_current_hash_leaf->get_ref());
         }
         else {
             if (m_current_string_leaf->is_attached()) {
                 m_current_string_leaf->update_from_parent();
-                m_current_hash_leaf->update_from_parent();
             }
             else {
                 m_current_string_leaf->init_from_ref(m_current_string_leaf->get_ref_from_parent());
-                m_current_hash_leaf->init_from_ref(m_current_hash_leaf->get_ref_from_parent());
             }
         }
     }
@@ -463,7 +416,6 @@ StringID StringInterner::intern(StringData sd)
     for (auto c : c_str) {
         m_current_string_leaf->add(c);
     }
-    m_current_hash_leaf->add(h);
     return id;
 }
 
@@ -477,12 +429,11 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
     if (sd.data() == nullptr)
         return 0;
     uint32_t h = sd.hash();
-    auto [it_first, it_last] = m_hash_to_id_map.equal_range(h);
-    while (it_first != it_last) {
-        auto& candidate = m_compressed_strings[it_first->second - 1];
-        if (m_compressor->compare(sd, candidate) == 0)
-            return it_first->second;
-        ++it_first;
+    auto candidates = hash_to_id(*m_hash_map.get(), h, 32);
+    for (auto& candidate : candidates) {
+        auto candidate_cpr = m_compressed_strings[candidate - 1];
+        if (m_compressor->compare(sd, candidate_cpr) == 0)
+            return candidate;
     }
     return {};
 }

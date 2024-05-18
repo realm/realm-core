@@ -51,7 +51,6 @@ class ArrayUnsigned;
 class Allocator;
 struct CachedString {
     uint8_t m_weight = 0;
-    uint32_t m_hash = 0;
     std::unique_ptr<std::string> m_decompressed;
 };
 
@@ -74,15 +73,12 @@ private:
     std::unique_ptr<Array> m_top;
     std::unique_ptr<Array> m_data;     // raw compressed data area
     std::unique_ptr<Array> m_hash_map; // mapping hash of uncompressed string to string id.
-    std::unique_ptr<ArrayUnsigned> m_current_hash_leaf;
     std::unique_ptr<ArrayUnsigned> m_current_string_leaf;
     void rebuild_internal();
 
     ColKey m_col_key; // for validation
     std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
-    // in memory hash map, to be replaced by in file m_hash_map above
-    std::unordered_multimap<uint32_t, uint64_t> m_hash_to_id_map;
     // At the moment we need to keep decompressed strings around if they've been
     // returned to the caller, since we're handing
     // out StringData references to their storage. This is a temporary solution.
