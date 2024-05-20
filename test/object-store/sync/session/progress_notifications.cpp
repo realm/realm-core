@@ -162,24 +162,30 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
 
     SECTION("callback is invoked immediately when a progress update has already occurred") {
         progress.set_local_version(1);
-        progress.update(0, 0, 0, 0, 1, 1.0, 1.0, 0);
+        progress.update(0, 0, 0, 0, 1, 0.0, 0.0, 0);
 
         bool callback_was_called = false;
         SECTION("for upload notifications, with no data transfer ongoing") {
+            double estimate = 0.0;
             progress.register_callback(
-                [&](auto, auto, double) {
+                [&](auto, auto, double ep) {
                     callback_was_called = true;
+                    estimate = ep;
                 },
                 NotifierType::upload, false, 0);
             REQUIRE(callback_was_called);
+            REQUIRE(estimate == 0.0);
         }
 
         SECTION("for download notifications, with no data transfer ongoing") {
+            double estimate = 0.0;
             progress.register_callback(
-                [&](auto, auto, double) {
+                [&](auto, auto, double ep) {
                     callback_was_called = true;
+                    estimate = ep;
                 },
                 NotifierType::download, false, 0);
+            REQUIRE(estimate == 0.0);
         }
 
         SECTION("can register another notifier while in the initial notification without deadlock") {
