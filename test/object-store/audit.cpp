@@ -1097,7 +1097,7 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
                               "Audit partition prefix must not be empty");
             config.audit_config->partition_value_prefix = "/audit";
             REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
-                              "Invalid audit parition prefix '/audit': prefix must not contain slashes");
+                              "Invalid audit partition prefix '/audit': prefix must not contain slashes");
         }
         SECTION("invalid metadata") {
             config.audit_config->metadata = {{"", "a"}};
@@ -1881,11 +1881,11 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     }
 
     SECTION("flexible sync") {
-        app::FLXSyncTestHarness harness("audit");
+        app::FLXSyncTestHarness harness("audit", {schema});
         create_user_and_log_in(harness.app());
 
         SECTION("auditing a flexible sync realm without specifying an audit user throws an exception") {
-            SyncTestFile config(harness.app()->current_user(), {}, SyncConfig::FLXSyncEnabled{});
+            SyncTestFile config(harness.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
             config.audit_config = std::make_shared<AuditConfig>();
             REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), "partition-based sync");
         }
@@ -1904,6 +1904,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
             config.sync_config->user = harness.app()->current_user();
             config.sync_config->flx_sync_requested = true;
             config.sync_config->partition_value.clear();
+            config.schema_version = 0;
 
             auto realm = Realm::get_shared_realm(config);
             {
