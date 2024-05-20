@@ -186,6 +186,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                 },
                 NotifierType::download, false, 0);
             REQUIRE(estimate == 0.0);
+            REQUIRE(callback_was_called);
         }
 
         SECTION("can register another notifier while in the initial notification without deadlock") {
