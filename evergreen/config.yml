@@ -430,8 +430,10 @@ functions:
       script: |-
         if ls crash-*> /dev/null 2>&1; then
           echo "Found crash file"
+          #Rename the crash file and the realm file. 
+          #If there is a crash, this will signal that something needs to be uploaded.
           mv crash-* realm-fuzzer-crash.txt
-          mv fuzz-test.realm fuzzer_realm.realm
+          mv fuzz-realm.realm fuzzer_realm.realm
         fi
 
   - command: s3.put
@@ -452,8 +454,8 @@ functions:
       working_dir: realm-core/build/test/realm-fuzzer
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/build/test/realm-fuzzer/fuzzer_realm.realm'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/fuzzer_realm.realm'
+      local_file: 'realm-core/build/test/realm-fuzzer/fuzz-realm.realm'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/fuzz-realm.realm'
       bucket: mciuploads
       permissions: public-read
       content_type: application/x-binary
@@ -464,8 +466,9 @@ functions:
     params:
       working_dir: realm-core/build/test/realm-fuzzer
       script: |-
+        #remove the crash file and the realm produced by the fuzzer run
         rm realm-fuzzer-crash.txt
-        mv fuzzer_realm.realm fuzz-test.realm
+        rm fuzz-realm.realm
 
   "run hang analyzer":
   - command: shell.exec
