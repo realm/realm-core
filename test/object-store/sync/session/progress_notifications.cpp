@@ -336,7 +336,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             current_transferred = 150;
             current_transferrable = 1228;
             current_estimate = current_transferred / double(current_transferrable);
-            progress.update(current_transferred, current_transferrable, 199, 591, 1.0, current_estimate,
+            progress.update(current_transferred, current_transferrable, 199, 591, 1, current_estimate,
                             199 / double(591), 0);
             CHECK(!callback_was_called);
         }
