@@ -399,6 +399,7 @@ void Changeset::Reflector::operator()(const Instruction::Clear& p) const
 {
     m_tracer.name("Clear");
     path_instr(p);
+    m_tracer.field("collection_type", p.collection_type);
 }
 
 void Changeset::Reflector::operator()(const Instruction::SetInsert& p) const
