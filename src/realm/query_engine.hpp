@@ -186,7 +186,7 @@ public:
         return false;
     }
     
-    virtual size_t find_range(size_t start, size_t end, std::vector<ParentNode*>, QueryStateBase*)
+    virtual size_t find_range(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*)
     {
         return not_found;
     }
@@ -450,44 +450,43 @@ public:
         //TODO: the weights assigned during the query for this node are wrong at this point, because I am not
         //considering local_matches etc, so it is very likely that something could be broken.
         
-        size_t s = 0;
-        while(s < vs.size()) {
-            size_t matching_index = s;
-            for(; matching_index<vs.size(); ++matching_index)
-                if(cond(cond_value, vs[matching_index]))
-                    break; //found a match in position matching_index.
+        auto update_query_status = [st, &start, &vs](const auto position){
+            auto i = std::distance(vs.begin(), position);
+            return st->match(start + i);
+        };
+        
+        auto pos = vs.begin();
+        while(pos != vs.end()) {
+            
+            pos = std::find_if(pos, vs.end(), [&cond,&cond_value](const auto v){
+                return cond(v, cond_value);
+            });
             
             //nothing was found, just return
-            if(matching_index == vs.size())
-                return not_found;
+            if(pos == vs.end())
+                return end;
             
             //explore all the other query nodes
-            size_t node_matching = vs.size();
+            auto k = pos;
             for(size_t j=1; j<children.size(); ++j) {
                 const auto child_node = (IntegerNode*)children[j]; //bad cast
                 const auto child_cond = child_node->get_condition();
                 const auto child_cond_value = child_node->get_condition_value();
+                k = std::find_if(pos, vs.end(), [&child_cond, &child_cond_value](const auto v){
+                    return child_cond(v, child_cond_value);
+                });
                 
-                //find first match in [matching_index, end]
-                for(size_t k = matching_index; k<vs.size(); ++k)
-                    if(child_cond(child_cond_value, vs[k])) {
-                        node_matching = k;
-                        break;
-                    }
-                        
-                if(node_matching != matching_index) //there is no possible matching.
+                if(k != pos) //there is no possible matching.
                     break;
             }
             
-            if(node_matching == matching_index) {
-                //found 
-                bool cont = st->match(start + matching_index);
-                if (!cont) {
-                    return static_cast<size_t>(-1);
-                }
+            if(k == pos) {
+                //found
+                if(!update_query_status(pos))
+                    return not_found;
             }
             
-            s+=matching_index+1; //move starting point to next element that matched the first condition.
+            ++pos;
         }
         return not_found;
     }
@@ -831,7 +830,8 @@ public:
     {
         if constexpr(std::is_same_v<LeafType, ArrayInteger>)
         {
-            if(m_leaf->is_compressed() && end - start >= 32)
+            constexpr auto limit = 16;
+            if(m_leaf->is_compressed() && (end - start) >= limit)
             {
                 auto values = m_leaf->get_all(start, end);
                 for(const auto v : values) {
@@ -908,6 +908,20 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         Allocator& alloc = m_table.unchecked_ptr()->get_alloc();
+        
+        constexpr auto limit = 16;
+        if(m_leaf->is_compressed() && (end-start) >= limit) {
+            const auto refs = m_leaf->get_all(start, end);
+            auto ndx = start;
+            for(const auto ref : refs) {
+                int64_t sz = size_of_list_from_ref(ref, alloc, m_cached_col_type, m_cached_nullable);
+                if (TConditionFunction()(sz, m_value))
+                    return ndx;
+                ndx++;
+            }
+            return not_found;
+        }
+        
         for (size_t s = start; s < end; ++s) {
             if (ref_type ref = m_leaf->get(s)) {
                 int64_t sz = size_of_list_from_ref(ref, alloc, m_cached_col_type, m_cached_nullable);

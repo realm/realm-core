@@ -34,6 +34,8 @@ public:
     using Array::get_ref;
     using Array::size;
     using Array::erase;
+    using Array::is_compressed;
+    using Array::get_all;
 
     static ref_type default_value(bool)
     {
