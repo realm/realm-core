@@ -4972,11 +4972,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                                  {"firstName", PropertyType::String},
                                  {"lastName", PropertyType::String}}}};
 
-    constexpr size_t num_emps = 1000;
-    constexpr size_t num_mgrs = 50;
-    constexpr size_t num_dirs = 10;
-    constexpr size_t num_total = num_emps + num_mgrs + num_dirs;
-
     auto fill_person_schema = [](SharedRealm realm, std::string role, size_t count) {
         CppContext c(realm);
         for (size_t i = 0; i < count; ++i) {
@@ -5004,6 +4999,14 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         size_t dirs;
     };
 
+    struct TestParams {
+        size_t num_emps = 500;
+        size_t num_mgrs = 10;
+        size_t num_dirs = 5;
+        std::optional<size_t> num_objects = std::nullopt;
+        std::optional<size_t> sleep_millis = std::nullopt;
+    };
+
     TestingStateMachine<TestState> state_machina(TestState::not_ready);
     std::mutex callback_mutex;
     int64_t query_version = 0;
@@ -5014,8 +5017,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     bool role_change_bootstrap = false;
     auto logger = util::Logger::get_default_logger();
 
-    auto setup_harness = [&](FLXSyncTestHarness& harness, std::optional<size_t> num_objects = std::nullopt,
-                             std::optional<size_t> sleep_millis = std::nullopt) {
+    auto setup_harness = [&](FLXSyncTestHarness& harness, TestParams params) {
         auto& app_session = harness.session().app_session();
         /** TODO: Remove when switching to use Protocol version in RCORE-1972 */
         // Enable the role change bootstraps
@@ -5023,20 +5025,21 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
         REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
 
-        if (num_objects) {
+        if (params.num_objects) {
             REQUIRE(app_session.admin_api.patch_app_settings(
-                app_session.server_app_id, {{"sync", {{"num_objects_before_bootstrap_flush", *num_objects}}}}));
+                app_session.server_app_id,
+                {{"sync", {{"num_objects_before_bootstrap_flush", *params.num_objects}}}}));
         }
-        if (sleep_millis) {
+        if (params.sleep_millis) {
             REQUIRE(app_session.admin_api.patch_app_settings(
-                app_session.server_app_id, {{"sync", {{"download_loop_sleep_millis", *sleep_millis}}}}));
+                app_session.server_app_id, {{"sync", {{"download_loop_sleep_millis", *params.sleep_millis}}}}));
         }
 
         // Initialize the realm with some data
         harness.load_initial_data([&](SharedRealm realm) {
-            fill_person_schema(realm, "employee", num_emps);
-            fill_person_schema(realm, "manager", num_mgrs);
-            fill_person_schema(realm, "director", num_dirs);
+            fill_person_schema(realm, "employee", params.num_emps);
+            fill_person_schema(realm, "manager", params.num_mgrs);
+            fill_person_schema(realm, "director", params.num_dirs);
         });
     };
 
@@ -5139,11 +5142,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         auto table = check_realm->read_group().get_table("class_Person");
         REQUIRE(table->size() == (expected.emps + expected.mgrs + expected.dirs));
         auto role_col = table->get_column_key("role");
-        auto table_query = Query(table).equal(role_col, "director").Or().equal(role_col, "manager");
+        auto table_query = Query(table).equal(role_col, "employee");
         auto results = Results(check_realm, table_query);
-        CHECK(results.size() == (expected.mgrs + expected.dirs));
-        table_query = Query(table).equal(role_col, "employee");
-        results = Results(check_realm, table_query);
         CHECK(results.size() == expected.emps);
         table_query = Query(table).equal(role_col, "manager");
         results = Results(check_realm, table_query);
@@ -5234,13 +5234,12 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             rule["roles"][0]["document_filters"]["write"] = doc_filter;
         };
 
-        auto run_test = [&](nlohmann::json initial_rules, size_t intitial_cnt, nlohmann::json test_rules,
-                            ExpectedResults expected_results, std::optional<size_t> num_objects = std::nullopt,
-                            std::optional<size_t> sleep_millis = std::nullopt) {
+        auto run_test = [&](TestParams params, nlohmann::json initial_rules, size_t initial_count,
+                            nlohmann::json test_rules, ExpectedResults expected_results) {
             // Set up the test harness with the provided initial rules
             FLXSyncTestHarness harness("flx_role_change_bootstrap",
                                        {person_schema, {"role", "firstName", "lastName"}});
-            setup_harness(harness, num_objects, sleep_millis);
+            setup_harness(harness, params);
 
             // Get the current rules so it can be updated during the test
             auto& app_session = harness.session().app_session();
@@ -5257,7 +5256,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             auto realm = Realm::get_shared_realm(config);
             REQUIRE(!wait_for_download(*realm));
             REQUIRE(!wait_for_upload(*realm));
-            set_up_realm(realm, intitial_cnt);
+            set_up_realm(realm, initial_count);
 
             // Single message bootstrap - remove employees, keep mgrs/dirs
             update_role(default_rule, test_rules);
@@ -5267,37 +5266,28 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         SECTION("Single-message bootstrap") {
             // Single message bootstrap - remove employees, keep mgrs/dirs
             logger->info(">>>>> REMOVING EMPLOYEES");
-            run_test({}, num_total, {{"role", {{"$in", {"manager", "director"}}}}},
-                     {BootstrapMode::SingleMessage, 0, num_mgrs, num_dirs});
+            // 500 emps, 10 mgrs, 5 dirs
+            TestParams params{};
+            auto num_total = params.num_emps + params.num_mgrs + params.num_dirs;
+            run_test(params, {}, num_total, {{"role", {{"$in", {"manager", "director"}}}}},
+                     {BootstrapMode::SingleMessage, 0, params.num_mgrs, params.num_dirs});
         }
         SECTION("Multi-message bootstrap") {
             // Multi-message bootstrap - add employeees, remove managers and directors
             logger->info(">>>>> SWITCHING TO EMPLOYEES ONLY");
-            run_test({{"role", {{"$in", {"manager", "director"}}}}}, num_mgrs + num_dirs, {{"role", "employee"}},
-                     {BootstrapMode::MultiMessage, num_emps, 0, 0}, 10);
+            // 5000 emps, 100 mgrs, 25 dirs
+            TestParams params{5000, 100, 25, 10};
+            run_test(params, {{"role", {{"$in", {"manager", "director"}}}}}, params.num_mgrs + params.num_dirs,
+                     {{"role", "employee"}}, {BootstrapMode::MultiMessage, params.num_emps, 0, 0});
         }
         SECTION("Single-message/Multi-changeset bootstrap") {
             // Single message/multi-changeset bootstrap - add back managers and directors
             logger->info(">>>>> SWITCHING BACK TO ALL");
-            run_test({{"role", "employee"}}, num_emps, true,
-                     {BootstrapMode::SingleMessageMulti, num_emps, num_mgrs, num_dirs}, 10, 2000);
+            // 500 emps, 500 mgrs, 125 dirs
+            TestParams params{500, 500, 125, 100, 2000};
+            run_test(params, {{"role", "employee"}}, params.num_emps, true,
+                     {BootstrapMode::SingleMessageMulti, params.num_emps, params.num_mgrs, params.num_dirs});
         }
-        /*
-                {
-                    // Multi-message bootstrap - add employeees, remove managers and directors
-                    logger->info(">>>>> SWITCHING TO EMPLOYEES ONLY");
-                    update_role(default_rule, {{"role", "employee"}});
-                    expected_results = {BootstrapMode::MultiMessage, num_emps, 0, 0};
-                    update_perms_and_verify(harness, realm, default_rule, expected_results);
-                }
-                {
-                    // Single message bootstrap - add back managers and directors
-                    logger->info(">>>>> SWITCHING BACK TO ALL");
-                    update_role(default_rule, true);
-                    expected_results = {BootstrapMode::SingleMessageMulti, num_emps, num_mgrs, num_dirs};
-                    update_perms_and_verify(harness, realm, default_rule, expected_results);
-                }
-        */
     }
 }
 
