@@ -65,7 +65,7 @@ set_target_properties(Realm2JSON PROPERTIES
     OUTPUT_NAME "realm2json"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
-target_link_libraries(Realm2JSON Storage QueryParser Sync)
+target_link_libraries(Realm2JSON Sync QueryParser)
 list(APPEND ExecTargetsToInstall Realm2JSON)
 endif()
 
