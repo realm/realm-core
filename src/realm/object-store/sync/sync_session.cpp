@@ -1619,7 +1619,7 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
         // the total number of uploadable bytes available rather than the number of
         // bytes this NotifierPackage was waiting to upload.
         if (!is_download) {
-            estimate = std::min(transfered / double(transferable), 1.0);
+            estimate = transferable > 0 ? std::min(transfered / double(transferable), 1.0) : 0.0;
         }
     }
 

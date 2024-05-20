@@ -199,7 +199,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
     }
 
     SECTION("callback is invoked after each update for streaming notifiers") {
-        progress.update(0, 0, 0, 0, 1, 0, 0, 0);
+        progress.update(0, 0, 0, 0, 1, 0.0, 0.0, 0);
 
         bool callback_was_called = false;
         uint64_t transferred = 0;
@@ -329,7 +329,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             current_transferred = 150;
             current_transferrable = 1228;
             current_estimate = current_transferred / double(current_transferrable);
-            progress.update(current_transferred, current_transferrable, 199, 591, 1, current_estimate,
+            progress.update(current_transferred, current_transferrable, 199, 591, 1.0, current_estimate,
                             199 / double(591), 0);
             CHECK(!callback_was_called);
         }
@@ -349,11 +349,13 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             bool callback_was_called_2 = false;
             uint64_t transferred_2 = 0;
             uint64_t transferrable_2 = 0;
+            double upload_estimate = 0.0;
             progress.register_callback(
-                [&](auto xferred, auto xferable, double) {
+                [&](auto xferred, auto xferable, double ep) {
                     transferred_2 = xferred;
                     transferrable_2 = xferable;
                     callback_was_called_2 = true;
+                    upload_estimate = ep;
                 },
                 NotifierType::upload, true, 0);
             REQUIRE(callback_was_called_2);
@@ -365,16 +367,18 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             uint64_t current_uploadable = 201;
             uint64_t current_downloaded = 68;
             uint64_t current_downloadable = 182;
-            auto current_estimate = current_downloaded / double(current_downloadable);
+            auto current_down_estimate = current_downloaded / double(current_downloadable);
+            auto current_up_estimate = current_uploaded / double(current_uploadable);
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1,
-                            current_estimate, 1.0, 0);
+                            current_down_estimate, current_up_estimate, 0);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
             CHECK(transferrable == current_downloadable);
-            CHECK(estimate == current_estimate);
+            CHECK(estimate == current_down_estimate);
             CHECK(callback_was_called_2);
             CHECK(transferred_2 == current_uploaded);
             CHECK(transferrable_2 == current_uploadable);
+            CHECK(upload_estimate == current_up_estimate);
 
             // Second callback
             callback_was_called = false;
@@ -383,16 +387,18 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             current_uploadable = 329;
             current_downloaded = 76;
             current_downloadable = 191;
-            current_estimate = current_downloaded / double(current_downloadable);
+            current_down_estimate = current_downloaded / double(current_downloadable);
+            current_up_estimate = current_uploaded / double(current_uploadable);
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1,
-                            current_estimate, 1.0, 0);
+                            current_down_estimate, current_up_estimate, 0);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
             CHECK(transferrable == current_downloadable);
-            CHECK(estimate == current_estimate);
+            CHECK(estimate == current_down_estimate);
             CHECK(callback_was_called_2);
             CHECK(transferred_2 == current_uploaded);
             CHECK(transferrable_2 == current_uploadable);
+            CHECK(current_up_estimate == upload_estimate);
         }
     }
 
@@ -422,7 +428,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                     callback_was_called = true;
                 },
                 NotifierType::upload, false, 0);
-            // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -447,7 +452,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == original_transferrable);
-            CHECK(upload_estimate == std::min(1.0, current_transferred / double(original_transferrable)));
+            CHECK(upload_estimate == 1.0);
 
             // The notifier should be unregistered at this point, and not fire.
             callback_was_called = false;
@@ -505,7 +510,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                     callback_was_called = true;
                 },
                 NotifierType::download, false, 0);
-            // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -559,7 +563,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                     callback_was_called = true;
                 },
                 NotifierType::upload, false, 0);
-            // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -747,7 +750,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                     callback_was_called_2 = true;
                 },
                 NotifierType::download, false, 0);
-            // Wait for the initial callback.
             REQUIRE(callback_was_called_2);
 
             // Second callback, last one for first notifier
@@ -816,7 +818,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                     download_estimate = ep;
                 },
                 NotifierType::download, false, 0);
-            // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
             // Download some data but also drop the total. transferrable should
