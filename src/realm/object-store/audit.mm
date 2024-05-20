@@ -1427,7 +1427,7 @@ std::shared_ptr<AuditInterface> make_audit_context(std::shared_ptr<DB> db, Realm
         throw LogicError(ErrorCodes::InvalidName, "Audit partition prefix must not be empty");
     if (audit_config.partition_value_prefix.find_first_of("\\/") != std::string::npos)
         throw LogicError(ErrorCodes::InvalidName,
-                         util::format("Invalid audit parition prefix '%1': prefix must not contain slashes",
+                         util::format("Invalid audit partition prefix '%1': prefix must not contain slashes",
                                       audit_config.partition_value_prefix));
     return std::make_shared<AuditContext>(db, config, audit_config);
 }

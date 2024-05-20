@@ -250,7 +250,7 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
 
 int SyncServer::port() const
 {
-    return m_server.listen_endpoint().port();
+    return static_cast<int>(m_server.listen_endpoint().port());
 }
 
 struct WaitForSessionState {

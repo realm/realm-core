@@ -332,10 +332,10 @@ static void check_attach_and_read(const char* key, const std::string& path, size
         REALM_ASSERT_3(foo->where().equal(pk_col, util::format("name %1", num_entries - 1).c_str()).count(), ==, 1);
     }
     catch (const std::exception& e) {
-        size_t fs = File::get_size_static(path);
+        auto fs = File::get_size_static(path);
         util::format(std::cout, "Error for num_entries %1 with page_size of %2 on file of size %3\n%4", num_entries,
                      page_size(), fs, e.what());
-        throw e;
+        throw;
     }
 }
 
