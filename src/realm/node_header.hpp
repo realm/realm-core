@@ -208,7 +208,7 @@ public:
     static size_t unsigned_to_num_bits(uint64_t value)
     {
         if constexpr (sizeof(size_t) == sizeof(uint64_t))
-            return static_cast<size_t>(1) + log2(value);
+            return 1 + log2(static_cast<size_t>(value));
         uint32_t high = value >> 32;
         if (high)
             return 33 + log2(high);

@@ -693,7 +693,7 @@ inline size_t first_field_marked(size_t width, uint64_t vector)
 }
 
 template <typename VectorCompare>
-size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
+size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, uint8_t width,
                              uint64_t MSBs, uint64_t search_vector, size_t start, size_t end)
 {
     const auto field_count = num_fields_for_width(width);
