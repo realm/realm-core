@@ -133,7 +133,7 @@ void Node::alloc(size_t init_size, size_t new_width)
     }
     // update width (important when we convert from normal uncompressed array into compressed format)
     if (new_width != orig_width) {
-        set_width_in_header(int(new_width), header);
+        set_width_in_header(new_width, header);
     }
     set_size_in_header(init_size, header);
     m_size = init_size;

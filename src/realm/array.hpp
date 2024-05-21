@@ -553,8 +553,7 @@ protected:
     typedef void (Array::*Setter)(size_t, int64_t);
     typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
-
-    typedef std::vector<int64_t> (Array::*GetterAll)(size_t, size_t) const; // Note: getters must not throw
+    typedef std::vector<int64_t> (Array::*GetterAll)(size_t, size_t) const;
 
     struct VTable {
         Getter getter;

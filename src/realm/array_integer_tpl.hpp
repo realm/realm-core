@@ -87,16 +87,28 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
             value = null_value;
         }
 
-        if (is_compressed()) {
-            return Array::find<cond>(value, start2, end2, baseindex2, state);
+        constexpr auto limit = 16;
+        if (is_compressed() && (end2 - start2) >= limit) {
+            const auto& vs = get_all(start2, end2);
+            size_t ndx = 0;
+            for (const auto& v : vs) {
+                bool value_is_null = (v == null_value);
+                if (c(v, value, value_is_null, find_null)) {
+                    if (!state->match(start2 + ndx + baseindex2)) {
+                        return false; // tell caller to stop aggregating/search
+                    }
+                }
+                ndx += 1;
+            }
         }
-
-        for (size_t i = start2; i < end2; ++i) {
-            int64_t v = Array::get(i);
-            bool value_is_null = (v == null_value);
-            if (c(v, value, value_is_null, find_null)) {
-                if (!state->match(i + baseindex2)) {
-                    return false; // tell caller to stop aggregating/search
+        else {
+            for (size_t i = start2; i < end2; ++i) {
+                int64_t v = Array::get(i);
+                bool value_is_null = (v == null_value);
+                if (c(v, value, value_is_null, find_null)) {
+                    if (!state->match(i + baseindex2)) {
+                        return false; // tell caller to stop aggregating/search
+                    }
                 }
             }
         }

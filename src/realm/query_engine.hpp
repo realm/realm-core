@@ -500,9 +500,9 @@ public:
 
     size_t find_first_in_range_of_values(const std::vector<int64_t>& vs, size_t pos) const override
     {
-        static TConditionFunction child_cond;
         auto it = std::find_if(vs.begin() + pos, vs.end(), [this](const auto v) {
-            return child_cond(v, this->m_value);
+            static TConditionFunction cond;
+            return cond(v, this->m_value);
         });
         return std::distance(vs.begin(), it);
     }
@@ -920,11 +920,17 @@ public:
 
         constexpr auto limit = 16;
         if (m_leaf->is_compressed() && (end - start) >= limit) {
-            const auto refs = m_leaf->get_all(start, end);
+            auto vs = m_leaf->get_all(start, end);
+            std::vector<ref_type> refs;
+            refs.reserve(vs.size());
+            for (const auto& v : vs)
+                refs.push_back(to_ref(v));
+
+            const TConditionFunction cond;
             auto ndx = start;
             for (const auto ref : refs) {
                 int64_t sz = size_of_list_from_ref(ref, alloc, m_cached_col_type, m_cached_nullable);
-                if (TConditionFunction()(sz, m_value))
+                if (cond(sz, m_value))
                     return ndx;
                 ndx++;
             }

@@ -205,7 +205,7 @@ public:
         h[4] = h4;
     }
 
-    static size_t unsigned_to_num_bits(uint64_t value)
+    static uint8_t unsigned_to_num_bits(uint64_t value)
     {
         if constexpr (sizeof(size_t) == sizeof(uint64_t))
             return 1 + log2(static_cast<size_t>(value));
@@ -218,7 +218,7 @@ public:
         return 0;
     }
 
-    static inline size_t signed_to_num_bits(int64_t value)
+    static inline uint8_t signed_to_num_bits(int64_t value)
     {
         if (value >= 0)
             return 1 + unsigned_to_num_bits(value);
@@ -233,7 +233,7 @@ public:
 
     static inline size_t get_size_from_header(const char* header) noexcept;
 
-    static inline void set_width_in_header(uint8_t value, char* header) noexcept
+    static inline void set_width_in_header(size_t value, char* header) noexcept
     {
         REALM_ASSERT_DEBUG(!wtype_is_extended(header));
         // Pack width in 3 bits (log2)
