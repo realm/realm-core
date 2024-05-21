@@ -139,7 +139,7 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
     std::vector<size_t> indices;
     compress_values(origin, values, indices);
     if (!values.empty()) {
-        size_t v_width, ndx_width;
+        uint8_t v_width, ndx_width;
         const uint8_t flags = NodeHeader::get_flags(origin.get_header());
 
         if (encoding == Encoding::Packed) {
@@ -169,7 +169,7 @@ bool IntegerCompressor::compress(const Array& origin, Array& arr) const
     std::vector<size_t> indices;
     compress_values(origin, values, indices);
     if (!values.empty()) {
-        size_t v_width, ndx_width;
+        uint8_t v_width, ndx_width;
         const auto uncompressed_size = origin.get_byte_size();
         const auto packed_size = packed_disk_size(values, origin.size(), v_width);
         const auto flex_size = flex_disk_size(values, indices, v_width, ndx_width);
@@ -275,7 +275,7 @@ bool IntegerCompressor::init(const char* h)
 }
 
 size_t IntegerCompressor::flex_disk_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
-                                         size_t& v_width, size_t& ndx_width) const
+                                         uint8_t& v_width, uint8_t& ndx_width) const
 {
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     ndx_width = NodeHeader::unsigned_to_num_bits(values.size());
@@ -285,7 +285,7 @@ size_t IntegerCompressor::flex_disk_size(const std::vector<int64_t>& values, con
     return NodeHeader::calc_size(values.size(), indices.size(), v_width, ndx_width);
 }
 
-size_t IntegerCompressor::packed_disk_size(std::vector<int64_t>& values, size_t sz, size_t& v_width) const
+size_t IntegerCompressor::packed_disk_size(std::vector<int64_t>& values, size_t sz, uint8_t& v_width) const
 {
     using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
