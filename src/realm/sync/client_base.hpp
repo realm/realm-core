@@ -217,6 +217,9 @@ struct ClientConfig {
     /// requires pks for all tables, so this is now only applicable to old sync
     /// tests and so is disabled by default.
     bool fix_up_object_ids = false;
+
+    /// Treat connection failures as transient so they are not surfaced to the SDK.
+    bool sync_connect_failed_is_transient = false;
 };
 
 /// \brief Information about an error causing a session to be temporarily

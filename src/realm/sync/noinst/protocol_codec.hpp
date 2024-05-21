@@ -280,7 +280,7 @@ public:
                 auto json_raw = msg.read_sized_data<std::string_view>(message_size);
                 try {
                     auto json = nlohmann::json::parse(json_raw);
-                    logger.trace(util::LogCategory::session, "Error message encoded as json: %1", json_raw);
+                    logger.debug(util::LogCategory::session, "Error message encoded as json: %1", json_raw);
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.is_fatal = sync::IsFatal{!json["tryAgain"]};
                     info.message = json["message"];

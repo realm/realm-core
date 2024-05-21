@@ -52,6 +52,7 @@ if(REALM_ENABLE_SYNC)
         util/sync/baas_admin_api.hpp
         util/sync/session_util.hpp
         util/sync/sync_test_utils.hpp
+        util/sync/mockable_proxy_server.hpp
     )
     list(APPEND SOURCES
         bson.cpp
@@ -62,6 +63,7 @@ if(REALM_ENABLE_SYNC)
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
         util/sync/sync_test_utils.cpp
+        util/sync/mockable_proxy_server.cpp
     )
 
     if (REALM_APP_SERVICES)

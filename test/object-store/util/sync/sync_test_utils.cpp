@@ -19,6 +19,7 @@
 #include <util/sync/sync_test_utils.hpp>
 
 #include <util/sync/baas_admin_api.hpp>
+#include <util/sync/mockable_proxy_server.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -733,7 +734,11 @@ struct BaasFLXClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
-        wait_for_upload(*realm);
+        std::chrono::minutes wait_for_upload_timeout(1);
+        if (get_testing_sync_socket_provider()) {
+            wait_for_upload_timeout = std::chrono::minutes(5);
+        }
+        wait_for_upload(*realm, wait_for_upload_timeout);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }

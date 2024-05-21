@@ -256,7 +256,7 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
     {
     }
 
-    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+    std::unique_ptr<sync::WebSocketInterface> connect(util::UniqueFunction<void(sync::WebSocketEvent&&)> observer,
                                                       sync::WebSocketEndpoint&& endpoint) override
     {
         std::optional<SocketProviderError> error;
@@ -273,8 +273,9 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         }
 
         if (error && error->ws_error != sync::websocket::WebSocketError::websocket_ok) {
-            observer->websocket_error_handler();
-            observer->websocket_closed_handler(error->was_clean, error->ws_error, error->body);
+            observer(sync::WebSocketEvent{sync::WebSocketEvent::Error{}});
+            observer(
+                sync::WebSocketEvent{sync::WebSocketEvent::Close{error->was_clean, error->ws_error, error->body}});
             return nullptr;
         }
 

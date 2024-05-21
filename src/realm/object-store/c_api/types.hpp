@@ -822,9 +822,10 @@ struct realm_sync_socket : realm::c_api::WrapC, std::shared_ptr<realm::sync::Syn
     }
 };
 
-struct realm_websocket_observer : realm::c_api::WrapC, std::shared_ptr<realm::sync::WebSocketObserver> {
-    explicit realm_websocket_observer(std::shared_ptr<realm::sync::WebSocketObserver> ptr)
-        : std::shared_ptr<realm::sync::WebSocketObserver>(std::move(ptr))
+struct realm_websocket_observer : realm::c_api::WrapC {
+    using ObserverCb = realm::util::UniqueFunction<void(realm::sync::WebSocketEvent&&)>;
+    explicit realm_websocket_observer(ObserverCb&& observer)
+        : observer(std::make_shared<ObserverCb>(std::move(observer)))
     {
     }
 
@@ -836,10 +837,12 @@ struct realm_websocket_observer : realm::c_api::WrapC, std::shared_ptr<realm::sy
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_websocket_observer*>(&other)) {
-            return get() == ptr->get();
+            return observer.get() == ptr->observer.get();
         }
         return false;
     }
+
+    std::shared_ptr<ObserverCb> observer;
 };
 
 struct realm_sync_socket_callback : realm::c_api::WrapC,

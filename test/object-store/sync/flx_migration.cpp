@@ -318,7 +318,7 @@ TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas
     }
 }
 
-TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx migration][baas]") {
+TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx migration][baas][no network chaos]") {
     auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string partition = "migration-test";

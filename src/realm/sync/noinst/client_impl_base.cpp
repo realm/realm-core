@@ -152,6 +152,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_enable_default_port_hack{config.enable_default_port_hack}
     , m_disable_upload_compaction{config.disable_upload_compaction}
     , m_fix_up_object_ids{config.fix_up_object_ids}
+    , m_sync_connect_failed_is_transient{config.sync_connect_failed_is_transient}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_socket_provider{std::move(config.socket_provider)}
     , m_client_protocol{} // Throws
@@ -188,6 +189,7 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
+    logger.debug("Config param: sync_connect_failed_is_transient = %1", config.sync_connect_failed_is_transient);
     logger.debug(
         "Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3, jitter: 1/%4",
         m_reconnect_backoff_info.max_resumption_delay_interval.count(),
@@ -296,13 +298,7 @@ ClientImpl::SyncTrigger ClientImpl::create_trigger(SyncSocketProvider::FunctionH
     return std::make_unique<Trigger<ClientImpl>>(this, std::move(handler));
 }
 
-Connection::~Connection()
-{
-    if (m_websocket_sentinel) {
-        m_websocket_sentinel->destroyed = true;
-        m_websocket_sentinel.reset();
-    }
-}
+Connection::~Connection() {}
 
 void Connection::activate()
 {
@@ -484,11 +480,11 @@ void Connection::websocket_connected_handler(const std::string& protocol)
 }
 
 
-bool Connection::websocket_binary_message_received(util::Span<const char> data)
+void Connection::websocket_binary_message_received(util::Span<const char> data)
 {
     if (m_force_closed) {
         logger.debug("Received binary message after connection was force closed");
-        return false;
+        return;
     }
 
     using sf = SimulatedFailure;
@@ -496,11 +492,10 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
         close_due_to_client_side_error(
             {ErrorCodes::RuntimeError, "Simulated failure during sync client websocket read"}, IsFatal{false},
             ConnectionTerminationReason::read_or_write_error);
-        return bool(m_websocket);
+        return;
     }
 
     handle_message_received(data);
-    return bool(m_websocket);
 }
 
 
@@ -509,17 +504,21 @@ void Connection::websocket_error_handler()
     m_websocket_error_received = true;
 }
 
-bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_code, std::string_view msg)
+void Connection::websocket_closed_handler(bool was_clean, WebSocketError error_code, std::string_view msg)
 {
     if (m_force_closed) {
         logger.debug("Received websocket close message after connection was force closed");
-        return false;
     }
     logger.info("Closing the websocket with error code=%1, message='%2', was_clean=%3", error_code, msg, was_clean);
 
     switch (error_code) {
-        case WebSocketError::websocket_ok:
+        case WebSocketError::websocket_ok: {
+            SessionErrorInfo error_info(
+                {ErrorCodes::ConnectionClosed, util::format("sync connection was closed: %1", msg)}, IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+            involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::server_said_try_again_later);
             break;
+        }
         case WebSocketError::websocket_resolve_failed:
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
@@ -529,6 +528,9 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             // to make sure the websocket URL is correct
             if (!m_server_endpoint.is_verified) {
                 error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+            }
+            if (m_client.m_sync_connect_failed_is_transient) {
+                error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
             }
             involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::connect_operation_failed);
             break;
@@ -638,8 +640,6 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
     }
-
-    return bool(m_websocket);
 }
 
 // Guarantees that handle_reconnect_wait() is never called from within the
@@ -698,63 +698,12 @@ void Connection::handle_reconnect_wait(Status status)
         initiate_reconnect(); // Throws
 }
 
-struct Connection::WebSocketObserverShim : public sync::WebSocketObserver {
-    explicit WebSocketObserverShim(Connection* conn)
-        : conn(conn)
-        , sentinel(conn->m_websocket_sentinel)
-    {
-    }
-
-    Connection* conn;
-    util::bind_ptr<LifecycleSentinel> sentinel;
-
-    void websocket_connected_handler(const std::string& protocol) override
-    {
-        if (sentinel->destroyed) {
-            return;
-        }
-
-        return conn->websocket_connected_handler(protocol);
-    }
-
-    void websocket_error_handler() override
-    {
-        if (sentinel->destroyed) {
-            return;
-        }
-
-        conn->websocket_error_handler();
-    }
-
-    bool websocket_binary_message_received(util::Span<const char> data) override
-    {
-        if (sentinel->destroyed) {
-            return false;
-        }
-
-        return conn->websocket_binary_message_received(data);
-    }
-
-    bool websocket_closed_handler(bool was_clean, WebSocketError error_code, std::string_view msg) override
-    {
-        if (sentinel->destroyed) {
-            return true;
-        }
-
-        return conn->websocket_closed_handler(was_clean, error_code, msg);
-    }
-};
-
 void Connection::initiate_reconnect()
 {
     REALM_ASSERT(m_activated);
 
     m_state = ConnectionState::connecting;
     report_connection_state_change(ConnectionState::connecting); // Throws
-    if (m_websocket_sentinel) {
-        m_websocket_sentinel->destroyed = true;
-    }
-    m_websocket_sentinel = util::make_bind<LifecycleSentinel>();
     m_websocket.reset();
 
     // Watchdog
@@ -778,21 +727,41 @@ void Connection::initiate_reconnect()
                 m_server_endpoint.port, m_http_request_path_prefix);
 
     m_websocket_error_received = false;
-    m_websocket =
-        m_client.m_socket_provider->connect(std::make_unique<WebSocketObserverShim>(this),
-                                            WebSocketEndpoint{
-                                                m_server_endpoint.address,
-                                                m_server_endpoint.port,
-                                                get_http_request_path(),
-                                                std::move(sec_websocket_protocol),
-                                                is_ssl(m_server_endpoint.envelope),
-                                                /// DEPRECATED - The following will be removed in a future release
-                                                {m_custom_http_headers.begin(), m_custom_http_headers.end()},
-                                                m_verify_servers_ssl_certificate,
-                                                m_ssl_trust_certificate_path,
-                                                m_ssl_verify_callback,
-                                                m_proxy_config,
-                                            });
+
+    auto observer = [this](WebSocketEvent&& event) {
+        using Event = WebSocketEvent;
+        mpark::visit(overload{
+                         [&](const Event::Close& close) {
+                             websocket_closed_handler(close.was_clean, close.error_code, close.message);
+                         },
+                         [&](const Event::Error&) {
+                             websocket_error_handler();
+                         },
+                         [&](const Event::Message& message) {
+                             websocket_binary_message_received(message.bytes);
+                         },
+                         [&](const Event::Open& open) {
+                             websocket_connected_handler(std::string{open.protocol});
+                         },
+                     },
+                     event.event);
+    };
+
+    logger.debug("assigning websocket");
+    m_websocket = m_client.m_socket_provider->connect(
+        std::move(observer), WebSocketEndpoint{
+                                 m_server_endpoint.address,
+                                 m_server_endpoint.port,
+                                 get_http_request_path(),
+                                 std::move(sec_websocket_protocol),
+                                 is_ssl(m_server_endpoint.envelope),
+                                 /// DEPRECATED - The following will be removed in a future release
+                                 {m_custom_http_headers.begin(), m_custom_http_headers.end()},
+                                 m_verify_servers_ssl_certificate,
+                                 m_ssl_trust_certificate_path,
+                                 m_ssl_verify_callback,
+                                 m_proxy_config,
+                             });
 }
 
 
@@ -974,14 +943,11 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
     if (m_websocket_error_received)
         return;
 
-    m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](Status status) {
-        if (sentinel->destroyed) {
-            return;
-        }
+    m_websocket->async_write_binary(out.as_span(), [this](Status status) {
         if (!status.is_ok()) {
             if (status != ErrorCodes::Error::OperationAborted) {
                 // Write errors will be handled by the websocket_write_error_handler() callback
-                logger.error("Connection: write failed %1: %2", status.code_string(), status.reason());
+                logger.error("Connection: write failed %1", status);
             }
             return;
         }
@@ -1059,14 +1025,11 @@ void Connection::send_ping()
 
 void Connection::initiate_write_ping(const OutputBuffer& out)
 {
-    m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](Status status) {
-        if (sentinel->destroyed) {
-            return;
-        }
+    m_websocket->async_write_binary(out.as_span(), [this](Status status) {
         if (!status.is_ok()) {
             if (status != ErrorCodes::Error::OperationAborted) {
                 // Write errors will be handled by the websocket_write_error_handler() callback
-                logger.error("Connection: send ping failed %1: %2", status.code_string(), status.reason());
+                logger.error("Connection: send ping failed %1", status);
             }
             return;
         }
@@ -1210,8 +1173,7 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_heartbeat_timer.reset();
     m_previous_ping_rtt = 0;
 
-    m_websocket_sentinel->destroyed = true;
-    m_websocket_sentinel.reset();
+    logger.debug("Resetting websocket");
     m_websocket.reset();
     m_input_body_buffer.reset();
     m_sending_session = nullptr;

@@ -18,6 +18,7 @@
 
 #include "collection_fixtures.hpp"
 #include "util/sync/baas_admin_api.hpp"
+#include "util/sync/mockable_proxy_server.hpp"
 #include "util/sync/sync_test_utils.hpp"
 #include "util/test_path.hpp"
 #include "util/unit_test_transport.hpp"
@@ -2682,6 +2683,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 
     SECTION("Expired Tokens") {
+        DisableNetworkChaosGuard network_chaos_guard;
         sync::AccessToken token;
         {
             std::shared_ptr<User> user = app->current_user();

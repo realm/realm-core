@@ -881,8 +881,9 @@ private:
 
         m_config.websocket_handshake_completion_handler(response.headers);
 
-        if (m_stopped)
+        if (m_stopped) {
             return;
+        }
 
         frame_reader_loop();
     }

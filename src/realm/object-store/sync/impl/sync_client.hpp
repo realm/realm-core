@@ -61,6 +61,7 @@ struct SyncClient {
             c.socket_provider = m_socket_provider;
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
+            c.sync_connect_failed_is_transient = config.sync_connect_failed_is_transient;
 
             // Only set the timeouts if they have sensible values
             if (config.timeouts.connect_timeout >= 1000)

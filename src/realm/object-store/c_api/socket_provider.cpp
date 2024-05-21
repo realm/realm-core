@@ -6,6 +6,7 @@
 
 namespace realm::c_api {
 namespace {
+using WebSocketEvent = sync::WebSocketEvent;
 
 // THis class represents the timer resource that is returned to the sync client from the
 // CAPI implementation details for canceling and deleting the timer resources.
@@ -137,41 +138,6 @@ private:
     realm_sync_socket_websocket_free_func_t m_websocket_free = nullptr;
 };
 
-// Represents the websocket observer in the sync client that receives websocket status
-// callbacks and passes them along to the WebSocketObserver object.
-struct CAPIWebSocketObserver : sync::WebSocketObserver {
-public:
-    CAPIWebSocketObserver(std::unique_ptr<sync::WebSocketObserver> observer)
-        : m_observer(std::move(observer))
-    {
-        REALM_ASSERT_EX(m_observer, "WebSocketObserver cannot be null");
-    }
-
-    ~CAPIWebSocketObserver() = default;
-
-    void websocket_connected_handler(const std::string& protocol) final
-    {
-        m_observer->websocket_connected_handler(protocol);
-    }
-
-    void websocket_error_handler() final
-    {
-        m_observer->websocket_error_handler();
-    }
-
-    bool websocket_binary_message_received(util::Span<const char> data) final
-    {
-        return m_observer->websocket_binary_message_received(data);
-    }
-
-    bool websocket_closed_handler(bool was_clean, sync::websocket::WebSocketError code, std::string_view msg) final
-    {
-        return m_observer->websocket_closed_handler(was_clean, code, msg);
-    }
-
-private:
-    std::unique_ptr<sync::WebSocketObserver> m_observer;
-};
 
 // This is the primary resource for providing event loop, timer and websocket
 // resources and synchronization for the Sync Client. The CAPI implementation
@@ -223,12 +189,11 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
     // Create a websocket object that will be returned to the Sync Client, which is expected to
     // begin connecting to the endpoint as soon as the object is created. The state and any data
     // received is passed to the socket observer via the helper functions defined below this class.
-    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+    std::unique_ptr<sync::WebSocketInterface> connect(util::UniqueFunction<void(WebSocketEvent&&)> observer,
                                                       sync::WebSocketEndpoint&& endpoint) final
     {
-        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(std::move(observer));
         return std::make_unique<CAPIWebSocket>(m_userdata, m_websocket_connect, m_websocket_async_write,
-                                               m_websocket_free, new realm_websocket_observer_t(capi_observer),
+                                               m_websocket_free, new realm_websocket_observer_t(std::move(observer)),
                                                std::move(endpoint));
     }
 
@@ -288,13 +253,13 @@ RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* r
                                                    const char* protocol)
 {
     if (realm_websocket_observer)
-        realm_websocket_observer->get()->websocket_connected_handler(protocol);
+        (*realm_websocket_observer->observer)(WebSocketEvent{WebSocketEvent::Open{std::string{protocol}}});
 }
 
 RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm_websocket_observer)
 {
     if (realm_websocket_observer)
-        realm_websocket_observer->get()->websocket_error_handler();
+        (*realm_websocket_observer->observer)(WebSocketEvent{WebSocketEvent::Error{}});
 }
 
 RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
@@ -303,7 +268,8 @@ RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
     if (!realm_websocket_observer)
         return false;
 
-    return realm_websocket_observer->get()->websocket_binary_message_received(util::Span{data, data_size});
+    (*realm_websocket_observer->observer)(WebSocketEvent{WebSocketEvent::Message{util::Span{data, data_size}}});
+    return true;
 }
 
 RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
@@ -312,8 +278,9 @@ RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* real
     if (!realm_websocket_observer)
         return false;
 
-    return realm_websocket_observer->get()->websocket_closed_handler(
-        was_clean, static_cast<sync::websocket::WebSocketError>(code), reason);
+    (*realm_websocket_observer->observer)(
+        WebSocketEvent{WebSocketEvent::Close{was_clean, static_cast<sync::websocket::WebSocketError>(code), reason}});
+    return false;
 }
 
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t* config,

@@ -36,7 +36,32 @@ enum class WebSocketError;
 
 struct WebSocketEndpoint;
 struct WebSocketInterface;
-struct WebSocketObserver;
+// A struct representing the possible events a WebSocket produced by a SyncSocketProvider
+// can observe.
+struct WebSocketEvent {
+    struct Close {
+        bool was_clean;
+        websocket::WebSocketError error_code;
+        std::string_view message;
+    };
+
+    struct Error {};
+
+    struct Message {
+        util::Span<const char> bytes;
+    };
+
+    struct Open {
+        std::string_view protocol;
+    };
+
+    bool is_terminal_event() const noexcept
+    {
+        return mpark::holds_alternative<Close>(event) || mpark::holds_alternative<Error>(event);
+    }
+
+    mpark::variant<Close, Error, Message, Open> event;
+};
 
 /// Sync Socket Provider interface that provides the event loop and WebSocket
 /// factory used by the SyncClient.
@@ -94,12 +119,8 @@ public:
     /// a thread, the thread must be joined as part of this operation.
     virtual ~SyncSocketProvider() = default;
 
-    /// Create a new websocket pointed to the server indicated by endpoint and
-    /// connect to the server. Any events that occur during the execution of the
-    /// websocket will call directly to the handlers provided by the observer.
-    /// The WebSocketObserver guarantees that the WebSocket object will be
-    /// closed/destroyed before the observer is terminated/destroyed.
-    virtual std::unique_ptr<WebSocketInterface> connect(std::unique_ptr<WebSocketObserver> observer,
+
+    virtual std::unique_ptr<WebSocketInterface> connect(util::UniqueFunction<void(WebSocketEvent&&)> observer,
                                                         WebSocketEndpoint&& endpoint) = 0;
 
     /// Submit a handler function to be executed by the event loop (thread).
@@ -204,53 +225,5 @@ struct WebSocketInterface {
     virtual void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) = 0;
 };
 
-
-/// WebSocket observer interface in the SyncClient that receives the websocket
-/// events during operation.
-struct WebSocketObserver {
-    virtual ~WebSocketObserver() = default;
-
-    /// Called when the websocket is connected, i.e. after the handshake is done.
-    /// The Sync Client is not allowed to send messages on the socket before the
-    /// handshake is complete and no message_received callbacks will be called
-    /// before the handshake is done.
-    ///
-    /// @param protocol The negotiated subprotocol value returned by the server
-    virtual void websocket_connected_handler(const std::string& protocol) = 0;
-
-    /// Called when an error occurs while establishing the WebSocket connection
-    /// to the server or during normal operations. No additional binary messages
-    /// will be processed after this function is called.
-    virtual void websocket_error_handler() = 0;
-
-    /// Called whenever a full message has arrived. The WebSocket implementation
-    /// is responsible for defragmenting fragmented messages internally and
-    /// delivering a full message to the Sync Client.
-    ///
-    /// @param data A util::Span containing the data received from the server.
-    ///             The buffer is only valid until the function returns.
-    ///
-    /// @return bool designates whether the WebSocket object should continue
-    ///         processing messages. The normal return value is true . False must
-    ///         be returned if the websocket object has been destroyed during
-    ///         execution of the function.
-    virtual bool websocket_binary_message_received(util::Span<const char> data) = 0;
-
-    /// Called whenever the WebSocket connection has been closed, either as a result
-    /// of a WebSocket error or a normal close.
-    ///
-    /// @param was_clean Was the TCP connection closed after the WebSocket closing
-    ///                  handshake was completed.
-    /// @param error_code The error code received or synthesized when the websocket was closed.
-    /// @param message    The message received in the close frame when the websocket was closed.
-    ///
-    /// @return bool designates whether the WebSocket object has been destroyed
-    ///         during the execution of this function. The normal return value is
-    ///         True to indicate the WebSocket object is no longer valid. If False
-    ///         is returned, the WebSocket object will be destroyed at some point
-    ///         in the future.
-    virtual bool websocket_closed_handler(bool was_clean, websocket::WebSocketError error_code,
-                                          std::string_view message) = 0;
-};
 
 } // namespace realm::sync

@@ -63,7 +63,8 @@ public:
     /// Stops the internal event loop (provided by network::Service)
     void stop(bool wait_for_stop = false) override;
 
-    std::unique_ptr<WebSocketInterface> connect(std::unique_ptr<WebSocketObserver>, WebSocketEndpoint&&) override;
+    std::unique_ptr<WebSocketInterface> connect(util::UniqueFunction<void(WebSocketEvent&&)> observer,
+                                                        WebSocketEndpoint&& endpoint) override;
 
     void post(FunctionHandler&& handler) override
     {
