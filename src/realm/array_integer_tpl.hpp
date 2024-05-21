@@ -86,12 +86,11 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
         else {
             value = null_value;
         }
-        
-        if(is_compressed())
-        {
+
+        if (is_compressed()) {
             return Array::find<cond>(value, start2, end2, baseindex2, state);
         }
-        
+
         for (size_t i = start2; i < end2; ++i) {
             int64_t v = Array::get(i);
             bool value_is_null = (v == null_value);

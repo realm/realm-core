@@ -182,20 +182,21 @@ public:
 
     virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
-    virtual bool is_compressed() const {
+    virtual bool is_compressed() const
+    {
         return false;
     }
-    
+
     virtual size_t find_first_in_range_of_values(const std::vector<int64_t>&, size_t) const
     {
         return not_found;
     }
-    
+
     virtual size_t find_range(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*)
     {
         return not_found;
     }
-    
+
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     virtual size_t find_all_local(size_t start, size_t end);
 
@@ -424,9 +425,10 @@ template <class LeafType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<LeafType> {
     using BaseType = IntegerNodeBase<LeafType>;
     using ThisType = IntegerNode<LeafType, TConditionFunction>;
+
 public:
     using TConditionValue = typename BaseType::TConditionValue;
-   
+
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
     {
@@ -435,73 +437,77 @@ public:
         : BaseType(from)
     {
     }
-    
+
     bool is_compressed() const override
     {
         return this->m_leaf->is_compressed();
     }
-    
-    virtual size_t find_range(size_t start, size_t end, std::vector<ParentNode*> children, QueryStateBase* st) override
+
+    virtual size_t find_range(size_t start, size_t end, std::vector<ParentNode*> children,
+                              QueryStateBase* st) override
     {
-        //if we are here, we have a range query for a compressed array.
+        // if we are here, we have a range query for a compressed array.
         const auto vs = this->m_leaf->get_all(start, end);
-        
-        
-        //TODO: Evaluate if it makes sense to setup weights for this query node, since for compressed arrays all the logic is not really needed, since when we call aggregate local, if the array is compressed, we either extract all the values and process them or we jump into a specialised search (in this case probably the weights have some sense)
-        
-        auto update_query_status = [st, &start](const auto position){
+
+
+        // TODO: Evaluate if it makes sense to setup weights for this query node, since for compressed arrays all the
+        // logic is not really needed, since when we call aggregate local, if the array is compressed, we either
+        // extract all the values and process them or we jump into a specialised search (in this case probably the
+        // weights have some sense)
+
+        auto update_query_status = [st, &start](const auto position) {
             return st->match(start + position);
         };
-        
+
         auto pos = vs.begin();
         const TConditionFunction cond;
-        while(pos != vs.end()) {
-            
-            pos = std::find_if(pos, vs.end(), [&cond,this](const auto v){
+        while (pos != vs.end()) {
+
+            pos = std::find_if(pos, vs.end(), [&cond, this](const auto v) {
                 return cond(v, this->m_value);
             });
-            
-            //nothing was found, just return
-            if(pos == vs.end())
+
+            // nothing was found, just return
+            if (pos == vs.end())
                 return end;
-            
-            //explore all the other query nodes
+
+            // explore all the other query nodes
             auto m = std::distance(vs.begin(), pos);
             auto k = m;
-            for(size_t j=1; j<children.size(); ++j) {
+            for (size_t j = 1; j < children.size(); ++j) {
                 k = children[j]->find_first_in_range_of_values(vs, m);
-                if(k != m) //there is no possible matching.
+                if (k != m) // there is no possible matching.
                     break;
             }
-            if(k == m && !update_query_status(m)) {
+            if (k == m && !update_query_status(m)) {
                 return not_found;
             }
             ++pos;
         }
         return not_found;
     }
-    
+
     TConditionFunction get_condition() const
     {
         return TConditionFunction{};
     }
-    
+
     TConditionValue get_condition_value() const
     {
         return this->m_value;
     }
-    
-    
+
+
     size_t find_first_in_range_of_values(const std::vector<int64_t>& vs, size_t pos) const override
     {
         static TConditionFunction child_cond;
-        auto it = std::find_if(vs.begin() + pos, vs.end(), [this](const auto v){
+        auto it = std::find_if(vs.begin() + pos, vs.end(), [this](const auto v) {
             return child_cond(v, this->m_value);
         });
         return std::distance(vs.begin(), it);
     }
-    
-    
+
+
     size_t find_first_local(size_t start, size_t end) override
     {
         return this->m_leaf->template find_first<TConditionFunction>(this->m_value, start, end);
@@ -563,7 +569,7 @@ template <size_t linear_search_threshold, class LeafType, class NeedleContainer>
 static size_t find_all_haystack(LeafType& leaf, NeedleContainer& needles, size_t start, size_t end,
                                 QueryStateBase* state)
 {
-    
+
     if constexpr (std::is_same_v<LeafType, ArrayInteger>) {
         if (needles.size() >= linear_search_threshold && leaf.is_compressed()) {
             const auto& values = leaf.get_all(start, end);
@@ -575,7 +581,7 @@ static size_t find_all_haystack(LeafType& leaf, NeedleContainer& needles, size_t
             }
         }
     }
-    
+
     if (needles.size() < linear_search_threshold) {
         for (size_t i = start; i < end; ++i) {
             auto element = leaf.get(i);
@@ -687,7 +693,7 @@ public:
 
         return s;
     }
-    
+
     size_t find_all_local(size_t start, size_t end) override
     {
         if (m_nb_needles) {
@@ -828,13 +834,11 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        if constexpr(std::is_same_v<LeafType, ArrayInteger>)
-        {
+        if constexpr (std::is_same_v<LeafType, ArrayInteger>) {
             constexpr auto limit = 16;
-            if(m_leaf->is_compressed() && (end - start) >= limit)
-            {
+            if (m_leaf->is_compressed() && (end - start) >= limit) {
                 auto values = m_leaf->get_all(start, end);
-                for(const auto v : values) {
+                for (const auto v : values) {
                     int64_t sz = v.size();
                     if (TConditionFunction()(sz, m_value))
                         return start;
@@ -842,8 +846,7 @@ public:
                 }
             }
         }
-        else
-        {
+        else {
             for (size_t s = start; s < end; ++s) {
                 if (T v = m_leaf->get(s)) {
                     int64_t sz = v.size();
@@ -851,7 +854,6 @@ public:
                         return s;
                 }
             }
-            
         }
         return not_found;
     }
@@ -908,12 +910,12 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         Allocator& alloc = m_table.unchecked_ptr()->get_alloc();
-        
+
         constexpr auto limit = 16;
-        if(m_leaf->is_compressed() && (end-start) >= limit) {
+        if (m_leaf->is_compressed() && (end - start) >= limit) {
             const auto refs = m_leaf->get_all(start, end);
             auto ndx = start;
-            for(const auto ref : refs) {
+            for (const auto ref : refs) {
                 int64_t sz = size_of_list_from_ref(ref, alloc, m_cached_col_type, m_cached_nullable);
                 if (TConditionFunction()(sz, m_value))
                     return ndx;
@@ -921,7 +923,7 @@ public:
             }
             return not_found;
         }
-        
+
         for (size_t s = start; s < end; ++s) {
             if (ref_type ref = m_leaf->get(s)) {
                 int64_t sz = size_of_list_from_ref(ref, alloc, m_cached_col_type, m_cached_nullable);

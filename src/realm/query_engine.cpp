@@ -103,34 +103,33 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     if (m_children.size() == 1) {
         return find_all_local(start, end);
     }
-    
+
     bool is_compressed = false;
-    if(m_children.size() > 1)
-    {
-        //TODO: this is temporary solution. And it is not ok. We need a new special node that is constucted when a new list of arguments is passed into the query, e.g Greater/Less (range query), but the same applies or should apply to Less/Less, Greater/Greater or Less/Greater
-        
-        for(const auto& c : m_children) {
+    if (m_children.size() > 1) {
+        // TODO: this is temporary solution. And it is not ok. We need a new special node that is constucted when a
+        // new list of arguments is passed into the query, e.g Greater/Less (range query), but the same applies or
+        // should apply to Less/Less, Greater/Greater or Less/Greater
+
+        for (const auto& c : m_children) {
             is_compressed = c->is_compressed();
-            if(!is_compressed)
+            if (!is_compressed)
                 break;
         }
     }
-    
-    if(is_compressed)
-    {
-        //all the data is compressed. So we run the custom logic here.
-        //TODO: have a node that understands and creates a range node query runner.
+
+    if (is_compressed) {
+        // all the data is compressed. So we run the custom logic here.
+        // TODO: have a node that understands and creates a range node query runner.
         return find_range(start, end, m_children, st);
     }
-    else
-    {
+    else {
         size_t r = start - 1;
         for (;;) {
             if (local_matches == local_limit) {
                 m_dD = double(r - start) / (local_matches + 1.1);
                 return r + 1;
             }
-            
+
             // Find first match in this condition node
             auto pos = r + 1;
             r = find_first_local(pos, end);
@@ -138,21 +137,21 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
                 m_dD = double(pos - start) / (local_matches + 1.1);
                 return end;
             }
-            
+
             local_matches++;
-            
+
             // Find first match in remaining condition nodes
             size_t m = r;
-            
+
             for (size_t c = 1; c < m_children.size(); c++) {
                 m = m_children[c]->find_first_local(r, r + 1);
                 if (m != r) {
                     break;
                 }
             }
-            
-            // If index of first match in this node equals index of first match in all remaining nodes, we have a final
-            // match
+
+            // If index of first match in this node equals index of first match in all remaining nodes, we have a
+            // final match
             if (m == r) {
                 bool cont = st->match(r);
                 if (!cont) {
