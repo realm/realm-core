@@ -454,8 +454,8 @@ functions:
       working_dir: realm-core/build/test/realm-fuzzer
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/build/test/realm-fuzzer/fuzz-realm.realm'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/fuzz-realm.realm'
+      local_file: 'realm-core/build/test/realm-fuzzer/fuzzer_realm.realm'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/fuzzer_realm.realm'
       bucket: mciuploads
       permissions: public-read
       content_type: application/x-binary
@@ -468,7 +468,7 @@ functions:
       script: |-
         #remove the crash file and the realm produced by the fuzzer run
         rm realm-fuzzer-crash.txt
-        rm fuzz-realm.realm
+        rm fuzzer_realm.realm
 
   "run hang analyzer":
   - command: shell.exec
