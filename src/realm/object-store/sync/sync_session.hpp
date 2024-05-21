@@ -55,12 +55,13 @@ public:
     using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes,
                                           double progress_estimate);
 
-    uint64_t register_callback(std::function<ProgressNotifierCallback>, NotifierType direction, bool is_streaming);
+    uint64_t register_callback(std::function<ProgressNotifierCallback>, NotifierType direction, bool is_streaming,
+                               int64_t pending_query_version);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
     void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
-                uint64_t snapshot_version, double download_estimate = 1.0, double upload_estimate = 1.0);
+                uint64_t snapshot_version, double download_estimate, double upload_estimate, int64_t query_version);
 
 private:
     mutable std::mutex m_mutex;
@@ -74,6 +75,7 @@ private:
         double upload_estimate;
         double download_estimate;
         uint64_t snapshot_version;
+        int64_t query_version;
     };
 
     // A PODS encapsulating some information for progress notifier callbacks a binding
@@ -83,11 +85,9 @@ private:
         uint64_t snapshot_version;
         bool is_streaming;
         bool is_download;
-        bool started_notifying = false;
-        uint64_t initial_transferred = 0;
+        int64_t pending_query_version = 0;
         std::optional<uint64_t> captured_transferable;
-        util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired,
-                                                       bool initial_registration = false);
+        util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired);
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.
@@ -175,7 +175,7 @@ public:
     // Note that bindings should dispatch the callback onto a separate thread or queue
     // in order to avoid blocking the sync client.
     uint64_t register_progress_notifier(std::function<ProgressNotifierCallback>&&, ProgressDirection,
-                                        bool is_streaming);
+                                        bool is_streaming) REQUIRES(!m_state_mutex);
 
     // Unregister a previously registered notifier. If the token is invalid,
     // this method does nothing.
@@ -423,7 +423,7 @@ private:
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
-    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, double, double);
+    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, double, double, int64_t);
     void handle_new_flx_sync_query(int64_t version);
 
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
