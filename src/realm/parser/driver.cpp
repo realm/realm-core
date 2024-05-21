@@ -127,34 +127,7 @@ inline bool try_parse_specials(std::string str, T& ret)
 }
 
 template <typename T>
-inline const char* get_type_name()
-{
-    return "unknown";
-}
-template <>
-inline const char* get_type_name<int64_t>()
-{
-    return "number";
-}
-template <>
-inline const char* get_type_name<float>()
-{
-    return "floating point number";
-}
-template <>
-inline const char* get_type_name<double>()
-{
-    return "floating point number";
-}
-
-template <>
-inline const char* get_type_name<Decimal128>()
-{
-    return "decimal number";
-}
-
-template <typename T>
-inline T string_to(const std::string& s)
+inline std::optional<T> string_to(const std::string& s)
 {
     std::istringstream iss(s);
     iss.imbue(std::locale::classic());
@@ -162,18 +135,18 @@ inline T string_to(const std::string& s)
     iss >> value;
     if (iss.fail()) {
         if (!try_parse_specials(s, value)) {
-            throw InvalidQueryArgError(util::format("Cannot convert '%1' to a %2", s, get_type_name<T>()));
+            return {};
         }
     }
     return value;
 }
 
 template <>
-inline Decimal128 string_to<Decimal128>(const std::string& s)
+inline std::optional<Decimal128> string_to<Decimal128>(const std::string& s)
 {
     Decimal128 value(s);
     if (value.is_nan()) {
-        throw InvalidQueryArgError(util::format("Cannot convert '%1' to a %2", s, get_type_name<Decimal128>()));
+        return {};
     }
     return value;
 }
@@ -1391,16 +1364,24 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 StringData str = value.get_string();
                 switch (hint) {
                     case type_Int:
-                        value = string_to<int64_t>(str);
+                        if (auto val = string_to<int64_t>(str)) {
+                            value = *val;
+                        }
                         break;
                     case type_Float:
-                        value = string_to<float>(str);
+                        if (auto val = string_to<float>(str)) {
+                            value = *val;
+                        }
                         break;
                     case type_Double:
-                        value = string_to<double>(str);
+                        if (auto val = string_to<double>(str)) {
+                            value = *val;
+                        }
                         break;
                     case type_Decimal:
-                        value = string_to<Decimal128>(str);
+                        if (auto val = string_to<Decimal128>(str)) {
+                            value = *val;
+                        }
                         break;
                     default:
                         break;
