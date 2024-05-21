@@ -186,6 +186,11 @@ public:
         return false;
     }
     
+    virtual size_t find_first_in_range_of_values(const std::vector<int64_t>&, size_t) const
+    {
+        return not_found;
+    }
+    
     virtual size_t find_range(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*)
     {
         return not_found;
@@ -419,10 +424,9 @@ template <class LeafType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<LeafType> {
     using BaseType = IntegerNodeBase<LeafType>;
     using ThisType = IntegerNode<LeafType, TConditionFunction>;
-
 public:
     using TConditionValue = typename BaseType::TConditionValue;
-
+   
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
     {
@@ -442,24 +446,19 @@ public:
         //if we are here, we have a range query for a compressed array.
         const auto vs = this->m_leaf->get_all(start, end);
         
-        //this is the first condition
-        auto node = (IntegerNode*)children[0];
-        const auto cond = node->get_condition();
-        const auto cond_value = node->get_condition_value();
         
-        //TODO: the weights assigned during the query for this node are wrong at this point, because I am not
-        //considering local_matches etc, so it is very likely that something could be broken.
+        //TODO: Evaluate if it makes sense to setup weights for this query node, since for compressed arrays all the logic is not really needed, since when we call aggregate local, if the array is compressed, we either extract all the values and process them or we jump into a specialised search (in this case probably the weights have some sense)
         
-        auto update_query_status = [st, &start, &vs](const auto position){
-            auto i = std::distance(vs.begin(), position);
-            return st->match(start + i);
+        auto update_query_status = [st, &start](const auto position){
+            return st->match(start + position);
         };
         
         auto pos = vs.begin();
+        const TConditionFunction cond;
         while(pos != vs.end()) {
             
-            pos = std::find_if(pos, vs.end(), [&cond,&cond_value](const auto v){
-                return cond(v, cond_value);
+            pos = std::find_if(pos, vs.end(), [&cond,this](const auto v){
+                return cond(v, this->m_value);
             });
             
             //nothing was found, just return
@@ -467,25 +466,16 @@ public:
                 return end;
             
             //explore all the other query nodes
-            auto k = pos;
+            auto m = std::distance(vs.begin(), pos);
+            auto k = m;
             for(size_t j=1; j<children.size(); ++j) {
-                const auto child_node = (IntegerNode*)children[j]; //bad cast
-                const auto child_cond = child_node->get_condition();
-                const auto child_cond_value = child_node->get_condition_value();
-                k = std::find_if(pos, vs.end(), [&child_cond, &child_cond_value](const auto v){
-                    return child_cond(v, child_cond_value);
-                });
-                
-                if(k != pos) //there is no possible matching.
+                k = children[j]->find_first_in_range_of_values(vs, m);
+                if(k != m) //there is no possible matching.
                     break;
             }
-            
-            if(k == pos) {
-                //found
-                if(!update_query_status(pos))
-                    return not_found;
+            if(k == m && !update_query_status(m)) {
+                return not_found;
             }
-            
             ++pos;
         }
         return not_found;
@@ -499,6 +489,16 @@ public:
     TConditionValue get_condition_value() const
     {
         return this->m_value;
+    }
+    
+    
+    size_t find_first_in_range_of_values(const std::vector<int64_t>& vs, size_t pos) const override
+    {
+        static TConditionFunction child_cond;
+        auto it = std::find_if(vs.begin() + pos, vs.end(), [this](const auto v){
+            return child_cond(v, this->m_value);
+        });
+        return std::distance(vs.begin(), it);
     }
     
     
