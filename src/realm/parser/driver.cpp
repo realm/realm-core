@@ -147,6 +147,12 @@ inline const char* get_type_name<double>()
     return "floating point number";
 }
 
+template <>
+inline const char* get_type_name<Decimal128>()
+{
+    return "decimal number";
+}
+
 template <typename T>
 inline T string_to(const std::string& s)
 {
