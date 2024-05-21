@@ -5069,6 +5069,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                             // More than 1 bootstrap message, always a multi-message
                             ++download_msg_count;
                             bootstrap_mode = BootstrapMode::MultiMessage;
+                            logger->debug("ROLE CHANGE: detected multi-message bootstrap");
                             return TestState::downloading;
                         }
                         // single bootstrap message or last message in the multi-message bootstrap
@@ -5077,6 +5078,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                             if (cur_state == TestState::reconnect_received) {
                                 // If reconnect error was last state, then bootstrap has only one message
                                 bootstrap_mode = BootstrapMode::SingleMessageMulti;
+                                logger->debug("ROLE CHANGE: detected single-message/multi-changeset bootstrap");
                                 // Must have 2 or more changesets in message to get here...
                                 REQUIRE(data.num_changesets > 1);
                             }
@@ -5171,7 +5173,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
         // Update the permissions on the server - should send an error to the client to force
         // it to reconnect
-        logger->info("New rule definitions: %1", new_rules);
+        logger->trace("ROLE CHANGE: New rule definitions: %1", new_rules);
         auto& app_session = harness.session().app_session();
         app_session.admin_api.update_default_rule(app_session.server_app_id, new_rules);
 
@@ -5208,6 +5210,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                 }
             }
             else if (expected.bootstrap == BootstrapMode::SingleMessage) {
+                logger->debug("ROLE CHANGE: expected single-message/single-changeset bootstrap");
                 REQUIRE(bootstrap_mode == BootstrapMode::None);
                 REQUIRE(bootstrap_msg_count == 0);
                 REQUIRE(cur_state == TestState::reconnect_received);
@@ -5246,7 +5249,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             auto default_rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
             if (!initial_rules.empty()) {
                 update_role(default_rule, initial_rules);
-                logger->info("Initial rule definitions: %1", default_rule);
+                logger->trace("ROLE CHANGE: Initial rule definitions: %1", default_rule);
                 app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule);
             }
 
@@ -5265,7 +5268,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
         SECTION("Single-message bootstrap") {
             // Single message bootstrap - remove employees, keep mgrs/dirs
-            logger->info(">>>>> REMOVING EMPLOYEES");
+            logger->trace("ROLE CHANGE: Updating rules to remove employees");
             // 500 emps, 10 mgrs, 5 dirs
             TestParams params{};
             auto num_total = params.num_emps + params.num_mgrs + params.num_dirs;
@@ -5274,7 +5277,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         }
         SECTION("Multi-message bootstrap") {
             // Multi-message bootstrap - add employeees, remove managers and directors
-            logger->info(">>>>> SWITCHING TO EMPLOYEES ONLY");
+            logger->trace("ROLE CHANGE: Updating rules to employees only");
             // 5000 emps, 100 mgrs, 25 dirs
             TestParams params{5000, 100, 25, 10};
             run_test(params, {{"role", {{"$in", {"manager", "director"}}}}}, params.num_mgrs + params.num_dirs,
@@ -5282,7 +5285,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         }
         SECTION("Single-message/Multi-changeset bootstrap") {
             // Single message/multi-changeset bootstrap - add back managers and directors
-            logger->info(">>>>> SWITCHING BACK TO ALL");
+            logger->trace("ROLE CHANGE: Updating rules to all records");
             // 500 emps, 500 mgrs, 125 dirs
             TestParams params{500, 500, 125, 100, 2000};
             run_test(params, {{"role", "employee"}}, params.num_emps, true,
