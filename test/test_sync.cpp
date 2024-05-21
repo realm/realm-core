@@ -3005,7 +3005,7 @@ TEST(Sync_UploadDownloadProgress_1)
         Session session = fixture.make_session(db, "/test");
 
         auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
+                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double, int64_t) {
             downloaded_bytes = downloaded;
             downloadable_bytes = downloadable;
             uploaded_bytes = uploaded;
@@ -3075,7 +3075,7 @@ TEST(Sync_UploadDownloadProgress_1)
         int number_of_handler_calls = 0;
 
         auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
+                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double, int64_t) {
             CHECK_EQUAL(downloaded, downloaded_bytes);
             CHECK_EQUAL(downloadable, downloaded_bytes);
             CHECK_EQUAL(uploaded, uploaded_bytes);
@@ -3130,7 +3130,7 @@ TEST(Sync_UploadDownloadProgress_2)
 
     auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+                                  uint_fast64_t snapshot_version, double, double, int64_t) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -3148,7 +3148,7 @@ TEST(Sync_UploadDownloadProgress_2)
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+                                  uint_fast64_t snapshot_version, double, double, int64_t) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -3355,7 +3355,7 @@ TEST(Sync_UploadDownloadProgress_3)
     auto progress_handler = [&, entry = int(0), promise = util::CopyablePromiseHolder(std::move(signal_pf.promise))](
                                 uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) mutable {
+                                uint_fast64_t snapshot_version, double, double, int64_t) mutable {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -3467,7 +3467,7 @@ TEST(Sync_UploadDownloadProgress_4)
 
     auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+                                  uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_NOT_EQUAL(uploadable_bytes, 0);
@@ -3513,7 +3513,7 @@ TEST(Sync_UploadDownloadProgress_4)
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+                                  uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
 
@@ -3567,7 +3567,7 @@ TEST(Sync_UploadDownloadProgress_5)
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) mutable {
+                                uint_fast64_t snapshot_version, double, double, int64_t) mutable {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -3647,7 +3647,7 @@ TEST(Sync_UploadDownloadProgress_6)
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) {
+                                uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -3746,7 +3746,7 @@ TEST(Sync_UploadProgress_EmptyCommits)
 
     std::atomic<int> entry = 0;
     session.set_progress_handler(
-        [&](uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, double, double) {
+        [&](uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, double, double, int64_t) {
             ++entry;
         });
     session.bind();
@@ -4045,7 +4045,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
 
     auto progress_handler_1 = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                   std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                  std::uint_fast64_t, double, double) {
+                                  std::uint_fast64_t, double, double, int64_t) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -4059,7 +4059,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes, uint_fast64_t, double,
-                                  double) {
+                                  double, int64_t) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -4199,7 +4199,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
     auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* snapshot_version */, double, double) {
+                                  uint_fast64_t /* snapshot_version */, double, double, int64_t) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -4213,7 +4213,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* snapshot_version */, double, double) {
+                                  uint_fast64_t /* snapshot_version */, double, double, int64_t) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -4634,7 +4634,7 @@ TEST(Sync_BatchedUploadMessages)
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) {
+                                uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_GREATER(uploadable_bytes, 1000);
 
         // This is the important check. If the changesets were not batched,
@@ -4686,7 +4686,7 @@ TEST(Sync_UploadLogCompactionEnabled)
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) {
+                                uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
@@ -4744,7 +4744,7 @@ TEST(Sync_UploadLogCompactionDisabled)
 
     auto progress_handler = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                 std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                std::uint_fast64_t snapshot_version, double, double) {
+                                std::uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
