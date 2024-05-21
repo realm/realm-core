@@ -58,12 +58,14 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
+#include "util/crypt_key.hpp"
+
 using namespace realm;
 using namespace realm::util;
 using realm::FileDesc;
 
 namespace {
-const uint8_t test_key[] = "1234567890123456789012345678901123456789012345678901234567890123";
+static EncryptionKey test_key = *realm::test_util::crypt_key(true);
 }
 
 TEST(EncryptedFile_CryptorBasic)
@@ -319,7 +321,8 @@ TEST(EncryptedFile_IVRefreshing)
     verify_page_states(states, read_data_pos, {page_needing_refresh});
 }
 
-static void check_attach_and_read(const char* key, const std::string& path, size_t num_entries)
+static void check_attach_and_read(const std::optional<EncryptionKey>& key, const std::string& path,
+                                  size_t num_entries)
 {
     try {
         auto hist = make_in_realm_history();
@@ -343,7 +346,7 @@ static void check_attach_and_read(const char* key, const std::string& path, size
 // It checks that an encrypted Realm is portable between systems with a different page size
 NONCONCURRENT_TEST(EncryptedFile_Portablility)
 {
-    const char* key = test_util::crypt_key(true);
+    auto key = test_util::crypt_key(true);
     // The idea here is to incrementally increase the allocations in the Realm
     // such that the top ref written eventually crosses over the block_size and
     // page_size() thresholds. This has caught faulty top_ref + size calculations.

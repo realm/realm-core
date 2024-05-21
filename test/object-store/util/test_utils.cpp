@@ -95,14 +95,13 @@ bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
     }
 }
 
-std::vector<char> make_test_encryption_key(const char start)
+util::EncryptionKey make_test_encryption_key(const char start)
 {
-    std::vector<char> vector;
-    vector.reserve(64);
+    std::array<uint8_t, 64> ret;
     for (int i = 0; i < 64; i++) {
-        vector.emplace_back((start + i) % 128);
+        ret[i] = (start + i) % 128;
     }
-    return vector;
+    return util::EncryptionKey(ret);
 }
 
 // FIXME: Catch2 limitation on old compilers (currently our android CI)

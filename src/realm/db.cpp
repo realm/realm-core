@@ -1619,7 +1619,7 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
 // Unmapping (during close()) while transactions are live, is not considered an error. There
 // is a potential race between unmapping during close() and any operation carried out by a live
 // transaction. The user must ensure that this race never happens if she uses DB::close().
-bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
+bool DB::compact(bool bump_version_number, const std::optional<util::EncryptionKey>& output_encryption_key)
     NO_THREAD_SAFETY_ANALYSIS // this would work except for a known limitation: "No alias analysis" where clang cannot
                               // tell that tr->db->m_mutex is the same thing as m_mutex
 {
@@ -1636,7 +1636,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     }
     auto info = m_info;
     Durability dura = Durability(info->durability);
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         auto t1 = std::chrono::steady_clock::now();
@@ -1672,7 +1671,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
             Group::DefaultTableWriter writer;
-            tr->write(file, write_key, info->latest_version_number + incr, writer); // Throws
+            tr->write(file, output_encryption_key, info->latest_version_number + incr, writer); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
@@ -1705,7 +1704,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.skip_validate = false;
         cfg.no_create = true;
         cfg.clear_file = false;
-        cfg.encryption_key = write_key;
+        cfg.encryption_key = output_encryption_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg, m_marker_observer.get());
         m_alloc.convert_from_streaming_form(top_ref);
@@ -1727,7 +1726,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     return true;
 }
 
-void DB::write_copy(StringData path, const char* output_encryption_key)
+void DB::write_copy(StringData path, const std::optional<util::EncryptionKey>& output_encryption_key)
 {
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
@@ -2184,16 +2183,14 @@ void DB::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
-bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key)
+bool DB::needs_file_format_upgrade(const std::string& file, const std::optional<util::EncryptionKey>& encryption_key)
 {
     SlabAlloc alloc;
     SlabAlloc::Config cfg;
     cfg.session_initiator = false;
     cfg.read_only = true;
     cfg.no_create = true;
-    if (!encryption_key.empty()) {
-        cfg.encryption_key = encryption_key.data();
-    }
+    cfg.encryption_key = encryption_key;
     try {
         alloc.attach_file(file, cfg);
         if (auto current_file_format_version = alloc.get_committed_file_format_version()) {

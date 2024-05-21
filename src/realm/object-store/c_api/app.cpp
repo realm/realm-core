@@ -264,7 +264,10 @@ RLM_API void realm_app_config_set_metadata_mode(realm_app_config_t* config,
 
 RLM_API void realm_app_config_set_metadata_encryption_key(realm_app_config_t* config, const uint8_t key[64]) noexcept
 {
-    config->custom_encryption_key = std::vector<char>(key, key + 64);
+    util::EncryptionKeyStorageType raw_key;
+    static_assert(raw_key.size() == 64);
+    std::copy_n(key, raw_key.size(), raw_key.begin());
+    config->custom_encryption_key.emplace(std::move(raw_key));
 }
 
 RLM_API void realm_app_config_set_security_access_group(realm_app_config_t* config, const char* group) noexcept

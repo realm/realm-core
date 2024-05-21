@@ -19,6 +19,7 @@
 #ifndef REALM_UTIL_FILE_HPP
 #define REALM_UTIL_FILE_HPP
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
@@ -36,6 +37,7 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/encryption_key.hpp>
 #include <realm/util/features.h>
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -392,11 +394,11 @@ public:
     /// mappings are created or any data is read from or written to the file.
     ///
     /// \param key A 64-byte encryption key, or null to disable encryption.
-    void set_encryption_key(const char* key);
+    void set_encryption_key(std::optional<util::EncryptionKey> key);
 
     /// Get the encryption key set by set_encryption_key(),
     /// null_ptr if no key set.
-    const char* get_encryption_key() const;
+    const std::optional<util::EncryptionKey>& get_encryption_key() const;
 
     /// Set the path used for emulating file locks. If not set explicitly,
     /// the emulation will use the path of the file itself suffixed by ".fifo"
@@ -648,7 +650,7 @@ private:
     std::string m_fifo_path;
 #endif
 #endif
-    std::unique_ptr<const char[]> m_encryption_key = nullptr;
+    std::optional<util::EncryptionKey> m_encryption_key;
     std::string m_path;
     std::optional<UniqueID> m_cached_unique_id;
 
@@ -712,7 +714,6 @@ private:
 #endif
     };
 };
-
 
 /// This class provides a RAII abstraction over the concept of a
 /// memory mapped file.

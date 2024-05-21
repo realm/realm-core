@@ -49,7 +49,7 @@ TEST_CASE("Automated backup", "[backup]") {
     TestFile config;
     std::string copy_from_file_name = test_util::get_test_resource_path() + "test_backup-olden-and-golden.realm";
     config.path = test_util::get_test_path_prefix() + "test_backup.realm";
-    config.encryption_key.clear();
+    config.encryption_key.reset();
     REQUIRE(util::File::exists(copy_from_file_name));
     util::File::copy(copy_from_file_name, config.path);
     REQUIRE(util::File::exists(config.path));

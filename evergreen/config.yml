@@ -1354,7 +1354,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    run_with_encryption: 1 
+    run_with_encryption: 1
     enable_asan: On
     cmake_build_type: RelWithDebInfo
   tasks:
@@ -1533,9 +1533,9 @@ buildvariants:
 #   tasks:
 #   - name: network_tests
 
-- name: rhel70
-  display_name: "RHEL 7 x86_64"
-  run_on: rhel70-large
+- name: rhel-x86_64
+  display_name: "RHEL 8 x86_64"
+  run_on: rhel8-latest-large
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
@@ -1545,6 +1545,7 @@ buildvariants:
     curl: "/opt/mongodbtoolchain/v3/bin/curl"
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
     ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
+    run_with_encryption: 1
   tasks:
   - name: compile_test_and_package
 
@@ -1766,6 +1767,7 @@ buildvariants:
     fetch_missing_dependencies: On
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
+    run_with_encryption: On
   tasks:
   - name: compile_test_and_package
   - name: long-running-tests
@@ -1784,6 +1786,7 @@ buildvariants:
     fetch_missing_dependencies: On
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
+    run_with_encryption: On
   tasks:
   - name: compile_test
 
@@ -1800,6 +1803,7 @@ buildvariants:
     fetch_missing_dependencies: On
     python3: "/cygdrive/c/python/python37/python.exe"
     disable_tests_against_baas: On
+    run_with_encryption: On
   tasks:
   - name: compile_local_tests
 

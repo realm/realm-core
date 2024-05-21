@@ -19,7 +19,9 @@
 #include <realm/object-store/impl/apple/keychain_helper.hpp>
 
 #include <realm/exceptions.hpp>
+#include <realm/util/cf_ptr.hpp>
 #include <realm/util/cf_str.hpp>
+#include <realm/util/file.hpp>
 
 #include <Security/Security.h>
 
@@ -29,12 +31,17 @@ using namespace realm;
 using util::adoptCF;
 using util::CFPtr;
 using util::string_view_to_cfstring;
+using util::EncryptionKey;
+using util::EncryptionKeyStorageType;
+using util::EncryptionKeySize;
 
-namespace {
+namespace realm::keychain {
+
+namespace impl {
 
 REALM_NORETURN
 REALM_COLD
-void keychain_access_exception(int32_t error_code)
+static void keychain_access_exception(int32_t error_code)
 {
     if (auto message = adoptCF(SecCopyErrorMessageString(error_code, nullptr))) {
         if (auto msg = CFStringGetCStringPtr(message.get(), kCFStringEncodingUTF8)) {
@@ -53,11 +60,8 @@ void keychain_access_exception(int32_t error_code)
                        util::format("Keychain returned unexpected status code: %1", error_code));
 }
 
-constexpr size_t key_size = 64;
-const CFStringRef s_legacy_account = CFSTR("metadata");
-const CFStringRef s_service = CFSTR("io.realm.sync.keychain");
-
-CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service, CFStringRef group)
+static CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service,
+                                                             CFStringRef group)
 {
     auto d = adoptCF(
         CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
@@ -78,8 +82,8 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStr
 }
 
 /// Get the encryption key for a given service, returning true if it either exists or the keychain is not usable.
-bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
-             std::optional<std::vector<char>>& result, bool result_on_error = true)
+static bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
+                    std::optional<EncryptionKey>& result, bool result_on_error = true)
 {
     auto search_dictionary = build_search_dictionary(account, service, string_view_to_cfstring(group).get());
     CFDataRef retained_key_data;
@@ -87,11 +91,11 @@ bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
         case errSecSuccess: {
             // Key was previously stored. Extract it.
             CFPtr<CFDataRef> key_data = adoptCF(retained_key_data);
-            if (key_size != CFDataGetLength(key_data.get()))
+            if (EncryptionKeySize != CFDataGetLength(key_data.get()))
                 return false;
 
-            auto key_bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(key_data.get()));
-            result.emplace(key_bytes, key_bytes + key_size);
+            auto key_bytes = reinterpret_cast<const EncryptionKeyStorageType*>(CFDataGetBytePtr(key_data.get()));
+            result.emplace(*key_bytes);
             return true;
         }
         case errSecItemNotFound:
@@ -114,7 +118,15 @@ bool get_key(CFStringRef account, CFStringRef service, std::string_view group,
     }
 }
 
-bool set_key(std::optional<std::vector<char>>& key, CFStringRef account, CFStringRef service, std::string_view group)
+bool get_key(std::string_view account, std::string_view service, std::string_view group,
+             std::optional<EncryptionKey>& result, bool result_on_error)
+{
+    return get_key(string_view_to_cfstring(account).get(), string_view_to_cfstring(service).get(), group, result,
+                   result_on_error);
+}
+
+static bool set_key(std::optional<EncryptionKey>& key, CFStringRef account, CFStringRef service,
+                    std::string_view group)
 {
     // key may be nullopt here if the keychain was inaccessible
     if (!key)
@@ -122,8 +134,9 @@ bool set_key(std::optional<std::vector<char>>& key, CFStringRef account, CFStrin
 
     auto search_dictionary = build_search_dictionary(account, service, string_view_to_cfstring(group).get());
     CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, reinterpret_cast<const UInt8*>(key->data()),
-                                                        key_size, kCFAllocatorNull));
+    auto key_scoped_storage = key->data();
+    auto key_ptr = reinterpret_cast<const UInt8*>(key_scoped_storage->data());
+    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, key_ptr, EncryptionKeySize, kCFAllocatorNull));
     if (!key_data)
         throw std::bad_alloc();
 
@@ -151,14 +164,21 @@ bool set_key(std::optional<std::vector<char>>& key, CFStringRef account, CFStrin
     }
 }
 
-void delete_key(CFStringRef account, CFStringRef service, CFStringRef group)
+
+bool set_key(std::optional<EncryptionKey>& key, std::string_view account, std::string_view service,
+             std::string_view group)
+{
+    return set_key(key, string_view_to_cfstring(account).get(), string_view_to_cfstring(service).get(), group);
+}
+
+static void delete_key(CFStringRef account, CFStringRef service, CFStringRef group)
 {
     auto search_dictionary = build_search_dictionary(account, service, group);
     auto status = SecItemDelete(search_dictionary.get());
     REALM_ASSERT(status == errSecSuccess || status == errSecItemNotFound);
 }
 
-CFPtr<CFStringRef> bundle_service()
+static CFPtr<CFStringRef> bundle_service()
 {
     if (CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle())) {
         return adoptCF(CFStringCreateWithFormat(nullptr, nullptr, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
@@ -166,15 +186,17 @@ CFPtr<CFStringRef> bundle_service()
     return CFPtr<CFStringRef>{};
 }
 
-} // anonymous namespace
+} // namespace impl
 
-namespace realm::keychain {
+using namespace impl;
 
-std::optional<std::vector<char>> get_existing_metadata_realm_key(std::string_view app_id,
-                                                                 std::string_view access_group)
+const CFStringRef s_legacy_account = CFSTR("metadata");
+const CFStringRef s_service = CFSTR("io.realm.sync.keychain");
+
+std::optional<EncryptionKey> get_existing_metadata_realm_key(std::string_view app_id, std::string_view access_group)
 {
     auto cf_app_id = string_view_to_cfstring(app_id);
-    std::optional<std::vector<char>> key;
+    std::optional<EncryptionKey> key;
 
     // If we have a security access groups then keys are stored the same way
     // everywhere and we don't have any legacy storage methods to handle, so
@@ -240,12 +262,12 @@ std::optional<std::vector<char>> get_existing_metadata_realm_key(std::string_vie
     return key;
 }
 
-std::optional<std::vector<char>> create_new_metadata_realm_key(std::string_view app_id, std::string_view access_group)
+std::optional<EncryptionKey> create_new_metadata_realm_key(std::string_view app_id, std::string_view access_group)
 {
     auto cf_app_id = string_view_to_cfstring(app_id);
-    std::optional<std::vector<char>> key;
-    key.emplace(key_size);
-    arc4random_buf(key->data(), key_size);
+    EncryptionKeyStorageType key_buffer;
+    arc4random_buf(key_buffer.data(), EncryptionKeySize);
+    std::optional<EncryptionKey> key(std::move(key_buffer));
 
     // See above for why macOS is different
 #if TARGET_OS_OSX

@@ -56,7 +56,7 @@
 #endif
 
 namespace realm::util {
-SharedFileInfo::SharedFileInfo(const uint8_t* key)
+SharedFileInfo::SharedFileInfo(const EncryptionKey& key)
     : cryptor(key)
 {
 }
@@ -167,12 +167,16 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 static_assert(c_min_encrypted_file_size == 2 * block_size,
               "chaging the block size breaks encrypted file portability");
 
-AESCryptor::AESCryptor(const uint8_t* key)
+AESCryptor::AESCryptor(const EncryptionKey& key)
     : m_rw_buffer(new char[block_size])
     , m_dst_buffer(new char[block_size])
 {
-    memcpy(m_aesKey.data(), key, 32);
-    memcpy(m_hmacKey.data(), key + 32, 32);
+    const auto& raw_key = key.data();
+    std::array<uint8_t, 32> aes_key;
+    std::copy_n(raw_key->begin(), aes_key.size(), aes_key.begin());
+
+    std::array<uint8_t, 32> hmac_key;
+    std::copy_n(raw_key->begin() + 32, hmac_key.size(), hmac_key.begin());
 
 #if REALM_PLATFORM_APPLE
     // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
@@ -181,25 +185,24 @@ AESCryptor::AESCryptor(const uint8_t* key)
     unsigned char u_iv[kCCKeySizeAES256];
     arc4random_buf(u_iv, kCCKeySizeAES256);
     void* iv = u_iv;
-    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
-    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_decr);
+    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, aes_key.data(), kCCKeySizeAES256, iv, &m_encr);
+    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, aes_key.data(), kCCKeySizeAES256, iv, &m_decr);
 #elif defined(_WIN32)
-    BCRYPT_ALG_HANDLE hAesAlg = NULL;
     int ret;
-    ret = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+    ret = BCryptOpenAlgorithmProvider(&m_aes_alg_handle, BCRYPT_AES_ALGORITHM, NULL, 0);
     REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptOpenAlgorithmProvider()", ret);
 
-    ret = BCryptSetProperty(hAesAlg, BCRYPT_CHAINING_MODE, (PBYTE)BCRYPT_CHAIN_MODE_CBC,
+    ret = BCryptSetProperty(m_aes_alg_handle, BCRYPT_CHAINING_MODE, (PBYTE)BCRYPT_CHAIN_MODE_CBC,
                             sizeof(BCRYPT_CHAIN_MODE_CBC), 0);
     REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptSetProperty()", ret);
-
-    ret = BCryptGenerateSymmetricKey(hAesAlg, &m_aes_key_handle, nullptr, 0, (PBYTE)key, 32, 0);
-    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptGenerateSymmetricKey()", ret);
 #else
     m_ctx = EVP_CIPHER_CTX_new();
     if (!m_ctx)
         handle_error();
 #endif
+
+    m_aesKey = util::SensitiveBuffer<std::array<uint8_t, 32>>(std::move(aes_key));
+    m_hmacKey = util::SensitiveBuffer<std::array<uint8_t, 32>>(std::move(hmac_key));
 }
 
 AESCryptor::~AESCryptor() noexcept
@@ -208,15 +211,22 @@ AESCryptor::~AESCryptor() noexcept
     CCCryptorRelease(m_encr);
     CCCryptorRelease(m_decr);
 #elif defined(_WIN32)
+    int ret = BCryptCloseAlgorithmProvider(m_aes_alg_handle, 0);
+    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptCloseAlgorithmProvider()", ret);
 #else
     EVP_CIPHER_CTX_cleanup(m_ctx);
     EVP_CIPHER_CTX_free(m_ctx);
 #endif
 }
 
-void AESCryptor::check_key(const uint8_t* key)
+void AESCryptor::check_key(const EncryptionKey& key)
 {
-    if (memcmp(m_aesKey.data(), key, 32) != 0 || memcmp(m_hmacKey.data(), key + 32, 32) != 0)
+    auto raw_key = key.data();
+    auto raw_aes = m_aesKey.data();
+    auto raw_hmac = m_hmacKey.data();
+
+    if (!std::equal(raw_key->begin(), raw_key->begin() + 32, raw_aes->begin(), raw_aes->end()) ||
+        !std::equal(raw_key->begin() + 32, raw_key->end(), raw_hmac->begin(), raw_hmac->end()))
         throw DecryptionFailed();
 }
 
@@ -263,7 +273,7 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mod
 bool AESCryptor::check_hmac(const void* src, size_t len, const std::array<uint8_t, 28>& hmac) const
 {
     std::array<uint8_t, 224 / 8> buffer;
-    hmac_sha224(Span(reinterpret_cast<const uint8_t*>(src), len), buffer, m_hmacKey);
+    hmac_sha224(Span(reinterpret_cast<const uint8_t*>(src), len), buffer, *m_hmacKey.data());
 
     // Constant-time memcmp to avoid timing attacks
     uint8_t result = 0;
@@ -510,7 +520,7 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size, Wri
                 ++iv.iv1;
 
             crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
-            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size), iv.hmac1, m_hmacKey);
+            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size), iv.hmac1, *m_hmacKey.data());
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
@@ -545,16 +555,25 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     REALM_ASSERT(bytesEncrypted == block_size);
 #elif defined(_WIN32)
     ULONG cbData;
+    BCRYPT_KEY_HANDLE aes_key_handle;
     int i;
 
+    {
+        // We generate the key handle and then throw it away because it stores the actual key in plaintext
+        const auto& raw_aes_key = m_aesKey.data();
+        i = BCryptGenerateSymmetricKey(m_aes_alg_handle, &aes_key_handle, nullptr, 0, (PBYTE)raw_aes_key->data(),
+                                       (ULONG)raw_aes_key->size(), 0);
+        REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptGenerateSymmetricKey()", i);
+    }
+
     if (mode == mode_Encrypt) {
-        i = BCryptEncrypt(m_aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
+        i = BCryptEncrypt(aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
                           block_size, &cbData, 0);
         REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptEncrypt()", i);
         REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptEncrypt()", cbData);
     }
     else if (mode == mode_Decrypt) {
-        i = BCryptDecrypt(m_aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
+        i = BCryptDecrypt(aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
                           block_size, &cbData, 0);
         REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptDecrypt()", i);
         REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptDecrypt()", cbData);
@@ -563,8 +582,11 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
         REALM_UNREACHABLE();
     }
 
+    i = BCryptDestroyKey(aes_key_handle);
+    REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptDestroyKey()", i);
+
 #else
-    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey.data(), iv, mode))
+    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey.data()->data(), iv, mode))
         handle_error();
 
     int len;

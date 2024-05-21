@@ -134,8 +134,8 @@ bool initialize_test_path(int argc, const char* argv[])
     }
     PathCchRemoveFileSpec(path, MAX_PATH);
     SetCurrentDirectory(path);
-    g_path_prefix = std::filesystem::path(path).u8string();
-    g_resource_path = g_path_prefix + "\\resources\\";
+    g_path_prefix = std::filesystem::path(path).u8string() + "\\";
+    g_resource_path = g_path_prefix + "resources\\";
 #else
     char executable[PATH_MAX];
     if (realpath(argv[0], executable) == nullptr) {
@@ -321,7 +321,7 @@ std::string TestDirNameGenerator::next()
     return m_path + "/" + std::to_string(m_counter++);
 }
 
-std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key)
+std::shared_ptr<DB> get_test_db(const std::string& path, const std::optional<EncryptionKey>& crypt_key)
 {
     const char* str = getenv("UNITTEST_LOG_LEVEL");
     realm::util::Logger::Level core_log_level = realm::util::Logger::Level::off;

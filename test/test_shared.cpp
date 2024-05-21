@@ -355,7 +355,7 @@ ONLY(Shared_DiskSpace)
 
         std::string path = "test.realm";
 
-        SharedGroup sg(path, DBOptions("1234567890123456789012345678901123456789012345678901234567890123"));
+        SharedGroup sg(path, DBOptions(crypt_key("1234567890123456789012345678901123456789012345678901234567890123")));
         //    SharedGroup sg(path, false, SharedGroupOptions(nullptr));
 
         int seed = time(0);
@@ -637,14 +637,14 @@ TEST(Shared_EncryptedRemap)
 TEST(Shared_Initial)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::vector<char> key;
+    std::optional<EncryptionKey> key;
 
     CHECK_NOT(DB::needs_file_format_upgrade(path, key)); // File not created yet
 
-    auto key_str = crypt_key();
+    auto key2 = crypt_key();
     {
         // Create a new shared db
-        DBRef sg = DB::create(path, DBOptions(key_str));
+        DBRef sg = DB::create(path, DBOptions(key2));
 
         // Verify that new group is empty
         {
@@ -652,9 +652,7 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
     }
-    if (key_str) {
-        key.insert(key.end(), key_str, key_str + strlen(key_str));
-    }
+    key = key2;
     CHECK_NOT(DB::needs_file_format_upgrade(path, key));
 }
 
@@ -2216,10 +2214,8 @@ TEST(Shared_EncryptionKeyCheck_2)
 TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* first_key = crypt_key(true);
-    char second_key[64];
-    memcpy(second_key, first_key, 64);
-    second_key[3] = ~second_key[3];
+    auto first_key = EncryptionKey({0});
+    auto second_key = EncryptionKey({1});
     DBRef sg = DB::create(path, DBOptions(first_key));
     CHECK_THROW(DB::create(path, DBOptions(second_key)), InvalidDatabase);
     DBRef sg3 = DB::create(path, DBOptions(first_key));
@@ -2835,7 +2831,7 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
     const char* key1 = "KdrL2ieWyspILXIPetpkLD6rQYKhYnS6lvGsgk4qsJAMr1adQnKsYo3oTEYJDIfa";
     const char* key2 = "ti6rOKviXrwxSGMPVk35Dp9Q4eku8Cu8YTtnnZKAejOTNIEv7TvXrYdjOPSNexMR";
     {
-        auto db = DB::create(path, DBOptions(key1));
+        auto db = DB::create(path, DBOptions(crypt_key(key1)));
         auto tr = db->start_write();
         TableRef t = tr->add_table("table");
         auto col = t->add_column(type_String, "Strings");
@@ -2852,13 +2848,13 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
         }
 
         bool bump_version_number = true;
-        CHECK(db->compact(bump_version_number, key2));
+        CHECK(db->compact(bump_version_number, crypt_key(key2)));
         {
             auto rt = db->start_read();
             CHECK(rt->has_table("table"));
         }
 
-        CHECK(db->compact(bump_version_number, nullptr));
+        CHECK(db->compact(bump_version_number, std::nullopt));
         {
             auto rt = db->start_read();
             CHECK(rt->has_table("table"));
@@ -3476,7 +3472,7 @@ TEST(Shared_OpenAfterClose)
     // REALM_MAX_BPNODE_SIZE is 4
     // ----------------------------------------------------------------------
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = nullptr;
+    std::optional<EncryptionKey> key = std::nullopt;
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef db_w = DB::create(*hist_w, path, DBOptions(key));
     auto wt = db_w->start_write();
@@ -3592,7 +3588,7 @@ TEST(Shared_UpgradeBinArray)
 TEST_IF(Shared_MoreVersionsInUse, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
+    auto key = crypt_key(true);
     std::unique_ptr<Replication> hist(make_in_realm_history());
     ColKey col;
     {
@@ -3645,7 +3641,7 @@ TEST_IF(Shared_LinksToSameCluster, REALM_ENABLE_ENCRYPTION)
     // There was a problem when a link referred an object living in the same
     // Cluster as the origin object.
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
+    auto key = crypt_key(true);
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef db = DB::create(*hist, path, DBOptions(key));
     std::vector<ObjKey> keys;
@@ -3929,13 +3925,13 @@ TEST(Shared_WriteCopy)
         t->add_column(type_Int, "value");
         tr->commit();
 
-        db->write_copy(path2.c_str(), nullptr);
-        CHECK_THROW_ANY(db->write_copy(path2.c_str(), nullptr)); // Not allowed to overwrite
+        db->write_copy(path2.c_str(), std::nullopt);
+        CHECK_THROW_ANY(db->write_copy(path2.c_str(), std::nullopt)); // Not allowed to overwrite
     }
     {
         auto hist = make_in_realm_history();
         DBRef db = DB::create(*hist, path2);
-        db->write_copy(path3.c_str(), nullptr);
+        db->write_copy(path3.c_str(), std::nullopt);
     }
     auto hist = make_in_realm_history();
     DBRef db = DB::create(*hist, path3);
@@ -4481,8 +4477,8 @@ TEST(Shared_ClearOnError_ResetInvalidFile)
 #if REALM_ENABLE_ENCRYPTION
 TEST(Shared_ClearOnError_ChangeEncryptionKey)
 {
-    auto key_1 = "1234567890123456789012345678901123456789012345678901234567890123";
-    auto key_2 = "2234567890123456789012345678901123456789012345678901234567890123";
+    auto key_1 = crypt_key("1234567890123456789012345678901123456789012345678901234567890123", true);
+    auto key_2 = crypt_key("2234567890123456789012345678901123456789012345678901234567890123", true);
 
     SHARED_GROUP_TEST_PATH(path);
     DBOptions options;
@@ -4506,7 +4502,7 @@ TEST(Shared_ClearOnError_ChangeEncryptionKey)
     }
 
     { // change from encrypted to unencrypted
-        options.encryption_key = nullptr;
+        options.encryption_key.reset();
         auto db = DB::create(path, options);
         WriteTransaction wt(db);
         CHECK_NOT(wt.get_table("table 2"));

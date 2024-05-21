@@ -55,11 +55,10 @@ std::shared_ptr<Realm> get_metadata_realm()
     return Realm::get_shared_realm(std::move(realm_config));
 }
 
-#if REALM_PLATFORM_APPLE
+#if REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE
 using realm::util::adoptCF;
 using realm::util::CFPtr;
 
-#if REALM_ENABLE_ENCRYPTION
 constexpr const char* access_group = "";
 bool can_access_keychain()
 {
@@ -75,49 +74,15 @@ bool can_access_keychain()
     }();
     return can_access_keychain;
 }
+
+std::optional<util::EncryptionKey> generate_key()
+{
+    util::EncryptionKeyStorageType key;
+    arc4random_buf(key.data(), key.size());
+    return util::EncryptionKey(std::move(key));
+}
 #endif
 
-CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service)
-{
-    auto d = adoptCF(
-        CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
-    CFDictionaryAddValue(d.get(), kSecClass, kSecClassGenericPassword);
-    CFDictionaryAddValue(d.get(), kSecReturnData, kCFBooleanTrue);
-    CFDictionaryAddValue(d.get(), kSecAttrAccount, account);
-    CFDictionaryAddValue(d.get(), kSecAttrService, service);
-    return d;
-}
-
-OSStatus get_key(CFStringRef account, CFStringRef service, std::vector<char>& result)
-{
-    auto search_dictionary = build_search_dictionary(account, service);
-    CFDataRef retained_key_data;
-    OSStatus status = SecItemCopyMatching(search_dictionary.get(), (CFTypeRef*)&retained_key_data);
-    if (status == errSecSuccess) {
-        CFPtr<CFDataRef> key_data = adoptCF(retained_key_data);
-        auto key_bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(key_data.get()));
-        result.assign(key_bytes, key_bytes + CFDataGetLength(key_data.get()));
-    }
-    return status;
-}
-
-OSStatus set_key(const std::vector<char>& key, CFStringRef account, CFStringRef service)
-{
-    auto search_dictionary = build_search_dictionary(account, service);
-    CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, reinterpret_cast<const UInt8*>(key.data()),
-                                                        key.size(), kCFAllocatorNull));
-    CFDictionaryAddValue(search_dictionary.get(), kSecValueData, key_data.get());
-    return SecItemAdd(search_dictionary.get(), nullptr);
-}
-
-std::vector<char> generate_key()
-{
-    std::vector<char> key(64);
-    arc4random_buf(key.data(), key.size());
-    return key;
-}
-#endif // REALM_PLATFORM_APPLE
 } // anonymous namespace
 
 namespace realm::app {
@@ -630,12 +595,7 @@ TEST_CASE("app metadata: encryption", "[sync][metadata]") {
         realm_config.encryption_key = make_test_encryption_key(0);
         CHECK_THROWS(Realm::get_shared_realm(realm_config));
 
-        if (key) {
-            realm_config.encryption_key = *key;
-        }
-        else {
-            realm_config.encryption_key.clear();
-        }
+        realm_config.encryption_key = key;
         CHECK_NOTHROW(Realm::get_shared_realm(realm_config));
     };
 
@@ -943,18 +903,19 @@ TEST_CASE("keychain", "[sync][metadata]") {
 
     SECTION("legacy key migration") {
         auto key = generate_key();
-        const auto legacy_account = CFSTR("metadata");
-        const auto service_name = CFSTR("io.realm.sync.keychain");
+        const std::string legacy_account = "metadata";
+        const std::string service_name = "io.realm.sync.keychain";
         const auto bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle());
         // Could be either ObjectStoreTests or CombinedTests but must be set
         REQUIRE(bundle_id);
+        std::unique_ptr<char[]> bundle_id_buffer;
         const auto bundle_service =
-            adoptCF(CFStringCreateWithFormat(nullptr, nullptr, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
+            util::format("%1 - Realm Sync Metadata Key", util::cfstring_to_cstring(bundle_id, bundle_id_buffer));
 
         enum class Location { Original, Bundle, BundleAndAppId };
         auto location = GENERATE(Location::Original, Location::Bundle, Location::BundleAndAppId);
         CAPTURE(location);
-        CFStringRef account, service;
+        std::string_view account, service;
         switch (location) {
             case Location::Original:
                 account = legacy_account;
@@ -962,24 +923,24 @@ TEST_CASE("keychain", "[sync][metadata]") {
                 break;
             case Location::Bundle:
                 account = legacy_account;
-                service = bundle_service.get();
+                service = bundle_service;
                 break;
             case Location::BundleAndAppId:
-                account = CFSTR("app id");
-                service = bundle_service.get();
+                account = "app id";
+                service = bundle_service;
                 break;
         }
 
-        set_key(key, account, service);
+        keychain::impl::set_key(key, account, service);
         auto key_2 = keychain::get_existing_metadata_realm_key(app_id, {});
         REQUIRE(key_2 == key);
 
         // Key should have been copied to the preferred location
-        REQUIRE(get_key(CFSTR("app id"), bundle_service.get(), key) == errSecSuccess);
+        REQUIRE(keychain::impl::get_key("app id", bundle_service, {}, key, false));
         REQUIRE(key_2 == key);
 
         // Key should not have been deleted from the original location
-        REQUIRE(get_key(account, service, key) == errSecSuccess);
+        REQUIRE(keychain::impl::get_key(account, service, {}, key, false));
         REQUIRE(key_2 == key);
     }
 }

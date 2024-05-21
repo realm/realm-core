@@ -87,6 +87,7 @@ set(UTIL_SOURCES
     util/memory_stream.cpp
     util/platform_info.cpp
     util/misc_errors.cpp
+    util/sensitive_buffer.cpp
     util/serializer.cpp
     util/sha_crypto.cpp
     util/terminate.cpp
@@ -228,6 +229,7 @@ set(REALM_INSTALL_HEADERS
     util/checked_mutex.hpp
     util/compression.hpp
     util/encrypted_file_mapping.hpp
+    util/encryption_key.hpp
     util/errno.hpp
     util/features.h
     util/flat_map.hpp
@@ -253,6 +255,7 @@ set(REALM_INSTALL_HEADERS
     util/random.hpp
     util/safe_int_ops.hpp
     util/scope_exit.hpp
+    util/sensitive_buffer.hpp
     util/serializer.hpp
     util/sha_crypto.hpp
     util/span.hpp

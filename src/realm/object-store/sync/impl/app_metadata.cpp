@@ -313,7 +313,7 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app
     // decrypt it, then we might have an unencrypted metadata Realm resulting
     // from a previous run being unable to access the keychain.
     if (util::File::exists(config.path)) {
-        config.encryption_key.clear();
+        config.encryption_key.reset();
         if (auto realm = try_get_realm())
             return realm;
 

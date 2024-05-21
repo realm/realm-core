@@ -1025,7 +1025,7 @@ ref_type SlabAlloc::read_and_validate_header(util::File& file, const std::string
             footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
         }
 
-        auto top_ref = validate_header(header, footer, size, path, file.get_encryption_key() != nullptr); // Throws
+        auto top_ref = validate_header(header, footer, size, path, file.get_encryption_key().has_value()); // Throws
 
         if (session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.

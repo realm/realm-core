@@ -105,7 +105,7 @@ struct Benchmark {
     }
     virtual void operator()(DBRef) = 0;
     DBOptions::Durability m_durability = DBOptions::Durability::Full;
-    const char* m_encryption_key = nullptr;
+    std::optional<util::EncryptionKey> m_encryption_key = std::nullopt;
     std::vector<ObjKey> m_keys;
     ColKey m_col;
     std::unique_ptr<WriteTransaction> m_tr;
@@ -2555,24 +2555,24 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
 template <typename B>
 void run_benchmark(BenchmarkResults& results, bool force_full = false)
 {
-    typedef std::pair<DBOptions::Durability, const char*> config_pair;
+    typedef std::pair<DBOptions::Durability, std::optional<util::EncryptionKey>> config_pair;
     std::vector<config_pair> configs;
 
     if (force_full) {
-        configs.push_back(config_pair(DBOptions::Durability::Full, nullptr));
+        configs.push_back(config_pair(DBOptions::Durability::Full, std::nullopt));
 #if REALM_ENABLE_ENCRYPTION
         configs.push_back(config_pair(DBOptions::Durability::Full, crypt_key(true)));
 #endif
     }
     else {
-        configs.push_back(config_pair(DBOptions::Durability::MemOnly, nullptr));
+        configs.push_back(config_pair(DBOptions::Durability::MemOnly, std::nullopt));
     }
 
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
         DBOptions::Durability level = it->first;
-        const char* key = it->second;
+        std::optional<util::EncryptionKey> key = it->second;
 
         B benchmark;
         if (should_filter_benchmark(benchmark.name()))
@@ -2585,9 +2585,9 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
         lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level) << ", "
-                     << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
+                     << (key.has_value() ? "EncryptionOn" : "EncryptionOff") << ")";
         ident_ss << benchmark.name() << "_" << to_ident_cstr(level)
-                 << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
+                 << (key.has_value() ? "_EncryptionOn" : "_EncryptionOff");
         std::string ident = ident_ss.str();
 
         realm::test_util::unit_test::TestDetails test_details;
