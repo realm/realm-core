@@ -624,6 +624,13 @@ public:
             if (const int64_t* val = it->get_if<int64_t>()) {
                 m_needles.insert(*val);
             }
+            else if (const double* val = it->get_if<double>()) {
+                // JS encodes numbers as double
+                // only add this value if it represents an integer
+                if (*val == double(int64_t(*val))) {
+                    m_needles.insert(int64_t(*val));
+                }
+            }
         }
     }
 
@@ -1386,18 +1393,12 @@ public:
         if (!this->m_value_is_null) {
             m_optional_value = this->m_value;
         }
-        if (m_index_evaluator && m_nb_needles == 0) {
+        if (m_nb_needles == 0 && has_search_index()) {
+            m_index_evaluator = std::make_optional(IndexEvaluator{});
             SearchIndex* index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
             m_index_evaluator->init(index, m_optional_value);
             this->m_dT = 0;
         }
-    }
-
-    void table_changed() override
-    {
-        const bool has_index =
-            this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
     }
 
     const IndexEvaluator* index_based_keys() override
@@ -1407,7 +1408,7 @@ public:
 
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -2022,17 +2023,9 @@ public:
 
     void init(bool) override;
 
-    void table_changed() override
-    {
-        StringNodeBase::table_changed();
-        const bool has_index =
-            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
-    }
-
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return bool(m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General);
     }
 
     void cluster_changed() override

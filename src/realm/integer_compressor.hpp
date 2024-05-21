@@ -38,7 +38,7 @@ public:
     bool init(const char*);
 
     // init from mem B
-    inline const uint64_t* data() const;
+    inline uint64_t* data() const;
     inline size_t size() const;
     inline NodeHeader::Encoding get_encoding() const;
     inline uint8_t v_width() const;
@@ -138,7 +138,7 @@ inline void IntegerCompressor::init_flex(const char* h)
     m_ndx_size = NodeHeader::get_arrayB_num_elements(h);
 }
 
-inline const uint64_t* IntegerCompressor::data() const
+inline uint64_t* IntegerCompressor::data() const
 {
     return m_data;
 }

@@ -1586,7 +1586,7 @@ TEST(DirectBitFields)
     uint64_t a[2];
     a[0] = a[1] = 0;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 0);
         auto it2(it);
         ++it2;
@@ -1600,7 +1600,7 @@ TEST(DirectBitFields)
     // reverse polarity
     a[0] = a[1] = -1ULL;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 127);
         auto it2(it);
         ++it2;
@@ -1636,25 +1636,21 @@ TEST(Extended_Array_encoding)
 TEST(Array_cares_about)
 {
     std::vector<uint64_t> expected{
-        18446744073709551615ULL, 18446744073709551615ULL, 18446744073709551615ULL, 9223372036854775807ULL,
-        18446744073709551615U,   1152921504606846975ULL,  1152921504606846975ULL,  9223372036854775807ULL,
-        18446744073709551615ULL, 9223372036854775807ULL,  1152921504606846975ULL,  36028797018963967ULL,
-        1152921504606846975ULL,  4503599627370495ULL,     72057594037927935ULL,    1152921504606846975ULL,
-        18446744073709551615ULL, 2251799813685247ULL,     18014398509481983ULL,    144115188075855871ULL,
-        1152921504606846975ULL,  9223372036854775807ULL,  17592186044415ULL,       70368744177663ULL,
-        281474976710655ULL,      1125899906842623ULL,     4503599627370495ULL,     18014398509481983ULL,
-        72057594037927935ULL,    288230376151711743ULL,   1152921504606846975ULL,  18446744073709551615ULL,
-        18446744073709551615ULL, 8589934591ULL,           17179869183ULL,          34359738367ULL,
-        68719476735ULL,          137438953471ULL,         274877906943ULL,         549755813887ULL,
-        1099511627775ULL,        2199023255551ULL,        4398046511103ULL,        8796093022207ULL,
-        17592186044415ULL,       35184372088831ULL,       70368744177663ULL,       140737488355327ULL,
-        281474976710655ULL,      562949953421311ULL,      1125899906842623ULL,     2251799813685247ULL,
-        4503599627370495ULL,     9007199254740991ULL,     18014398509481983ULL,    36028797018963967ULL,
-        72057594037927935ULL,    144115188075855871ULL,   288230376151711743ULL,   576460752303423487ULL,
-        1152921504606846975ULL,  2305843009213693951ULL,  4611686018427387903ULL,  9223372036854775807ULL,
-        18446744073709551615ULL};
+        0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff,
+        0xfffffffffffffff,  0xfffffffffffffff,  0x7fffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff,
+        0xfffffffffffffff,  0x7fffffffffffff,   0xfffffffffffffff,  0xfffffffffffff,    0xffffffffffffff,
+        0xfffffffffffffff,  0xffffffffffffffff, 0x7ffffffffffff,    0x3fffffffffffff,   0x1ffffffffffffff,
+        0xfffffffffffffff,  0x7fffffffffffffff, 0xfffffffffff,      0x3fffffffffff,     0xffffffffffff,
+        0x3ffffffffffff,    0xfffffffffffff,    0x3fffffffffffff,   0xffffffffffffff,   0x3ffffffffffffff,
+        0xfffffffffffffff,  0x3fffffffffffffff, 0xffffffffffffffff, 0x1ffffffff,        0x3ffffffff,
+        0x7ffffffff,        0xfffffffff,        0x1fffffffff,       0x3fffffffff,       0x7fffffffff,
+        0xffffffffff,       0x1ffffffffff,      0x3ffffffffff,      0x7ffffffffff,      0xfffffffffff,
+        0x1fffffffffff,     0x3fffffffffff,     0x7fffffffffff,     0xffffffffffff,     0x1ffffffffffff,
+        0x3ffffffffffff,    0x7ffffffffffff,    0xfffffffffffff,    0x1fffffffffffff,   0x3fffffffffffff,
+        0x7fffffffffffff,   0xffffffffffffff,   0x1ffffffffffffff,  0x3ffffffffffffff,  0x7ffffffffffffff,
+        0xfffffffffffffff,  0x1fffffffffffffff, 0x3fffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff};
     std::vector<uint64_t> res;
-    for (size_t i = 0; i <= 64; i++) {
+    for (uint8_t i = 0; i <= 64; i++) {
         res.push_back(cares_about(i));
     }
     CHECK_EQUAL(res, expected);
@@ -1665,7 +1661,7 @@ TEST(AlignDirectBitFields)
     uint64_t a[2];
     a[0] = a[1] = 0;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 0);
         auto it2(it);
         ++it2;
@@ -1679,7 +1675,7 @@ TEST(AlignDirectBitFields)
     // reverse polarity
     a[0] = a[1] = -1ULL;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 127);
         auto it2(it);
         ++it2;
@@ -1692,54 +1688,12 @@ TEST(AlignDirectBitFields)
     }
 }
 
-TEST(UnalignBitFields)
-{
-    uint8_t a[16];
-    for (size_t i = 0; i < 16; ++i)
-        a[i] = i + 1;
-    {
-        size_t cnt = 1;
-        unaligned_word_iter it((uint64_t*)&a, 0);
-        for (size_t i = 1; i <= 2; ++i) {
-            auto v = it.get(64); // get the first word which contains 64 bits (asking for less bits does not matter)
-            // now extract all the values
-            for (size_t j = 0; j < 8; ++j) {
-                const auto single_v = v & 0xFF;
-                CHECK_EQUAL(single_v, cnt);
-                cnt += 1;
-                v >>= 8;
-            }
-            it.bump(64); // go to the second word
-        }
-    }
-    {
-        // reverse polarity
-        auto cnt = 0;
-        for (size_t i = 0; i < 16; ++i)
-            a[i] = uint8_t(-1) - i;
-        unaligned_word_iter it((uint64_t*)&a, 0);
-        for (size_t i = 1; i <= 2; ++i) {
-            // get the first word which contains 64 bits.
-            //(asking for 8 bits and bump by 8 bits is another viable way of approaching this)
-            auto v = it.get(64);
-            // now extract all the values
-            for (size_t j = 0; j < 8; ++j) {
-                const auto single_v = v & 0xFF;
-                CHECK_EQUAL(single_v, (uint8_t)(-1) - cnt);
-                cnt += 1;
-                v >>= 8;
-            }
-            it.bump(64); // go to the second word
-        }
-    }
-}
-
 TEST(TestSignValuesStoredIterator)
 {
     {
         // positive values are easy.
         uint64_t a[2];
-        bf_iterator it(a, 0, 8, 8, 0);
+        BfIterator it(a, 0, 8, 8, 0);
         for (size_t i = 0; i < 16; ++i) {
             it.set_value(i);
             ++it;
@@ -1754,7 +1708,7 @@ TEST(TestSignValuesStoredIterator)
     {
         // negative values require a bit more work
         uint64_t a[2];
-        bf_iterator it(a, 0, 8, 8, 0);
+        BfIterator it(a, 0, 8, 8, 0);
         for (size_t i = 0; i < 16; ++i) {
             it.set_value(-i);
             ++it;
@@ -1775,38 +1729,10 @@ TEST(TestSignValuesStoredIterator)
     }
 }
 
-TEST(TestSignValuesStoredUnalignIterator)
-{
-    // we don't use the unaligned iterator for writing, so there is no API for it.
-    // Maybe it is something we could evaluate, if it makes faster to rewrite the array
-    // when we are compressing via an unaligned iterator.
-    // But in theory it should be the same.
-    {
-        // positive values are easy.
-        uint8_t a_positive[16]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        unaligned_word_iter it((uint64_t*)&a_positive, 0);
-        for (size_t i = 0; i < 16; ++i) {
-            const auto v = it.get(8) & 0xFF; //
-            CHECK_EQUAL(v, i);
-            it.bump(8);
-        }
-    }
-    {
-        int8_t a_negative[16]{0, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15};
-        unaligned_word_iter it((uint64_t*)&a_negative, 0);
-        for (int8_t i = 0; i < 16; ++i) {
-            const auto v = it.get(8) & 0xFF;
-            const auto sv = sign_extend_value(8, v);
-            CHECK_EQUAL(sv, -i);
-            it.bump(8);
-        }
-    }
-}
-
 TEST(VerifyIterationAcrossWords)
 {
     uint64_t a[4]{0, 0, 0, 0}; // 4 64 bit words, let's store N elements of 5bits each
-    bf_iterator it(a, 0, 5, 5, 0);
+    BfIterator it(a, 0, 5, 5, 0);
     // 51 is the max amount of values we can fit in 4 words. Writting beyond this point is likely going
     // to crash. Writing beyond the 4 words is not possible in practice because the Array has boundery checks
     // and enough memory is reserved during compression.
@@ -1834,7 +1760,7 @@ TEST(VerifyIterationAcrossWords)
 
     {
         // unaligned iterator
-        unaligned_word_iter u_it(a, 0);
+        UnalignedWordIter u_it(a, 0);
         for (size_t i = 0; i < 51; ++i) {
             const auto v = sign_extend_value(5, u_it.get(5) & 0x1F);
             CHECK_EQUAL(v, values[i]);
@@ -1856,7 +1782,7 @@ TEST(LowerBoundCorrectness)
 
     // now simulate the compression of a in less bits
     uint64_t buff[2] = {0, 0};
-    bf_iterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
+    BfIterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
     for (size_t i = 0; i < 16; ++i) {
         it.set_value(i);
         CHECK_EQUAL(*it, a[i]);
@@ -1866,7 +1792,7 @@ TEST(LowerBoundCorrectness)
         uint64_t* _data;
         int64_t get(size_t ndx) const
         {
-            bf_iterator it(_data, 0, 5, 5, ndx);
+            BfIterator it(_data, 0, 5, 5, ndx);
             return sign_extend_value(5, *it);
         }
     };
@@ -1903,7 +1829,7 @@ TEST(UpperBoundCorrectness)
 
     // now simulate the compression of a in less bits
     uint64_t buff[2] = {0, 0};
-    bf_iterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
+    BfIterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
     for (size_t i = 0; i < size; ++i) {
         it.set_value(i);
         CHECK_EQUAL(*it, a[i]);
@@ -1913,7 +1839,7 @@ TEST(UpperBoundCorrectness)
         uint64_t* _data;
         int64_t get(size_t ndx) const
         {
-            bf_iterator it(_data, 0, 5, 5, ndx);
+            BfIterator it(_data, 0, 5, 5, ndx);
             return sign_extend_value(5, *it);
         }
     };
@@ -1940,53 +1866,69 @@ TEST(UpperBoundCorrectness)
 
 TEST(ParallelSearchEqualMatch)
 {
-    uint64_t buff[2] = {0, 0};
-    constexpr size_t width = 1;
-    constexpr size_t size = 128;
-    constexpr int64_t key = -1;
-    bf_iterator it(buff, 0, width, width, 0);
-    for (size_t i = 0; i < size; ++i) {
-        it.set_value(1); // this is equivalent to set it to -1
-        ++it;
-    }
-    it.move(0);
-    for (size_t i = 0; i < size; ++i) {
-        auto v = sign_extend_value(width, *it);
-        CHECK_EQUAL(v, -1);
-        ++it;
-    }
-    const auto mask = 1ULL << (width - 1);
-    const auto msb = populate(width, mask);
-    const auto search_vector = populate(width, key);
+    std::mt19937_64 gen64;
+    constexpr size_t buflen = 4;
+    uint64_t buff[buflen];
+    std::vector<int64_t> values;
+    for (uint8_t width = 1; width <= 64; width++) {
+        const size_t size = (buflen * 64) / width;
+        const uint64_t bit_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - width); // (1ULL << width) - 1;
 
-    static auto vector_compare_eq = [](auto msb, auto a, auto b) {
-        return find_all_fields_EQ(msb, a, b);
-    };
+        values.resize(size);
+        BfIterator it(buff, 0, width, width, 0);
+        for (size_t i = 0; i < size; ++i) {
+            uint64_t u_val = gen64() & bit_mask;
+            int64_t val = sign_extend_value(width, u_val);
+            values[i] = val;
+            it.set_value(val);
+            ++it;
+        }
+        it.move(0);
+        for (size_t i = 0; i < size; ++i) {
+            auto v = sign_extend_value(width, *it);
+            CHECK_EQUAL(v, values[i]);
+            ++it;
+        }
 
-    size_t start = 0;
-    const auto end = size;
-    std::vector<size_t> parallel_result;
-    while (start < end) {
-        start = parallel_subword_find(vector_compare_eq, buff, size_t{0}, width, msb, search_vector, start, end);
-        if (start != end)
-            parallel_result.push_back(start);
-        start += 1;
+        std::sort(values.begin(), values.end());
+        auto last = std::unique(values.begin(), values.end());
+        for (auto val = values.begin(); val != last; val++) {
+            const auto mask = 1ULL << (width - 1);
+            const auto msb = populate(width, mask);
+            const auto search_vector = populate(width, *val);
+
+            // perform the check with a normal iteration
+            size_t start = 0;
+            const auto end = size;
+            std::vector<size_t> linear_scan_result;
+            while (start < end) {
+                it.move(start);
+                const auto sv = sign_extend_value(width, *it);
+                if (sv == *val)
+                    linear_scan_result.push_back(start);
+                ++start;
+            }
+
+            // Now use the optimized version
+            static auto vector_compare_eq = [](auto msb, auto a, auto b) {
+                return find_all_fields_EQ(msb, a, b);
+            };
+
+            start = 0;
+            std::vector<size_t> parallel_result;
+            while (start < end) {
+                start =
+                    parallel_subword_find(vector_compare_eq, buff, size_t{0}, width, msb, search_vector, start, end);
+                if (start != end)
+                    parallel_result.push_back(start);
+                start += 1;
+            }
+
+            CHECK(!parallel_result.empty());
+            CHECK(!linear_scan_result.empty());
+            CHECK_EQUAL(linear_scan_result, parallel_result);
+        }
     }
-
-    // perform the same check but with a normal iteration
-    start = 0;
-    std::vector<size_t> linear_scan_result;
-    while (start < end) {
-        it.move(start);
-        const auto sv = sign_extend_value(width, *it);
-        if (sv == key)
-            linear_scan_result.push_back(start);
-        ++start;
-    }
-
-    CHECK(!parallel_result.empty());
-    CHECK(!linear_scan_result.empty());
-    CHECK_EQUAL(linear_scan_result, parallel_result);
 }
 
 TEST(ParallelSearchEqualNoMatch)
@@ -1995,7 +1937,7 @@ TEST(ParallelSearchEqualNoMatch)
     constexpr size_t width = 2;
     constexpr size_t size = 64;
     constexpr int64_t key = 2;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(1);
         ++it;
@@ -2045,7 +1987,7 @@ TEST(ParallelSearchNotEqual)
     constexpr size_t width = 2;
     constexpr size_t size = 64;
     constexpr int64_t key = 2;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(1);
         ++it;
@@ -2096,7 +2038,7 @@ TEST(ParallelSearchLessThan)
     constexpr size_t width = 4;
     constexpr size_t size = 32;
     constexpr int64_t key = 3;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(2);
         ++it;
@@ -2111,7 +2053,7 @@ TEST(ParallelSearchLessThan)
     const auto msb = populate(width, mask);
     const auto search_vector = populate(width, key);
 
-    static auto vector_compare_neq = [](auto msb, auto a, auto b) {
+    static auto vector_compare_lt = [](auto msb, auto a, auto b) {
         return find_all_fields_signed_LT(msb, a, b);
     };
 
@@ -2119,7 +2061,7 @@ TEST(ParallelSearchLessThan)
     const auto end = size;
     std::vector<size_t> parallel_result;
     while (start < end) {
-        start = parallel_subword_find(vector_compare_neq, buff, size_t{0}, width, msb, search_vector, start, end);
+        start = parallel_subword_find(vector_compare_lt, buff, size_t{0}, width, msb, search_vector, start, end);
         if (start != end)
             parallel_result.push_back(start);
         start += 1;
@@ -2146,7 +2088,7 @@ TEST(ParallelSearchGreaterThan)
     constexpr size_t width = 4;
     constexpr size_t size = 32;
     constexpr int64_t key = 2;
-    bf_iterator it(buff, 0, width, width, 0);
+    BfIterator it(buff, 0, width, width, 0);
     for (size_t i = 0; i < size; ++i) {
         it.set_value(3);
         ++it;
@@ -2161,7 +2103,7 @@ TEST(ParallelSearchGreaterThan)
     const auto msb = populate(width, mask);
     const auto search_vector = populate(width, key);
 
-    static auto vector_compare_neq = [](auto msb, auto a, auto b) {
+    static auto vector_compare_gt = [](auto msb, auto a, auto b) {
         return find_all_fields_signed_GT(msb, a, b);
     };
 
@@ -2169,7 +2111,7 @@ TEST(ParallelSearchGreaterThan)
     const auto end = size;
     std::vector<size_t> parallel_result;
     while (start < end) {
-        start = parallel_subword_find(vector_compare_neq, buff, size_t{0}, width, msb, search_vector, start, end);
+        start = parallel_subword_find(vector_compare_gt, buff, size_t{0}, width, msb, search_vector, start, end);
         if (start != end)
             parallel_result.push_back(start);
         start += 1;

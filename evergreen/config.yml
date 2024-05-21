@@ -180,6 +180,7 @@ functions:
           fi
 
           set_cmake_var realm_vars REALM_NO_TESTS BOOL ${no_tests|Off}
+          set_cmake_var realm_vars CMAKE_COMPILE_WARNING_AS_ERROR BOOL On
 
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
