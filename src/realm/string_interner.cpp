@@ -365,8 +365,8 @@ void StringInterner::rebuild_internal()
     for (auto& e : m_compressed_strings) {
         total_compressor_data += e.size();
     }
-    std::cout << "Number of compressed strings: " << target_size << "    using: " << total_compressor_data
-              << "   avg length " << (total_compressor_data / target_size) << std::endl;
+    // std::cout << "Number of compressed strings: " << target_size << "    using: " << total_compressor_data
+    //           << "   avg length " << (total_compressor_data / target_size) << std::endl;
 }
 
 StringInterner::~StringInterner() {}
