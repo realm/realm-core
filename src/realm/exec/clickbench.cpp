@@ -299,20 +299,22 @@ static void import(const char* filename)
     int buf_cnt = 0;
     const int bufs_per_commit = 100;
     while (auto buf = mbx.receive()) {
-        // t->create_objects(buf);
-        //        for (auto& val : buf->values) {
-        //            //Obj o = t->create_object(ObjKey(), val);
-        //            // verify
-        //            /*
-        //                        for (auto& e : val) {
-        //                            if (e.col_key.get_type() == col_type_String) {
-        //                                auto got_string = o.get<StringData>(e.col_key);
-        //                                auto the_string = e.value.get_string();
-        //                                REALM_ASSERT(got_string == the_string);
-        //                            }
-        //                        }
-        //            */
-        //        }
+        for (auto& val : buf->values) {
+            Obj o = t->create_object(ObjKey(), val);
+            // verify
+            for (auto& e : val) {
+                if (e.col_key.get_type() == col_type_Int) {
+                    auto got_int = o.get<Int>(e.col_key);
+                    auto the_int = e.value.get_int();
+                    REALM_ASSERT(got_int == the_int);
+                }
+                if (e.col_key.get_type() == col_type_String) {
+                    auto got_string = o.get<StringData>(e.col_key);
+                    auto the_string = e.value.get_string();
+                    REALM_ASSERT(got_string == the_string);
+                }
+            }
+        }
         resp.send(buf);
         if (buf_cnt++ > bufs_per_commit) {
             tr->commit_and_continue_as_read();
@@ -329,12 +331,6 @@ static void import(const char* filename)
     std::cout << "Ingestion complete in "
               << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() << " msecs"
               << std::endl;
-    /*
-        std::cout << std::endl;
-        t->dump_interning_stats();
-        std::cout << std::endl;
-        std::cout << t->size() << std::endl;
-    */
 }
 
 static void dump_prop(const char* filename, const char* prop_name)
@@ -368,7 +364,7 @@ static void dump_prop(const char* filename, const char* prop_name)
 int main(int argc, const char* argv[])
 {
     if (argc == 1) {
-        import("/home/finn/Downloads/mill.tsv");
+        import("mill.tsv");
     }
     if (argc == 2) {
         import(argv[1]);
