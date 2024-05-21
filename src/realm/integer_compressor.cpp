@@ -169,7 +169,7 @@ bool IntegerCompressor::compress(const Array& origin, Array& arr) const
     std::vector<size_t> indices;
     compress_values(origin, values, indices);
     if (!values.empty()) {
-        size_t v_width, ndx_width;
+        uint8_t v_width, ndx_width;
         const auto uncompressed_size = origin.get_byte_size();
         const auto packed_size = packed_disk_size(values, origin.size(), v_width);
         const auto flex_size = flex_disk_size(values, indices, v_width, ndx_width);
