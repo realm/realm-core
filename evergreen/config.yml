@@ -741,6 +741,7 @@ tasks:
   - command: shell.exec
     params:
       working_dir: realm-core
+      shell: bash
       script: |-
         set -o errexit
         if [[ -n "${cmake_bindir}" ]]; then
