@@ -1409,9 +1409,8 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
-  - name: compile_local_tests
+  - name: compile_test_and_package 
   - name: benchmarks
-  - name: package
   - name: generate-sync-corpus
 
 - name: ubuntu2004-arm64
