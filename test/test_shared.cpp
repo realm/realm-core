@@ -421,7 +421,7 @@ ONLY(Shared_DiskSpace)
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
-    Thread writer_thread;
+    std::thread writer_thread;
     {
         DBRef sg = get_test_db(path, crypt_key());
         // Create table entries
@@ -439,7 +439,7 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            writer_thread.start(std::bind(&writer, sg, 41));
+            writer_thread = std::thread(&writer, sg, 41);
 
             // make sure writer has started:
             bool waiting = true;
@@ -931,8 +931,7 @@ TEST(Shared_try_begin_write)
     };
 
     thread_obtains_write_lock.lock();
-    Thread async_writer;
-    async_writer.start(do_async);
+    std::thread async_writer(do_async);
 
     // wait for the thread to start a write transaction
     std::unique_lock<std::mutex> lock(cv_lock);
@@ -1424,9 +1423,9 @@ TEST(Many_ConcurrentReaders)
     };
 
     constexpr int num_threads = 4;
-    Thread threads[num_threads];
+    std::thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        threads[i].start(reader);
+        threads[i] = std::thread(reader);
     }
     for (int i = 0; i < num_threads; ++i) {
         threads[i].join();
@@ -1538,13 +1537,11 @@ TEST(Shared_WriterThreads)
             wt.commit();
         }
 
-        Thread threads[thread_count];
+        std::thread threads[thread_count];
 
         // Create all threads
         for (int i = 0; i < thread_count; ++i)
-            threads[i].start([this, &sg, i] {
-                writer_threads_thread(test_context, sg, ObjKey(i));
-            });
+            threads[i] = std::thread(writer_threads_thread, std::ref(test_context), sg, ObjKey(i));
 
         // Wait for all threads to complete
         for (int i = 0; i < thread_count; ++i)
@@ -3016,8 +3013,7 @@ TEST(Shared_LockFileInitSpinsOnZeroSize)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.rw_lock_shared();
         File::UnlockGuard ug(f);
@@ -3033,8 +3029,7 @@ TEST(Shared_LockFileInitSpinsOnZeroSize)
 
         millisleep(100);
         // the lock is then released and the other thread will be able to initialise properly
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3062,8 +3057,7 @@ TEST(Shared_LockFileSpinsOnInitComplete)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.rw_lock_shared();
         File::UnlockGuard ug(f);
@@ -3079,8 +3073,7 @@ TEST(Shared_LockFileSpinsOnInitComplete)
 
         millisleep(100);
         // the lock is then released and the other thread will be able to initialise properly
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3112,8 +3105,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.rw_lock_shared();
@@ -3141,8 +3133,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3173,8 +3164,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         CHECK(File::exists(path.get_lock_path()));
 
         File f;
@@ -3195,8 +3185,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
     sg->close();
@@ -3227,8 +3216,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
@@ -3247,8 +3235,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3280,8 +3267,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
@@ -3300,8 +3286,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
     sg->close();
