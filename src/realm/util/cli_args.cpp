@@ -2,6 +2,7 @@
 #include <string>
 #include <errno.h>
 #include <algorithm>
+#include <cstdint>
 
 namespace realm::util {
 
