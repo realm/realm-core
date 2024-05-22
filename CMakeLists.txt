@@ -256,6 +256,8 @@ if(UNIX)
         add_compile_definitions("_POSIX_C_SOURCE=200112L")
     endif()
     cmake_pop_check_state()
+    cmake_reset_check_state()
+    check_symbol_exists(explicit_bzero "string.h" REALM_HAVE_EXPLICIT_BZERO)
 endif()
 
 # Options (passed to CMake)

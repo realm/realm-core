@@ -219,9 +219,12 @@ void SensitiveBufferBase::secure_erase(void* buffer, size_t size)
     SecureZeroMemory(buffer, size);
 #elif defined(__STDC_LIB_EXT1__) || __APPLE__
     memset_s(buffer, size, 0, size);
-#elif defined(__GNU_LIBRARY__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 25
+#elif REALM_HAVE_EXPLICIT_BZERO
+    // it's at least expected to be available on glibc >= 2.25 and Musl
     explicit_bzero(buffer, size);
 #else
-#error "Platforms lacks memset_s"
+#error "Platforms lacks memset_s or explicit_bzero"
+    (void)buffer;
+    (void)size;
 #endif
 }
