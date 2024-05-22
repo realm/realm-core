@@ -1424,11 +1424,6 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             else {
                 explain_value_message = util::format("argument %1 with value '%2'", explain_value_message, value);
-                if (!(m_target_table || Mixed::data_types_are_comparable(value.get_type(), hint) ||
-                      Mixed::is_numeric(hint) || (value.is_type(type_String) && hint == type_TypeOfValue))) {
-                    throw InvalidQueryArgError(
-                        util::format("Cannot compare %1 to a %2", explain_value_message, get_data_type_name(hint)));
-                }
             }
         }
     }
@@ -1465,6 +1460,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     }
 
     convert_if_needed(value);
+
+    if (type == Type::ARG && !(m_target_table || Mixed::data_types_are_comparable(value.get_type(), hint) ||
+                               (value.is_type(type_TypedLink) && hint == type_Link) ||
+                               (value.is_type(type_String) && hint == type_TypeOfValue))) {
+        throw InvalidQueryArgError(
+            util::format("Cannot compare %1 to a %2", explain_value_message, get_data_type_name(hint)));
+    }
 
     switch (value.get_type()) {
         case type_Int: {
