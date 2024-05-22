@@ -509,20 +509,22 @@ functions:
   - command: shell.exec
     params:
       shell: bash
+      working_dir: realm-core
       script: |-
         set -o errexit
         set -o verbose
 
-        TOP_DIR=$(pwd)/realm-core
+        TOP_DIR=$(pwd)
+        
         HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
         REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
 
-        if [[ ! -d $TOP_DIR || ! -d $REQUIREMENTS_PATH ]]; then
+        if [[ ! -d $TOP_DIR || ! -f $REQUIREMENTS_PATH ]]; then
           echo "No source directory exists. Not running hang analyzer"
           exit 1
         fi
 
-        mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
+        mkdir hang_analyzer_workdir; cd hang_analyzer_workdir
         ${python3|python3} -m venv venv
 
         # venv creates its Scripts/activate file with CLRF endings, which
@@ -547,16 +549,6 @@ functions:
         python=python
 
         echo "python set to $(which $python)"
-
-        echo "Upgrading pip to 21.0.1"
-
-        # ref: https://github.com/grpc/grpc/issues/25082#issuecomment-778392661
-        if [ "$(uname -m)" = "arm64" ] && [ "$(uname)" == "Darwin" ]; then
-          export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-          export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-        fi
-
-        python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 
         if [ "Windows_NT" = "$OS" ]; then
           REQUIREMENTS_PATH=$(cygpath -w $REQUIREMENTS_PATH)

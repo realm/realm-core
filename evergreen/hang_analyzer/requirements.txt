@@ -1,3 +1,4 @@
 pypiwin32==223; sys_platform == "win32" and python_version > "3"
 pywin32==301; sys_platform == "win32" and python_version > "3"
 distro == 1.5.0
+setuptools == 70.0.0
