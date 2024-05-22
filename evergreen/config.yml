@@ -759,6 +759,7 @@ tasks:
   - command: shell.exec
     params:
       working_dir: realm-core
+      shell: bash
       script: |-
         set -o errexit
         if [[ -n "${cmake_bindir}" ]]; then
@@ -1138,6 +1139,56 @@ tasks:
       script: |-
         ${cmake_build_type|Debug}/realm-libfuzz -rss_limit_mb=0 -max_total_time=3600
 
+- name: generate-sync-corpus
+  tags: [ "for_nightly_tests" ]
+  exec_timeout_secs: 1800
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: "SyncTests"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+          set -o errexit
+          set -o verbose
+
+          if [[ -n "${c_compiler}" && "$(basename ${c_compiler})" = "clang" && -f "$(dirname ${c_compiler})/llvm-symbolizer" ]]; then
+              LLVM_SYMBOLIZER="$(dirname ${c_compiler})/llvm-symbolizer"
+              export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
+              export TSAN_OPTIONS="external_symbolizer_path=$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
+          fi
+
+          export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
+          if [[ -n "$UNITTEST_EVERGREEN_TEST_RESULTS" && -f "$UNITTEST_EVERGREEN_TEST_RESULTS" ]]; then
+              rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
+          fi
+          export UNITTEST_PROGRESS=1
+          export UNITTEST_FILTER="Array_Example Transform_* EmbeddedObjects_*"
+          export UNITTEST_DUMP_TRANSFORM="changeset_dump"
+
+          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 $TSAN_OPTIONS"
+          export UBSAN_OPTIONS="print_stacktrace=1"
+
+          ./build/test/${cmake_build_type}/realm-sync-tests
+
+          CHANGESET_DUMP_DIR="$(find . -type d -name changeset_dump -print -quit)"
+          mv "$CHANGESET_DUMP_DIR" changeset_dump
+          tar -czvf changeset_dump.tgz changeset_dump
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/changeset_dump.tgz'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/changeset_dump.tgz'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: changeset dump tarball
+
 task_groups:
 - name: core_tests_group
   setup_group_can_fail_task: true
@@ -1361,9 +1412,10 @@ buildvariants:
   - name: core_tests_group
 
 # TODO RCORE-2085 ubuntu2004-release/ubuntu2004-arm64 build variants are here until we've established
-# a new baseline for the updated ubuntu 2204/clang 18 builders.
+# a new baseline for the updated ubuntu 2204/clang 18 builders and to generate artifacts for the baas
+# team.
 - name: ubuntu2004-release
-  display_name: "Ubuntu 20.04 x86_64 (Clang 11 release benchmarks)"
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 release benchmarks/baas artifacts)"
   run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
@@ -1376,7 +1428,9 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
+  - name: compile_test_and_package 
   - name: benchmarks
+  - name: generate-sync-corpus
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64 (Clang 11 release benchmarks)"
@@ -1532,21 +1586,6 @@ buildvariants:
 #     proxy_toxics_randoms: "1000:3000|1000:3000|1000:1500|50:200"
 #   tasks:
 #   - name: network_tests
-
-- name: rhel70
-  display_name: "RHEL 7 x86_64"
-  run_on: rhel70-large
-  expansions:
-    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
-    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    fetch_missing_dependencies: On
-    curl: "/opt/mongodbtoolchain/v3/bin/curl"
-    python3: "/opt/mongodbtoolchain/v3/bin/python3"
-    ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
-  tasks:
-  - name: compile_test_and_package
 
 - name: ubuntu-valgrind
   display_name: "Ubuntu 22.04 x86_64 (Valgrind)"
