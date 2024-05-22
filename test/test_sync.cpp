@@ -2962,8 +2962,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    auto reset_store = sync::PendingResetStore::create(db);
-    Session session(client, db, nullptr, nullptr, reset_store, std::move(session_config));
+    Session session(client, db, nullptr, nullptr, std::move(session_config));
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -3336,8 +3335,7 @@ TEST(Sync_UploadDownloadProgress_3)
     config.server_port = server_port;
     config.realm_identifier = "/test";
 
-    auto reset_store = sync::PendingResetStore::create(db);
-    Session session(client, db, nullptr, nullptr, reset_store, std::move(config));
+    Session session(client, db, nullptr, nullptr, std::move(config));
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -3642,8 +3640,7 @@ TEST(Sync_UploadDownloadProgress_6)
     std::mutex mutex;
     std::condition_variable session_cv;
     bool signaled = false;
-    auto reset_store = sync::PendingResetStore::create(db);
-    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, reset_store, std::move(session_config));
+    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -3717,8 +3714,7 @@ TEST(Sync_UploadDownloadProgress_7)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    auto reset_store = sync::PendingResetStore::create(db);
-    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, reset_store, std::move(session_config));
+    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
     session->bind();
 
     client.shutdown_and_wait();
@@ -3821,9 +3817,8 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
         config_1.realm_identifier = "blablabla";
         Session::Config config_2;
         config_2.realm_identifier = config_1.realm_identifier;
-        auto reset_store = sync::PendingResetStore::create(db);
-        Session session_1{client, db, nullptr, nullptr, reset_store, std::move(config_1)};
-        Session session_2{client, db, nullptr, nullptr, reset_store, std::move(config_2)};
+        Session session_1{client, db, nullptr, nullptr, std::move(config_1)};
+        Session session_2{client, db, nullptr, nullptr, std::move(config_2)};
         session_1.bind();
         session_2.bind();
         CHECK_THROW(
@@ -5130,7 +5125,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, nullptr, nullptr, nullptr, std::move(session_config)};
+        Session session{client, db, nullptr, nullptr, std::move(session_config)};
 
         auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {

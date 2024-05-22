@@ -358,7 +358,7 @@ public:
     ///
     /// Note that the session is not fully activated until you call bind().
     Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
-            std::shared_ptr<PendingResetStore>, Config&& = {});
+            Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().

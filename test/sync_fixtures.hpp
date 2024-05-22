@@ -703,8 +703,7 @@ public:
         config.server_port = m_server_ports[server_index];
         config.server_address = "localhost";
 
-        auto reset_store = sync::PendingResetStore::create(db);
-        Session session{*m_clients[client_index], std::move(db), nullptr, nullptr, reset_store, std::move(config)};
+        Session session{*m_clients[client_index], std::move(db), nullptr, nullptr, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }

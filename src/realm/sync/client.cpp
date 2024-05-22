@@ -85,7 +85,7 @@ using ProxyConfig                     = SyncConfig::ProxyConfig;
 class SessionWrapper final : public util::AtomicRefCountBase, DB::CommitListener {
 public:
     SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
-                   std::shared_ptr<PendingResetStore>, Session::Config);
+                   Session::Config);
     ~SessionWrapper() noexcept;
 
     ClientReplication& get_replication() noexcept;
@@ -1213,8 +1213,7 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 // provides a link to the ClientImpl::Session that creates and receives messages with the server with
 // the ClientImpl::Connection that owns the ClientImpl::Session.
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
-                               std::shared_ptr<MigrationStore> migration_store,
-                               std::shared_ptr<PendingResetStore> pending_reset_store, Session::Config config)
+                               std::shared_ptr<MigrationStore> migration_store, Session::Config config)
     : m_client{client}
     , m_db(std::move(db))
     , m_replication(m_db->get_replication())
@@ -1241,7 +1240,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))
-    , m_pending_reset_store(std::move(pending_reset_store))
+    , m_pending_reset_store{sync::PendingResetStore::create(m_db)}
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
@@ -2233,12 +2232,11 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 
 
 Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
-                 std::shared_ptr<MigrationStore> migration_store,
-                 std::shared_ptr<PendingResetStore> pending_reset_store, Config&& config)
+                 std::shared_ptr<MigrationStore> migration_store, Config&& config)
 {
     util::bind_ptr<SessionWrapper> sess;
     sess.reset(new SessionWrapper{*client.m_impl, std::move(db), std::move(flx_sub_store), std::move(migration_store),
-                                  std::move(pending_reset_store), std::move(config)}); // Throws
+                                  std::move(config)}); // Throws
     // The reference count passed back to the application is implicitly
     // owned by a naked pointer. This is done to avoid exposing
     // implementation details through the header file (that is, through the

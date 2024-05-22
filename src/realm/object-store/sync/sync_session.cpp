@@ -373,7 +373,6 @@ SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, co
     , m_db{std::move(db)}
     , m_original_sync_config{m_config.sync_config}
     , m_migration_store{sync::MigrationStore::create(m_db)}
-    , m_pending_reset_store{sync::PendingResetStore::create(m_db)}
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
@@ -957,8 +956,7 @@ void SyncSession::create_sync_session()
         m_client_reset_error.reset();
     }
 
-    m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, m_pending_reset_store,
-                                      std::move(session_config));
+    m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 

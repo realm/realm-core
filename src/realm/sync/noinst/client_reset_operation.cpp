@@ -56,6 +56,7 @@ bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& rese
                           sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
                           sync::PendingResetStore* reset_store, util::FunctionRef<void(int64_t)> on_flx_version)
 {
+    REALM_ASSERT(reset_store);
     REALM_ASSERT(reset_config.mode != ClientResyncMode::Manual);
     REALM_ASSERT(reset_config.error);
     REALM_ASSERT(reset_config.fresh_copy);
