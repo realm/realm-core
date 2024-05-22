@@ -16,12 +16,12 @@
  *
  **************************************************************************/
 
+#include <realm/util/thread.hpp>
+#include <realm/util/backtrace.hpp>
+
 #include <cstring>
 #include <stdexcept>
 #include <system_error>
-
-#include <realm/util/thread.hpp>
-#include <realm/util/backtrace.hpp>
 
 #if !defined _WIN32
 #include <unistd.h>
@@ -57,25 +57,6 @@
 
 using namespace realm;
 using namespace realm::util;
-
-void Thread::join()
-{
-    if (!m_joinable)
-        throw util::runtime_error("Thread is not joinable");
-
-#ifdef _WIN32
-    // Returns void; error handling not possible
-    m_std_thread.join();
-#else
-    void** value_ptr = nullptr; // Ignore return value
-    int r = pthread_join(m_id, value_ptr);
-    if (REALM_UNLIKELY(r != 0))
-        join_failed(r); // Throws
-#endif
-
-    m_joinable = false;
-}
-
 
 void Thread::set_name(const std::string& name)
 {
@@ -130,17 +111,6 @@ bool Thread::get_name(std::string& name) noexcept
 #endif
 }
 
-
-REALM_NORETURN void Thread::create_failed(int)
-{
-    throw std::runtime_error("pthread_create() failed");
-}
-
-REALM_NORETURN void Thread::join_failed(int)
-{
-    // It is intentional that the argument is ignored here.
-    throw std::runtime_error("pthread_join() failed.");
-}
 
 void Mutex::init_as_process_shared(bool robust_if_available)
 {

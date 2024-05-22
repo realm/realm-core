@@ -22,8 +22,7 @@
 #include <exception>
 #include <string>
 #include <iostream>
-
-#include <realm/util/thread.hpp>
+#include <thread>
 
 namespace realm {
 namespace test_util {
@@ -37,9 +36,7 @@ public:
     void start(const F& func)
     {
         m_except = false;
-        m_thread.start([func, this] {
-            Runner<F>::run(func, this);
-        });
+        m_thread = std::thread(Runner<F>::run, func, this);
     }
 
     /// Returns 'true' if thread has thrown an exception. In that case
@@ -73,7 +70,7 @@ public:
     }
 
 private:
-    util::Thread m_thread;
+    std::thread m_thread;
     bool m_except;
     std::string m_except_msg;
 

@@ -1,13 +1,13 @@
 #ifndef REALM_UTIL_THREAD_EXEC_GUARD_HPP
 #define REALM_UTIL_THREAD_EXEC_GUARD_HPP
 
-#include <exception>
-#include <utility>
-#include <string>
-
-#include <realm/util/thread.hpp>
 #include <realm/util/signal_blocker.hpp>
+#include <realm/util/thread.hpp>
 
+#include <exception>
+#include <string>
+#include <thread>
+#include <utility>
 
 namespace realm {
 namespace util {
@@ -48,7 +48,7 @@ public:
 private:
     struct State {
         R& runnable;
-        util::Thread thread;
+        std::thread thread;
         std::exception_ptr exception;
         State(R&) noexcept;
         ~State() noexcept;
@@ -114,7 +114,7 @@ private:
     struct State {
         R& runnable;
         P& parent;
-        util::Thread thread;
+        std::thread thread;
         std::exception_ptr exception;
         State(R&, P&) noexcept;
         ~State() noexcept;
@@ -209,7 +209,7 @@ inline void ThreadExecGuard<R>::State::start(const std::string* thread_name)
             exception = std::current_exception();
         }
     };
-    thread.start(std::move(run)); // Throws
+    thread = std::thread(std::move(run)); // Throws
 }
 
 template <class R>
@@ -299,7 +299,7 @@ inline void ThreadExecGuardWithParent<R, P>::State::start(const std::string* thr
             parent.stop();
         }
     };
-    thread.start(std::move(run)); // Throws
+    thread = std::thread(std::move(run)); // Throws
 }
 
 template <class R, class P>

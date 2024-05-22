@@ -1397,9 +1397,8 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // occasionally modify the database through the accessor.
     // feed the accessor refs to the background thread for
     // later deletion.
-    util::Thread deleter;
     ConcurrentQueue<LnkLstPtr> queue(buffer_size);
-    deleter.start([&] {
+    std::thread deleter([&] {
         deleter_thread(queue);
     });
     for (int i = 0; i < max_refs; ++i) {
@@ -2980,16 +2979,12 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         wt.commit();
     }
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
-    Thread threads[write_thread_count + read_thread_count];
+    std::thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
-        threads[i].start([&] {
-            multiple_trackers_writer_thread(sg);
-        });
+        threads[i] = std::thread(multiple_trackers_writer_thread, sg);
     std::this_thread::yield();
     for (int i = 0; i < read_thread_count; ++i) {
-        threads[write_thread_count + i].start([&] {
-            multiple_trackers_reader_thread(test_context, sg);
-        });
+        threads[write_thread_count + i] = std::thread(multiple_trackers_reader_thread, std::ref(test_context), sg);
     }
 
     // Wait for all writer threads to complete
@@ -3749,10 +3744,7 @@ void handover_querier(HandoverControl<Work>* control, TestContext& test_context,
     // one written by the writer thread. We do this (simplisticly) by locking on
     // to the initial version before even starting the writer.
     auto g = db->start_read();
-    Thread writer;
-    writer.start([&] {
-        handover_writer(db);
-    });
+    std::thread writer(handover_writer, db);
     TableRef table = g->get_table("table");
     ColKeys cols = table->get_column_keys();
     TableView tv = table->where().greater(cols[0], 50).find_all();
@@ -3858,11 +3850,9 @@ TEST_IF(LangBindHelper_RacingAttachers, !running_with_tsan)
             table->create_object(ObjKey(i));
         g->commit();
     }
-    Thread attachers[num_attachers];
+    std::thread attachers[num_attachers];
     for (int i = 0; i < num_attachers; ++i) {
-        attachers[i].start([&] {
-            attacher(path, col);
-        });
+        attachers[i] = std::thread(attacher, std::string(path), col);
     }
     for (int i = 0; i < num_attachers; ++i) {
         attachers[i].join();
@@ -3885,13 +3875,8 @@ TEST_IF(LangBindHelper_HandoverBetweenThreads, !running_with_valgrind)
     g->end_read();
 
     HandoverControl<Work> control;
-    Thread querier, verifier;
-    querier.start([&] {
-        handover_querier(&control, test_context, sg);
-    });
-    verifier.start([&] {
-        handover_verifier(&control, test_context);
-    });
+    std::thread querier(handover_querier, &control, std::ref(test_context), sg);
+    std::thread verifier(handover_verifier, &control, std::ref(test_context));
     querier.join();
     verifier.join();
 }
@@ -5064,11 +5049,9 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
     realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
     query.find_all(); // <-- fails
 
-    Thread slaves[threads];
+    std::thread slaves[threads];
     for (int i = 0; i != threads; ++i) {
-        slaves[i].start([=] {
-            async();
-        });
+        slaves[i] = std::thread(async);
     }
 
     // Main thread
