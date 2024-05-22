@@ -66,6 +66,7 @@ public:
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state) const;
 
     template <class T>
+    size_t find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const;
     static ref_type typed_write(ref_type ref, T& out, Allocator& alloc)
     {
         Array arr(alloc);
@@ -140,6 +141,7 @@ public:
 
 
     size_t find_first(value_type value, size_t begin = 0, size_t end = npos) const;
+    size_t find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const;
 
     template <class T>
     static ref_type typed_write(ref_type ref, T& out, Allocator& alloc)

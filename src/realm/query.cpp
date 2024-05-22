@@ -624,10 +624,12 @@ Query& Query::less(ColKey column_key, int64_t value)
 }
 Query& Query::between(ColKey column_key, int64_t from, int64_t to)
 {
-    group();
-    greater_equal(column_key, from);
-    less_equal(column_key, to);
-    end_group();
+    if (column_key.is_nullable()) {
+        add_node(std::unique_ptr<realm::ParentNode>(new BetweenNode<ArrayIntNull>(from, to, column_key)));
+    }
+    else {
+        add_node(std::unique_ptr<realm::ParentNode>(new BetweenNode<ArrayInteger>(from, to, column_key)));
+    }
     return *this;
 }
 Query& Query::equal(ColKey column_key, bool value)
