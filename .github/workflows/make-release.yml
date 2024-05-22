@@ -32,7 +32,7 @@ jobs:
       with:
         bodyFile: extracted_changelog.md
         name: ${{ steps.get-version.outputs.version }}
-        commit: ${{ github.ref }}
+        commit: ${{ github.base_ref }}
         tag: ${{ steps.get-version.outputs.version }}
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: false
@@ -48,7 +48,7 @@ jobs:
         title: Prepare for vNext
         body: Update Changelog for vNext
         delete-branch: true
-        base: ${{ github.ref }}
+        base: ${{ github.base_ref }}
         commit-message: Prepare for vNext
     - name: Merge Pull Request
       uses: juliangruber/merge-pull-request-action@9234b8714dda9a08f3d1df5b2a6a3abd7b695353 #! 1.3.1
