@@ -406,6 +406,64 @@ protected:
 };
 
 
+template <class LeafType>
+class BetweenNode : public ColumnNodeBase {
+public:
+    using TConditionValue = typename util::RemoveOptional<typename LeafType::value_type>::type;
+
+    BetweenNode(TConditionValue from, TConditionValue to, ColKey column_key)
+        : ColumnNodeBase(column_key)
+        , m_from(std::move(from))
+        , m_to(std::move(to))
+    {
+    }
+
+    BetweenNode(const BetweenNode& from)
+        : ColumnNodeBase(from)
+        , m_from(from.m_from)
+        , m_to(from.m_to)
+    {
+    }
+
+    void cluster_changed() override
+    {
+        m_leaf.emplace(m_table.unchecked_ptr()->get_alloc());
+        m_cluster->init_leaf(this->m_condition_column_key, &*m_leaf);
+    }
+
+    void init(bool will_query_ranges) override
+    {
+        ColumnNodeBase::init(will_query_ranges);
+
+        m_dT = .25;
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        return m_leaf->template find_first_in_range(m_from, m_to, start, end);
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_column(ParentNode::m_table, ColumnNodeBase::m_condition_column_key) + " between {" +
+               util::serializer::print_value(this->m_from) + ", " + util::serializer::print_value(this->m_to) + "}";
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new BetweenNode(*this));
+    }
+
+private:
+    // Search values:
+    TConditionValue m_from;
+    TConditionValue m_to;
+
+    // Leaf cache
+    std::optional<LeafType> m_leaf;
+};
+
+
 template <class LeafType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<LeafType> {
     using BaseType = IntegerNodeBase<LeafType>;

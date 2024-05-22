@@ -3898,6 +3898,27 @@ TEST(Query_SortDates)
     CHECK_EQUAL(tv[2].get<Timestamp>(col_date), Timestamp(3000, 0));
 }
 
+TEST(Query_DateRange)
+{
+    Table table;
+    auto col_date = table.add_column(type_Timestamp, "date", true);
+
+    for (int64_t sec = 100; sec < 110; sec++) {
+        for (int nano = 0; nano < 5; nano++) {
+            table.create_object().set(col_date, Timestamp(sec, nano));
+        }
+    }
+
+    CHECK_EQUAL(table.where().between(col_date, Timestamp(100, 1), Timestamp(100, 1)).count(), 1);
+    CHECK_EQUAL(table.where().between(col_date, Timestamp(100, 1), Timestamp(100, 4)).count(), 4);
+    CHECK_EQUAL(table.where().between(col_date, Timestamp(100, 4), Timestamp(100, 7)).count(), 1);
+    CHECK_EQUAL(table.where().between(col_date, Timestamp(100, 4), Timestamp(101, 0)).count(), 2);
+    auto q = table.where().between(col_date, Timestamp(102, 0), Timestamp(103, 10));
+    CHECK_EQUAL(q.count(), 10);
+    auto d = q.get_description();
+    q = table.query(d);
+    CHECK_EQUAL(q.count(), 10);
+}
 
 TEST(Query_SortBools)
 {
