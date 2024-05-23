@@ -48,8 +48,10 @@ jobs:
         title: Prepare for vNext
         body: Update Changelog for vNext
         delete-branch: true
+        draft: false
         base: ${{ github.base_ref }}
-        commit-message: Prepare for vNext
+        labels: no-jira-ticket
+        commit-message: New changelog section to prepare for vNext
     - name: Merge Pull Request
       uses: juliangruber/merge-pull-request-action@9234b8714dda9a08f3d1df5b2a6a3abd7b695353 #! 1.3.1
       with:
