@@ -4332,12 +4332,13 @@ TEST_CASE("flx: open realm + register subscription callback while bootstrapping"
           "[sync][flx][bootstrap][async open][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_and_subscribe");
     auto foo_obj_id = ObjectId::gen();
+    int64_t foo_obj_queryable_int = 5;
     harness.load_initial_data([&](SharedRealm realm) {
         CppContext c(realm);
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{{"_id", foo_obj_id},
                                         {"queryable_str_field", "foo"s},
-                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"queryable_int_field", foo_obj_queryable_int},
                                         {"non_queryable_field", "created as initial data seed"s}}));
     });
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
@@ -4593,6 +4594,62 @@ TEST_CASE("flx: open realm + register subscription callback while bootstrapping"
                 REQUIRE(r1_active >= 1);
                 REQUIRE(r1_active <= 2);
             }
+        }
+
+        SECTION("Wait to bootstrap all pending subscriptions even when subscription_initializer is not used") {
+            // Client 1
+            {
+                auto realm = Realm::get_shared_realm(config);
+                // Create subscription (version = 1) and bootstrap data.
+                subscribe_to_all_and_bootstrap(*realm);
+                realm->sync_session()->shutdown_and_wait();
+
+                // Create a new subscription (version = 2) while the session is closed.
+                // The new subscription does not match the object bootstrapped at version 1.
+                auto mutable_subscription = realm->get_latest_subscription_set().make_mutable_copy();
+                mutable_subscription.clear();
+                auto table = realm->read_group().get_table("class_TopLevel");
+                auto queryable_int_field = table->get_column_key("queryable_int_field");
+                mutable_subscription.insert_or_assign(
+                    Query(table).not_equal(queryable_int_field, foo_obj_queryable_int));
+                mutable_subscription.commit();
+
+                realm->close();
+            }
+
+            _impl::RealmCoordinator::assert_no_open_realms();
+
+            // Client 2 uploads data matching Client 1's subscription at version 1
+            harness.load_initial_data([&](SharedRealm realm) {
+                CppContext c(realm);
+                Object::create(c, realm, "TopLevel",
+                               std::any(AnyDict{{"_id", ObjectId::gen()},
+                                                {"queryable_str_field", "bar"s},
+                                                {"queryable_int_field", 2 * foo_obj_queryable_int},
+                                                {"non_queryable_field", "some data"s}}));
+            });
+
+            // Client 1 opens the realm asynchronously and expects the task to complete
+            // when the subscription at version 2 finishes bootstrapping.
+            auto async_open = Realm::get_synchronized_realm(config);
+            auto open_task_pf = util::make_promise_future<bool>();
+            int64_t latest_version, active_version;
+            auto open_realm_completed_callback =
+                [promise_holder = util::CopyablePromiseHolder(std::move(open_task_pf.promise)), &latest_version,
+                 &active_version](ThreadSafeReference ref, std::exception_ptr err) mutable {
+                    REQUIRE_FALSE(err);
+                    auto realm = Realm::get_shared_realm(std::move(ref));
+                    REQUIRE(realm);
+                    latest_version = realm->get_latest_subscription_set().version();
+                    active_version = realm->get_active_subscription_set().version();
+                    promise_holder.get_promise().emplace_value(true);
+                };
+            async_open->start(open_realm_completed_callback);
+            CHECK(open_task_pf.future.get());
+
+            // Check subscription at version 2 is marked Complete.
+            CHECK(active_version == 2);
+            CHECK(latest_version == active_version);
         }
     }
 }
