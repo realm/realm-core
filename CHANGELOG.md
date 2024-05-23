@@ -206,6 +206,7 @@
 * Added `App::default_base_url()` static accessor for SDKs to retrieve the default base URL from Core. ([PR #7534](https://github.com/realm/realm-core/pull/7534))
 * Realm2JSON tool will now correctly upgrade file to current fileformat.
 * (bindgen) Remove dependency on the `clang-format` package and rely on a binary provided by the system instead.
+* Protocol version bumped to 12 ([#7124](https://github.com/realm/realm-core/issues/7124))
 
 ----------------------------------------------
 
