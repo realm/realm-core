@@ -348,7 +348,7 @@
 # 14.0.0 Release notes
 
 ### Enhancements
-* Property keypath in RQL can be substituted with value given as argument. Use '$P<i>' in query string. (Issue [#7033](https://github.com/realm/realm-core/issues/7033))
+* Property keypath in RQL can be substituted with value given as argument. Use '$K\<i\>' in query string. (Issue [#7033](https://github.com/realm/realm-core/issues/7033))
 * You can now use query substitution for the @type argument ([#7289](https://github.com/realm/realm-core/issues/7289))
 
 ### Fixed
