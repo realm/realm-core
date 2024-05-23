@@ -5,6 +5,8 @@
 # Description of release procedure can be found at https://github.com/realm/realm-core/doc/development/how-to-release.md
 #
 
+set -e -x
+
 VERSION_GREP='^[0-9]?[0-9].[0-9]+.[0-9]+(-.*)?$'
 
 function usage()
@@ -34,8 +36,6 @@ git submodule update --init --recursive
 
 project_dir=$(git rev-parse --show-toplevel)
 
-git checkout -b release/automated_v$realm_version
-
 # update dependencies.yml
 sed -i.bak -e "s/^VERSION.*/VERSION: ${realm_version}/" "${project_dir}/dependencies.yml"
 rm "${project_dir}/dependencies.yml.bak" || exit 1
@@ -44,10 +44,14 @@ rm "${project_dir}/dependencies.yml.bak" || exit 1
 sed -i.bak -e "s/^let versionStr =.*/let versionStr = \"${realm_version}\"/" "${project_dir}/Package.swift"
 rm "${project_dir}/Package.swift.bak" || exit 1
 
+# update CHANGELOG.md
 RELEASE_HEADER="# $realm_version Release notes" || exit 1
 sed -i.bak -e "1s/.*/$RELEASE_HEADER/" "${project_dir}/CHANGELOG.md" || exit 1
+sed -i.bak -e "/.*\[#????\](https.*/d" "${project_dir}/CHANGELOG.md"
 rm "${project_dir}/CHANGELOG.md.bak" || exit 1
 
+# on CI we use a shallow clone, so we may not have the tags yet
+git fetch --tags
 git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-merges > changes-since-last-tag.txt
 echo changes since last tag are
 cat changes-since-last-tag.txt
