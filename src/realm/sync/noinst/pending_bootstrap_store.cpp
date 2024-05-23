@@ -97,8 +97,10 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
          }}};
 
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_pending_bootstraps)) {
+    // Start with a reader so it doesn't try to write until we are ready
+    SyncMetadataSchemaVersionsReader schema_versions_reader(tr);
+    if (auto schema_version =
+            schema_versions_reader.get_version_for(tr, internal_schema_groups::c_pending_bootstraps)) {
         if (*schema_version != c_schema_version) {
             throw RuntimeError(ErrorCodes::SchemaVersionMismatch,
                                "Invalid schema version for FLX sync pending bootstrap table group");
@@ -107,7 +109,10 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
     }
     else {
         tr->promote_to_write();
+        // Create the metadata schema
         create_sync_metadata_schema(tr, &internal_tables);
+        // Update the schema version (and create the schema versions table, if needed)
+        SyncMetadataSchemaVersions schema_versions(tr);
         schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, c_schema_version);
         tr->commit_and_continue_as_read();
     }

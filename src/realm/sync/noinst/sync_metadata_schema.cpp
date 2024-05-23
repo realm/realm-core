@@ -175,10 +175,8 @@ SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const Transac
          {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
-    // Since this is read only, then Frozen is also allowed
-    REALM_ASSERT_EX(
-        (tr->get_transact_stage() == DB::transact_Reading || tr->get_transact_stage() == DB::transact_Frozen),
-        tr->get_transact_stage());
+    // Any type of transaction is allowed, including frozen and write, as long as it supports reading
+    REALM_ASSERT_EX(tr->get_transact_stage() != DB::transact_Ready, tr->get_transact_stage());
     // If the legacy_meta_table exists, then this table hasn't been converted and
     // the metadata schema versions information has not been upgraded/not accurate
     if (tr->has_table(c_flx_metadata_table)) {
@@ -224,8 +222,9 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
          {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
+    // Read and write transactions are allowed, but not frozen
     REALM_ASSERT_EX(
-        (tr->get_transact_stage() == DB::transact_Reading || tr->get_transact_stage() == DB::transact_Frozen),
+        (tr->get_transact_stage() == DB::transact_Reading || tr->get_transact_stage() == DB::transact_Writing),
         tr->get_transact_stage());
     // If the versions table exists, then m_table would have been initialized by the reader constructor
     // If the versions table doesn't exist, then initialize it now
@@ -236,9 +235,11 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
             load_sync_metadata_schema(tr, &unified_schema_version_table_def);
         }
         else {
-            tr->promote_to_write();
+            // Only write the versions table if it doesn't exist
+            if (tr->get_transact_stage() != DB::transact_Writing) {
+                tr->promote_to_write();
+            }
             create_sync_metadata_schema(tr, &unified_schema_version_table_def);
-            tr->commit_and_continue_as_read();
         }
     }
 
@@ -250,14 +251,16 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
     load_sync_metadata_schema(tr, &legacy_table_def);
     // Migrate from just having a subscription store metadata table to having multiple table groups with multiple
     // versions.
-    tr->promote_to_write();
+    if (tr->get_transact_stage() != DB::transact_Writing) {
+        tr->promote_to_write();
+    }
     auto legacy_meta_table = tr->get_table(legacy_table_key);
     auto legacy_obj = legacy_meta_table->get_object(0);
     // Only the flx subscription store can potentially have the legacy metadata table
     set_version_for(tr, internal_schema_groups::c_flx_subscription_store,
                     legacy_obj.get<int64_t>(legacy_version_key));
     tr->remove_table(legacy_table_key);
-    tr->commit_and_continue_as_read();
+    // Don't commit changes now - wait for the caller to commit them
 }
 
 void SyncMetadataSchemaVersions::set_version_for(const TransactionRef& tr, std::string_view schema_group_name,

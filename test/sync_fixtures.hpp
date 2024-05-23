@@ -10,7 +10,6 @@
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/server.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>

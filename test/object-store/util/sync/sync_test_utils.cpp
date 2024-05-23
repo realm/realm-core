@@ -33,7 +33,6 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/pending_reset_store.hpp>
 
 #include <realm/util/base64.hpp>
 #include <realm/util/hex_dump.hpp>
@@ -435,12 +434,9 @@ struct FakeLocalClientReset : public TestClientReset {
             reset_config.mode = m_mode;
             reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
             reset_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
-            auto reset_store = sync::PendingResetStore::create(local_db);
 
             using _impl::client_reset::perform_client_reset_diff;
-            perform_client_reset_diff(*local_db, reset_config, fake_ident, *logger, nullptr, reset_store.get(),
-                                      [](int64_t) {});
-
+            perform_client_reset_diff(*local_db, reset_config, fake_ident, *logger, nullptr, [](int64_t) {});
 
             remote_realm->close();
             if (m_on_post_reset) {

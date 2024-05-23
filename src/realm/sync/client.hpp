@@ -18,7 +18,6 @@ namespace realm::sync {
 
 class MigrationStore;
 class SubscriptionStore;
-class PendingResetStore;
 
 class Client {
 public:

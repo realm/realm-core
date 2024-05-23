@@ -1669,8 +1669,8 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     SECTION("cycle detection") {
         auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<sync::PendingReset> {
             auto db = TestHelper::get_db(realm);
-            auto reset_store = sync::PendingResetStore::create(db);
-            return reset_store->has_pending_reset();
+            auto rd_tr = db->start_frozen();
+            return sync::PendingResetStore::has_pending_reset(rd_tr);
         };
         auto logger = util::Logger::get_default_logger();
         ThreadSafeSyncError err;
@@ -1683,9 +1683,10 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                                             sync::ProtocolErrorInfo::Action::ClientReset) {
             local_config.sync_config->notify_before_client_reset = [mode, action](SharedRealm realm) {
                 auto db = TestHelper::get_db(realm);
-                auto reset_store = sync::PendingResetStore::create(db);
-                reset_store->track_reset(mode, action,
-                                         {{ErrorCodes::SyncClientResetRequired, "Bad client file ident"}});
+                auto wr_tr = db->start_write();
+                sync::PendingResetStore::track_reset(
+                    wr_tr, mode, action, {{ErrorCodes::SyncClientResetRequired, "Bad client file ident"}});
+                wr_tr->commit();
             };
         };
         SECTION("a normal reset adds and removes a cycle detection flag") {

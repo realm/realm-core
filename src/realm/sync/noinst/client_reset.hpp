@@ -32,7 +32,6 @@ std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
 
 namespace sync {
 class SubscriptionStore;
-class PendingResetStore;
 
 // The reset fails if there seems to be conflict between the
 // instructions and state.
@@ -63,7 +62,7 @@ namespace _impl::client_reset {
 void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger,
                     bool allow_schema_additions);
 
-ClientResyncMode reset_precheck_guard(sync::PendingResetStore* reset_store, ClientResyncMode mode,
+ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResyncMode mode,
                                       sync::ProtocolErrorInfo::Action action, const std::optional<Status>& error,
                                       util::Logger& logger);
 
@@ -76,7 +75,6 @@ ClientResyncMode reset_precheck_guard(sync::PendingResetStore* reset_store, Clie
 // 'client_file_ident'
 bool perform_client_reset_diff(DB& db, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
                                util::Logger& logger, sync::SubscriptionStore* sub_store,
-                               sync::PendingResetStore* reset_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete);
 
 } // namespace _impl::client_reset

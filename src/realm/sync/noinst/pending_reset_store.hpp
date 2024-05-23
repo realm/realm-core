@@ -32,10 +32,6 @@
 
 namespace realm::sync {
 
-class PendingResetStore;
-
-using PendingResetStoreRef = std::shared_ptr<PendingResetStore>;
-
 struct PendingReset {
     using Action = sync::ProtocolErrorInfo::Action;
     Timestamp time;
@@ -46,19 +42,27 @@ struct PendingReset {
 
 std::ostream& operator<<(std::ostream& os, const sync::PendingReset& pr);
 bool operator==(const sync::PendingReset& lhs, const sync::PendingReset& rhs);
+bool operator==(const sync::PendingReset& lhs, const PendingReset::Action& action);
+
+template <class T>
+bool operator!=(const sync::PendingReset& lhs, const T& rhs)
+{
+    return !(lhs == rhs);
+}
 
 class PendingResetStore {
-    struct Private {};
-
 public:
-    static PendingResetStoreRef create(DBRef db);
-    PendingResetStore(Private, DBRef db);
     ~PendingResetStore() = default;
 
-    void track_reset(ClientResyncMode mode, PendingReset::Action action,
-                     const std::optional<Status>& error = std::nullopt);
-    void clear_pending_reset();
-    util::Optional<PendingReset> has_pending_reset();
+    // Store the pending reset tracking information - it is an error if the tracking info already
+    // esists in the store
+    // Requires a writable transaction and changes must be committed manually
+    static void track_reset(const TransactionRef& wr_tr, ClientResyncMode mode, PendingReset::Action action,
+                            const std::optional<Status>& error = std::nullopt);
+    // Clear the pending reset tracking information, if it exists
+    // Requires a writable transaction and changes must be committed manually
+    static void clear_pending_reset(const TransactionRef& wr_tr);
+    static std::optional<PendingReset> has_pending_reset(const TransactionRef& rd_tr);
 
     static int64_t from_reset_action(PendingReset::Action action);
     static PendingReset::Action to_reset_action(int64_t action);
@@ -66,17 +70,10 @@ public:
     static int64_t from_resync_mode(ClientResyncMode mode);
 
 private:
-    // Returns true if the schema was loaded
-    bool load_schema(const TransactionRef& rd_tr);
-    void create_schema(const TransactionRef& rd_tr);
+    // The instantiated class is only used internally
+    PendingResetStore(const TransactionRef& rd_tr);
 
-    std::optional<PendingReset> read_legacy_pending_reset(const TransactionRef& rd_tr);
-    std::optional<PendingReset> has_v1_pending_reset(const TableRef& table);
-
-    DBRef m_db;
     std::vector<SyncMetadataTable> m_internal_tables;
-
-    std::optional<int64_t> m_schema_version = std::nullopt;
     TableKey m_pending_reset_table;
     ColKey m_id;
     ColKey m_version;
@@ -85,6 +82,16 @@ private:
     ColKey m_action;
     ColKey m_error_code;
     ColKey m_error_message;
+    std::optional<int64_t> m_schema_version = std::nullopt;
+
+    // Returns true if the schema was loaded
+    static std::optional<PendingResetStore> load_schema(const TransactionRef& rd_tr);
+    // Loads the schema or creates it if it doesn't exist
+    // Requires a writable transaction and changes must be committed manually
+    static PendingResetStore load_or_create_schema(const TransactionRef& wr_tr);
+
+    // Try to read the pending reset info from v1 of the schema
+    static std::optional<PendingReset> read_legacy_pending_reset(const TransactionRef& rd_tr);
 };
 
 } // namespace realm::sync

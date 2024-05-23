@@ -410,12 +410,11 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     }
 }
 
-ClientResyncMode reset_precheck_guard(PendingResetStore* reset_store, ClientResyncMode mode,
+ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResyncMode mode,
                                       PendingReset::Action action, const std::optional<Status>& error,
                                       util::Logger& logger)
 {
-    REALM_ASSERT(reset_store);
-    if (auto previous_reset = reset_store->has_pending_reset()) {
+    if (auto previous_reset = sync::PendingResetStore::has_pending_reset(wt_local)) {
         logger.info(util::LogCategory::reset, "Found a previous %1", *previous_reset);
         switch (previous_reset->mode) {
             case ClientResyncMode::Manual:
@@ -435,10 +434,10 @@ ClientResyncMode reset_precheck_guard(PendingResetStore* reset_store, ClientResy
                         logger.info(util::LogCategory::reset,
                                     "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
                                     previous_reset->mode, previous_reset->time, mode);
-                        reset_store->clear_pending_reset();
+                        sync::PendingResetStore::clear_pending_reset(wt_local);
                         break;
                     case ClientResyncMode::DiscardLocal:
-                        reset_store->clear_pending_reset();
+                        sync::PendingResetStore::clear_pending_reset(wt_local);
                         // previous mode Recover and this mode is Discard, this is not a cycle yet
                         break;
                     case ClientResyncMode::Manual:
@@ -463,19 +462,21 @@ ClientResyncMode reset_precheck_guard(PendingResetStore* reset_store, ClientResy
             mode = ClientResyncMode::DiscardLocal;
         }
     }
-    reset_store->track_reset(mode, action, error);
+    sync::PendingResetStore::track_reset(wt_local, mode, action, error);
+    // Ensure we save the tracker object even if we encounter an error and roll
+    // back the client reset later
+    wt_local->commit_and_continue_writing();
     return mode;
 }
 
 bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
                                util::Logger& logger, sync::SubscriptionStore* sub_store,
-                               sync::PendingResetStore* reset_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete)
 {
-    REALM_ASSERT(reset_store);
     DB& db_remote = *reset_config.fresh_copy;
+    auto wt_local = db_local.start_write();
     auto actual_mode =
-        reset_precheck_guard(reset_store, reset_config.mode, reset_config.action, reset_config.error, logger);
+        reset_precheck_guard(wt_local, reset_config.mode, reset_config.action, reset_config.error, logger);
     bool recover_local_changes =
         actual_mode == ClientResyncMode::Recover || actual_mode == ClientResyncMode::RecoverOrDiscard;
 
@@ -488,7 +489,6 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
 
     auto& repl_local = dynamic_cast<ClientReplication&>(*db_local.get_replication());
     auto& history_local = repl_local.get_history();
-    auto wt_local = db_local.start_write();
     history_local.ensure_updated(wt_local->get_version());
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
 

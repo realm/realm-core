@@ -21,7 +21,6 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/transaction.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -54,9 +53,8 @@ bool is_fresh_path(const std::string& path)
 
 bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& reset_config,
                           sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
-                          sync::PendingResetStore* reset_store, util::FunctionRef<void(int64_t)> on_flx_version)
+                          util::FunctionRef<void(int64_t)> on_flx_version)
 {
-    REALM_ASSERT(reset_store);
     REALM_ASSERT(reset_config.mode != ClientResyncMode::Manual);
     REALM_ASSERT(reset_config.error);
     REALM_ASSERT(reset_config.fresh_copy);
@@ -91,19 +89,21 @@ bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& rese
         return false;
     }
 
-    VersionID frozen_before_state_version =
-        reset_config.notify_before_client_reset ? reset_config.notify_before_client_reset() : latest_version;
+    auto notify_before = std::move(reset_config.notify_before_client_reset);
+    auto notify_after = std::move(reset_config.notify_after_client_reset);
+
+    VersionID frozen_before_state_version = notify_before ? notify_before() : latest_version;
 
     // If m_notify_after is set, pin the previous state to keep it around.
     TransactionRef previous_state;
-    if (reset_config.notify_after_client_reset) {
+    if (notify_after) {
         previous_state = db.start_frozen(frozen_before_state_version);
     }
     bool did_recover = client_reset::perform_client_reset_diff(db, reset_config, new_file_ident, logger, sub_store,
-                                                               reset_store, on_flx_version); // throws
+                                                               on_flx_version); // throws
 
-    if (reset_config.notify_after_client_reset) {
-        reset_config.notify_after_client_reset(previous_state->get_version_of_current_transaction(), did_recover);
+    if (notify_after) {
+        notify_after(previous_state->get_version_of_current_transaction(), did_recover);
     }
 
     return true;

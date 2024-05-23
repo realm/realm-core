@@ -42,7 +42,6 @@ class SyncUser;
 namespace sync {
 class Session;
 class MigrationStore;
-class PendingResetStore;
 } // namespace sync
 
 namespace _impl {

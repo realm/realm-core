@@ -2250,9 +2250,9 @@ bool Session::client_reset_if_needed()
     auto on_flx_version_complete = [this](int64_t version) {
         this->on_flx_sync_version_complete(version);
     };
-    bool did_reset = client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config),
-                                                        m_client_file_ident, get_flx_subscription_store(),
-                                                        get_pending_reset_store(), on_flx_version_complete);
+    bool did_reset =
+        client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config), m_client_file_ident,
+                                           get_flx_subscription_store(), on_flx_version_complete);
     if (!did_reset) {
         return false;
     }

@@ -630,21 +630,24 @@ SubscriptionStore::SubscriptionStore(Private, DBRef db)
     };
 
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
-        !schema_version) {
-        tr->promote_to_write();
-        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, c_flx_schema_version);
-        create_sync_metadata_schema(tr, &internal_tables);
-        tr->commit_and_continue_as_read();
-    }
-    else {
+    // Start with a reader so it doesn't try to write until we are ready
+    SyncMetadataSchemaVersionsReader schema_versions_reader(tr);
+    if (auto schema_version =
+            schema_versions_reader.get_version_for(tr, internal_schema_groups::c_flx_subscription_store)) {
         if (*schema_version != c_flx_schema_version) {
             throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
                                "Invalid schema version for flexible sync metadata");
         }
         load_sync_metadata_schema(tr, &internal_tables);
+    }
+    else {
+        tr->promote_to_write();
+        // Create the metadata schema
+        create_sync_metadata_schema(tr, &internal_tables);
+        // Update the schema version (and create the schema versions table, if needed)
+        SyncMetadataSchemaVersions schema_versions(tr);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, c_flx_schema_version);
+        tr->commit_and_continue_as_read();
     }
 
     // Make sure the subscription set table is properly initialized

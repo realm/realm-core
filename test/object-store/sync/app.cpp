@@ -3184,11 +3184,10 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             // - RealmCoordinator
             // - SyncSession
             // - MigrationStore
-            // - PendingResetStore
             // - SessionWrapper
             // - local dbref
             logger->trace("DBRef ACTIVE use count: %1", dbref.use_count());
-            REQUIRE(dbref.use_count() >= 6);
+            REQUIRE(dbref.use_count() >= 5);
 
             realm->sync_session()->pause();
             state = realm->sync_session()->state();
@@ -3200,7 +3199,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         REQUIRE_THAT(
             [&] {
                 logger->trace("DBRef PAUSED use count: %1", dbref.use_count());
-                return dbref.use_count() < 6;
+                return dbref.use_count() < 5;
             },
             ReturnsTrueWithinTimeLimit{});
 

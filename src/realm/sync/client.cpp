@@ -96,7 +96,6 @@ public:
     PendingBootstrapStore* get_flx_pending_bootstrap_store();
 
     MigrationStore* get_migration_store();
-    PendingResetStore* get_pending_reset_store();
 
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
@@ -200,7 +199,6 @@ private:
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
 
     std::shared_ptr<MigrationStore> m_migration_store;
-    std::shared_ptr<PendingResetStore> m_pending_reset_store;
 
     bool m_initiated = false;
 
@@ -1024,13 +1022,6 @@ MigrationStore* SessionImpl::get_migration_store()
     return m_wrapper.get_migration_store();
 }
 
-PendingResetStore* SessionImpl::get_pending_reset_store()
-{
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == State::Active, m_state);
-    return m_wrapper.get_pending_reset_store();
-}
-
 void SessionImpl::on_flx_sync_version_complete(int64_t version)
 {
     // Ignore the call if the session is not active
@@ -1240,7 +1231,6 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))
-    , m_pending_reset_store{sync::PendingResetStore::create(m_db)}
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
@@ -1347,12 +1337,6 @@ MigrationStore* SessionWrapper::get_migration_store()
 {
     REALM_ASSERT(!m_finalized);
     return m_migration_store.get();
-}
-
-PendingResetStore* SessionWrapper::get_pending_reset_store()
-{
-    REALM_ASSERT(!m_finalized);
-    return m_pending_reset_store.get();
 }
 
 inline void SessionWrapper::mark_initiated()
@@ -2001,9 +1985,11 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 
     std::optional<PendingReset> pending_reset;
     {
-        pending_reset = get_pending_reset_store()->has_pending_reset();
-        if (!pending_reset)
+        auto fr_tr = m_db->start_frozen();
+        auto pending_reset = sync::PendingResetStore::has_pending_reset(fr_tr);
+        if (!pending_reset) {
             return; // nothing to do
+        }
     }
     m_sess->logger.info(util::LogCategory::reset, "Tracking %1", *pending_reset);
 
@@ -2020,7 +2006,8 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 
         logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
 
-        auto cur_pending_reset = self->get_pending_reset_store()->has_pending_reset();
+        auto tr = self->m_db->start_read();
+        auto cur_pending_reset = PendingResetStore::has_pending_reset(tr);
         if (!cur_pending_reset) {
             logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
             return;
@@ -2031,7 +2018,9 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
         else {
             logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
         }
-        self->get_pending_reset_store()->clear_pending_reset();
+        tr->promote_to_write();
+        PendingResetStore::clear_pending_reset(tr);
+        tr->commit();
     });
 }
 

@@ -29,7 +29,6 @@
 
 namespace realm::sync {
 class SubscriptionStore;
-class PendingResetStore;
 }
 
 namespace realm::_impl::client_reset {
@@ -41,7 +40,7 @@ bool is_fresh_path(const std::string& realm_path);
 
 bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& reset_config,
                           sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
-                          sync::PendingResetStore* reset_store, util::FunctionRef<void(int64_t)> on_flx_version);
+                          util::FunctionRef<void(int64_t)> on_flx_version);
 
 } // namespace realm::_impl::client_reset
 
