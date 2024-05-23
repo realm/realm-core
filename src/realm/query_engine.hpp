@@ -192,7 +192,7 @@ public:
         return not_found;
     }
 
-    virtual size_t find_range(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*)
+    virtual size_t aggregate_local_compressed(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*, size_t, double&)
     {
         return not_found;
     }
@@ -308,6 +308,8 @@ private:
     {
         return false;
     }
+    
+    size_t do_aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit);
 };
 
 
@@ -455,7 +457,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        return m_leaf->template find_first_in_range(m_from, m_to, start, end);
+        return m_leaf->find_first_in_range(m_from, m_to, start, end);
     }
 
     std::string describe(util::serializer::SerialisationState& state) const override
@@ -501,17 +503,13 @@ public:
         return this->m_leaf->is_compressed();
     }
 
-    virtual size_t find_range(size_t start, size_t end, std::vector<ParentNode*> children,
-                              QueryStateBase* st) override
+    virtual size_t aggregate_local_compressed(size_t start, size_t end, std::vector<ParentNode*> children,
+                              QueryStateBase* st, size_t local_limit, double& dD) override
     {
-        // if we are here, we have a range query for a compressed array.
+        // if we are here, we have a query with a list of conditions for a compressed leaf
         const auto vs = this->m_leaf->get_all(start, end);
-
-
-        // TODO: Evaluate if it makes sense to setup weights for this query node, since for compressed arrays all the
-        // logic is not really needed, since when we call aggregate local, if the array is compressed, we either
-        // extract all the values and process them or we jump into a specialised search (in this case probably the
-        // weights have some sense)
+        
+        size_t local_matches = 0;
 
         auto update_query_status = [st, &start](const auto position) {
             return st->match(start + position);
@@ -519,16 +517,27 @@ public:
 
         auto pos = vs.begin();
         const TConditionFunction cond;
-        while (pos != vs.end()) {
+        for(;;) {
+            
+            if (local_matches == local_limit) {
+                const auto r = start + std::distance(vs.begin(), pos);
+                dD = double(r - start) / (local_matches + 1.1);
+                return r;
+            }
 
             pos = std::find_if(pos, vs.end(), [&cond, this](const auto v) {
                 return cond(v, this->m_value);
             });
-
+            
             // nothing was found, just return
-            if (pos == vs.end())
+            if (pos == vs.end()) {
+                const auto r = start + std::distance(vs.begin(), pos);
+                dD = double(r - start) / (local_matches + 1.1);
                 return end;
-
+            }
+            
+            local_matches++;
+             
             // explore all the other query nodes
             auto m = std::distance(vs.begin(), pos);
             auto k = m;
