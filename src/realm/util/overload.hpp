@@ -23,6 +23,15 @@ namespace realm::util {
 template <class... Ts>
 struct overload : Ts... {
     using Ts::operator()...;
+#ifdef _MSC_VER
+    // https://developercommunity.visualstudio.com/t/runtime-stack-corruption-using-stdvisit/346200
+    // A bug in VC++'s Empty Base Optimization causes it to compute the wrong
+    // size if both the type and the last base class have zero size. This
+    // results in the stack pointer being adjusted incorrectly if the final
+    // lambda passed to overload has no captures. Making overload non-zero size
+    // prevents this.
+    char dummy = 0;
+#endif
 };
 template <class... Ts>
 overload(Ts...) -> overload<Ts...>;

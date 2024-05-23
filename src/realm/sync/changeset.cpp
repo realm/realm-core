@@ -44,30 +44,15 @@ InternString Changeset::find_string(StringData string) const noexcept
 
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    // we do not use the expected `mpark::visit(overload...` because in MSVC 2019 this
-    // code produces a segfault for something that works on other compilers.
-    // See https://github.com/realm/realm-core/issues/4624
-    if (const auto int64_ptr = mpark::get_if<int64_t>(&key)) {
-        return *int64_ptr;
-    }
-    else if (const auto intern_string_ptr = mpark::get_if<InternString>(&key)) {
-        return this->get_string(*intern_string_ptr);
-    }
-    else if (const auto monostate_ptr = mpark::get_if<mpark::monostate>(&key)) {
-        return *monostate_ptr;
-    }
-    else if (const auto global_key_ptr = mpark::get_if<GlobalKey>(&key)) {
-        return *global_key_ptr;
-    }
-    else if (const auto oid_ptr = mpark::get_if<ObjectId>(&key)) {
-        return *oid_ptr;
-    }
-    else if (const auto uuid_ptr = mpark::get_if<UUID>(&key)) {
-        return *uuid_ptr;
-    }
-    else {
-        REALM_UNREACHABLE(); // unhandled primary key type
-    }
+    return mpark::visit(overload{
+                            [this](InternString str) -> PrimaryKey {
+                                return get_string(str);
+                            },
+                            [](auto otherwise) -> PrimaryKey {
+                                return otherwise;
+                            },
+                        },
+                        key);
 }
 
 bool Changeset::operator==(const Changeset& that) const noexcept

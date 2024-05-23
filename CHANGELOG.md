@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Work around a bug in VC++ that resulted in runtime errors when running the tests in a debug build (#[7741](https://github.com/realm/realm-core/issues/7741)).
 
 ----------------------------------------------
 
