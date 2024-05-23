@@ -50,8 +50,7 @@ sed -i.bak -e "1s/.*/$RELEASE_HEADER/" "${project_dir}/CHANGELOG.md" || exit 1
 sed -i.bak -e "/.*\[#????\](https.*/d" "${project_dir}/CHANGELOG.md"
 rm "${project_dir}/CHANGELOG.md.bak" || exit 1
 
-# on CI we use a shallow clone, so we may not have the tags yet
-git fetch --tags
+# assumes that tags and history have been fetched
 git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-merges > changes-since-last-tag.txt
 echo changes since last tag are
 cat changes-since-last-tag.txt
