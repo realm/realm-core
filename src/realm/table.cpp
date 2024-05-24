@@ -876,22 +876,14 @@ static std::unique_ptr<SearchIndex> make_index(ColKey col_key, const ClusterColu
                                                size_t col_ndx = realm::npos)
 {
     bool eligible_for_radix_6 = (col_key.get_type() == col_type_Int || col_key.get_type() == col_type_Timestamp);
-    bool eligable_for_radix_8 =
-        (col_key.get_type() == col_type_String && !col_key.is_collection() && !cluster.full_word());
     if (parent) {
         if (eligible_for_radix_6) {
             return std::make_unique<IntegerIndex>(ref, parent, col_ndx, cluster, alloc);
-        }
-        if (eligable_for_radix_8) {
-            return std::make_unique<RadixTree<8>>(ref, parent, col_ndx, cluster, alloc);
         }
         return std::make_unique<StringIndex>(ref, parent, col_ndx, cluster, alloc);
     }
     if (eligible_for_radix_6) {
         return std::make_unique<IntegerIndex>(cluster, alloc); // Throws
-    }
-    if (eligable_for_radix_8) {
-        return std::make_unique<RadixTree<8>>(cluster, alloc);
     }
     return std::make_unique<StringIndex>(cluster, alloc); // Throws
 }
