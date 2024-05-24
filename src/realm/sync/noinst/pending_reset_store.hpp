@@ -44,12 +44,6 @@ std::ostream& operator<<(std::ostream& os, const sync::PendingReset& pr);
 bool operator==(const sync::PendingReset& lhs, const sync::PendingReset& rhs);
 bool operator==(const sync::PendingReset& lhs, const PendingReset::Action& action);
 
-template <class T>
-bool operator!=(const sync::PendingReset& lhs, const T& rhs)
-{
-    return !(lhs == rhs);
-}
-
 class PendingResetStore {
 public:
     ~PendingResetStore() = default;

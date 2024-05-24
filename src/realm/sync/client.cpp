@@ -1986,7 +1986,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
     std::optional<PendingReset> pending_reset;
     {
         auto fr_tr = m_db->start_frozen();
-        auto pending_reset = sync::PendingResetStore::has_pending_reset(fr_tr);
+        pending_reset = sync::PendingResetStore::has_pending_reset(fr_tr);
         if (!pending_reset) {
             return; // nothing to do
         }
@@ -2006,7 +2006,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 
         logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
 
-        auto tr = self->m_db->start_read();
+        auto tr = self->m_db->start_write();
         auto cur_pending_reset = PendingResetStore::has_pending_reset(tr);
         if (!cur_pending_reset) {
             logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
@@ -2018,7 +2018,6 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
         else {
             logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
         }
-        tr->promote_to_write();
         PendingResetStore::clear_pending_reset(tr);
         tr->commit();
     });
