@@ -24,6 +24,20 @@
 
 namespace realm {
 
+// Fast mapping of strings (or rather hash of strings) to string IDs.
+//
+// We use a tree where:
+// * All interior nodes are radix nodes with a fan-out of 256.
+// * Leaf nodes with up to 16 entries are just lists, searched linearly
+// * Leaf nodes with more than 16 entries and less than 1K are hash tables.
+//   Hash tables use linear search starting from the entry found by hashing.
+//
+constexpr static size_t linear_search_limit = 16;
+constexpr static size_t hash_node_min_size = 32;
+constexpr static size_t hash_node_max_size = 1024;
+constexpr static size_t radix_node_consumes_bits = 8;
+constexpr static size_t radix_node_size = 1ULL << radix_node_consumes_bits;
+
 // helpers
 struct HashMapIter {
     Array& m_array;
@@ -66,7 +80,7 @@ struct HashMapIter {
     {
         return left_to_search != 0;
     }
-    inline void set_index(int i, size_t search_limit = 16)
+    inline void set_index(int i, size_t search_limit = linear_search_limit)
     {
         index = i;
         left_to_search = std::min(m_array.size(), (size_t)search_limit);
@@ -83,6 +97,7 @@ struct HashMapIter {
     }
 };
 
+// Build a hash leaf from a smaller hash leaf or a non-hash leaf.
 static void rehash(Array& from, Array& to, uint8_t hash_size)
 {
     REALM_ASSERT_DEBUG(from.size() * 2 == to.size());
@@ -103,20 +118,21 @@ static void rehash(Array& from, Array& to, uint8_t hash_size)
     }
 }
 
+// Add a binding from hash value to id.
 static void add_to_hash_map(Array& node, uint32_t hash, uint32_t id, uint8_t hash_size)
 {
     REALM_ASSERT(node.is_attached());
     if (!node.has_refs()) {
         // it's a leaf.
-        if (node.size() < 16) {
+        if (node.size() < linear_search_limit) {
             // it's a list with room to grow
             node.add(((uint64_t)id << hash_size) | hash);
             return;
         }
-        if (node.size() == 16) {
+        if (node.size() == linear_search_limit) {
             // it's a full list, must be converted to a hash table
             Array new_node(node.get_alloc());
-            new_node.create(NodeHeader::type_Normal, false, 32, 0);
+            new_node.create(NodeHeader::type_Normal, false, hash_node_min_size, 0);
             new_node.set_parent(node.get_parent(), node.get_ndx_in_parent());
             new_node.update_parent();
             // transform existing list into hash table
@@ -124,8 +140,8 @@ static void add_to_hash_map(Array& node, uint32_t hash, uint32_t id, uint8_t has
             node.destroy();
             node.init_from_parent();
         }
-        // it's a hash table. Grow if needed up till 1024 entries
-        while (node.size() < 1024) {
+        // it's a hash table. Grow if needed up till 'hash_node_max_size' entries
+        while (node.size() < hash_node_max_size) {
             auto size = node.size();
             auto start_index = hash & (size - 1);
             HashMapIter it(node, 0, hash_size);
@@ -138,9 +154,9 @@ static void add_to_hash_map(Array& node, uint32_t hash, uint32_t id, uint8_t has
                 it.set(((uint64_t)id << hash_size) | hash);
                 return;
             }
-            if (node.size() >= 1024)
+            if (node.size() >= hash_node_max_size)
                 break;
-            // rehash into twice as big array
+            // No free spot found - rehash into twice as big hash table
             auto new_size = 2 * node.size();
             Array new_node(node.get_alloc());
             new_node.create(NodeHeader::type_Normal, false, new_size, 0);
@@ -152,37 +168,37 @@ static void add_to_hash_map(Array& node, uint32_t hash, uint32_t id, uint8_t has
         }
         // we ran out of space. Rewrite as a radix node with subtrees
         Array new_node(node.get_alloc());
-        new_node.create(NodeHeader::type_HasRefs, false, 256, 0);
+        new_node.create(NodeHeader::type_HasRefs, false, radix_node_size, 0);
         new_node.set_parent(node.get_parent(), node.get_ndx_in_parent());
         new_node.update_parent();
         for (size_t index = 0; index < node.size(); ++index) {
             auto element = node.get(index);
             auto hash = element & (0xFFFFFFFF >> (32 - hash_size));
             auto string_id = element >> hash_size;
-            auto remaining_hash = hash >> 8;
+            auto remaining_hash = hash >> radix_node_consumes_bits;
             add_to_hash_map(new_node, remaining_hash, string_id, hash_size - 8);
         }
         node.destroy();
         node.init_from_parent();
     }
-    // We have a radix node and need to insert into proper subtree
-    size_t index = hash & 0xFF;
+    // We have a radix node and need to insert the new binding into the proper subtree
+    size_t index = hash & (radix_node_size - 1);
     auto rot = node.get_as_ref_or_tagged(index);
     REALM_ASSERT(!rot.is_tagged());
+    Array subtree(node.get_alloc());
     if (rot.get_as_ref() == 0) {
         // no subtree present, create an empty one
-        Array subtree(node.get_alloc());
         subtree.set_parent(&node, index);
         subtree.create(NodeHeader::type_Normal);
         subtree.update_parent();
-        add_to_hash_map(subtree, hash >> 8, id, hash_size - 8);
     }
     else {
-        Array subtree(node.get_alloc());
+        // subtree already present
         subtree.set_parent(&node, index);
         subtree.init_from_parent();
-        add_to_hash_map(subtree, hash >> 8, id, hash_size - 8);
     }
+    // recurse into subtree
+    add_to_hash_map(subtree, hash >> radix_node_consumes_bits, id, hash_size - radix_node_consumes_bits);
 }
 
 static std::vector<uint32_t> hash_to_id(Array& node, uint32_t hash, uint8_t hash_size)
@@ -192,7 +208,7 @@ static std::vector<uint32_t> hash_to_id(Array& node, uint32_t hash, uint8_t hash
     if (!node.has_refs()) {
         // it's a leaf - default is a list, search starts from index 0.
         HashMapIter it(node, hash, hash_size);
-        if (node.size() > 16) {
+        if (node.size() > hash_node_min_size) {
             // it is a hash table, so use hash to select index to start searching
             // table size must be power of two!
             size_t index = hash & (node.size() - 1);
@@ -220,12 +236,22 @@ static std::vector<uint32_t> hash_to_id(Array& node, uint32_t hash, uint8_t hash
         Array subtree(node.get_alloc());
         subtree.set_parent(&node, index);
         subtree.init_from_parent();
-        return hash_to_id(subtree, hash >> 8, hash_size - 8);
+        return hash_to_id(subtree, hash >> radix_node_consumes_bits, hash_size - radix_node_consumes_bits);
     }
 }
 
 
 enum positions { Pos_Version, Pos_ColKey, Pos_Size, Pos_Compressor, Pos_Data, Pos_Map, Top_Size };
+struct StringInterner::DataLeaf {
+    std::vector<CompressedStringView> m_compressed;
+    ref_type m_leaf_ref = 0;
+    bool m_is_loaded = false;
+    DataLeaf() {}
+    DataLeaf(ref_type ref)
+        : m_leaf_ref(ref)
+    {
+    }
+};
 
 StringInterner::StringInterner(Allocator& alloc, Array& parent, ColKey col_key, bool writable)
     : m_parent(parent)
@@ -277,6 +303,7 @@ void StringInterner::update_from_parent(bool writable)
         // We're lacking part of underlying data and not allowed to create it, so enter "dead" mode
         m_compressor.reset();
         m_compressed_strings.clear();
+        m_compressed_leafs.clear();
         // m_compressed_string_map.clear();
         m_top->detach(); // <-- indicates "dead" mode
         m_data->detach();
@@ -307,7 +334,27 @@ void StringInterner::update_from_parent(bool writable)
 void StringInterner::rebuild_internal()
 {
     std::lock_guard lock(m_mutex);
+    // release old decompressed strings
+    for (auto& e : m_decompressed_strings) {
+        e.m_weight >>= 1;
+        if (e.m_weight == 0 && e.m_decompressed)
+            e.m_decompressed.reset();
+    }
     size_t target_size = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
+    if (m_data->size() != m_compressed_leafs.size()) {
+        m_compressed_leafs.resize(m_data->size());
+    }
+    // allways force new setup of all leafs:
+    // update m_compressed_leafs to reflect m_data
+    for (size_t idx = 0; idx < m_compressed_leafs.size(); ++idx) {
+        auto ref = m_data->get_as_ref(idx);
+        auto& leaf_meta = m_compressed_leafs[idx];
+        if (ref != leaf_meta.m_leaf_ref) {
+            leaf_meta.m_is_loaded = false;
+            leaf_meta.m_compressed.clear();
+            leaf_meta.m_leaf_ref = ref;
+        }
+    }
     if (target_size == m_compressed_strings.size()) {
         return;
     }
@@ -315,6 +362,7 @@ void StringInterner::rebuild_internal()
         m_compressed_strings.resize(target_size);
         return;
     }
+
     // We need to add in any new strings:
     auto internal_size = m_compressed_strings.size();
     // Determine leaf offset:
@@ -355,12 +403,6 @@ void StringInterner::rebuild_internal()
         m_decompressed_strings.push_back(CachedString({0, {}}));
         internal_size = m_compressed_strings.size();
     }
-    // release old decompressed strings
-    for (auto& e : m_decompressed_strings) {
-        e.m_weight >>= 1;
-        if (e.m_weight == 0 && e.m_decompressed)
-            e.m_decompressed.reset();
-    }
     size_t total_compressor_data = 0;
     for (auto& e : m_compressed_strings) {
         total_compressor_data += e.size();
@@ -400,6 +442,7 @@ StringID StringInterner::intern(StringData sd)
         if ((index & 0xFF) == 0) {
             m_current_string_leaf->create(0, 65535);
             m_data->add(m_current_string_leaf->get_ref());
+            m_compressed_leafs.push_back({});
         }
         else {
             if (m_current_string_leaf->is_attached()) {
@@ -416,7 +459,69 @@ StringID StringInterner::intern(StringData sd)
     for (auto c : c_str) {
         m_current_string_leaf->add(c);
     }
+    REALM_ASSERT_DEBUG(m_compressed_leafs.size());
+    bool reloaded = load_leaf_if_new_ref(m_compressed_leafs.back(), m_current_string_leaf->get_ref());
+    if (!reloaded) {
+        CompressionSymbol* p = reinterpret_cast<CompressionSymbol*>(m_current_string_leaf->m_data);
+        auto p_limit = p + m_current_string_leaf->size();
+        auto p_start = p_limit - c_str.size();
+        m_compressed_leafs.back().m_compressed.push_back({p_start, c_str.size()});
+        REALM_ASSERT(m_compressed_leafs.back().m_compressed.size() <= 256);
+    }
+    auto csv = get_compressed(id);
+    CompressedStringView csv2(c_str);
+    REALM_ASSERT_DEBUG(csv == csv2);
     return id;
+}
+
+bool StringInterner::load_leaf_if_needed(DataLeaf& leaf)
+{
+    if (!leaf.m_is_loaded) {
+        // must interpret leaf first
+        size_t leaf_offset = 0;
+        leaf.m_compressed.clear();
+        leaf.m_compressed.reserve(256);
+        ArrayUnsigned leaf_array(m_top->get_alloc());
+        leaf_array.init_from_ref(leaf.m_leaf_ref);
+        REALM_ASSERT(NodeHeader::get_encoding(leaf_array.get_header()) == NodeHeader::Encoding::WTypBits);
+        REALM_ASSERT(NodeHeader::get_width_from_header(leaf_array.get_header()) == 16);
+        // This is dangerous if the leaf is for some reason not in the assumed format
+        CompressionSymbol* c = reinterpret_cast<CompressionSymbol*>(leaf_array.m_data);
+        auto leaf_size = leaf_array.size();
+        while (leaf_offset < leaf_size) {
+            size_t length = c[leaf_offset];
+            REALM_ASSERT_DEBUG(length == leaf_array.get(leaf_offset));
+            leaf_offset++;
+            leaf.m_compressed.push_back({c + leaf_offset, length});
+            REALM_ASSERT_DEBUG(leaf.m_compressed.size() <= 256);
+            leaf_offset += length;
+        }
+        leaf.m_is_loaded = true;
+        return true;
+    }
+    return false;
+}
+
+// Danger: Only to be used if you know that a change in content ==> different ref
+bool StringInterner::load_leaf_if_new_ref(DataLeaf& leaf, ref_type new_ref)
+{
+    if (leaf.m_leaf_ref != new_ref) {
+        leaf.m_leaf_ref = new_ref;
+        leaf.m_is_loaded = false;
+        leaf.m_compressed.resize(0);
+    }
+    return load_leaf_if_needed(leaf);
+}
+
+CompressedStringView& StringInterner::get_compressed(StringID id)
+{
+    auto index = id - 1; // 0 represents null
+    auto hi = index >> 8;
+    auto lo = index & 0xFFUL;
+    DataLeaf& leaf = m_compressed_leafs[hi];
+    load_leaf_if_needed(leaf);
+    REALM_ASSERT_DEBUG(lo < leaf.m_compressed.size());
+    return leaf.m_compressed[lo];
 }
 
 std::optional<StringID> StringInterner::lookup(StringData sd)
@@ -432,6 +537,9 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
     auto candidates = hash_to_id(*m_hash_map.get(), h, 32);
     for (auto& candidate : candidates) {
         auto candidate_cpr = m_compressed_strings[candidate - 1];
+        auto c = get_compressed(candidate);
+        CompressedStringView c2(candidate_cpr);
+        REALM_ASSERT(c == c2);
         if (m_compressor->compare(sd, candidate_cpr) == 0)
             return candidate;
     }
@@ -452,7 +560,7 @@ int StringInterner::compare(StringID A, StringID B)
         return 1;
     // ok, no nulls.
     REALM_ASSERT(m_compressor);
-    return m_compressor->compare(m_compressed_strings[A], m_compressed_strings[B]);
+    return m_compressor->compare(m_compressed_strings[A - 1], m_compressed_strings[B - 1]);
 }
 
 int StringInterner::compare(StringData s, StringID A)
@@ -468,7 +576,7 @@ int StringInterner::compare(StringData s, StringID A)
         return -1;
     // ok, no nulls
     REALM_ASSERT(m_compressor);
-    return m_compressor->compare(s, m_compressed_strings[A]);
+    return m_compressor->compare(s, m_compressed_strings[A - 1]);
 }
 
 
@@ -484,6 +592,9 @@ StringData StringInterner::get(StringID id)
     if (cs.m_decompressed) {
         std::string* ref_str = cs.m_decompressed.get();
         std::string str = m_compressor->decompress(m_compressed_strings[id - 1]);
+        auto csv = get_compressed(id);
+        CompressedStringView csv2(m_compressed_strings[id - 1]);
+        REALM_ASSERT_DEBUG(csv == csv2);
         REALM_ASSERT(str == *ref_str);
         if (cs.m_weight < 128)
             cs.m_weight += 64;

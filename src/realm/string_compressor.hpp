@@ -24,6 +24,31 @@
 
 using CompressionSymbol = uint16_t;
 using CompressedString = std::vector<CompressionSymbol>;
+struct CompressedStringView {
+    CompressionSymbol* data = 0;
+    uint32_t size = 0;
+    CompressedStringView() = default;
+    CompressedStringView(CompressionSymbol* c_ptr, size_t s)
+        : data(c_ptr)
+        , size(s)
+    {
+    }
+    explicit CompressedStringView(CompressedString& cs)
+        : data(cs.data())
+        , size(cs.size())
+    {
+    }
+    bool operator==(CompressedStringView& other)
+    {
+        if (size != other.size)
+            return false;
+        for (size_t i = 0; i < size; ++i) {
+            if (data[i] != other.data[i])
+                return false;
+        }
+        return true;
+    }
+};
 
 namespace realm {
 
