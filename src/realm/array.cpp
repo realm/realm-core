@@ -194,7 +194,7 @@ Array::Array(Allocator& allocator) noexcept
 {
 }
 
-size_t Array::bit_width(int64_t v)
+uint8_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
@@ -233,6 +233,7 @@ struct Array::VTableForEncodedArray {
             getter = &Array::get_from_compressed_array;
             setter = &Array::set_compressed_array;
             chunk_getter = &Array::get_chunk_compressed_array;
+            getter_all = &Array::get_all_compressed_array;
             finder[cond_Equal] = &Array::find_compressed_array<Equal>;
             finder[cond_NotEqual] = &Array::find_compressed_array<NotEqual>;
             finder[cond_Greater] = &Array::find_compressed_array<Greater>;
@@ -252,36 +253,33 @@ void Array::init_from_mem(MemRef mem) noexcept
     // Since we will try to fetch some data from the just initialised header, and never reset
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
-    char* header = mem.get_addr();
-    const auto old_header = !NodeHeader::wtype_is_extended(header);
-    // Cache all the header info as long as this array is alive and encoded.
-    m_integer_compressor.init(header);
-    if (!old_header) {
-        REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Flex ||
-                           NodeHeader::get_encoding(header) == Encoding::Packed);
-        char* header = mem.get_addr();
+    const auto header = mem.get_addr();
+    const auto is_extended = m_integer_compressor.init(header);
+
+    m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
+    m_has_refs = get_hasrefs_from_header(header);
+    m_context_flag = get_context_flag_from_header(header);
+
+    if (is_extended) {
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        // encoder knows which format we are compressed into, width and size are read accordingly with the format of
-        // the header
-        m_size = m_integer_compressor.size();
-        m_width = static_cast<uint_least8_t>(m_integer_compressor.width());
-        m_lbound = -m_integer_compressor.width_mask();
-        m_ubound = m_integer_compressor.width_mask() - 1;
-        m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-        m_has_refs = get_hasrefs_from_header(header);
-        m_context_flag = get_context_flag_from_header(header);
-        m_vtable = &VTableForEncodedArray::vtable;
-        m_getter = m_vtable->getter;
+        update_width_cache_from_int_compressor(); // compressor knows which format this array is
     }
     else {
         // Old init phase.
-        header = Node::init_from_mem(mem);
-        m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-        m_has_refs = get_hasrefs_from_header(header);
-        m_context_flag = get_context_flag_from_header(header);
+        Node::init_from_mem(mem);
         update_width_cache_from_header();
     }
+}
+
+void Array::update_width_cache_from_int_compressor() noexcept
+{
+    m_size = m_integer_compressor.size();
+    m_width = m_integer_compressor.v_width();
+    m_lbound = -m_integer_compressor.v_mask();
+    m_ubound = m_integer_compressor.v_mask() - 1;
+    m_vtable = &VTableForEncodedArray::vtable;
+    m_getter = m_vtable->getter;
 }
 
 MemRef Array::get_mem() const noexcept
@@ -674,6 +672,11 @@ int64_t Array::get_from_compressed_array(size_t ndx) const noexcept
     return m_integer_compressor.get(ndx);
 }
 
+std::vector<int64_t> Array::get_all_compressed_array(size_t b, size_t e) const
+{
+    return m_integer_compressor.get_all(b, e);
+}
+
 void Array::set_compressed_array(size_t ndx, int64_t val)
 {
     m_integer_compressor.set_direct(ndx, val);
@@ -781,9 +784,9 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 {
     REALM_ASSERT_DEBUG(value == 0 || width_type == wtype_Bits);
     REALM_ASSERT_DEBUG(size == 0 || width_type != wtype_Ignore);
-    int width = 0;
+    uint8_t width = 0;
     if (value != 0)
-        width = static_cast<int>(bit_width(value));
+        width = bit_width(value);
     auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
     if (value != 0) {
         const auto header = mem.get_addr();
@@ -1033,31 +1036,43 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::lower_bound_int_compressed(int64_t value) const noexcept
 {
-    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    static impl::CompressedDataFetcher<IntegerCompressor> encoder;
     encoder.ptr = &m_integer_compressor;
     return lower_bound(m_data, m_size, value, encoder);
 }
 
 size_t Array::upper_bound_int_compressed(int64_t value) const noexcept
 {
-    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    static impl::CompressedDataFetcher<IntegerCompressor> encoder;
     encoder.ptr = &m_integer_compressor;
     return upper_bound(m_data, m_size, value, encoder);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    if (wtype_is_extended(header)) {
-        static IntegerCompressor compressor;
-        compressor.init(header);
-        return compressor.get(ndx);
+    // this is very important. Most of the times we end up here
+    // because we are traversing the cluster, the keys/refs in the cluster
+    // are not compressed (because there is almost no gain), so the intent
+    // is avoiding to pollute traversing the cluster as little as possible.
+    // We need to check the header wtype and only initialise the
+    // integer compressor, if needed. Otherwise we should just call
+    // get_direct. On average there should be one more access to the header
+    // while traversing the cluster tree.
+    if (REALM_LIKELY(!NodeHeader::wtype_is_extended(header))) {
+        const char* data = get_data_from_header(header);
+        uint_least8_t width = get_width_from_header(header);
+        return get_direct(data, width, ndx);
     }
-
-    auto sz = get_size_from_header(header);
-    REALM_ASSERT(ndx < sz);
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    return get_direct(data, width, ndx);
+    static IntegerCompressor s_compressor;
+    // we don't want to construct a compressor, every time we end up here.
+    // however since the compressor is usually unique per array, it caches a
+    // bunch of masks that are expensive to compute over and over again.
+    // In this case we need to compute the masks again at least once, so we
+    // need to call init and reset the compressor.
+    // If we don't do this, the values extracted from the arrays could be wrong,
+    // and lead to either wrong query results or even corrupting the data in the file.
+    s_compressor.init(header);
+    return s_compressor.get(ndx);
 }
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept

@@ -178,6 +178,8 @@ public:
 
     inline int64_t get(size_t ndx) const noexcept;
 
+    inline std::vector<int64_t> get_all(size_t b, size_t e) const;
+
     template <size_t w>
     inline int64_t get(size_t ndx) const noexcept;
 
@@ -499,7 +501,7 @@ public:
     /// Takes a 64-bit value and returns the minimum number of bits needed
     /// to fit the value. For alignment this is rounded up to nearest
     /// log2. Possible results {0, 1, 2, 4, 8, 16, 32, 64}
-    static size_t bit_width(int64_t value);
+    static uint8_t bit_width(int64_t value);
 
     void typed_print(std::string prefix) const;
 
@@ -520,6 +522,8 @@ protected:
     size_t count(int64_t value) const noexcept;
 
 private:
+    void update_width_cache_from_int_compressor() noexcept;
+
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
@@ -550,9 +554,12 @@ protected:
     typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
+    typedef std::vector<int64_t> (Array::*GetterAll)(size_t, size_t) const; // Note: getters must not throw
+
     struct VTable {
         Getter getter;
         ChunkGetter chunk_getter;
+        GetterAll getter_all;
         Setter setter;
         Finder finder[cond_VTABLE_FINDER_COUNT]; // one for each active function pointer
     };
@@ -584,6 +591,7 @@ protected:
     bool compress_array(Array&) const;
     bool decompress_array(Array& arr) const;
     int64_t get_from_compressed_array(size_t ndx) const noexcept;
+    std::vector<int64_t> get_all_compressed_array(size_t, size_t) const;
     void set_compressed_array(size_t ndx, int64_t);
     void get_chunk_compressed_array(size_t, int64_t[8]) const noexcept;
 
@@ -617,10 +625,10 @@ private:
 
 class TempArray : public Array {
 public:
-    TempArray(size_t sz, Type type = Type::type_HasRefs)
+    TempArray(size_t sz, Type type = Type::type_HasRefs, bool cf = false)
         : Array(Allocator::get_default())
     {
-        create(type, false, sz);
+        create(type, cf, sz);
     }
     ~TempArray()
     {
@@ -668,6 +676,11 @@ inline int64_t Array::get(size_t ndx) const noexcept
     */
 }
 
+inline std::vector<int64_t> Array::get_all(size_t b, size_t e) const
+{
+    REALM_ASSERT_DEBUG(is_compressed());
+    return (this->*(m_vtable->getter_all))(b, e);
+}
 
 template <size_t w>
 inline int64_t Array::get(size_t ndx) const noexcept

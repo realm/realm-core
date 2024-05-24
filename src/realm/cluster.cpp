@@ -774,24 +774,48 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     set_spec<T>(values, col_ndx);
     set_string_interner<T>(values, col_key);
     values.init_from_parent();
-    ObjLink link;
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
-        link = values.get(ndx);
-    }
-    if constexpr (std::is_same_v<T, ArrayMixed>) {
-        Mixed value = values.get(ndx);
-        if (value.is_type(type_TypedLink)) {
-            link = value.get<ObjLink>();
-        }
-    }
-    if (link) {
-        if (const Table* origin_table = m_tree_top.get_owning_table()) {
-            auto target_obj = origin_table->get_parent_group()->get_object(link);
+        if (ObjLink link = values.get(ndx)) {
+            if (const Table* origin_table = m_tree_top.get_owning_table()) {
+                auto target_obj = origin_table->get_parent_group()->get_object(link);
 
-            ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-            REALM_ASSERT(backlink_col_key);
-            target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
+                ColKey backlink_col_key =
+                    target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
+                REALM_ASSERT(backlink_col_key);
+                target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
+            }
         }
+    }
+    values.erase(ndx);
+}
+
+inline void Cluster::do_erase_mixed(size_t ndx, ColKey col_key, ObjKey key, CascadeState& state)
+{
+    const Table* origin_table = m_tree_top.get_owning_table();
+    auto col_ndx = col_key.get_index();
+
+    ArrayMixed values(m_alloc);
+    values.set_parent(this, col_ndx.val + s_first_col_index);
+    values.init_from_parent();
+
+    Mixed value = values.get(ndx);
+    if (value.is_type(type_TypedLink)) {
+        ObjLink link = value.get<ObjLink>();
+        auto target_obj = origin_table->get_parent_group()->get_object(link);
+
+        ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
+        REALM_ASSERT(backlink_col_key);
+        target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
+    }
+    if (value.is_type(type_List)) {
+        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+        Lst<Mixed> list(obj, col_key);
+        list.remove_backlinks(state);
+    }
+    if (value.is_type(type_Dictionary)) {
+        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+        Dictionary dict(obj, col_key);
+        dict.remove_backlinks(state);
     }
     values.erase(ndx);
 }
@@ -910,7 +934,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 do_erase<ArrayBinary>(ndx, col_key);
                 break;
             case col_type_Mixed:
-                do_erase<ArrayMixed>(ndx, col_key);
+                do_erase_mixed(ndx, col_key, key, state);
                 break;
             case col_type_Timestamp:
                 do_erase<ArrayTimestamp>(ndx, col_key);

@@ -266,8 +266,8 @@ option(REALM_VALGRIND "Tell the test suite we are running with valgrind." OFF)
 option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default." ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
-option(REALM_COMPRESS "Compress all the arrays by default in flex format." OFF)
 option(REALM_APP_SERVICES "Enable the default app services implementation." ON)
+option(REALM_COMPRESS "Compress all the arrays by default in flex format." OFF)
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)

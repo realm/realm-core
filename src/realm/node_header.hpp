@@ -205,10 +205,10 @@ public:
         h[4] = h4;
     }
 
-    static size_t unsigned_to_num_bits(uint64_t value)
+    static uint8_t unsigned_to_num_bits(uint64_t value)
     {
         if constexpr (sizeof(size_t) == sizeof(uint64_t))
-            return static_cast<size_t>(1) + log2(value);
+            return 1 + log2(static_cast<size_t>(value));
         uint32_t high = value >> 32;
         if (high)
             return 33 + log2(high);
@@ -218,7 +218,7 @@ public:
         return 0;
     }
 
-    static inline size_t signed_to_num_bits(int64_t value)
+    static inline uint8_t signed_to_num_bits(int64_t value)
     {
         if (value >= 0)
             return 1 + unsigned_to_num_bits(value);
@@ -344,16 +344,16 @@ private:
     friend class Node;
     friend class IntegerCompressor;
     // Setting element size for encodings with a single element size:
-    static void inline set_element_size(char* header, size_t bits_per_element, Encoding);
+    static void inline set_element_size(char* header, uint8_t bits_per_element, Encoding);
     // Getting element size for encodings with a single element size:
-    static inline size_t get_element_size(const char* header, Encoding);
+    static inline uint8_t get_element_size(const char* header, Encoding);
     // Used only by flex at this stage.
     // Setting element sizes for encodings with two element sizes (called A and B)
-    static inline void set_elementA_size(char* header, size_t bits_per_element);
-    static inline void set_elementB_size(char* header, size_t bits_per_element);
+    static inline void set_elementA_size(char* header, uint8_t bits_per_element);
+    static inline void set_elementB_size(char* header, uint8_t bits_per_element);
     // Getting element sizes for encodings with two element sizes (called A and B)
-    static inline size_t get_elementA_size(const char* header);
-    static inline size_t get_elementB_size(const char* header);
+    static inline uint8_t get_elementA_size(const char* header);
+    static inline uint8_t get_elementB_size(const char* header);
     // Setting num of elements for encodings with two element sizes (called A and B)
     static inline void set_arrayA_num_elements(char* header, size_t num_elements);
     static inline void set_arrayB_num_elements(char* header, size_t num_elements);
@@ -366,9 +366,9 @@ private:
     static inline void set_num_elements(char* header, size_t num_elements, Encoding);
 
     static inline size_t calc_size(size_t num_elements);
-    static inline size_t calc_size(size_t num_elements, size_t element_size, Encoding);
-    static inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
-                                   size_t elementB_size);
+    static inline size_t calc_size(size_t num_elements, uint8_t element_size, Encoding);
+    static inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, uint8_t elementA_size,
+                                   uint8_t elementB_size);
 
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
     {
@@ -441,7 +441,7 @@ private:
     }
 };
 
-inline void NodeHeader::set_element_size(char* header, size_t bits_per_element, Encoding encoding)
+inline void NodeHeader::set_element_size(char* header, uint8_t bits_per_element, Encoding encoding)
 {
     switch (encoding) {
         case NodeHeader::Encoding::Packed: {
@@ -469,7 +469,7 @@ inline void NodeHeader::set_element_size(char* header, size_t bits_per_element, 
     }
 }
 
-inline size_t NodeHeader::get_element_size(const char* header, Encoding encoding)
+inline uint8_t NodeHeader::get_element_size(const char* header, Encoding encoding)
 {
     switch (encoding) {
         case NodeHeader::Encoding::Packed: {
@@ -496,7 +496,7 @@ inline size_t NodeHeader::get_element_size(const char* header, Encoding encoding
     }
 }
 
-inline void NodeHeader::set_elementA_size(char* header, size_t bits_per_element)
+inline void NodeHeader::set_elementA_size(char* header, uint8_t bits_per_element)
 {
     // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
@@ -509,7 +509,7 @@ inline void NodeHeader::set_elementA_size(char* header, size_t bits_per_element)
     (reinterpret_cast<uint16_t*>(header))[1] = word;
 }
 
-inline void NodeHeader::set_elementB_size(char* header, size_t bits_per_element)
+inline void NodeHeader::set_elementB_size(char* header, uint8_t bits_per_element)
 {
     // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
@@ -522,7 +522,7 @@ inline void NodeHeader::set_elementB_size(char* header, size_t bits_per_element)
     (reinterpret_cast<uint16_t*>(header))[3] = word;
 }
 
-inline size_t NodeHeader::get_elementA_size(const char* header)
+inline uint8_t NodeHeader::get_elementA_size(const char* header)
 {
     const auto encoding = get_encoding(header);
     REALM_ASSERT_DEBUG(encoding == Encoding::Flex);
@@ -536,7 +536,7 @@ inline size_t NodeHeader::get_elementA_size(const char* header)
     return bits_per_element;
 }
 
-inline size_t NodeHeader::get_elementB_size(const char* header)
+inline uint8_t NodeHeader::get_elementB_size(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
     uint16_t word = (reinterpret_cast<const uint16_t*>(header))[3];
@@ -643,7 +643,7 @@ inline size_t NodeHeader::calc_size(size_t num_elements)
     return calc_byte_size(wtype_Ignore, num_elements, 0);
 }
 
-inline size_t NodeHeader::calc_size(size_t num_elements, size_t element_size, Encoding encoding)
+inline size_t NodeHeader::calc_size(size_t num_elements, uint8_t element_size, Encoding encoding)
 {
     using Encoding = NodeHeader::Encoding;
     switch (encoding) {
@@ -660,8 +660,8 @@ inline size_t NodeHeader::calc_size(size_t num_elements, size_t element_size, En
     }
 }
 
-inline size_t NodeHeader::calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
-                                    size_t elementB_size)
+inline size_t NodeHeader::calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, uint8_t elementA_size,
+                                    uint8_t elementB_size)
 {
     return NodeHeader::header_size +
            align_bits_to8(arrayA_num_elements * elementA_size + arrayB_num_elements * elementB_size);

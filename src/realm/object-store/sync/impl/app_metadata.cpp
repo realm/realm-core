@@ -272,16 +272,6 @@ void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> real
     }
 }
 
-std::shared_ptr<Realm> try_get_realm(const RealmConfig& config)
-{
-    try {
-        return Realm::get_shared_realm(config);
-    }
-    catch (const InvalidDatabase&) {
-        return nullptr;
-    }
-}
-
 std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app_config)
 {
     bool should_encrypt = app_config.metadata_mode == app::AppConfig::MetadataMode::Encryption;
@@ -296,6 +286,15 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app
     }
 
 #if REALM_PLATFORM_APPLE
+    auto try_get_realm = [&]() -> std::shared_ptr<Realm> {
+        try {
+            return Realm::get_shared_realm(config);
+        }
+        catch (const InvalidDatabase&) {
+            return nullptr;
+        }
+    };
+
     // This logic is all a giant race condition once we have multi-process sync.
     // Wrapping it all (including the keychain accesses) in DB::call_with_lock()
     // might suffice.
@@ -306,7 +305,7 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app
     auto key = keychain::get_existing_metadata_realm_key(app_config.app_id, app_config.security_access_group);
     if (key) {
         config.encryption_key = *key;
-        if (auto realm = try_get_realm(config))
+        if (auto realm = try_get_realm())
             return realm;
     }
 
@@ -315,7 +314,7 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app
     // from a previous run being unable to access the keychain.
     if (util::File::exists(config.path)) {
         config.encryption_key.clear();
-        if (auto realm = try_get_realm(config))
+        if (auto realm = try_get_realm())
             return realm;
 
         // We weren't able to open the existing file with either the stored key
@@ -330,7 +329,7 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app
         key = keychain::create_new_metadata_realm_key(app_config.app_id, app_config.security_access_group);
     if (key)
         config.encryption_key = std::move(*key);
-    return try_get_realm(config);
+    return try_get_realm();
 #else  // REALM_PLATFORM_APPLE
     REALM_UNREACHABLE();
 #endif // REALM_PLATFORM_APPLE
