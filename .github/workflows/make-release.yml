@@ -31,9 +31,9 @@ jobs:
       uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5 #! 1.14.0
       with:
         bodyFile: extracted_changelog.md
-        name: ${{ steps.get-version.outputs.version }}
+        name: Realm Core v${{ steps.get-version.outputs.version }}
         commit: ${{ github.base_ref }}
-        tag: ${{ steps.get-version.outputs.version }}
+        tag: v${{ steps.get-version.outputs.version }}
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: false
     - name: Update Changelog
