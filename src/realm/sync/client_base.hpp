@@ -62,11 +62,12 @@ class SyncSocketProvider;
 struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
+    Status error;
     sync::ProtocolErrorInfo::Action action = sync::ProtocolErrorInfo::Action::ClientReset;
-    std::optional<Status> error;
     util::UniqueFunction<VersionID()> notify_before_client_reset;
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
+
 static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
 static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
 static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute

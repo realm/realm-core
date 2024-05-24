@@ -429,11 +429,9 @@ struct FakeLocalClientReset : public TestClientReset {
             sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto logger = util::Logger::get_default_logger();
-            sync::ClientReset reset_config;
-            reset_config.fresh_copy = TestHelper::get_db(remote_realm);
-            reset_config.mode = m_mode;
-            reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-            reset_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file ident"};
+            sync::ClientReset reset_config{m_mode,
+                                           TestHelper::get_db(remote_realm),
+                                           {ErrorCodes::SyncClientResetRequired, "Bad client file ident"}};
 
             using _impl::client_reset::perform_client_reset_diff;
             perform_client_reset_diff(*local_db, reset_config, fake_ident, *logger, nullptr, [](int64_t) {});

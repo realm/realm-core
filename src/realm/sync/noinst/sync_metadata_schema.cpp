@@ -189,10 +189,39 @@ SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const Transac
     }
 }
 
+std::optional<int64_t> SyncMetadataSchemaVersionsReader::get_legacy_version(const TransactionRef& tr)
+{
+    if (!tr->has_table(c_flx_metadata_table)) {
+        return std::nullopt;
+    }
+
+    TableKey legacy_table_key;
+    ColKey legacy_version_key;
+    std::vector<SyncMetadataTable> legacy_table_def{
+        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
+
+    // Convert the legacy table to the regular schema versions table if it exists
+    load_sync_metadata_schema(tr, &legacy_table_def);
+
+    if (auto legacy_meta_table = tr->get_table(legacy_table_key);
+        legacy_meta_table && legacy_meta_table->size() > 0) {
+        auto legacy_obj = legacy_meta_table->get_object(0);
+        return legacy_obj.get<int64_t>(legacy_version_key);
+    }
+
+    return std::nullopt;
+}
+
 std::optional<int64_t> SyncMetadataSchemaVersionsReader::get_version_for(const TransactionRef& tr,
                                                                          std::string_view schema_group_name)
 {
     if (!m_table) {
+        // The legacy version only applies to the subscription store, don't query otherwise
+        if (schema_group_name == internal_schema_groups::c_flx_subscription_store) {
+            if (auto legacy_version = get_legacy_version(tr)) {
+                return legacy_version;
+            }
+        }
         return util::none;
     }
 
@@ -212,10 +241,6 @@ std::optional<int64_t> SyncMetadataSchemaVersionsReader::get_version_for(const T
 SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
     : SyncMetadataSchemaVersionsReader(tr)
 {
-    TableKey legacy_table_key;
-    ColKey legacy_version_key;
-    std::vector<SyncMetadataTable> legacy_table_def{
-        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
     std::vector<SyncMetadataTable> unified_schema_version_table_def{
         {&m_table,
          c_sync_internal_schemas_table,
@@ -243,23 +268,16 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
         }
     }
 
-    if (!tr->has_table(c_flx_metadata_table)) {
-        return;
+    if (auto legacy_version = get_legacy_version(tr)) {
+        // Migrate from just having a subscription store metadata table to having multiple table groups with multiple
+        // versions.
+        if (tr->get_transact_stage() != DB::transact_Writing) {
+            tr->promote_to_write();
+        }
+        // Only the flx subscription store can potentially have the legacy metadata table
+        set_version_for(tr, internal_schema_groups::c_flx_subscription_store, *legacy_version);
+        tr->remove_table(c_flx_metadata_table);
     }
-
-    // Convert the legacy table to the regular schema versions table if it exists
-    load_sync_metadata_schema(tr, &legacy_table_def);
-    // Migrate from just having a subscription store metadata table to having multiple table groups with multiple
-    // versions.
-    if (tr->get_transact_stage() != DB::transact_Writing) {
-        tr->promote_to_write();
-    }
-    auto legacy_meta_table = tr->get_table(legacy_table_key);
-    auto legacy_obj = legacy_meta_table->get_object(0);
-    // Only the flx subscription store can potentially have the legacy metadata table
-    set_version_for(tr, internal_schema_groups::c_flx_subscription_store,
-                    legacy_obj.get<int64_t>(legacy_version_key));
-    tr->remove_table(legacy_table_key);
     // Don't commit changes now - wait for the caller to commit them
 }
 

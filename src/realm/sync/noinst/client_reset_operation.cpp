@@ -56,11 +56,10 @@ bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& rese
                           util::FunctionRef<void(int64_t)> on_flx_version)
 {
     REALM_ASSERT(reset_config.mode != ClientResyncMode::Manual);
-    REALM_ASSERT(reset_config.error);
     REALM_ASSERT(reset_config.fresh_copy);
     logger.debug(util::LogCategory::reset,
                  "Possibly beginning client reset operation: realm_path = %1, mode = %2, action = %3, error = %4",
-                 db.get_path(), reset_config.mode, reset_config.action, *reset_config.error);
+                 db.get_path(), reset_config.mode, reset_config.action, reset_config.error);
 
     auto always_try_clean_up = util::make_scope_exit([&]() noexcept {
         std::string path_to_clean = reset_config.fresh_copy->get_path();

@@ -187,13 +187,11 @@ TEST(ClientReset_NoLocalChanges)
 
             Session::Config session_config;
             {
-                Session::Config::ClientReset client_reset_config;
-                client_reset_config.mode = ClientResyncMode::DiscardLocal;
-                client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-                client_reset_config.error = {ErrorCodes::SyncClientResetRequired,
-                                             "Bad client file identifier (IDENT)"};
-                client_reset_config.fresh_copy = std::move(sg_fresh);
-                session_config.client_reset_config = std::move(client_reset_config);
+                Session::Config::ClientReset cr_config{
+                    ClientResyncMode::DiscardLocal,
+                    sg_fresh,
+                    {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"}};
+                session_config.client_reset_config = std::move(cr_config);
             }
             Session session = fixture.make_session(sg, server_path, std::move(session_config));
             session.bind();
@@ -259,14 +257,11 @@ TEST(ClientReset_InitialLocalChanges)
 
     // Start a client reset. There is no need for a reset, but we can do it.
     Session::Config session_config_2;
-    {
-        Session::Config::ClientReset client_reset_config;
-        client_reset_config.mode = ClientResyncMode::DiscardLocal;
-        client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-        client_reset_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
-        client_reset_config.fresh_copy = std::move(sg_fresh);
-        session_config_2.client_reset_config = std::move(client_reset_config);
-    }
+    Session::Config::ClientReset cr_config{
+        ClientResyncMode::DiscardLocal,
+        sg_fresh,
+        {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"}};
+    session_config_2.client_reset_config = std::move(cr_config);
     Session session_2 = fixture.make_session(db_2, server_path, std::move(session_config_2));
     session_2.bind();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -378,14 +373,14 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
     }
     DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
 
-    Session::Config::ClientReset client_reset_config;
-    client_reset_config.mode = recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal;
-    client_reset_config.action = recover ? sync::ProtocolErrorInfo::Action::ClientReset
-                                         : sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
-    client_reset_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
-    client_reset_config.fresh_copy = std::move(sg_fresh1);
+    Session::Config::ClientReset cr_config{
+        recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal,
+        sg_fresh1,
+        {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"},
+        recover ? sync::ProtocolErrorInfo::Action::ClientReset
+                : sync::ProtocolErrorInfo::Action::ClientResetNoRecovery};
     Session::Config session_config_3;
-    session_config_3.client_reset_config = std::move(client_reset_config);
+    session_config_3.client_reset_config = std::move(cr_config);
     Session session_3 = fixture.make_session(sg, server_path, std::move(session_config_3));
     session_3.bind();
     session_3.wait_for_upload_complete_or_client_stopped();
@@ -628,23 +623,19 @@ TEST(ClientReset_ThreeClients)
         {
             Session::Config session_config_1;
             {
-                Session::Config::ClientReset client_reset_config;
-                client_reset_config.mode = ClientResyncMode::DiscardLocal;
-                client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-                client_reset_config.error = {ErrorCodes::SyncClientResetRequired,
-                                             "Bad client file identifier (IDENT)"};
-                client_reset_config.fresh_copy = std::move(sg_fresh1);
-                session_config_1.client_reset_config = std::move(client_reset_config);
+                Session::Config::ClientReset cr_config{
+                    ClientResyncMode::DiscardLocal,
+                    sg_fresh1,
+                    {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"}};
+                session_config_1.client_reset_config = std::move(cr_config);
             }
             Session::Config session_config_2;
             {
-                Session::Config::ClientReset client_reset_config;
-                client_reset_config.mode = ClientResyncMode::DiscardLocal;
-                client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-                client_reset_config.error = {ErrorCodes::SyncClientResetRequired,
-                                             "Bad client file identifier (IDENT)"};
-                client_reset_config.fresh_copy = std::move(sg_fresh2);
-                session_config_2.client_reset_config = std::move(client_reset_config);
+                Session::Config::ClientReset cr_config{
+                    ClientResyncMode::DiscardLocal,
+                    sg_fresh2,
+                    {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"}};
+                session_config_2.client_reset_config = std::move(cr_config);
             }
             Session session_1 = fixture.make_session(path_1, server_path, std::move(session_config_1));
             session_1.bind();
@@ -760,12 +751,12 @@ TEST(ClientReset_DoNotRecoverSchema)
     {
         Session::Config session_config;
         {
-            Session::Config::ClientReset client_reset_config;
-            client_reset_config.mode = ClientResyncMode::DiscardLocal;
-            client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-            client_reset_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
-            client_reset_config.fresh_copy = std::move(sg_fresh1);
-            session_config.client_reset_config = std::move(client_reset_config);
+            Session::Config::ClientReset cr_config{
+                ClientResyncMode::DiscardLocal,
+                sg_fresh1,
+                {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"},
+                sync::ProtocolErrorInfo::Action::ClientReset};
+            session_config.client_reset_config = std::move(cr_config);
         }
         Session session = fixture.make_session(path_1, server_path_2, std::move(session_config));
         BowlOfStonesSemaphore bowl;
@@ -850,13 +841,11 @@ TEST(ClientReset_PinnedVersion)
 
         Session::Config session_config;
         {
-            Session::Config::ClientReset client_reset_config;
-            client_reset_config = Session::Config::ClientReset{};
-            client_reset_config.mode = ClientResyncMode::DiscardLocal;
-            client_reset_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-            client_reset_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
-            client_reset_config.fresh_copy = std::move(sg_fresh);
-            session_config.client_reset_config = std::move(client_reset_config);
+            Session::Config::ClientReset cr_config{
+                ClientResyncMode::DiscardLocal,
+                sg_fresh,
+                {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"}};
+            session_config.client_reset_config = std::move(cr_config);
         }
 
         Session session = fixture.make_bound_session(sg, server_path_1, std::move(session_config));
@@ -906,13 +895,7 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
         return ClientResyncMode::DiscardLocal;
     }(mode, allow_recovery);
 
-    sync::ClientReset cr_config;
-    cr_config.mode = mode;
-    cr_config.action = action;
-    cr_config.error = error;
-    cr_config.fresh_copy = fresh->shared_from_this();
-    cr_config.notify_before_client_reset = nullptr;
-    cr_config.notify_after_client_reset = nullptr;
+    sync::ClientReset cr_config{mode, fresh, error, action};
 
     bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *target, std::move(cr_config),
                                                                {100, 200}, sub_store, [](int64_t) {});
@@ -1105,13 +1088,9 @@ TEST(ClientReset_UninitializedFile)
     });
 
     auto db_empty = DB::create(make_client_replication(), path_3);
-    sync::ClientReset cr_config;
-    cr_config.mode = ClientResyncMode::Recover;
-    cr_config.action = sync::ProtocolErrorInfo::Action::ClientReset;
-    cr_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
-    cr_config.fresh_copy = db_fresh;
-    cr_config.notify_before_client_reset = nullptr;
-    cr_config.notify_after_client_reset = nullptr;
+    sync::ClientReset cr_config{ClientResyncMode::Recover,
+                                db_fresh,
+                                {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"}};
 
     // Should not perform a client reset because the target file has never been
     // written to
@@ -1282,13 +1261,10 @@ TEST(ClientReset_Recover_RecoveryDisabled)
     auto dbs = prepare_db(path_1, path_2, [](Transaction& tr) {
         tr.add_table_with_primary_key("class_table", type_Int, "pk");
     });
-    sync::ClientReset cr_config;
-    cr_config.mode = ClientResyncMode::Recover;
-    cr_config.action = sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
-    cr_config.error = {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
-    cr_config.fresh_copy = dbs.second;
-    cr_config.notify_before_client_reset = nullptr;
-    cr_config.notify_after_client_reset = nullptr;
+    sync::ClientReset cr_config{ClientResyncMode::Recover,
+                                dbs.second,
+                                {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"},
+                                sync::ProtocolErrorInfo::Action::ClientResetNoRecovery};
 
     CHECK_THROW((_impl::client_reset::perform_client_reset(*test_context.logger, *dbs.first, std::move(cr_config),
                                                            {100, 200}, nullptr, [](int64_t) {})),

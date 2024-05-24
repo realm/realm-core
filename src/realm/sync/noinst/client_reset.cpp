@@ -485,7 +485,7 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
                 "remote_path = %4, requested_mode = %5, action = %6, actual_mode = %7, will_recover = %8, "
                 "originating_error = %9",
                 db_local.get_path(), client_file_ident.ident, client_file_ident.salt, db_remote.get_path(),
-                reset_config.mode, reset_config.action, actual_mode, recover_local_changes, *reset_config.error);
+                reset_config.mode, reset_config.action, actual_mode, recover_local_changes, reset_config.error);
 
     auto& repl_local = dynamic_cast<ClientReplication&>(*db_local.get_replication());
     auto& history_local = repl_local.get_history();

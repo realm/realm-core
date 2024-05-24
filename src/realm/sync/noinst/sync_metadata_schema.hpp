@@ -130,6 +130,8 @@ public:
 
     std::optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
 
+    std::optional<int64_t> get_legacy_version(const TransactionRef& tr);
+
 protected:
     TableKey m_table;
     ColKey m_version_field;

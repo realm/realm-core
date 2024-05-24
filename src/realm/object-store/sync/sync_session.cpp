@@ -841,11 +841,8 @@ make_client_reset_config(const RealmConfig& base_config, const std::shared_ptr<S
 {
     REALM_ASSERT(sync_config->client_resync_mode != ClientResyncMode::Manual);
 
-    sync::Session::Config::ClientReset config;
-    config.mode = sync_config->client_resync_mode;
-    config.fresh_copy = std::move(fresh_copy);
-    config.action = error_info.server_requests_action;
-    config.error = std::move(error_info.status);
+    sync::Session::Config::ClientReset config{sync_config->client_resync_mode, fresh_copy,
+                                              std::move(error_info.status), error_info.server_requests_action};
 
     // The conditions here are asymmetric because if we have *either* a before
     // or after callback we need to make sure to initialize the local schema
