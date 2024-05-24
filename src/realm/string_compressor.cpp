@@ -196,10 +196,10 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
     return result;
 }
 
-std::string StringCompressor::decompress(CompressedString& c_str)
+std::string StringCompressor::decompress(CompressedStringView& c_str)
 {
-    CompressionSymbol* ptr = c_str.data();
-    CompressionSymbol* limit = ptr + c_str.size();
+    CompressionSymbol* ptr = c_str.data;
+    CompressionSymbol* limit = ptr + c_str.size;
     // compute size of decompressed string first to avoid allocations as string grows
     size_t result_size = 0;
     while (ptr < limit) {
@@ -212,7 +212,7 @@ std::string StringCompressor::decompress(CompressedString& c_str)
     std::string result2;
     result2.reserve(result_size);
     // generate result
-    ptr = c_str.data();
+    ptr = c_str.data;
     while (ptr < limit) {
         if (*ptr < 256)
             result2.push_back(*ptr);
@@ -234,8 +234,8 @@ std::string StringCompressor::decompress(CompressedString& c_str)
             }
         };
 
-        CompressionSymbol* ptr = c_str.data();
-        CompressionSymbol* limit = ptr + c_str.size();
+        CompressionSymbol* ptr = c_str.data;
+        CompressionSymbol* limit = ptr + c_str.size;
         while (ptr < limit) {
             decompress(*ptr, decompress);
             ++ptr;
@@ -246,12 +246,12 @@ std::string StringCompressor::decompress(CompressedString& c_str)
     return result2;
 }
 
-int StringCompressor::compare(CompressedString& A, CompressedString& B)
+int StringCompressor::compare(CompressedStringView& A, CompressedStringView& B)
 {
-    auto A_ptr = A.data();
-    auto A_limit = A_ptr + A.size();
-    auto B_ptr = B.data();
-    auto B_limit = B_ptr + B.size();
+    auto A_ptr = A.data;
+    auto A_limit = A_ptr + A.size;
+    auto B_ptr = B.data;
+    auto B_limit = B_ptr + B.size;
     while (A_ptr < A_limit && B_ptr < B_limit) {
         auto code_A = *A_ptr++;
         auto code_B = *B_ptr++;
@@ -275,7 +275,7 @@ int StringCompressor::compare(CompressedString& A, CompressedString& B)
             return -1;
     }
     // The compressed strings are identical or one is the prefix of the other
-    return B.size() - A.size();
+    return B.size - A.size;
     // ^ a faster way of producing same positive / negative / zero as:
     // if (A.size() < B.size())
     //     return 1;
@@ -284,9 +284,9 @@ int StringCompressor::compare(CompressedString& A, CompressedString& B)
     // return 0;
 }
 
-int StringCompressor::compare(StringData sd, CompressedString& B)
+int StringCompressor::compare(StringData sd, CompressedStringView& B)
 {
-    auto B_size = B.size();
+    auto B_size = B.size;
     // make sure comparisons are unsigned, even though StringData does not specify signedness
     const unsigned char* A_ptr = reinterpret_cast<const unsigned char*>(sd.data());
     auto A_limit = A_ptr + sd.size();
@@ -295,7 +295,7 @@ int StringCompressor::compare(StringData sd, CompressedString& B)
             // sd ended first, so B is bigger
             return -1;
         }
-        auto code = B[i];
+        auto code = B.data[i];
         if (code < 256) {
             if (code < *A_ptr)
                 return 1;

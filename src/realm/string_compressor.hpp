@@ -30,12 +30,12 @@ struct CompressedStringView {
     CompressedStringView() = default;
     CompressedStringView(CompressionSymbol* c_ptr, size_t s)
         : data(c_ptr)
-        , size(s)
+        , size(uint32_t(s))
     {
     }
     explicit CompressedStringView(CompressedString& cs)
         : data(cs.data())
-        , size(cs.size())
+        , size(uint32_t(cs.size()))
     {
     }
     bool operator==(CompressedStringView& other)
@@ -62,11 +62,11 @@ public:
     void refresh(bool writable);
     ~StringCompressor();
 
-    int compare(CompressedString& A, CompressedString& B);
-    int compare(StringData sd, CompressedString& B);
+    int compare(CompressedStringView& A, CompressedStringView& B);
+    int compare(StringData sd, CompressedStringView& B);
 
     CompressedString compress(StringData, bool learn);
-    std::string decompress(CompressedString& c_str);
+    std::string decompress(CompressedStringView& c_str);
 
 private:
     struct SymbolDef {

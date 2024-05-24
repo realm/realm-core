@@ -59,7 +59,7 @@ struct HashMapIter {
     }
     inline uint32_t get()
     {
-        return m_array.get(index) >> hash_size;
+        return (uint32_t)(m_array.get(index) >> hash_size);
     }
     inline bool empty()
     {
@@ -80,7 +80,7 @@ struct HashMapIter {
     {
         return left_to_search != 0;
     }
-    inline void set_index(int i, size_t search_limit = linear_search_limit)
+    inline void set_index(size_t i, size_t search_limit = linear_search_limit)
     {
         index = i;
         left_to_search = std::min(m_array.size(), (size_t)search_limit);
@@ -119,7 +119,7 @@ static void rehash(Array& from, Array& to, uint8_t hash_size)
 }
 
 // Add a binding from hash value to id.
-static void add_to_hash_map(Array& node, uint32_t hash, uint32_t id, uint8_t hash_size)
+static void add_to_hash_map(Array& node, uint64_t hash, uint64_t id, uint8_t hash_size)
 {
     REALM_ASSERT(node.is_attached());
     if (!node.has_refs()) {
@@ -302,7 +302,6 @@ void StringInterner::update_from_parent(bool writable)
     if (!valid_top) {
         // We're lacking part of underlying data and not allowed to create it, so enter "dead" mode
         m_compressor.reset();
-        m_compressed_strings.clear();
         m_compressed_leafs.clear();
         // m_compressed_string_map.clear();
         m_top->detach(); // <-- indicates "dead" mode
@@ -318,7 +317,6 @@ void StringInterner::update_from_parent(bool writable)
     if (m_col_key.value != data_colkey) {
         // new column, new data
         m_compressor.reset();
-        m_compressed_strings.clear();
         // m_compressed_string_map.clear();
         m_decompressed_strings.clear();
     }
@@ -341,6 +339,7 @@ void StringInterner::rebuild_internal()
             e.m_decompressed.reset();
     }
     size_t target_size = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
+    m_decompressed_strings.resize(target_size);
     if (m_data->size() != m_compressed_leafs.size()) {
         m_compressed_leafs.resize(m_data->size());
     }
@@ -355,60 +354,6 @@ void StringInterner::rebuild_internal()
             leaf_meta.m_leaf_ref = ref;
         }
     }
-    if (target_size == m_compressed_strings.size()) {
-        return;
-    }
-    if (target_size < m_compressed_strings.size()) {
-        m_compressed_strings.resize(target_size);
-        return;
-    }
-
-    // We need to add in any new strings:
-    auto internal_size = m_compressed_strings.size();
-    // Determine leaf offset:
-    size_t leaf_offset = 0;
-    auto curr_entry = internal_size & ~0xFFULL;
-    auto hi = curr_entry >> 8;
-    auto last_hi = hi;
-    m_current_string_leaf->set_parent(m_data.get(), hi);
-    REALM_ASSERT_DEBUG(m_data->get_as_ref(hi));
-    if (m_current_string_leaf->is_attached())
-        m_current_string_leaf->update_from_parent();
-    else
-        m_current_string_leaf->init_from_ref(m_current_string_leaf->get_ref_from_parent());
-    while (curr_entry < internal_size) {
-        REALM_ASSERT_DEBUG(leaf_offset < m_current_string_leaf->size());
-        size_t length = m_current_string_leaf->get(leaf_offset++);
-        leaf_offset += length;
-        curr_entry++;
-    }
-    // now add new strings - leaf offset must have been set correct for this
-    while (internal_size < target_size) {
-        auto hi = internal_size >> 8;
-        if (last_hi != hi) {
-            last_hi = hi;
-            m_current_string_leaf->set_parent(m_data.get(), hi);
-            REALM_ASSERT_DEBUG(m_data->get_as_ref(hi));
-            m_current_string_leaf->update_from_parent();
-            leaf_offset = 0;
-        }
-        CompressedString cpr;
-        REALM_ASSERT_DEBUG(leaf_offset < m_current_string_leaf->size());
-        size_t length = 0xFFFF & m_current_string_leaf->get(leaf_offset++);
-        REALM_ASSERT_DEBUG(leaf_offset + length <= m_current_string_leaf->size());
-        while (length--) {
-            cpr.push_back(0xFFFF & m_current_string_leaf->get(leaf_offset++));
-        }
-        m_compressed_strings.push_back(cpr);
-        m_decompressed_strings.push_back(CachedString({0, {}}));
-        internal_size = m_compressed_strings.size();
-    }
-    size_t total_compressor_data = 0;
-    for (auto& e : m_compressed_strings) {
-        total_compressor_data += e.size();
-    }
-    // std::cout << "Number of compressed strings: " << target_size << "    using: " << total_compressor_data
-    //           << "   avg length " << (total_compressor_data / target_size) << std::endl;
 }
 
 StringInterner::~StringInterner() {}
@@ -420,19 +365,18 @@ StringID StringInterner::intern(StringData sd)
     // special case for null string
     if (sd.data() == nullptr)
         return 0;
-    uint32_t h = sd.hash();
+    uint32_t h = (uint32_t)sd.hash();
     auto candidates = hash_to_id(*m_hash_map.get(), h, 32);
     for (auto& candidate : candidates) {
-        auto candidate_cpr = m_compressed_strings[candidate - 1];
+        auto candidate_cpr = get_compressed(candidate);
         if (m_compressor->compare(sd, candidate_cpr) == 0)
             return candidate;
     }
     // it's a new string
     bool learn = true;
     auto c_str = m_compressor->compress(sd, learn);
-    m_compressed_strings.push_back(c_str);
     m_decompressed_strings.push_back({64, std::make_unique<std::string>(sd)});
-    auto id = m_compressed_strings.size();
+    auto id = m_decompressed_strings.size();
     add_to_hash_map(*m_hash_map.get(), h, id, 32);
     size_t index = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     REALM_ASSERT_DEBUG(index == id - 1);
@@ -533,13 +477,10 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
     std::lock_guard lock(m_mutex);
     if (sd.data() == nullptr)
         return 0;
-    uint32_t h = sd.hash();
+    uint32_t h = (uint32_t)sd.hash();
     auto candidates = hash_to_id(*m_hash_map.get(), h, 32);
     for (auto& candidate : candidates) {
-        auto candidate_cpr = m_compressed_strings[candidate - 1];
-        auto c = get_compressed(candidate);
-        CompressedStringView c2(candidate_cpr);
-        REALM_ASSERT(c == c2);
+        auto candidate_cpr = get_compressed(candidate);
         if (m_compressor->compare(sd, candidate_cpr) == 0)
             return candidate;
     }
@@ -549,8 +490,8 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
 int StringInterner::compare(StringID A, StringID B)
 {
     std::lock_guard lock(m_mutex);
-    REALM_ASSERT_DEBUG(A < m_compressed_strings.size());
-    REALM_ASSERT_DEBUG(B < m_compressed_strings.size());
+    REALM_ASSERT_DEBUG(A < m_decompressed_strings.size());
+    REALM_ASSERT_DEBUG(B < m_decompressed_strings.size());
     // comparisons against null
     if (A == B && A == 0)
         return 0;
@@ -560,13 +501,13 @@ int StringInterner::compare(StringID A, StringID B)
         return 1;
     // ok, no nulls.
     REALM_ASSERT(m_compressor);
-    return m_compressor->compare(m_compressed_strings[A - 1], m_compressed_strings[B - 1]);
+    return m_compressor->compare(get_compressed(A), get_compressed(B));
 }
 
 int StringInterner::compare(StringData s, StringID A)
 {
     std::lock_guard lock(m_mutex);
-    REALM_ASSERT_DEBUG(A < m_compressed_strings.size());
+    REALM_ASSERT_DEBUG(A < m_decompressed_strings.size());
     // comparisons against null
     if (s.data() == nullptr && A == 0)
         return 0;
@@ -576,7 +517,7 @@ int StringInterner::compare(StringData s, StringID A)
         return -1;
     // ok, no nulls
     REALM_ASSERT(m_compressor);
-    return m_compressor->compare(s, m_compressed_strings[A - 1]);
+    return m_compressor->compare(s, get_compressed(A));
 }
 
 
@@ -586,22 +527,16 @@ StringData StringInterner::get(StringID id)
     std::lock_guard lock(m_mutex);
     if (id == 0)
         return StringData{nullptr};
-    REALM_ASSERT_DEBUG(id <= m_compressed_strings.size());
     REALM_ASSERT_DEBUG(id <= m_decompressed_strings.size());
     CachedString& cs = m_decompressed_strings[id - 1];
     if (cs.m_decompressed) {
         std::string* ref_str = cs.m_decompressed.get();
-        std::string str = m_compressor->decompress(m_compressed_strings[id - 1]);
-        auto csv = get_compressed(id);
-        CompressedStringView csv2(m_compressed_strings[id - 1]);
-        REALM_ASSERT_DEBUG(csv == csv2);
-        REALM_ASSERT(str == *ref_str);
         if (cs.m_weight < 128)
             cs.m_weight += 64;
         return {ref_str->c_str(), ref_str->size()};
     }
     cs.m_weight = 64;
-    cs.m_decompressed = std::make_unique<std::string>(m_compressor->decompress(m_compressed_strings[id - 1]));
+    cs.m_decompressed = std::make_unique<std::string>(m_compressor->decompress(get_compressed(id)));
     return {cs.m_decompressed->c_str(), cs.m_decompressed->size()};
 }
 

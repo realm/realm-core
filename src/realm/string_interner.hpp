@@ -79,7 +79,6 @@ private:
     bool load_leaf_if_new_ref(DataLeaf& leaf, ref_type new_ref);
     ColKey m_col_key; // for validation
     std::unique_ptr<StringCompressor> m_compressor;
-    std::vector<CompressedString> m_compressed_strings;
     // At the moment we need to keep decompressed strings around if they've been
     // returned to the caller, since we're handing
     // out StringData references to their storage. This is a temporary solution.
