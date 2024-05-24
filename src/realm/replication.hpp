@@ -77,6 +77,7 @@ public:
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, ObjKey, Mixed);
+    void create_linked_object(const Table*, ObjKey);
     virtual void remove_object(const Table*, ObjKey);
 
     virtual void typed_link_change(const Table*, ColKey, TableKey);
@@ -389,17 +390,30 @@ private:
     _impl::TransactLogBufferStream m_stream;
     _impl::TransactLogEncoder m_encoder{m_stream};
     util::Logger* m_logger = nullptr;
-    mutable const Table* m_selected_table = nullptr;
-    mutable ObjKey m_selected_obj;
-    mutable CollectionId m_selected_list;
+    const Table* m_selected_table = nullptr;
+    ObjKey m_selected_obj;
+    CollectionId m_selected_collection;
+    // The ObjKey of the most recently created object for each table (indexed
+    // by the Table's index in the group). Most insertion patterns will only
+    // ever update the most recently created object, so this is almost as
+    // effective as tracking all newly created objects but much cheaper.
+    std::vector<ObjKey> m_most_recently_created_object;
+    // When true, the currently selected object was created in this transaction
+    // and we don't need to emit instructions for mutations on it
+    bool m_newly_created_object = false;
 
     void unselect_all() noexcept;
     void select_table(const Table*); // unselects link list and obj
-    void select_obj(ObjKey key);
-    void select_collection(const CollectionBase&);
+    bool select_obj(ObjKey key);
+    bool select_collection(const CollectionBase&);
 
     void do_select_table(const Table*);
+    void do_select_obj(ObjKey key);
     void do_select_collection(const CollectionBase&);
+
+    // Mark this ObjKey as being a newly created object that should not emit
+    // mutation instructions
+    void track_new_object(ObjKey);
 
     void do_set(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant = _impl::instr_Set);
     void log_collection_operation(const char* operation, const CollectionBase& collection, Mixed value,
@@ -445,11 +459,11 @@ inline size_t Replication::transact_log_size()
     return m_encoder.write_position() - m_stream.get_data();
 }
 
-
 inline void Replication::unselect_all() noexcept
 {
     m_selected_table = nullptr;
-    m_selected_list = CollectionId();
+    m_selected_collection = CollectionId();
+    m_newly_created_object = false;
 }
 
 inline void Replication::select_table(const Table* table)
@@ -458,11 +472,20 @@ inline void Replication::select_table(const Table* table)
         do_select_table(table); // Throws
 }
 
-inline void Replication::select_collection(const CollectionBase& list)
+inline bool Replication::select_collection(const CollectionBase& coll)
 {
-    if (CollectionId(list) != m_selected_list) {
-        do_select_collection(list); // Throws
+    if (CollectionId(coll) != m_selected_collection) {
+        do_select_collection(coll); // Throws
     }
+    return !m_newly_created_object;
+}
+
+inline bool Replication::select_obj(ObjKey key)
+{
+    if (key != m_selected_obj) {
+        do_select_obj(key);
+    }
+    return !m_newly_created_object;
 }
 
 inline void Replication::rename_class(TableKey table_key, StringData)

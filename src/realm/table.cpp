@@ -2253,8 +2253,10 @@ Obj Table::create_linked_object()
 
     GlobalKey object_id = allocate_object_id_squeezed();
     ObjKey key = object_id.get_local_key(get_sync_file_id());
-
     REALM_ASSERT(key.value >= 0);
+
+    if (auto repl = get_repl())
+        repl->create_linked_object(this, key);
 
     Obj obj = m_clusters.insert(key, {});
 

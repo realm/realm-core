@@ -54,6 +54,7 @@ void Replication::do_initiate_transact(Group&, version_type, bool)
     char* data = m_stream.get_data();
     size_t size = m_stream.get_size();
     m_encoder.set_buffer(data, data + size);
+    m_most_recently_created_object.clear();
 }
 
 Replication::version_type Replication::prepare_commit(version_type orig_version)
@@ -100,7 +101,6 @@ void Replication::erase_class(TableKey tk, StringData table_name, size_t)
     m_encoder.erase_class(tk); // Throws
 }
 
-
 void Replication::insert_column(const Table* t, ColKey col_key, DataType type, StringData col_name,
                                 Table* target_table)
 {
@@ -140,6 +140,21 @@ void Replication::erase_column(const Table* t, ColKey col_key)
     m_encoder.erase_column(col_key); // Throws
 }
 
+void Replication::track_new_object(ObjKey key)
+{
+    m_selected_obj = key;
+    m_selected_collection = CollectionId();
+    m_newly_created_object = true;
+
+    auto table_index = m_selected_table->get_index_in_group();
+    if (table_index >= m_most_recently_created_object.size()) {
+        if (table_index >= m_most_recently_created_object.capacity())
+            m_most_recently_created_object.reserve(table_index * 2);
+        m_most_recently_created_object.resize(table_index + 1);
+    }
+    m_most_recently_created_object[table_index] = m_selected_obj;
+}
+
 void Replication::create_object(const Table* t, GlobalKey id)
 {
     if (auto logger = would_log(LogLevel::debug)) {
@@ -147,6 +162,7 @@ void Replication::create_object(const Table* t, GlobalKey id)
     }
     select_table(t);                              // Throws
     m_encoder.create_object(id.get_local_key(0)); // Throws
+    track_new_object(id.get_local_key(0));        // Throws
 }
 
 void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mixed pk)
@@ -157,6 +173,14 @@ void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mix
     }
     select_table(t);              // Throws
     m_encoder.create_object(key); // Throws
+    track_new_object(key);
+}
+
+void Replication::create_linked_object(const Table* t, ObjKey key)
+{
+    select_table(t);       // Throws
+    track_new_object(key); // Throws
+    // Does not need to encode anything as embedded tables can't be observed
 }
 
 void Replication::remove_object(const Table* t, ObjKey key)
@@ -177,11 +201,27 @@ void Replication::remove_object(const Table* t, ObjKey key)
     m_encoder.remove_object(key); // Throws
 }
 
-void Replication::select_obj(ObjKey key)
+void Replication::do_select_table(const Table* table)
 {
-    if (key == m_selected_obj) {
-        return;
+    m_encoder.select_table(table->get_key()); // Throws
+    m_selected_table = table;
+    m_selected_collection = CollectionId();
+    m_selected_obj = ObjKey();
+}
+
+void Replication::do_select_obj(ObjKey key)
+{
+    m_selected_obj = key;
+    m_selected_collection = CollectionId();
+
+    auto table_index = m_selected_table->get_index_in_group();
+    if (table_index < m_most_recently_created_object.size()) {
+        m_newly_created_object = m_most_recently_created_object[table_index] == key;
     }
+    else {
+        m_newly_created_object = false;
+    }
+
     if (auto logger = would_log(LogLevel::debug)) {
         auto class_name = m_selected_table->get_class_name();
         if (m_selected_table->get_primary_key_column()) {
@@ -198,16 +238,28 @@ void Replication::select_obj(ObjKey key)
             logger->log(LogCategory::object, LogLevel::debug, "Mutating anonymous object '%1'[%2]", class_name, key);
         }
     }
-    m_selected_obj = key;
-    m_selected_list = CollectionId();
+}
+
+void Replication::do_select_collection(const CollectionBase& coll)
+{
+    select_table(coll.get_table().unchecked_ptr());
+    ColKey col_key = coll.get_col_key();
+    ObjKey key = coll.get_owner_key();
+    auto path = coll.get_stable_path();
+
+    if (select_obj(key)) {
+        m_encoder.select_collection(col_key, key, path); // Throws
+    }
+    m_selected_collection = CollectionId(coll.get_table()->get_key(), key, std::move(path));
 }
 
 void Replication::do_set(const Table* t, ColKey col_key, ObjKey key, _impl::Instruction variant)
 {
     if (variant != _impl::Instruction::instr_SetDefault) {
         select_table(t); // Throws
-        select_obj(key);
-        m_encoder.modify_object(col_key, key); // Throws
+        if (select_obj(key)) {
+            m_encoder.modify_object(col_key, key); // Throws
+        }
     }
 }
 
@@ -243,8 +295,9 @@ void Replication::set(const Table* t, ColKey col_key, ObjKey key, Mixed value, _
 void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key)
 {
     select_table(t); // Throws
-    select_obj(key);
-    m_encoder.modify_object(col_key, key); // Throws
+    if (select_obj(key)) {
+        m_encoder.modify_object(col_key, key); // Throws
+    }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Nullify '%1'", t->get_column_name(col_key));
     }
@@ -257,7 +310,6 @@ void Replication::add_int(const Table* t, ColKey col_key, ObjKey key, int_fast64
         logger->log(LogCategory::object, LogLevel::trace, "   Adding %1 to '%2'", value, t->get_column_name(col_key));
     }
 }
-
 
 Path Replication::get_prop_name(Path&& path) const
 {
@@ -308,24 +360,26 @@ void Replication::log_collection_operation(const char* operation, const Collecti
 
 void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed value, size_t)
 {
-    select_collection(list);                                     // Throws
-    m_encoder.collection_insert(list.translate_index(list_ndx)); // Throws
+    if (select_collection(list)) {                                   // Throws
+        m_encoder.collection_insert(list.translate_index(list_ndx)); // Throws
+    }
     log_collection_operation("Insert", list, value, int64_t(list_ndx));
 }
 
 void Replication::list_set(const CollectionBase& list, size_t list_ndx, Mixed value)
 {
-    select_collection(list);                                  // Throws
-    m_encoder.collection_set(list.translate_index(list_ndx)); // Throws
+    if (select_collection(list)) {                                // Throws
+        m_encoder.collection_set(list.translate_index(list_ndx)); // Throws
+    }
     log_collection_operation("Set", list, value, int64_t(list_ndx));
 }
 
 void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
 {
-    select_collection(list);                                    // Throws
-    m_encoder.collection_erase(list.translate_index(link_ndx)); // Throws
+    if (select_collection(list)) {                                  // Throws
+        m_encoder.collection_erase(list.translate_index(link_ndx)); // Throws
+    }
     if (auto logger = would_log(LogLevel::trace)) {
-
         logger->log(LogCategory::object, LogLevel::trace, "   Erase '%1' at position %2",
                     get_prop_name(list.get_short_path()), link_ndx);
     }
@@ -333,8 +387,9 @@ void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
 
 void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, size_t to_link_ndx)
 {
-    select_collection(list);                                                                           // Throws
-    m_encoder.collection_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
+    if (select_collection(list)) {                                                                         // Throws
+        m_encoder.collection_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
+    }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Move %1 to %2 in '%3'", from_link_ndx, to_link_ndx,
                     get_prop_name(list.get_short_path()));
@@ -343,55 +398,24 @@ void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, si
 
 void Replication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed value)
 {
-    select_collection(set);               // Throws
-    m_encoder.collection_insert(set_ndx); // Throws
-    log_collection_operation("Insert", set, value, Mixed());
+    Replication::list_insert(set, set_ndx, value, 0); // Throws
 }
 
-void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
+void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
 {
-    select_collection(set);              // Throws
-    m_encoder.collection_erase(set_ndx); // Throws
-    if (auto logger = would_log(LogLevel::trace)) {
-        logger->log(LogCategory::object, LogLevel::trace, "   Erase %1 from '%2'", value,
-                    get_prop_name(set.get_short_path()));
-    }
+    Replication::list_erase(set, set_ndx); // Throws
 }
 
 void Replication::set_clear(const CollectionBase& set)
 {
-    select_collection(set);                 // Throws
-    m_encoder.collection_clear(set.size()); // Throws
-    if (auto logger = would_log(LogLevel::trace)) {
-        logger->log(LogCategory::object, LogLevel::trace, "   Clear '%1'", get_prop_name(set.get_short_path()));
-    }
-}
-
-void Replication::do_select_table(const Table* table)
-{
-    m_encoder.select_table(table->get_key()); // Throws
-    m_selected_table = table;
-    m_selected_list = CollectionId();
-    m_selected_obj = ObjKey();
-}
-
-void Replication::do_select_collection(const CollectionBase& list)
-{
-    select_table(list.get_table().unchecked_ptr());
-    ColKey col_key = list.get_col_key();
-    ObjKey key = list.get_owner_key();
-    auto path = list.get_stable_path();
-
-    select_obj(key);
-
-    m_encoder.select_collection(col_key, key, path); // Throws
-    m_selected_list = CollectionId(list.get_table()->get_key(), key, std::move(path));
+    Replication::list_clear(set); // Throws
 }
 
 void Replication::list_clear(const CollectionBase& list)
 {
-    select_collection(list);                 // Throws
-    m_encoder.collection_clear(list.size()); // Throws
+    if (select_collection(list)) {               // Throws
+        m_encoder.collection_clear(list.size()); // Throws
+    }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Clear '%1'", get_prop_name(list.get_short_path()));
     }
@@ -399,8 +423,9 @@ void Replication::list_clear(const CollectionBase& list)
 
 void Replication::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
 {
-    select_collection(list);
-    m_encoder.collection_erase(link_ndx);
+    if (select_collection(list)) { // Throws
+        m_encoder.collection_erase(link_ndx);
+    }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Nullify '%1' position %2",
                     m_selected_table->get_column_name(list.get_col_key()), link_ndx);
@@ -409,22 +434,25 @@ void Replication::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
 
 void Replication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
-    select_collection(dict);
-    m_encoder.collection_insert(ndx);
+    if (select_collection(dict)) { // Throws
+        m_encoder.collection_insert(ndx);
+    }
     log_collection_operation("Insert", dict, value, key);
 }
 
 void Replication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
-    select_collection(dict);
-    m_encoder.collection_set(ndx);
+    if (select_collection(dict)) { // Throws
+        m_encoder.collection_set(ndx);
+    }
     log_collection_operation("Set", dict, value, key);
 }
 
 void Replication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
 {
-    select_collection(dict);
-    m_encoder.collection_erase(ndx);
+    if (select_collection(dict)) { // Throws
+        m_encoder.collection_erase(ndx);
+    }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Erase %1 from '%2'", key,
                     get_prop_name(dict.get_short_path()));
@@ -433,8 +461,9 @@ void Replication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed
 
 void Replication::dictionary_clear(const CollectionBase& dict)
 {
-    select_collection(dict);
-    m_encoder.collection_clear(dict.size());
+    if (select_collection(dict)) { // Throws
+        m_encoder.collection_clear(dict.size());
+    }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Clear '%1'", get_prop_name(dict.get_short_path()));
     }
