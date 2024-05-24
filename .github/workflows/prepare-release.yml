@@ -32,7 +32,7 @@ jobs:
           body-path: changes-since-last-tag.txt
           labels: no-jira-ticket
           commit-message: Prepare for release ${{ inputs.version }}
-          token: ${{ secrets.REALM_CI_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           add-paths: |
             dependencies.yml
             Package.swift

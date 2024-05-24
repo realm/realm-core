@@ -9,8 +9,10 @@ The core release process is automated with github [actions](https://github.com/r
 3. When ready, merge the PR. You can squash if there are only "prepare release" changes, but use a "merge-commit" strategy if there are functional changes added manually to the PR. On merge, the "make-release" action will run. This takes care of:
   - Making a tag
   - Publishing the release on Github
-  - Updating the Changelog
+  - Making a PR to update the Changelog with the new template section
   - Announcing the release in the #appx-releases slack channel
+
+4. Find the freshly generated PR that adds the new changelog section. Approve it and merge it.
 
 ## Previous process
 
