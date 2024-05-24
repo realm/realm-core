@@ -192,7 +192,8 @@ public:
         return not_found;
     }
 
-    virtual size_t aggregate_local_compressed(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*, size_t, double&)
+    virtual size_t aggregate_local_compressed(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*, size_t,
+                                              double&)
     {
         return not_found;
     }
@@ -308,7 +309,7 @@ private:
     {
         return false;
     }
-    
+
     size_t do_aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit);
 };
 
@@ -504,11 +505,11 @@ public:
     }
 
     virtual size_t aggregate_local_compressed(size_t start, size_t end, std::vector<ParentNode*> children,
-                              QueryStateBase* st, size_t local_limit, double& dD) override
+                                              QueryStateBase* st, size_t local_limit, double& dD) override
     {
         // if we are here, we have a query with a list of conditions for a compressed leaf
         const auto vs = this->m_leaf->get_all(start, end);
-        
+
         size_t local_matches = 0;
 
         auto update_query_status = [st, &start](const auto position) {
@@ -517,8 +518,8 @@ public:
 
         auto pos = vs.begin();
         const TConditionFunction cond;
-        for(;;) {
-            
+        for (;;) {
+
             if (local_matches == local_limit) {
                 const auto r = start + std::distance(vs.begin(), pos);
                 dD = double(r - start) / (local_matches + 1.1);
@@ -528,16 +529,16 @@ public:
             pos = std::find_if(pos, vs.end(), [&cond, this](const auto v) {
                 return cond(v, this->m_value);
             });
-            
+
             // nothing was found, just return
             if (pos == vs.end()) {
                 const auto r = start + std::distance(vs.begin(), pos);
                 dD = double(r - start) / (local_matches + 1.1);
                 return end;
             }
-            
+
             local_matches++;
-             
+
             // explore all the other query nodes
             auto m = std::distance(vs.begin(), pos);
             auto k = m;

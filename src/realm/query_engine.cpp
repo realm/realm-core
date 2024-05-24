@@ -102,13 +102,12 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     if (m_children.size() == 1) {
         return find_all_local(start, end);
     }
-    
-    if(m_children.size()>1)
-    {
-        const auto compressed = std::all_of(m_children.begin(), m_children.end(), [](const auto child){
+
+    if (m_children.size() > 1) {
+        const auto compressed = std::all_of(m_children.begin(), m_children.end(), [](const auto child) {
             return child->is_compressed();
         });
-        if(compressed)
+        if (compressed)
             return aggregate_local_compressed(start, end, m_children, st, local_limit, m_dD);
     }
     return do_aggregate_local(st, start, end, local_limit);
@@ -123,7 +122,7 @@ size_t ParentNode::do_aggregate_local(QueryStateBase* st, size_t start, size_t e
             m_dD = double(r - start) / (local_matches + 1.1);
             return r + 1;
         }
-        
+
         // Find first match in this condition node
         auto pos = r + 1;
         r = find_first_local(pos, end);
@@ -131,19 +130,19 @@ size_t ParentNode::do_aggregate_local(QueryStateBase* st, size_t start, size_t e
             m_dD = double(pos - start) / (local_matches + 1.1);
             return end;
         }
-        
+
         local_matches++;
-        
+
         // Find first match in remaining condition nodes
         size_t m = r;
-        
+
         for (size_t c = 1; c < m_children.size(); c++) {
             m = m_children[c]->find_first_local(r, r + 1);
             if (m != r) {
                 break;
             }
         }
-        
+
         // If index of first match in this node equals index of first match in all remaining nodes, we have a
         // final match
         if (m == r) {

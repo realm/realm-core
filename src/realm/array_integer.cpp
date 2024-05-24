@@ -41,22 +41,22 @@ Mixed ArrayInteger::get_any(size_t ndx) const
 
 size_t ArrayInteger::find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const
 {
-    if(is_compressed()) {
+    if (is_compressed()) {
         const auto& vs = get_all(start, end);
         size_t i = start;
-        for(const auto val : vs) {
+        for (const auto val : vs) {
             if (val >= from && val <= to)
                 return i;
         }
     }
     else {
-        for(size_t i =start; i<end; ++i) {
+        for (size_t i = start; i < end; ++i) {
             const auto val = get(i);
             if (val >= from && val <= to)
                 return i;
         }
     }
-    
+
     return realm::not_found;
 }
 
