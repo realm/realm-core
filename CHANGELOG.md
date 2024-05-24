@@ -5,7 +5,8 @@
 * Add support for server initiated bootstraps. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 
 ### Fixed
-* A non-streaming progress notifier would not immediately call its callback after registration. Instead you would have to wait for a download message to be received to get your first update - if you were already caught up when you registered the notifier you could end up waiting a long time for the server to deliver a download that would call/expire your notifier ([#7627](https://github.com/realm/realm-core/issues/7627), since v14.6.0).
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
 
 ### Breaking changes
 * None.
@@ -17,6 +18,28 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 14.8.0 Release notes
+
+### Enhancements
+* Add vendor support to the Android Blueprint (PR [#7614](https://github.com/realm/realm-core/pull/7614)).
+
+### Fixed
+* A non-streaming progress notifier would not immediately call its callback after registration. Instead you would have to wait for a download message to be received to get your first update - if you were already caught up when you registered the notifier you could end up waiting a long time for the server to deliver a download that would call/expire your notifier ([#7627](https://github.com/realm/realm-core/issues/7627), since v14.6.0).
+* Comparing a numeric property with an argument list containing a string would throw. ([#7714](https://github.com/realm/realm-core/issues/7714), since v14.7.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* `util::Thread` no longer has any functionality other than `get_name()` and `set_name()`. Use `std::thread` instead ([PR #7696](https://github.com/realm/realm-core/pull/7696)).
 
 ----------------------------------------------
 
@@ -3235,7 +3258,6 @@
 * Added `TableView::update_query()`
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix race potentially allowing frozen transactions to access incomplete search index accessors. (Since v6)
 * Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
 * Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
