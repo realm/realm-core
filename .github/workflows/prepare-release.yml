@@ -18,7 +18,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+          fetch-depth: 0 # include history and tags
       - name: Change Version
         run: tools/release-init.sh ${{ inputs.version }}
         shell: bash
@@ -32,8 +33,6 @@ jobs:
           labels: no-jira-ticket
           commit-message: Prepare for release ${{ inputs.version }}
           token: ${{ secrets.REALM_CI_PAT }}
-          delete-branch: true
-          base: ${{ github.ref }}
           add-paths: |
             dependencies.yml
             Package.swift

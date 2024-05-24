@@ -2,6 +2,28 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 14.8.0 Release notes
+
+### Enhancements
 * Add vendor support to the Android Blueprint (PR [#7614](https://github.com/realm/realm-core/pull/7614)).
 * Report the originating error that caused a client reset to occur. ([#6154](https://github.com/realm/realm-core/issues/6154))
 
@@ -3238,7 +3260,6 @@
 * Added `TableView::update_query()`
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix race potentially allowing frozen transactions to access incomplete search index accessors. (Since v6)
 * Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
 * Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
