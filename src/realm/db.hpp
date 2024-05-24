@@ -32,7 +32,6 @@
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/version_id.hpp>
-#include <realm/string_interner.hpp>
 
 #include <functional>
 #include <cstdint>
@@ -451,8 +450,6 @@ public:
 
     void add_commit_listener(CommitListener*);
     void remove_commit_listener(CommitListener*);
-
-    StringInterner* get_string_interner(TableKey, ColKey::Idx);
 
 private:
     class AsyncCommitHelper;
