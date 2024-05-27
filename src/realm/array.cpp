@@ -206,7 +206,7 @@ uint8_t Array::bit_width(int64_t v)
 
 template <size_t width>
 struct Array::VTableForWidth {
-    struct PopulatedVTable : Array::VTable {
+    struct PopulatedVTable : VTable {
         PopulatedVTable()
         {
             getter = &Array::get<width>;
@@ -221,26 +221,9 @@ struct Array::VTableForWidth {
     static const PopulatedVTable vtable;
 };
 
-struct Array::VTableForEncodedArray {
-    struct PopulatedVTableEncoded : Array::VTable {
-        PopulatedVTableEncoded()
-        {
-            getter = &Array::get_from_compressed_array;
-            setter = &Array::set_compressed_array;
-            chunk_getter = &Array::get_chunk_compressed_array;
-            getter_all = &Array::get_all_compressed_array;
-            finder[cond_Equal] = &Array::find_compressed_array<Equal>;
-            finder[cond_NotEqual] = &Array::find_compressed_array<NotEqual>;
-            finder[cond_Greater] = &Array::find_compressed_array<Greater>;
-            finder[cond_Less] = &Array::find_compressed_array<Less>;
-        }
-    };
-    static const PopulatedVTableEncoded vtable;
-};
-
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
-const typename Array::VTableForEncodedArray::PopulatedVTableEncoded Array::VTableForEncodedArray::vtable;
+
 void Array::init_from_mem(MemRef mem) noexcept
 {
     // Header is the type of header that has been allocated, in case we are decompressing,
@@ -258,23 +241,18 @@ void Array::init_from_mem(MemRef mem) noexcept
     if (is_extended) {
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        update_width_cache_from_int_compressor(); // compressor knows which format this array is
+        m_size = m_integer_compressor.size();
+        m_width = m_integer_compressor.v_width();
+        m_lbound = -m_integer_compressor.v_mask();
+        m_ubound = m_integer_compressor.v_mask() - 1;
+        m_integer_compressor.set_vtable(*this);
+        m_getter = m_vtable->getter;
     }
     else {
         // Old init phase.
         Node::init_from_mem(mem);
         update_width_cache_from_header();
     }
-}
-
-void Array::update_width_cache_from_int_compressor() noexcept
-{
-    m_size = m_integer_compressor.size();
-    m_width = m_integer_compressor.v_width();
-    m_lbound = -m_integer_compressor.v_mask();
-    m_ubound = m_integer_compressor.v_mask() - 1;
-    m_vtable = &VTableForEncodedArray::vtable;
-    m_getter = m_vtable->getter;
 }
 
 MemRef Array::get_mem() const noexcept
@@ -408,8 +386,8 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     if (bits_per_elem < 8) {
         // FIXME: Should be optimized
         for (size_t i = begin; i != end; ++i) {
-            int_fast64_t v = (this->*m_getter)(i);
-            (this->*(m_vtable->setter))(dest_begin++, v);
+            int_fast64_t v = m_getter(*this, i);
+            m_vtable->setter(*this, dest_begin++, v);
         }
         return;
     }
@@ -435,8 +413,8 @@ void Array::move(Array& dst, size_t ndx)
     size_t sz = m_size;
 
     for (size_t i = ndx; i < sz; i++) {
-        auto v = (this->*getter)(i);
-        (dst.*setter)(dest_begin++, v);
+        auto v = getter(*this, i);
+        setter(dst, dest_begin++, v);
     }
 
     truncate(ndx);
@@ -445,7 +423,7 @@ void Array::move(Array& dst, size_t ndx)
 void Array::set(size_t ndx, int64_t value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
-    if ((this->*(m_vtable->getter))(ndx) == value)
+    if (m_vtable->getter(*this, ndx) == value)
         return;
 
     // Check if we need to copy before modifying
@@ -453,7 +431,7 @@ void Array::set(size_t ndx, int64_t value)
     // Grow the array if needed to store this value
     ensure_minimum_width(value); // Throws
     // Set the value
-    (this->*(m_vtable->setter))(ndx, value);
+    m_vtable->setter(*this, ndx, value);
 }
 
 void Array::set_as_ref(size_t ndx, ref_type ref)
@@ -521,8 +499,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
         size_t i = old_size;
         while (i > ndx) {
             --i;
-            int64_t v = (this->*old_getter)(i);
-            (this->*(m_vtable->setter))(i + 1, v);
+            int64_t v = old_getter(*this, i);
+            m_vtable->setter(*this, i + 1, v);
         }
     }
     else if (ndx != old_size) {
@@ -536,15 +514,15 @@ void Array::insert(size_t ndx, int_fast64_t value)
     }
 
     // Insert the new value
-    (this->*(m_vtable->setter))(ndx, value);
+    m_vtable->setter(*this, ndx, value);
 
     // Expand values above insertion
     if (do_expand) {
         size_t i = ndx;
         while (i != 0) {
             --i;
-            int64_t v = (this->*old_getter)(i);
-            (this->*(m_vtable->setter))(i, v);
+            int64_t v = old_getter(*this, i);
+            m_vtable->setter(*this, i, v);
         }
     }
 }
@@ -626,8 +604,8 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     size_t i = m_size;
     while (i != 0) {
         --i;
-        int64_t v = (this->*old_getter)(i);
-        (this->*(m_vtable->setter))(i, v);
+        int64_t v = old_getter(*this, i);
+        m_vtable->setter(*this, i, v);
     }
 }
 
@@ -660,26 +638,6 @@ bool Array::try_compress(Array& arr) const
 bool Array::try_decompress()
 {
     return decompress_array(*this);
-}
-
-int64_t Array::get_from_compressed_array(size_t ndx) const noexcept
-{
-    return m_integer_compressor.get(ndx);
-}
-
-std::vector<int64_t> Array::get_all_compressed_array(size_t b, size_t e) const
-{
-    return m_integer_compressor.get_all(b, e);
-}
-
-void Array::set_compressed_array(size_t ndx, int64_t val)
-{
-    m_integer_compressor.set_direct(ndx, val);
-}
-
-void Array::get_chunk_compressed_array(size_t ndx, int64_t res[8]) const noexcept
-{
-    m_integer_compressor.get_chunk(ndx, res);
 }
 
 size_t Array::calc_aligned_byte_size(size_t size, int width)
@@ -794,16 +752,10 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 
 // This is the one installed into the m_vtable->finder slots.
 template <class cond>
-bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool Array::find_vtable(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                        QueryStateBase* state)
 {
-    REALM_TEMPEX2(return ArrayWithFind(*this).find_optimized, cond, m_width, (value, start, end, baseindex, state));
-}
-
-template <class cond>
-bool Array::find_compressed_array(int64_t value, size_t start, size_t end, size_t baseindex,
-                                  QueryStateBase* state) const
-{
-    return m_integer_compressor.find_all<cond>(*this, value, start, end, baseindex, state);
+    REALM_TEMPEX2(return ArrayWithFind(arr).find_optimized, cond, arr.m_width, (value, start, end, baseindex, state));
 }
 
 void Array::update_width_cache_from_header() noexcept
@@ -821,9 +773,10 @@ void Array::update_width_cache_from_header() noexcept
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be be set to 0.
 template <size_t w>
-void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
+void Array::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) noexcept
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    auto sz = arr.size();
+    REALM_ASSERT_3(ndx, <, sz);
     size_t i = 0;
 
     // if constexpr to avoid producing spurious warnings resulting from
@@ -835,7 +788,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 
         // Round m_size down to byte granularity as the trailing bits in the last
         // byte are uninitialized
-        size_t bytes_available = m_size / elements_per_byte;
+        size_t bytes_available = sz / elements_per_byte;
 
         // Round start and end to be byte-aligned. Start is rounded down and
         // end is rounded up as we may read up to 7 unused bits at each end.
@@ -847,7 +800,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
             uint64_t c = 0;
             for (size_t i = end; i > start; --i) {
                 c <<= 8;
-                c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
+                c += *reinterpret_cast<const uint8_t*>(arr.m_data + i - 1);
             }
             // Trim off leading bits which aren't part of the requested range
             c >>= (ndx - start * elements_per_byte) * w;
@@ -867,31 +820,31 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
         }
     }
 
-    for (; i + ndx < m_size && i < 8; i++)
-        res[i] = get<w>(ndx + i);
+    for (; i + ndx < sz && i < 8; i++)
+        res[i] = get<w>(arr, ndx + i);
     for (; i < 8; i++)
         res[i] = 0;
 
 #ifdef REALM_DEBUG
-    for (int j = 0; j + ndx < m_size && j < 8; j++) {
-        int64_t expected = get<w>(ndx + j);
+    for (int j = 0; j + ndx < sz && j < 8; j++) {
+        int64_t expected = Array::get_universal<w>(arr.m_data, ndx + j);
         REALM_ASSERT(res[j] == expected);
     }
 #endif
 }
 
 template <>
-void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
+void Array::get_chunk<0>(const Array& arr, size_t ndx, int64_t res[8]) noexcept
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(ndx, <, arr.m_size);
     memset(res, 0, sizeof(int64_t) * 8);
 }
 
 
 template <size_t width>
-void Array::set(size_t ndx, int64_t value)
+void Array::set(Array& arr, size_t ndx, int64_t value)
 {
-    realm::set_direct<width>(m_data, ndx, value);
+    realm::set_direct<width>(arr.m_data, ndx, value);
 }
 
 void Array::_mem_usage(size_t& mem) const noexcept

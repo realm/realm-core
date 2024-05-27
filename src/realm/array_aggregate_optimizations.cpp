@@ -41,7 +41,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
     // Sum manually until 128 bit aligned
     for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % 128 != 0); start++) {
-        s += get<w>(start);
+        s += get<w>(*this, start);
     }
 
     if (w == 1 || w == 2 || w == 4) {
@@ -185,7 +185,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
     // Sum remaining elements
     for (; start < end; ++start)
-        s += get<w>(start);
+        s += get<w>(*this, start);
 
     return s;
 }
