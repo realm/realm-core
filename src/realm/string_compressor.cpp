@@ -80,11 +80,11 @@ void StringCompressor::add_expansion(SymbolDef def)
     auto& chunk = m_expansion_storage.back();
     auto start_index = (uint32_t)chunk.size();
     if (def.expansion_a < 256)
-        chunk.push_back(def.expansion_a);
+        chunk.push_back((char)def.expansion_a);
     else
         chunk.append(m_symbols[def.expansion_a - 256].expansion);
     if (def.expansion_b < 256)
-        chunk.push_back(def.expansion_b);
+        chunk.push_back((char)def.expansion_b);
     else
         chunk.append(m_symbols[def.expansion_b - 256].expansion);
     std::string_view expansion(chunk.data() + start_index, exp_size);
@@ -115,7 +115,7 @@ void StringCompressor::rebuild_internal()
     for (size_t i = m_symbols.size(); i < num_symbols; ++i) {
         auto pair = m_data->get(i);
         SymbolDef def;
-        def.id = i + 256;
+        def.id = (CompressionSymbol)(i + 256);
         def.expansion_a = 0xFFFF & (pair >> 16);
         def.expansion_b = 0xFFFF & pair;
         auto hash = symbol_pair_hash(def.expansion_a, def.expansion_b);
@@ -167,7 +167,7 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
                     REALM_ASSERT_DEBUG(m_compression_map[hash].id == 0);
                     REALM_ASSERT_DEBUG(m_symbols.size() == m_data->size());
                     REALM_ASSERT_DEBUG(m_data->is_attached());
-                    CompressionSymbol id = 256 + m_symbols.size();
+                    CompressionSymbol id = (CompressionSymbol)(256 + m_symbols.size());
                     SymbolDef def{id, from[0], from[1]};
                     m_compression_map[hash] = def;
                     add_expansion(def);
@@ -215,7 +215,7 @@ std::string StringCompressor::decompress(CompressedStringView& c_str)
     ptr = c_str.data;
     while (ptr < limit) {
         if (*ptr < 256)
-            result2.push_back(*ptr);
+            result2.push_back((char)*ptr);
         else
             result2.append(m_symbols[*ptr - 256].expansion);
         ptr++;
@@ -225,7 +225,7 @@ std::string StringCompressor::decompress(CompressedStringView& c_str)
     {
         auto decompress = [&](CompressionSymbol symbol, auto& decompress) -> void {
             if (symbol < 256) {
-                result.push_back(symbol);
+                result.push_back((char)symbol);
             }
             else {
                 auto& s = m_symbols[symbol - 256];

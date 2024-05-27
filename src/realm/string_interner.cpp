@@ -82,8 +82,8 @@ struct HashMapIter {
     }
     inline void set_index(size_t i, size_t search_limit = linear_search_limit)
     {
-        index = i;
-        left_to_search = std::min(m_array.size(), (size_t)search_limit);
+        index = (uint16_t)i;
+        left_to_search = (uint16_t)std::min(m_array.size(), (size_t)search_limit);
     }
     void operator++()
     {
@@ -103,10 +103,10 @@ static void rehash(Array& from, Array& to, uint8_t hash_size)
     REALM_ASSERT_DEBUG(from.size() * 2 == to.size());
 
     for (size_t i = 0; i < from.size(); ++i) {
-        auto entry = from.get(i);
+        auto entry = (size_t)from.get(i);
         if ((entry >> hash_size) == 0)
             continue;
-        auto starting_index = entry & (to.size() - 1);
+        size_t starting_index = entry & (to.size() - 1);
         HashMapIter it(to, 0, hash_size);
         it.set_index(starting_index);
         while (it.is_valid() && !it.empty()) {
@@ -143,7 +143,7 @@ static void add_to_hash_map(Array& node, uint64_t hash, uint64_t id, uint8_t has
         // it's a hash table. Grow if needed up till 'hash_node_max_size' entries
         while (node.size() < hash_node_max_size) {
             auto size = node.size();
-            auto start_index = hash & (size - 1);
+            size_t start_index = hash & (size - 1);
             HashMapIter it(node, 0, hash_size);
             it.set_index(start_index);
             while (it.is_valid() && !it.empty()) {
@@ -338,7 +338,7 @@ void StringInterner::rebuild_internal()
         if (e.m_weight == 0 && e.m_decompressed)
             e.m_decompressed.reset();
     }
-    size_t target_size = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
+    size_t target_size = (size_t)m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     m_decompressed_strings.resize(target_size);
     if (m_data->size() != m_compressed_leafs.size()) {
         m_compressed_leafs.resize(m_data->size());
@@ -378,7 +378,7 @@ StringID StringInterner::intern(StringData sd)
     m_decompressed_strings.push_back({64, std::make_unique<std::string>(sd)});
     auto id = m_decompressed_strings.size();
     add_to_hash_map(*m_hash_map.get(), h, id, 32);
-    size_t index = m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
+    size_t index = (size_t)m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     REALM_ASSERT_DEBUG(index == id - 1);
     // Create a new leaf if needed (limit number of entries to 256 pr leaf)
     if (!m_current_string_leaf->is_attached() || (index & 0xFF) == 0) {
