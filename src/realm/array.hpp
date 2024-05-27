@@ -174,19 +174,19 @@ public:
     void set_as_ref(size_t ndx, ref_type ref);
 
     template <size_t w>
-    void set(size_t ndx, int64_t value);
+    static void set(Array&, size_t ndx, int64_t value);
 
     inline int64_t get(size_t ndx) const noexcept;
 
-    inline std::vector<int64_t> get_all(size_t b, size_t e) const;
+    std::vector<int64_t> get_all(size_t b, size_t e) const;
 
     template <size_t w>
-    inline int64_t get(size_t ndx) const noexcept;
+    static int64_t get(const Array& arr, size_t ndx) noexcept;
 
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     template <size_t w>
-    void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
+    static void get_chunk(const Array&, size_t ndx, int64_t res[8]) noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
     RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
@@ -427,7 +427,7 @@ public:
     {
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
-        (this->*finder)(value, start, end, 0, &state);
+        finder(*this, value, start, end, 0, &state);
         return state.m_state;
     }
 
@@ -435,7 +435,7 @@ public:
     bool find(int64_t value, size_t start, size_t end, size_t baseIndex, QueryStateBase* state) const
     {
         Finder finder = m_vtable->finder[cond::condition];
-        return (this->*finder)(value, start, end, baseIndex, state);
+        return finder(*this, value, start, end, baseIndex, state);
     }
 
 
@@ -521,8 +521,6 @@ protected:
     size_t count(int64_t value) const noexcept;
 
 private:
-    void update_width_cache_from_int_compressor() noexcept;
-
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
@@ -548,12 +546,12 @@ protected:
 
 protected:
     // Getters and Setters for adaptive-packed arrays
-    typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
-    typedef void (Array::*Setter)(size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
+    typedef int64_t (*Getter)(const Array&, size_t); // Note: getters must not throw
+    typedef void (*Setter)(Array&, size_t, int64_t);
+    typedef bool (*Finder)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
+    typedef void (*ChunkGetter)(const Array&, size_t, int64_t res[8]); // Note: getters must not throw
 
-    typedef std::vector<int64_t> (Array::*GetterAll)(size_t, size_t) const; // Note: getters must not throw
+    typedef std::vector<int64_t> (*GetterAll)(const Array&, size_t, size_t); // Note: getters must not throw
 
     struct VTable {
         Getter getter;
@@ -564,14 +562,14 @@ protected:
     };
     template <size_t w>
     struct VTableForWidth;
-    struct VTableForEncodedArray;
 
     // This is the one installed into the m_vtable->finder slots.
     template <class cond>
-    bool find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    static bool find_vtable(const Array&, int64_t value, size_t start, size_t end, size_t baseindex,
+                            QueryStateBase* state);
 
     template <size_t w>
-    int64_t get_universal(const char* const data, const size_t ndx) const;
+    static int64_t get_universal(const char* const data, const size_t ndx);
 
 protected:
     Getter m_getter = nullptr; // cached to avoid indirection
@@ -589,17 +587,6 @@ protected:
     // compress/decompress this array
     bool compress_array(Array&) const;
     bool decompress_array(Array& arr) const;
-    int64_t get_from_compressed_array(size_t ndx) const noexcept;
-    std::vector<int64_t> get_all_compressed_array(size_t, size_t) const;
-    void set_compressed_array(size_t ndx, int64_t);
-    void get_chunk_compressed_array(size_t, int64_t[8]) const noexcept;
-
-#ifdef REALM_DEBUG
-public: // make it public for testing
-#endif
-    template <class cond>
-    bool find_compressed_array(int64_t value, size_t start, size_t end, size_t baseindex,
-                               QueryStateBase* state) const;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -656,7 +643,7 @@ inline int64_t Array::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
-    return (this->*m_getter)(ndx);
+    return m_getter(*this, ndx);
 
     // Two ideas that are not efficient but may be worth looking into again:
     /*
@@ -678,14 +665,14 @@ inline int64_t Array::get(size_t ndx) const noexcept
 inline std::vector<int64_t> Array::get_all(size_t b, size_t e) const
 {
     REALM_ASSERT_DEBUG(is_compressed());
-    return (this->*(m_vtable->getter_all))(b, e);
+    return m_vtable->getter_all(*this, b, e);
 }
 
 template <size_t w>
-inline int64_t Array::get(size_t ndx) const noexcept
+inline int64_t Array::get(const Array& arr, size_t ndx) noexcept
 {
-    REALM_ASSERT_DEBUG(is_attached());
-    return get_universal<w>(m_data, ndx);
+    REALM_ASSERT_DEBUG(arr.is_attached());
+    return get_universal<w>(arr.m_data, ndx);
 }
 
 constexpr inline int_fast64_t Array::lbound_for_width(size_t width) noexcept
@@ -802,11 +789,11 @@ inline Array::Type Array::get_type() const noexcept
 inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_size);
-    (this->*(m_vtable->chunk_getter))(ndx, res);
+    m_vtable->chunk_getter(*this, ndx, res);
 }
 
 template <size_t w>
-inline int64_t Array::get_universal(const char* data, size_t ndx) const
+inline int64_t Array::get_universal(const char* data, size_t ndx)
 {
     if (w == 64) {
         size_t offset = ndx << 3;

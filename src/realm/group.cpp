@@ -508,6 +508,7 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::op
 {
     size_t top_size = arr.size();
     ref_type top_ref = arr.get_ref();
+
     switch (top_size) {
         // These are the valid sizes
         case 3:
@@ -1751,8 +1752,9 @@ void Group::verify() const
         mem_usage_1.add_immutable(ref, corrected_size);
         mem_usage_1.canonicalize();
     }
-    //  At this point we have accounted for all memory managed by the slab
-    //  allocator
+
+    // At this point we have accounted for all memory managed by the slab
+    // allocator
     mem_usage_1.check_total_coverage();
 #endif
 }

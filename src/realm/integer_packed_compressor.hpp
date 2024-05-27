@@ -37,34 +37,34 @@ public:
     void init_array(char*, uint8_t, uint8_t, size_t) const;
     void copy_data(const Array&, Array&) const;
     // get or set
-    inline int64_t get(const IntegerCompressor&, size_t) const;
-    inline std::vector<int64_t> get_all(const IntegerCompressor& c, size_t b, size_t e) const;
-    inline void get_chunk(const IntegerCompressor&, size_t, int64_t res[8]) const;
-    inline void set_direct(const IntegerCompressor&, size_t, int64_t) const;
+    static int64_t get(const IntegerCompressor&, size_t);
+    static std::vector<int64_t> get_all(const IntegerCompressor& c, size_t b, size_t e);
+    static void get_chunk(const IntegerCompressor&, size_t, int64_t res[8]);
+    static void set_direct(const IntegerCompressor&, size_t, int64_t);
 
     template <typename Cond>
-    inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
 private:
-    bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    static bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state);
 
     template <typename Cond>
-    inline bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename Cond>
-    inline bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename Cond>
-    inline bool run_parallel_scan(size_t, size_t) const;
+    static bool run_parallel_scan(size_t, size_t);
 };
 
-inline int64_t PackedCompressor::get(const IntegerCompressor& c, size_t ndx) const
+inline int64_t PackedCompressor::get(const IntegerCompressor& c, size_t ndx)
 {
     BfIterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
     return sign_extend_field_by_mask(c.v_mask(), *it);
 }
 
-inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
+inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e)
 {
     const auto range = (e - b);
     const auto v_w = c.v_width();
@@ -101,13 +101,13 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     return res;
 }
 
-inline void PackedCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value) const
+inline void PackedCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value)
 {
     BfIterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
     it.set_value(value);
 }
 
-inline void PackedCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8]) const
+inline void PackedCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8])
 {
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
@@ -126,7 +126,7 @@ inline void PackedCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, 
 
 template <typename Cond>
 inline bool PackedCompressor::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                       QueryStateBase* state) const
+                                       QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
     Cond c;
@@ -157,7 +157,7 @@ inline bool PackedCompressor::find_all(const Array& arr, int64_t value, size_t s
 
 template <typename Cond>
 inline bool PackedCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end,
-                                            size_t baseindex, QueryStateBase* state) const
+                                            size_t baseindex, QueryStateBase* state)
 {
     //
     // Main idea around find parallel (applicable to flex arrays too).
@@ -202,7 +202,7 @@ inline bool PackedCompressor::find_parallel(const Array& arr, int64_t value, siz
 
 template <typename Cond>
 inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                          QueryStateBase* state) const
+                                          QueryStateBase* state)
 {
     auto compare = [](int64_t a, int64_t b) {
         if constexpr (std::is_same_v<Cond, Equal>)
@@ -226,7 +226,7 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
 }
 
 template <typename Cond>
-inline bool PackedCompressor::run_parallel_scan(size_t width, size_t range) const
+inline bool PackedCompressor::run_parallel_scan(size_t width, size_t range)
 {
     if constexpr (std::is_same_v<Cond, NotEqual>) {
         // we seem to be particularly slow doing parallel scan in packed for NotEqual.

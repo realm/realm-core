@@ -56,7 +56,7 @@ void PackedCompressor::copy_data(const Array& origin, Array& arr) const
     }
 }
 
-bool PackedCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool PackedCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
     const auto process = state->limit() - state->match_count();

@@ -67,7 +67,7 @@ void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& val
     }
 }
 
-bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
     const auto process = state->limit() - state->match_count();
