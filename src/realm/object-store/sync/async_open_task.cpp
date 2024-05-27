@@ -117,6 +117,13 @@ void AsyncOpenTask::wait_for_bootstrap_or_complete(AsyncOpenCallback&& callback,
         return;
     }
 
+    auto config = coordinator->get_config();
+    // FlX sync is not used so there is nothing to bootstrap.
+    if (!config.sync_config || !config.sync_config->flx_sync_requested) {
+        async_open_complete(std::move(callback), coordinator, status);
+        return;
+    }
+
     SharedRealm shared_realm;
     try {
         shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
