@@ -1142,7 +1142,6 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         REALM_ASSERT(version_number == 0 || version_number == 1);
     }
     else {
-        // table_writer.typed_print("");
         // Because we need to include the total logical file size in the
         // top-array, we have to start by writing everything except the
         // top-array, and then finally compute and write a correct version of
@@ -1152,7 +1151,13 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // DB to compact the database by writing only the live data
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
-        ref_type tables_ref = table_writer.write_tables(out_2); // Throws
+
+        // compress the tables
+        out_2.only_modified = false;
+        out_2.compress = true;
+        ref_type tables_ref = table_writer.typed_write_tables(out_2); // Throws
+        out_2.compress = false;                                       // disable compression for other tables/arrays
+
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws
         Array top(new_alloc);
