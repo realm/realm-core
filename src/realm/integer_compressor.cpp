@@ -344,25 +344,15 @@ void IntegerCompressor::compress_values(const Array& arr, std::vector<int64_t>& 
     for (size_t i = 0; i < sz; ++i) {
         auto item = arr.get(i);
         values.push_back(item);
-        REALM_ASSERT_DEBUG(values.back() == item);
     }
 
     std::sort(values.begin(), values.end());
     auto last = std::unique(values.begin(), values.end());
     values.erase(last, values.end());
 
-    for (size_t i = 0; i < arr.size(); ++i) {
+    for (size_t i = 0; i < sz; ++i) {
         auto pos = std::lower_bound(values.begin(), values.end(), arr.get(i));
         indices.push_back(std::distance(values.begin(), pos));
         REALM_ASSERT_DEBUG(values[indices[i]] == arr.get(i));
     }
-
-#if REALM_DEBUG
-    for (size_t i = 0; i < sz; ++i) {
-        auto old_value = arr.get(i);
-        auto new_value = values[indices[i]];
-        REALM_ASSERT_DEBUG(new_value == old_value);
-    }
-#endif
-    REALM_ASSERT_DEBUG(indices.size() == sz);
 }

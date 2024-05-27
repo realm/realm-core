@@ -176,7 +176,7 @@ public:
     template <size_t w>
     static void set(Array&, size_t ndx, int64_t value);
 
-    inline int64_t get(size_t ndx) const noexcept;
+    int64_t get(size_t ndx) const noexcept;
 
     std::vector<int64_t> get_all(size_t b, size_t e) const;
 
@@ -627,6 +627,11 @@ public:
 };
 
 // Implementation:
+
+inline Array::Array(Allocator& allocator) noexcept
+    : Node(allocator)
+{
+}
 
 inline bool Array::is_compressed() const
 {
