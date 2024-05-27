@@ -189,11 +189,6 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 
-Array::Array(Allocator& allocator) noexcept
-    : Node(allocator)
-{
-}
-
 uint8_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
@@ -646,7 +641,7 @@ size_t Array::size() const noexcept
 
 bool Array::compress_array(Array& arr) const
 {
-    if (!is_compressed() && m_integer_compressor.get_encoding() == NodeHeader::Encoding::WTypBits) {
+    if (m_integer_compressor.get_encoding() == NodeHeader::Encoding::WTypBits) {
         return m_integer_compressor.compress(*this, arr);
     }
     return false;
