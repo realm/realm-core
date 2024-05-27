@@ -458,10 +458,12 @@ inline void Cluster::do_move(size_t ndx, ColKey col_key, Cluster* to)
     T src(m_alloc);
     src.set_parent(this, col_ndx);
     src.init_from_parent();
+    set_string_interner<T>(src, col_key);
 
     T dst(m_alloc);
     dst.set_parent(to, col_ndx);
     dst.init_from_parent();
+    set_string_interner<T>(dst, col_key);
 
     src.move(dst, ndx);
 }
