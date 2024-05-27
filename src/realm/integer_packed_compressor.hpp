@@ -34,8 +34,8 @@ namespace realm {
 class PackedCompressor {
 public:
     // encoding/decoding
-    void init_array(char*, uint8_t, uint8_t, size_t) const;
-    void copy_data(const Array&, Array&) const;
+    static void init_header(char*, uint8_t, uint8_t, size_t);
+    static void copy_data(const Array&, Array&);
     // get or set
     static int64_t get(const IntegerCompressor&, size_t);
     static std::vector<int64_t> get_all(const IntegerCompressor& c, size_t b, size_t e);

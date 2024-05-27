@@ -28,8 +28,7 @@
 
 using namespace realm;
 
-static FlexCompressor s_flex;
-static PackedCompressor s_packed;
+namespace {
 
 class ArraySetter {
 public:
@@ -60,21 +59,17 @@ static ArraySetter s_array_setter;
 
 
 template <typename T, typename... Arg>
-inline void compress_array(const T& compressor, Array& arr, size_t byte_size, Arg&&... args)
+inline void init_compress_array(Array& arr, size_t byte_size, Arg&&... args)
 {
     Allocator& allocator = arr.get_alloc();
     auto mem = allocator.alloc(byte_size);
     auto h = mem.get_addr();
-    compressor.init_array(h, std::forward<Arg>(args)...);
+    T::init_header(h, std::forward<Arg>(args)...);
     NodeHeader::set_capacity_in_header(byte_size, h);
     arr.init_from_mem(mem);
 }
 
-template <typename T, typename... Arg>
-inline void copy_into_compressed_array(const T& compress_array, Arg&&... args)
-{
-    compress_array.copy_data(std::forward<Arg>(args)...);
-}
+} // namespace
 
 bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHeader::Encoding encoding) const
 {
@@ -88,13 +83,14 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 
         if (encoding == Encoding::Packed) {
             const auto packed_size = packed_disk_size(values, origin.size(), v_width);
-            compress_array(s_packed, arr, packed_size, flags, v_width, origin.size());
-            copy_into_compressed_array(s_packed, origin, arr);
+            init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
+            PackedCompressor::copy_data(origin, arr);
         }
         else if (encoding == Encoding::Flex) {
             const auto flex_size = flex_disk_size(values, indices, v_width, ndx_width);
-            compress_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-            copy_into_compressed_array(s_flex, arr, values, indices);
+            init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(),
+                                                indices.size());
+            FlexCompressor::copy_data(arr, values, indices);
         }
         else {
             REALM_UNREACHABLE();
@@ -123,14 +119,15 @@ bool IntegerCompressor::compress(const Array& origin, Array& arr) const
         const auto adjusted_flex_size = flex_size + flex_size / 4;
         if (adjusted_flex_size < adjusted_packed_size && adjusted_flex_size < uncompressed_size) {
             const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-            compress_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-            copy_into_compressed_array(s_flex, arr, values, indices);
+            init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(),
+                                                indices.size());
+            FlexCompressor::copy_data(arr, values, indices);
             return true;
         }
         else if (adjusted_packed_size < uncompressed_size) {
             const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-            compress_array(s_packed, arr, packed_size, flags, v_width, origin.size());
-            copy_into_compressed_array(s_packed, origin, arr);
+            init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
+            PackedCompressor::copy_data(origin, arr);
             return true;
         }
     }

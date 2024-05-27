@@ -38,8 +38,8 @@ struct WordTypeIndex {};
 class FlexCompressor {
 public:
     // encoding/decoding
-    void init_array(char*, uint8_t, uint8_t, uint8_t, size_t, size_t) const;
-    void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
+    static void init_header(char*, uint8_t, uint8_t, uint8_t, size_t, size_t);
+    static void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&);
     // getters/setters
     static int64_t get(const IntegerCompressor&, size_t);
     static std::vector<int64_t> get_all(const IntegerCompressor&, size_t, size_t);
