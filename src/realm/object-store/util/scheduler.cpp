@@ -37,7 +37,7 @@
 #define HAS_ANDROID_ALOOPER
 #endif
 
-#if HAS_ANDROID_ALOOPER
+#if defined(HAS_ANDROID_ALOOPER)
 #include <realm/object-store/util/android/scheduler.hpp>
 #endif
 
@@ -134,7 +134,7 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
 #else
 #if REALM_PLATFORM_APPLE
     return make_runloop(nullptr);
-#elif HAS_ANDROID_ALOOPER
+#elif defined(HAS_ANDROID_ALOOPER)
     return make_alooper();
 #elif defined(__EMSCRIPTEN__)
     return std::make_shared<EmscriptenScheduler>();
@@ -176,7 +176,7 @@ std::shared_ptr<Scheduler> Scheduler::make_dispatch(void* queue)
 }
 #endif // REALM_PLATFORM_APPLE
 
-#if HAS_ANDROID_ALOOPER
+#if defined(HAS_ANDROID_ALOOPER)
 std::shared_ptr<Scheduler> Scheduler::make_alooper()
 {
     return std::make_shared<ALooperScheduler>();

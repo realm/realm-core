@@ -136,7 +136,7 @@ void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, JSONOutputMode outp
         if (i > 0)
             out << ",";
         Mixed val = get_any(i);
-        if (val.is_type(type_TypedLink)) {
+        if (val.is_type(type_Link, type_TypedLink)) {
             fn(val);
         }
         else {
@@ -951,19 +951,9 @@ void LnkLst::remove_all_target_rows()
     }
 }
 
-void LnkLst::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const
+void LnkLst::to_json(std::ostream& out, JSONOutputMode mode, util::FunctionRef<void(const Mixed&)> fn) const
 {
-    out << "[";
-
-    auto sz = m_list.size();
-    for (size_t i = 0; i < sz; i++) {
-        if (i > 0)
-            out << ",";
-        Mixed val(m_list.get(i));
-        fn(val);
-    }
-
-    out << "]";
+    m_list.to_json(out, mode, fn);
 }
 
 void LnkLst::replace_link(ObjKey old_val, ObjKey new_val)
