@@ -38,7 +38,7 @@ void FlexCompressor::init_header(char* h, uint8_t flags, uint8_t v_width, uint8_
 }
 
 void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& values,
-                               const std::vector<unsigned>& indices)
+                               const std::vector<size_t>& indices)
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());

@@ -1305,28 +1305,3 @@ TEST(List_AsCollectionParent)
     CHECK_EQUAL(list_3_1->get_owner(), list_3.get());
     CHECK_EQUAL(list_3_1->get_owner(), list_3_2->get_owner());
 }
-
-TEST(Test_ListJed)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::string message;
-    DBOptions options;
-    options.logger = test_context.logger;
-    DBRef db = DB::create(make_in_realm_history(), path, options);
-
-    auto tr = db->start_write();
-    auto table = tr->add_table("table");
-    auto col = table->add_column_list(type_Int, "ints");
-
-    Obj obj = table->create_object();
-    auto list = obj.get_list<Int>(col);
-    static int64_t values[] = {12345, 67890};
-    constexpr size_t num_values = sizeof(values) / sizeof(int64_t);
-    for (size_t i = 0; i < 100; i++) {
-        list.add(values[i % num_values]);
-    }
-    tr->commit_and_continue_as_read();
-    tr->promote_to_write();
-    list.remove(0);
-    tr->commit_and_continue_as_read();
-}

@@ -30,6 +30,34 @@ using namespace realm;
 
 namespace {
 
+class ArraySetter {
+public:
+    ArraySetter()
+    {
+        m_width_setters.resize(65);
+        m_width_setters[0] = &realm::set_direct<0>;
+        m_width_setters[1] = &realm::set_direct<1>;
+        m_width_setters[2] = &realm::set_direct<2>;
+        m_width_setters[4] = &realm::set_direct<4>;
+        m_width_setters[8] = &realm::set_direct<8>;
+        m_width_setters[16] = &realm::set_direct<16>;
+        m_width_setters[32] = &realm::set_direct<32>;
+        m_width_setters[64] = &realm::set_direct<64>;
+    }
+    void set(uint8_t width, char* data, size_t pos, int_fast64_t value) const
+    {
+        const auto setter = m_width_setters[width];
+        REALM_ASSERT_DEBUG(setter != nullptr);
+        (setter)(data, pos, value);
+    }
+
+private:
+    using SetDirect = void (*)(char*, size_t, int_fast64_t);
+    std::vector<SetDirect> m_width_setters;
+};
+static ArraySetter s_array_setter;
+
+
 template <typename T, typename... Arg>
 inline void init_compress_array(Array& arr, size_t byte_size, Arg&&... args)
 {
@@ -47,20 +75,19 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 {
     using Encoding = NodeHeader::Encoding;
     std::vector<int64_t> values;
-    std::vector<unsigned> indices;
+    std::vector<size_t> indices;
     compress_values(origin, values, indices);
     if (!values.empty()) {
+        uint8_t v_width, ndx_width;
         const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-        uint8_t v_width = std::max(Node::signed_to_num_bits(values.front()), Node::signed_to_num_bits(values.back()));
 
         if (encoding == Encoding::Packed) {
-            const auto packed_size = NodeHeader::calc_size(indices.size(), v_width, NodeHeader::Encoding::Packed);
+            const auto packed_size = packed_disk_size(values, origin.size(), v_width);
             init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
             PackedCompressor::copy_data(origin, arr);
         }
         else if (encoding == Encoding::Flex) {
-            uint8_t ndx_width = NodeHeader::unsigned_to_num_bits(values.size());
-            const auto flex_size = NodeHeader::calc_size(values.size(), indices.size(), v_width, ndx_width);
+            const auto flex_size = flex_disk_size(values, indices, v_width, ndx_width);
             init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(),
                                                 indices.size());
             FlexCompressor::copy_data(arr, values, indices);
@@ -78,33 +105,31 @@ bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 #if REALM_COMPRESS
     return always_compress(origin, arr, NodeHeader::Encoding::Flex);
 #else
-    if (origin.m_width < 2 || origin.m_size == 0)
-        return false;
-
     std::vector<int64_t> values;
-    std::vector<unsigned> indices;
+    std::vector<size_t> indices;
     compress_values(origin, values, indices);
-    REALM_ASSERT(!values.empty());
-    const auto uncompressed_size = origin.get_byte_size();
-    uint8_t ndx_width = NodeHeader::unsigned_to_num_bits(values.size());
-    uint8_t v_width = std::max(Node::signed_to_num_bits(values.front()), Node::signed_to_num_bits(values.back()));
-    const auto packed_size = NodeHeader::calc_size(indices.size(), v_width, NodeHeader::Encoding::Packed);
-    const auto flex_size = NodeHeader::calc_size(values.size(), indices.size(), v_width, ndx_width);
-    // heuristic: only compress to packed if gain at least 11.1%
-    const auto adjusted_packed_size = packed_size + packed_size / 8;
-    // heuristic: only compress to flex if gain at least 20%
-    const auto adjusted_flex_size = flex_size + flex_size / 4;
-    if (adjusted_flex_size < adjusted_packed_size && adjusted_flex_size < uncompressed_size) {
-        const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-        init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-        FlexCompressor::copy_data(arr, values, indices);
-        return true;
-    }
-    else if (adjusted_packed_size < uncompressed_size) {
-        const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-        init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
-        PackedCompressor::copy_data(origin, arr);
-        return true;
+    if (!values.empty()) {
+        uint8_t v_width, ndx_width;
+        const auto uncompressed_size = origin.get_byte_size();
+        const auto packed_size = packed_disk_size(values, origin.size(), v_width);
+        const auto flex_size = flex_disk_size(values, indices, v_width, ndx_width);
+        // heuristic: only compress to packed if gain at least 12.5%
+        const auto adjusted_packed_size = packed_size + packed_size / 8;
+        // heuristic: only compress to flex if gain at least 25%
+        const auto adjusted_flex_size = flex_size + flex_size / 4;
+        if (adjusted_flex_size < adjusted_packed_size && adjusted_flex_size < uncompressed_size) {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(),
+                                                indices.size());
+            FlexCompressor::copy_data(arr, values, indices);
+            return true;
+        }
+        else if (adjusted_packed_size < uncompressed_size) {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
+            PackedCompressor::copy_data(origin, arr);
+            return true;
+        }
     }
     return false;
 #endif
@@ -112,28 +137,18 @@ bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 
 bool IntegerCompressor::decompress(Array& arr) const
 {
-    int64_t min_v = std::numeric_limits<int64_t>::max();
-    int64_t max_v = std::numeric_limits<int64_t>::min();
     REALM_ASSERT_DEBUG(arr.is_attached());
-    auto values_fetcher = [&]() {
+    auto values_fetcher = [&arr, this]() {
         const auto sz = arr.size();
         if (is_packed()) {
             std::vector<int64_t> res;
             res.reserve(sz);
-            for (size_t i = 0; i < sz; ++i) {
-                auto val = arr.get(i);
-                if (val > max_v)
-                    max_v = val;
-                if (val < min_v)
-                    min_v = val;
-                res.push_back(val);
-            }
+            for (size_t i = 0; i < sz; ++i)
+                res.push_back(arr.get(i));
             return res;
         }
         // in flex format this is faster.
-        min_v = FlexCompressor::min(*this);
-        max_v = FlexCompressor::max(*this);
-        return FlexCompressor::get_all(*this, 0, sz);
+        return arr.get_all(0, sz);
     };
     const auto& values = values_fetcher();
     //  do the reverse of compressing the array
@@ -141,33 +156,33 @@ bool IntegerCompressor::decompress(Array& arr) const
     using Encoding = NodeHeader::Encoding;
     const auto flags = NodeHeader::get_flags(arr.get_header());
     const auto size = values.size();
-
-    const auto width = std::max(Array::bit_width(min_v), Array::bit_width(max_v));
+    const auto [min_v, max_v] = std::minmax_element(values.begin(), values.end());
+    const auto width = std::max(Array::bit_width(*min_v), Array::bit_width(*max_v));
     REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
                        width == 32 || width == 64);
     // 64 is some slab allocator magic number.
     // The padding is needed in order to account for bit width expansion.
     const auto byte_size = 64 + NodeHeader::calc_size(size, width, Encoding::WTypBits);
+
     REALM_ASSERT_DEBUG(byte_size % 8 == 0); // nevertheless all the values my be aligned to 8
 
-    // Create new array with the correct width
-    const auto mem = arr.get_alloc().alloc(byte_size);
-    const auto header = mem.get_addr();
-    init_header(header, Encoding::WTypBits, flags, width, size);
-    NodeHeader::set_capacity_in_header(byte_size, header);
+    auto& allocator = arr.get_alloc(); // get allocator
 
-    // Destroy old array before initializing
-    arr.destroy();
+    // store tmp header and ref, because these will be deleted once the array is restored.
+    auto old_ref = arr.get_ref();
+    auto old_h = arr.get_header();
+
+    const auto mem = allocator.alloc(byte_size);
+    const auto header = mem.get_addr();
+    init_header(header, Encoding::WTypBits, flags, width, values.size());
+    NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
 
     // this is copying the bits straight, without doing any COW, since the array is basically restored, we just need
     // to copy the data straight back into it. This makes decompressing the array equivalent to copy on write for
     // normal arrays, in fact for a compressed array, we skip COW and we just decompress, getting the same result.
-    if (width > 0) {
-        auto setter = arr.m_vtable->setter;
-        for (size_t ndx = 0; ndx < size; ++ndx)
-            setter(arr, ndx, values[ndx]);
-    }
+    for (size_t ndx = 0; ndx < size; ++ndx)
+        s_array_setter.set(width, arr.m_data, ndx, values[ndx]);
 
     // very important: since the ref of the current array has changed, the parent must be informed.
     // Otherwise we will lose the link between parent array and child array.
@@ -175,6 +190,8 @@ bool IntegerCompressor::decompress(Array& arr) const
     REALM_ASSERT_DEBUG(width == arr.get_width());
     REALM_ASSERT_DEBUG(arr.size() == values.size());
 
+    // free memory no longer used. Very important to avoid to leak memory. Either in the slab or in the C++  heap.
+    allocator.free_(old_ref, old_h);
     return true;
 }
 
@@ -289,8 +306,28 @@ int64_t IntegerCompressor::get(size_t ndx) const
     }
 }
 
+size_t IntegerCompressor::flex_disk_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
+                                         uint8_t& v_width, uint8_t& ndx_width) const
+{
+    const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
+    ndx_width = NodeHeader::unsigned_to_num_bits(values.size());
+    v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
+    REALM_ASSERT_DEBUG(v_width > 0);
+    REALM_ASSERT_DEBUG(ndx_width > 0);
+    return NodeHeader::calc_size(values.size(), indices.size(), v_width, ndx_width);
+}
+
+size_t IntegerCompressor::packed_disk_size(std::vector<int64_t>& values, size_t sz, uint8_t& v_width) const
+{
+    using Encoding = NodeHeader::Encoding;
+    const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
+    v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
+    REALM_ASSERT_DEBUG(v_width > 0);
+    return NodeHeader::calc_size(sz, v_width, Encoding::Packed);
+}
+
 void IntegerCompressor::compress_values(const Array& arr, std::vector<int64_t>& values,
-                                        std::vector<unsigned>& indices) const
+                                        std::vector<size_t>& indices) const
 {
     // The main idea is to encode the values in flex format. If Packed is better it will chosen by
     // ArrayEncode::encode. The algorithm is O(n lg n), it gives us nice properties, but we could use an efficient
@@ -315,7 +352,7 @@ void IntegerCompressor::compress_values(const Array& arr, std::vector<int64_t>& 
 
     for (size_t i = 0; i < sz; ++i) {
         auto pos = std::lower_bound(values.begin(), values.end(), arr.get(i));
-        indices.push_back(unsigned(std::distance(values.begin(), pos)));
+        indices.push_back(std::distance(values.begin(), pos));
         REALM_ASSERT_DEBUG(values[indices[i]] == arr.get(i));
     }
 }
