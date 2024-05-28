@@ -25,7 +25,6 @@
 #include <stddef.h>
 #include <vector>
 
-
 namespace realm {
 
 struct WordTypeValue {};
@@ -39,7 +38,7 @@ class FlexCompressor {
 public:
     // encoding/decoding
     static void init_header(char*, uint8_t, uint8_t, uint8_t, size_t, size_t);
-    static void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&);
+    static void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<unsigned>&);
     // getters/setters
     static int64_t get(const IntegerCompressor&, size_t);
     static std::vector<int64_t> get_all(const IntegerCompressor&, size_t, size_t);
@@ -48,6 +47,9 @@ public:
 
     template <typename Cond>
     static bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
+
+    static int64_t min(const IntegerCompressor&);
+    static int64_t max(const IntegerCompressor&);
 
 private:
     static bool find_all_match(size_t, size_t, size_t, QueryStateBase*);
@@ -85,7 +87,6 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     const auto sign_mask = c.v_mask();
     const auto range = (e - b);
     const auto starting_bit = offset + b * ndx_w;
-    const auto total_bits = starting_bit + ndx_w * range;
     const auto bit_per_it = num_bits_for_width(ndx_w);
     const auto ndx_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - ndx_w);
     const auto values_per_word = num_fields_for_width(ndx_w);
@@ -96,8 +97,8 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
 
     UnalignedWordIter unaligned_ndx_iterator(data, starting_bit);
     BfIterator data_iterator{data, 0, v_w, v_w, 0};
-    auto cnt_bits = starting_bit;
-    while (cnt_bits + bit_per_it < total_bits) {
+    auto remaining_bits = ndx_w * range;
+    while (remaining_bits >= bit_per_it) {
         auto word = unaligned_ndx_iterator.get(bit_per_it);
         for (int i = 0; i < values_per_word; ++i) {
             const auto index = word & ndx_mask;
@@ -106,21 +107,41 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
             res.push_back(sv);
             word >>= ndx_w;
         }
-        cnt_bits += bit_per_it;
+        remaining_bits -= bit_per_it;
         unaligned_ndx_iterator.bump(bit_per_it);
     }
-    if (cnt_bits < total_bits) {
-        auto last_word = unaligned_ndx_iterator.get(total_bits - cnt_bits);
-        while (cnt_bits < total_bits) {
+    if (remaining_bits) {
+        auto last_word = unaligned_ndx_iterator.get(remaining_bits);
+        while (remaining_bits) {
             const auto index = last_word & ndx_mask;
             data_iterator.move(static_cast<size_t>(index));
             const auto sv = sign_extend_field_by_mask(sign_mask, *data_iterator);
             res.push_back(sv);
-            cnt_bits += ndx_w;
+            remaining_bits -= ndx_w;
             last_word >>= ndx_w;
         }
     }
     return res;
+}
+
+inline int64_t FlexCompressor::min(const IntegerCompressor& c)
+{
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    BfIterator data_iterator{data, 0, v_w, v_w, 0};
+    return sign_extend_field_by_mask(sign_mask, *data_iterator);
+    ;
+}
+
+inline int64_t FlexCompressor::max(const IntegerCompressor& c)
+{
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    BfIterator data_iterator{data, 0, v_w, v_w, c.v_size() - 1};
+    return sign_extend_field_by_mask(sign_mask, *data_iterator);
+    ;
 }
 
 inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8])
