@@ -601,7 +601,10 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     {
         m_client_reset_fresh_copy = db;
         CompletionCallbacks callbacks;
+        // Save the client reset error for when the original sync session is revived
         REALM_ASSERT(client_reset_error); // required if we get here
+        m_client_reset_error = std::move(client_reset_error);
+
         std::swap(m_completion_callbacks, callbacks);
         // always swap back, even if advance_state throws
         auto guard = util::make_scope_exit([&]() noexcept {
@@ -614,10 +617,8 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         // Do not cancel the notifications on subscriptions.
         bool cancel_subscription_notifications = false;
         bool is_migration =
-            client_reset_error->server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
-            client_reset_error->server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS;
-        // Save the client reset error for when the original sync session is revived
-        m_client_reset_error = std::move(client_reset_error);
+            m_client_reset_error->server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
+            m_client_reset_error->server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS;
         become_inactive(std::move(lock), Status::OK(), cancel_subscription_notifications); // unlocks the lock
 
         // Once the session is inactive, update sync config and subscription store after migration.
@@ -946,14 +947,15 @@ void SyncSession::create_sync_session()
     }
     session_config.custom_http_headers = sync_config.custom_http_headers;
 
-    if (m_client_reset_error &&
-        m_client_reset_error->server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
-        // Use the original sync config, not the updated one from the migration store
-        session_config.client_reset_config =
-            make_client_reset_config(m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy),
-                                     std::move(*m_client_reset_error), m_previous_schema_version.has_value());
-        session_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
-        m_client_reset_error.reset();
+    if (m_client_reset_error) {
+        auto client_reset_error = std::exchange(m_client_reset_error, std::nullopt);
+        if (client_reset_error->server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
+            // Use the original sync config, not the updated one from the migration store
+            session_config.client_reset_config =
+                make_client_reset_config(m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy),
+                                         std::move(*client_reset_error), m_previous_schema_version.has_value());
+            session_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
+        }
     }
 
     m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, std::move(session_config));
