@@ -28,64 +28,7 @@
 
 using namespace realm;
 
-static FlexCompressor s_flex;
-static PackedCompressor s_packed;
-
-template bool IntegerCompressor::find_all_packed<Equal>(const Array&, int64_t, size_t, size_t, size_t,
-                                                        QueryStateBase*) const;
-template bool IntegerCompressor::find_all_packed<NotEqual>(const Array&, int64_t, size_t, size_t, size_t,
-                                                           QueryStateBase*) const;
-template bool IntegerCompressor::find_all_packed<Greater>(const Array&, int64_t, size_t, size_t, size_t,
-                                                          QueryStateBase*) const;
-template bool IntegerCompressor::find_all_packed<Less>(const Array&, int64_t, size_t, size_t, size_t,
-                                                       QueryStateBase*) const;
-
-template bool IntegerCompressor::find_all_flex<Equal>(const Array&, int64_t, size_t, size_t, size_t,
-                                                      QueryStateBase*) const;
-template bool IntegerCompressor::find_all_flex<NotEqual>(const Array&, int64_t, size_t, size_t, size_t,
-                                                         QueryStateBase*) const;
-template bool IntegerCompressor::find_all_flex<Greater>(const Array&, int64_t, size_t, size_t, size_t,
-                                                        QueryStateBase*) const;
-template bool IntegerCompressor::find_all_flex<Less>(const Array&, int64_t, size_t, size_t, size_t,
-                                                     QueryStateBase*) const;
-
-
-struct IntegerCompressor::VTableForPacked {
-    struct PopulatedVTablePacked : IntegerCompressor::VTable {
-        PopulatedVTablePacked()
-        {
-            m_getter = &IntegerCompressor::get_packed;
-            m_chunk_getter = &IntegerCompressor::get_chunk_packed;
-            m_getter_all = &IntegerCompressor::get_all_packed;
-            m_direct_setter = &IntegerCompressor::set_direct_packed;
-            m_finder[cond_Equal] = &IntegerCompressor::find_all_packed<Equal>;
-            m_finder[cond_NotEqual] = &IntegerCompressor::find_all_packed<NotEqual>;
-            m_finder[cond_Less] = &IntegerCompressor::find_all_packed<Less>;
-            m_finder[cond_Greater] = &IntegerCompressor::find_all_packed<Greater>;
-        }
-    };
-    static const PopulatedVTablePacked vtable;
-};
-
-struct IntegerCompressor::VTableForFlex {
-    struct PopulatedVTableFlex : IntegerCompressor::VTable {
-        PopulatedVTableFlex()
-        {
-            m_getter = &IntegerCompressor::get_flex;
-            m_chunk_getter = &IntegerCompressor::get_chunk_flex;
-            m_getter_all = &IntegerCompressor::get_all_flex;
-            m_direct_setter = &IntegerCompressor::set_direct_flex;
-            m_finder[cond_Equal] = &IntegerCompressor::find_all_flex<Equal>;
-            m_finder[cond_NotEqual] = &IntegerCompressor::find_all_flex<NotEqual>;
-            m_finder[cond_Less] = &IntegerCompressor::find_all_flex<Less>;
-            m_finder[cond_Greater] = &IntegerCompressor::find_all_flex<Greater>;
-        }
-    };
-    static const PopulatedVTableFlex vtable;
-};
-
-const typename IntegerCompressor::VTableForPacked::PopulatedVTablePacked IntegerCompressor::VTableForPacked::vtable;
-const typename IntegerCompressor::VTableForFlex::PopulatedVTableFlex IntegerCompressor::VTableForFlex::vtable;
+namespace {
 
 class ArraySetter {
 public:
@@ -116,21 +59,17 @@ static ArraySetter s_array_setter;
 
 
 template <typename T, typename... Arg>
-inline void compress_array(const T& compressor, Array& arr, size_t byte_size, Arg&&... args)
+inline void init_compress_array(Array& arr, size_t byte_size, Arg&&... args)
 {
     Allocator& allocator = arr.get_alloc();
     auto mem = allocator.alloc(byte_size);
     auto h = mem.get_addr();
-    compressor.init_array(h, std::forward<Arg>(args)...);
+    T::init_header(h, std::forward<Arg>(args)...);
     NodeHeader::set_capacity_in_header(byte_size, h);
     arr.init_from_mem(mem);
 }
 
-template <typename T, typename... Arg>
-inline void copy_into_compressed_array(const T& compress_array, Arg&&... args)
-{
-    compress_array.copy_data(std::forward<Arg>(args)...);
-}
+} // namespace
 
 bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHeader::Encoding encoding) const
 {
@@ -144,13 +83,14 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 
         if (encoding == Encoding::Packed) {
             const auto packed_size = packed_disk_size(values, origin.size(), v_width);
-            compress_array(s_packed, arr, packed_size, flags, v_width, origin.size());
-            copy_into_compressed_array(s_packed, origin, arr);
+            init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
+            PackedCompressor::copy_data(origin, arr);
         }
         else if (encoding == Encoding::Flex) {
             const auto flex_size = flex_disk_size(values, indices, v_width, ndx_width);
-            compress_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-            copy_into_compressed_array(s_flex, arr, values, indices);
+            init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(),
+                                                indices.size());
+            FlexCompressor::copy_data(arr, values, indices);
         }
         else {
             REALM_UNREACHABLE();
@@ -179,14 +119,15 @@ bool IntegerCompressor::compress(const Array& origin, Array& arr) const
         const auto adjusted_flex_size = flex_size + flex_size / 4;
         if (adjusted_flex_size < adjusted_packed_size && adjusted_flex_size < uncompressed_size) {
             const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-            compress_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-            copy_into_compressed_array(s_flex, arr, values, indices);
+            init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(),
+                                                indices.size());
+            FlexCompressor::copy_data(arr, values, indices);
             return true;
         }
         else if (adjusted_packed_size < uncompressed_size) {
             const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-            compress_array(s_packed, arr, packed_size, flags, v_width, origin.size());
-            copy_into_compressed_array(s_packed, origin, arr);
+            init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
+            PackedCompressor::copy_data(origin, arr);
             return true;
         }
     }
@@ -203,11 +144,11 @@ bool IntegerCompressor::decompress(Array& arr) const
             std::vector<int64_t> res;
             res.reserve(sz);
             for (size_t i = 0; i < sz; ++i)
-                res.push_back(get(i));
+                res.push_back(arr.get(i));
             return res;
         }
         // in flex format this is faster.
-        return get_all(0, sz);
+        return arr.get_all(0, sz);
     };
     const auto& values = values_fetcher();
     //  do the reverse of compressing the array
@@ -265,13 +206,104 @@ bool IntegerCompressor::init(const char* h)
 
     if (is_packed()) {
         init_packed(h);
-        m_vtable = &VTableForPacked::vtable;
     }
     else {
         init_flex(h);
-        m_vtable = &VTableForFlex::vtable;
     }
     return true;
+}
+int64_t IntegerCompressor::get_packed(const Array& arr, size_t ndx)
+{
+    return PackedCompressor::get(arr.m_integer_compressor, ndx);
+}
+
+int64_t IntegerCompressor::get_flex(const Array& arr, size_t ndx)
+{
+    return FlexCompressor::get(arr.m_integer_compressor, ndx);
+}
+
+std::vector<int64_t> IntegerCompressor::get_all_packed(const Array& arr, size_t begin, size_t end)
+{
+    return PackedCompressor::get_all(arr.m_integer_compressor, begin, end);
+}
+
+std::vector<int64_t> IntegerCompressor::get_all_flex(const Array& arr, size_t begin, size_t end)
+{
+    return FlexCompressor::get_all(arr.m_integer_compressor, begin, end);
+}
+
+void IntegerCompressor::get_chunk_packed(const Array& arr, size_t ndx, int64_t res[8])
+{
+    PackedCompressor::get_chunk(arr.m_integer_compressor, ndx, res);
+}
+
+void IntegerCompressor::get_chunk_flex(const Array& arr, size_t ndx, int64_t res[8])
+{
+    FlexCompressor::get_chunk(arr.m_integer_compressor, ndx, res);
+}
+
+void IntegerCompressor::set_packed(Array& arr, size_t ndx, int64_t val)
+{
+    PackedCompressor::set_direct(arr.m_integer_compressor, ndx, val);
+}
+
+void IntegerCompressor::set_flex(Array& arr, size_t ndx, int64_t val)
+{
+    FlexCompressor::set_direct(arr.m_integer_compressor, ndx, val);
+}
+
+template <class Cond>
+bool IntegerCompressor::find_packed(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
+                                    QueryStateBase* st)
+{
+    return PackedCompressor::find_all<Cond>(arr, val, begin, end, base_index, st);
+}
+
+template <class Cond>
+bool IntegerCompressor::find_flex(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
+                                  QueryStateBase* st)
+{
+    return FlexCompressor::find_all<Cond>(arr, val, begin, end, base_index, st);
+}
+
+void IntegerCompressor::set_vtable(Array& arr)
+{
+    static const Array::VTable vtable_packed = {get_packed,
+                                                get_chunk_packed,
+                                                get_all_packed,
+                                                set_packed,
+                                                {
+                                                    find_packed<Equal>,
+                                                    find_packed<NotEqual>,
+                                                    find_packed<Greater>,
+                                                    find_packed<Less>,
+                                                }};
+    static const Array::VTable vtable_flex = {get_flex,
+                                              get_chunk_flex,
+                                              get_all_flex,
+                                              set_flex,
+                                              {
+                                                  find_flex<Equal>,
+                                                  find_flex<NotEqual>,
+                                                  find_flex<Greater>,
+                                                  find_flex<Less>,
+                                              }};
+    if (is_packed()) {
+        arr.m_vtable = &vtable_packed;
+    }
+    else {
+        arr.m_vtable = &vtable_flex;
+    }
+}
+
+int64_t IntegerCompressor::get(size_t ndx) const
+{
+    if (is_packed()) {
+        return PackedCompressor::get(*this, ndx);
+    }
+    else {
+        return FlexCompressor::get(*this, ndx);
+    }
 }
 
 size_t IntegerCompressor::flex_disk_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
@@ -312,79 +344,15 @@ void IntegerCompressor::compress_values(const Array& arr, std::vector<int64_t>& 
     for (size_t i = 0; i < sz; ++i) {
         auto item = arr.get(i);
         values.push_back(item);
-        REALM_ASSERT_DEBUG(values.back() == item);
     }
 
     std::sort(values.begin(), values.end());
     auto last = std::unique(values.begin(), values.end());
     values.erase(last, values.end());
 
-    for (size_t i = 0; i < arr.size(); ++i) {
+    for (size_t i = 0; i < sz; ++i) {
         auto pos = std::lower_bound(values.begin(), values.end(), arr.get(i));
         indices.push_back(std::distance(values.begin(), pos));
         REALM_ASSERT_DEBUG(values[indices[i]] == arr.get(i));
     }
-
-#if REALM_DEBUG
-    for (size_t i = 0; i < sz; ++i) {
-        auto old_value = arr.get(i);
-        auto new_value = values[indices[i]];
-        REALM_ASSERT_DEBUG(new_value == old_value);
-    }
-#endif
-    REALM_ASSERT_DEBUG(indices.size() == sz);
-}
-
-int64_t IntegerCompressor::get_packed(size_t ndx) const
-{
-    return s_packed.get(*this, ndx);
-}
-
-int64_t IntegerCompressor::get_flex(size_t ndx) const
-{
-    return s_flex.get(*this, ndx);
-}
-
-std::vector<int64_t> IntegerCompressor::get_all_packed(size_t begin, size_t end) const
-{
-    return s_packed.get_all(*this, begin, end);
-}
-
-std::vector<int64_t> IntegerCompressor::get_all_flex(size_t begin, size_t end) const
-{
-    return s_flex.get_all(*this, begin, end);
-}
-
-void IntegerCompressor::get_chunk_packed(size_t ndx, int64_t res[8]) const
-{
-    s_packed.get_chunk(*this, ndx, res);
-}
-
-void IntegerCompressor::get_chunk_flex(size_t ndx, int64_t res[8]) const
-{
-    s_flex.get_chunk(*this, ndx, res);
-}
-
-void IntegerCompressor::set_direct_packed(size_t ndx, int64_t value) const
-{
-    s_packed.set_direct(*this, ndx, value);
-}
-
-void IntegerCompressor::set_direct_flex(size_t ndx, int64_t value) const
-{
-    s_flex.set_direct(*this, ndx, value);
-}
-
-template <typename Cond>
-bool IntegerCompressor::find_all_packed(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                        QueryStateBase* state) const
-{
-    return s_packed.find_all<Cond>(arr, value, start, end, baseindex, state);
-}
-
-template <typename Cond>
-bool IntegerCompressor::find_all_flex(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                      QueryStateBase* state) const
-{
-    return s_flex.find_all<Cond>(arr, value, start, end, baseindex, state);
 }

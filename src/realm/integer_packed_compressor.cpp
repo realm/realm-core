@@ -32,13 +32,13 @@
 
 using namespace realm;
 
-void PackedCompressor::init_array(char* h, uint8_t flags, uint8_t v_width, size_t v_size) const
+void PackedCompressor::init_header(char* h, uint8_t flags, uint8_t v_width, size_t v_size)
 {
     using Encoding = NodeHeader::Encoding;
-    init_header((char*)h, Encoding::Packed, flags, static_cast<uint8_t>(v_width), v_size);
+    ::init_header((char*)h, Encoding::Packed, flags, static_cast<uint8_t>(v_width), v_size);
 }
 
-void PackedCompressor::copy_data(const Array& origin, Array& arr) const
+void PackedCompressor::copy_data(const Array& origin, Array& arr)
 {
     // this can be boosted a little bit, with and size should be known at this stage.
     using Encoding = NodeHeader::Encoding;
@@ -56,7 +56,7 @@ void PackedCompressor::copy_data(const Array& origin, Array& arr) const
     }
 }
 
-bool PackedCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool PackedCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
     const auto process = state->limit() - state->match_count();

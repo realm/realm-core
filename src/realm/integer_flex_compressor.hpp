@@ -38,34 +38,34 @@ struct WordTypeIndex {};
 class FlexCompressor {
 public:
     // encoding/decoding
-    void init_array(char*, uint8_t, uint8_t, uint8_t, size_t, size_t) const;
-    void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
+    static void init_header(char*, uint8_t, uint8_t, uint8_t, size_t, size_t);
+    static void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&);
     // getters/setters
-    inline int64_t get(const IntegerCompressor&, size_t) const;
-    inline std::vector<int64_t> get_all(const IntegerCompressor&, size_t, size_t) const;
-    inline void get_chunk(const IntegerCompressor&, size_t, int64_t[8]) const;
-    inline void set_direct(const IntegerCompressor&, size_t, int64_t) const;
+    static int64_t get(const IntegerCompressor&, size_t);
+    static std::vector<int64_t> get_all(const IntegerCompressor&, size_t, size_t);
+    static void get_chunk(const IntegerCompressor&, size_t, int64_t[8]);
+    static void set_direct(const IntegerCompressor&, size_t, int64_t);
 
     template <typename Cond>
-    inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
 private:
-    bool find_all_match(size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_all_match(size_t, size_t, size_t, QueryStateBase*);
 
     template <typename Cond>
-    inline bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename CondVal, typename CondIndex>
-    inline bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
-    inline bool do_find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool do_find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename Cond>
-    inline bool run_parallel_subscan(size_t, size_t, size_t) const;
+    static bool run_parallel_subscan(size_t, size_t, size_t);
 };
 
-inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
+inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx)
 {
     const auto offset = c.v_width() * c.v_size();
     const auto ndx_w = c.ndx_width();
@@ -76,7 +76,7 @@ inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
     return sign_extend_field_by_mask(c.v_mask(), *data_iterator);
 }
 
-inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
+inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e)
 {
     const auto offset = c.v_width() * c.v_size();
     const auto ndx_w = c.ndx_width();
@@ -123,7 +123,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     return res;
 }
 
-inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8]) const
+inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8])
 {
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
@@ -138,7 +138,7 @@ inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, in
     }
 }
 
-void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value) const
+inline void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value)
 {
     const auto offset = c.v_width() * c.v_size();
     const auto ndx_w = c.ndx_width();
@@ -151,7 +151,7 @@ void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t 
 
 template <typename Cond>
 inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                     QueryStateBase* state) const
+                                     QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
     Cond c;
@@ -191,7 +191,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
 
 template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
 inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                        QueryStateBase* state) const
+                                        QueryStateBase* state)
 {
     const auto v_width = arr.m_width;
     const auto v_range = arr.integer_compressor().v_size();
@@ -203,7 +203,7 @@ inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t 
 
 template <typename Cond>
 inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                        QueryStateBase* state) const
+                                        QueryStateBase* state)
 {
     const auto cmp = [](int64_t item, int64_t key) {
         if constexpr (std::is_same_v<Cond, Equal>)
@@ -275,7 +275,7 @@ inline uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
 
 template <typename CondVal, typename CondIndex>
 inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                          QueryStateBase* state) const
+                                          QueryStateBase* state)
 {
     const auto& compressor = arr.integer_compressor();
     const auto v_width = compressor.v_width();
@@ -305,7 +305,7 @@ inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_
 }
 
 template <typename Cond>
-inline bool FlexCompressor::run_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_range) const
+inline bool FlexCompressor::run_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_range)
 {
     if constexpr (std::is_same_v<Cond, Equal> || std::is_same_v<Cond, NotEqual>) {
         return v_width < 32 && v_range >= 20 && ndx_range >= 20;
