@@ -1983,18 +1983,20 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    std::optional<PendingReset> pending_reset;
+    PendingReset pending_reset;
     {
         auto fr_tr = m_db->start_frozen();
-        pending_reset = sync::PendingResetStore::has_pending_reset(fr_tr);
-        if (!pending_reset) {
+        if (auto has_pending_reset = sync::PendingResetStore::has_pending_reset(fr_tr)) {
+            pending_reset = std::move(*has_pending_reset);
+        }
+        else {
             return; // nothing to do
         }
     }
-    m_sess->logger.info(util::LogCategory::reset, "Tracking %1", *pending_reset);
+    m_sess->logger.info(util::LogCategory::reset, "Tracking %1", pending_reset);
 
     // Now that the client reset merge is complete, wait for the changes to synchronize with the server
-    async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset = *pending_reset](Status status) {
+    async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset](Status status) {
         if (status == ErrorCodes::OperationAborted) {
             return;
         }

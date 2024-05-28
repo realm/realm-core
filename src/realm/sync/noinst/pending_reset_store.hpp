@@ -46,8 +46,6 @@ bool operator==(const sync::PendingReset& lhs, const PendingReset::Action& actio
 
 class PendingResetStore {
 public:
-    ~PendingResetStore() = default;
-
     // Store the pending reset tracking information - it is an error if the tracking info already
     // esists in the store
     // Requires a writable transaction and changes must be committed manually

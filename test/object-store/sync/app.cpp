@@ -3180,7 +3180,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
             sync_sess_ext_ref = realm->sync_session()->external_reference();
             dbref = TestHelper::get_db(*realm);
-            // One ref each for the
+            // An active PBS realm should have one ref each for:
             // - RealmCoordinator
             // - SyncSession
             // - MigrationStore
@@ -3195,15 +3195,19 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             logger->trace("DBRef PAUSING called use count: %1", dbref.use_count());
         }
 
-        // Closing the realm should leave one ref for the SyncSession and one for the local dbref.
+        // Closing the realm should leave one ref each for:
+        // - SyncSession
+        // - MigrationStore
+        // - local dbref
         REQUIRE_THAT(
             [&] {
                 logger->trace("DBRef PAUSED use count: %1", dbref.use_count());
-                return dbref.use_count() < 5;
+                return dbref.use_count() < 4;
             },
             ReturnsTrueWithinTimeLimit{});
 
-        // Releasing the external reference should leave one ref (the local dbref) only.
+        // Releasing the external reference should leave one ref for:
+        // - local dbref
         sync_sess_ext_ref.reset();
         REQUIRE_THAT(
             [&] {

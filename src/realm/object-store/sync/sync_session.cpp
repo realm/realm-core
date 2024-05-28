@@ -512,8 +512,7 @@ void SyncSession::download_fresh_realm(const sync::SessionErrorInfo& error_info)
         auto self = shared_from_this();
         using SubscriptionState = sync::SubscriptionSet::State;
         fresh_sub.get_state_change_notification(SubscriptionState::Complete)
-            .then([self, error_info, fresh_sync_session, fresh_sub_store,
-                   fresh_sub](SubscriptionState) -> util::Future<sync::SubscriptionSet> {
+            .then([=](SubscriptionState) -> util::Future<sync::SubscriptionSet> {
                 if (error_info.server_requests_action != sync::ProtocolErrorInfo::Action::MigrateToFLX) {
                     return fresh_sub;
                 }
@@ -534,37 +533,37 @@ void SyncSession::download_fresh_realm(const sync::SessionErrorInfo& error_info)
                         return fresh_sub_store->get_latest();
                     });
             })
-            .get_async([self, fresh_sync_session, db,
-                        client_reset_error = std::move(error_info)](StatusWith<sync::SubscriptionSet>&& subs) {
+            .get_async([=](StatusWith<sync::SubscriptionSet>&& subs) {
                 // Keep the sync session alive while it's downloading, but then close
                 // it immediately
                 fresh_sync_session->force_close();
                 if (subs.is_ok()) {
-                    self->handle_fresh_realm_downloaded(db, Status::OK(), std::move(client_reset_error),
-                                                        std::move(subs.get_value()));
+                    self->handle_fresh_realm_downloaded(db, std::move(error_info), std::move(subs.get_value()));
                 }
                 else {
-                    self->handle_fresh_realm_downloaded(nullptr, subs.get_status());
+                    self->handle_fresh_realm_downloaded(nullptr, std::move(subs.get_status()));
                 }
             });
     }
     else { // pbs
-        fresh_sync_session->wait_for_download_completion([fresh_sync_session, db,
-                                                          client_reset_error = std::move(error_info),
-                                                          weak_self = weak_from_this()](Status status) {
+        fresh_sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](Status status) {
             // Keep the sync session alive while it's downloading, but then close
             // it immediately
             fresh_sync_session->force_close();
             if (auto strong_self = weak_self.lock()) {
-                strong_self->handle_fresh_realm_downloaded(db, status, std::move(client_reset_error));
+                if (status.is_ok()) {
+                    strong_self->handle_fresh_realm_downloaded(db, std::move(error_info));
+                }
+                else {
+                    strong_self->handle_fresh_realm_downloaded(nullptr, std::move(status));
+                }
             }
         });
     }
     fresh_sync_session->revive_if_needed();
 }
 
-void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
-                                                std::optional<sync::SessionErrorInfo> client_reset_error,
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, StatusWith<sync::SessionErrorInfo> error_info,
                                                 std::optional<sync::SubscriptionSet> new_subs)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
@@ -575,15 +574,15 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     // - unable to write the fresh copy to the file system
     // - during download of the fresh copy, the fresh copy itself is reset
     // - in FLX mode there was a problem fulfilling the previously active subscription
-    if (!status.is_ok()) {
-        if (status == ErrorCodes::OperationAborted) {
+    if (!error_info.is_ok()) {
+        if (error_info.get_status() == ErrorCodes::OperationAborted) {
             return;
         }
         lock.unlock();
 
         sync::SessionErrorInfo synthetic(
             Status{ErrorCodes::AutoClientResetFailed,
-                   util::format("A fatal error occurred during client reset: '%1'", status)},
+                   util::format("A fatal error occurred during client reset: '%1'", error_info.get_status())},
             sync::IsFatal{true});
         handle_error(synthetic);
         return;
@@ -602,8 +601,8 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         m_client_reset_fresh_copy = db;
         CompletionCallbacks callbacks;
         // Save the client reset error for when the original sync session is revived
-        REALM_ASSERT(client_reset_error); // required if we get here
-        m_client_reset_error = std::move(client_reset_error);
+        REALM_ASSERT(error_info.is_ok()); // required if we get here
+        m_client_reset_error = std::move(error_info.get_value());
 
         std::swap(m_completion_callbacks, callbacks);
         // always swap back, even if advance_state throws
