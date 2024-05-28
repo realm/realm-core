@@ -1263,7 +1263,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
 
 // disable this test if forcing compression to Packed.
 #if !REALM_COMPRESS
-TEST(Test_ArrayInt_no_encode)
+TEST(Test_ArrayInt_no_compress)
 {
     ArrayInteger a(Allocator::get_default());
     ArrayInteger a1(Allocator::get_default());
@@ -1282,7 +1282,7 @@ TEST(Test_ArrayInt_no_encode)
     a1.destroy();
 }
 
-TEST(Test_ArrayInt_encode_decode_needed)
+TEST(Test_ArrayInt_compress_decompress_needed)
 {
     ArrayInteger a(Allocator::get_default());
     ArrayInteger a1(Allocator::get_default());
