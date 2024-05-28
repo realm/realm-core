@@ -1012,10 +1012,6 @@ ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 }
 ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
 {
-    // bool deep = true;              // Deep
-    // bool only_if_modified = false; // Always
-    // bool compress = false;         // true;
-    // return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
     return m_group->typed_write_tables(out);
 }
 
@@ -1151,12 +1147,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // DB to compact the database by writing only the live data
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
-
-        // compress the tables
-        out_2.only_modified = false;
-        out_2.compress = true;
-        ref_type tables_ref = table_writer.typed_write_tables(out_2); // Throws
-        out_2.compress = false;                                       // disable compression for other tables/arrays
+        ref_type tables_ref = table_writer.write_tables(out_2);
 
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws

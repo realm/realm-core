@@ -1133,10 +1133,7 @@ public:
     {
         m_group->typed_print(prefix);
     }
-    ref_type typed_write_tables(_impl::OutputStream& out)
-    {
-        return m_group->typed_write_tables(out);
-    }
+
     virtual ~TableWriter() noexcept {}
 
     void set_group(const Group* g)
