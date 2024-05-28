@@ -182,22 +182,6 @@ public:
 
     virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
-    virtual bool is_compressed() const
-    {
-        return false;
-    }
-
-    virtual size_t find_first_in_range_of_values(const std::vector<int64_t>&, size_t) const
-    {
-        return not_found;
-    }
-
-    virtual size_t aggregate_local_compressed(size_t, size_t, std::vector<ParentNode*>, QueryStateBase*, size_t,
-                                              double&)
-    {
-        return not_found;
-    }
-
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     virtual size_t find_all_local(size_t start, size_t end);
 
@@ -499,62 +483,6 @@ public:
     {
     }
 
-    bool is_compressed() const override
-    {
-        return this->m_leaf->is_compressed();
-    }
-
-    virtual size_t aggregate_local_compressed(size_t start, size_t end, std::vector<ParentNode*> children,
-                                              QueryStateBase* st, size_t local_limit, double& dD) override
-    {
-        // if we are here, we have a query with a list of conditions for a compressed leaf
-        const auto vs = this->m_leaf->get_all(start, end);
-
-        size_t local_matches = 0;
-
-        auto update_query_status = [st, &start](const auto position) {
-            return st->match(start + position);
-        };
-
-        auto pos = vs.begin();
-        const TConditionFunction cond;
-        for (;;) {
-
-            if (local_matches == local_limit) {
-                const auto r = start + std::distance(vs.begin(), pos);
-                dD = double(r - start) / (local_matches + 1.1);
-                return r;
-            }
-
-            pos = std::find_if(pos, vs.end(), [&cond, this](const auto v) {
-                return cond(v, this->m_value);
-            });
-
-            // nothing was found, just return
-            if (pos == vs.end()) {
-                const auto r = start + std::distance(vs.begin(), pos);
-                dD = double(r - start) / (local_matches + 1.1);
-                return end;
-            }
-
-            local_matches++;
-
-            // explore all the other query nodes
-            auto m = std::distance(vs.begin(), pos);
-            auto k = m;
-            for (size_t j = 1; j < children.size(); ++j) {
-                k = children[j]->find_first_in_range_of_values(vs, m);
-                if (k != m) // there is no possible matching.
-                    break;
-            }
-            if (k == m && !update_query_status(m)) {
-                return not_found;
-            }
-            ++pos;
-        }
-        return not_found;
-    }
-
     TConditionFunction get_condition() const
     {
         return TConditionFunction{};
@@ -565,19 +493,12 @@ public:
         return this->m_value;
     }
 
-
-    size_t find_first_in_range_of_values(const std::vector<int64_t>& vs, size_t pos) const override
-    {
-        auto it = std::find_if(vs.begin() + pos, vs.end(), [this](const auto v) {
-            static TConditionFunction cond;
-            return cond(v, this->m_value);
-        });
-        return std::distance(vs.begin(), it);
-    }
-
-
     size_t find_first_local(size_t start, size_t end) override
     {
+        if (end - start == 1) {
+            TConditionFunction c;
+            return c(this->m_leaf->get(start), this->m_value) ? start : not_found;
+        }
         return this->m_leaf->template find_first<TConditionFunction>(this->m_value, start, end);
     }
 

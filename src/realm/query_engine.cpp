@@ -103,13 +103,6 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
         return find_all_local(start, end);
     }
 
-    if (m_children.size() > 1) {
-        const auto compressed = std::all_of(m_children.begin(), m_children.end(), [](const auto child) {
-            return child->is_compressed();
-        });
-        if (compressed)
-            return aggregate_local_compressed(start, end, m_children, st, local_limit, m_dD);
-    }
     return do_aggregate_local(st, start, end, local_limit);
 }
 
