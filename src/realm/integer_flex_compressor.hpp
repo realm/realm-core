@@ -48,6 +48,9 @@ public:
     template <typename Cond>
     static bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
+    static int64_t min(const IntegerCompressor&);
+    static int64_t max(const IntegerCompressor&);
+
 private:
     static bool find_all_match(size_t, size_t, size_t, QueryStateBase*);
 
@@ -119,6 +122,26 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
         }
     }
     return res;
+}
+
+inline int64_t FlexCompressor::min(const IntegerCompressor& c)
+{
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    BfIterator data_iterator{data, 0, v_w, v_w, 0};
+    return sign_extend_field_by_mask(sign_mask, *data_iterator);
+    ;
+}
+
+inline int64_t FlexCompressor::max(const IntegerCompressor& c)
+{
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    BfIterator data_iterator{data, 0, v_w, v_w, c.v_size() - 1};
+    return sign_extend_field_by_mask(sign_mask, *data_iterator);
+    ;
 }
 
 inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8])
