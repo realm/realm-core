@@ -17,6 +17,7 @@
 -----------
 
 ### Internals
+* Work around a bug in VC++ that resulted in runtime errors when running the tests in a debug build (#[7741](https://github.com/realm/realm-core/issues/7741)).
 * Add the originating error and server requests action that caused a client reset to occur to the client reset tracking metadata storage. ([PR #7649](https://github.com/realm/realm-core/pull/7649))
 
 ----------------------------------------------
