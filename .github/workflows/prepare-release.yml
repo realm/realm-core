@@ -1,0 +1,39 @@
+name: Prepare Release
+
+# This action is triggered manually and starts the release process.
+# See github.com/realm/realm-core/doc/development/how-to-release.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Use this to provide a version. For example "10.123.1" or "4.5.0-CustDemo".
+        required: true
+        type: string
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0 # include history and tags
+      - name: Change Version
+        run: tools/release-init.sh ${{ inputs.version }}
+        shell: bash
+      - name: Create Release PR
+        uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e #! 6.0.5
+        with:
+          branch: release/automated_v${{ inputs.version }}
+          title: Prepare for ${{ inputs.version }}
+          draft: false
+          body-path: changes-since-last-tag.txt
+          labels: no-jira-ticket
+          commit-message: Prepare for release ${{ inputs.version }}
+          token: ${{ secrets.REALM_CI_PAT }}
+          add-paths: |
+            dependencies.yml
+            Package.swift
+            CHANGELOG.md
