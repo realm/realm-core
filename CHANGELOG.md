@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Add a missing file from the bid library to the android blueprint. (PR [#7738](https://github.com/realm/realm-core/pull/7738))
 
 ### Breaking changes
 * None.
@@ -228,6 +228,7 @@
 * Added `App::default_base_url()` static accessor for SDKs to retrieve the default base URL from Core. ([PR #7534](https://github.com/realm/realm-core/pull/7534))
 * Realm2JSON tool will now correctly upgrade file to current fileformat.
 * (bindgen) Remove dependency on the `clang-format` package and rely on a binary provided by the system instead.
+* Protocol version bumped to 12 ([#7124](https://github.com/realm/realm-core/issues/7124))
 
 ----------------------------------------------
 
@@ -369,7 +370,7 @@
 # 14.0.0 Release notes
 
 ### Enhancements
-* Property keypath in RQL can be substituted with value given as argument. Use '$P<i>' in query string. (Issue [#7033](https://github.com/realm/realm-core/issues/7033))
+* Property keypath in RQL can be substituted with value given as argument. Use '$K\<i\>' in query string. (Issue [#7033](https://github.com/realm/realm-core/issues/7033))
 * You can now use query substitution for the @type argument ([#7289](https://github.com/realm/realm-core/issues/7289))
 
 ### Fixed

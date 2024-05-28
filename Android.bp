@@ -75,6 +75,7 @@ cc_object {
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_string.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_2_str_tables.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid64_to_bid128.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid32_to_bid128.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_to_int64.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_quantize.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_convert_data.c",
