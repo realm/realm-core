@@ -315,8 +315,7 @@ void ArrayString::move(ArrayString& dst, size_t ndx)
             REALM_UNREACHABLE();
             break;
         case Type::interned_strings:
-            // unimplemented
-            REALM_ASSERT(false);
+            m_arr->truncate(ndx);
             break;
     }
 }
