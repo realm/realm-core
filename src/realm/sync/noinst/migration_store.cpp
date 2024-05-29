@@ -67,17 +67,14 @@ bool MigrationStore::load_data(bool read_only)
             // Writing is disabled
             return false; // Either table is not initialized or version does not exist
         }
-        else { // writable
-            tr->promote_to_write();
-            // Create the metadata schema
-            create_sync_metadata_schema(tr, &internal_tables);
-            // Update the schema version (and create the schema versions table, if needed)
-            SyncMetadataSchemaVersions schema_versions(tr);
-            schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
-            tr->commit_and_continue_as_read();
-        }
+        tr->promote_to_write();
+        // Ensure the schema versions table is initialized (may add its own commit)
+        SyncMetadataSchemaVersions schema_versions(tr);
+        // Create the metadata schema and set the version (in the same commit)
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
+        create_sync_metadata_schema(tr, &internal_tables);
+        tr->commit_and_continue_as_read();
     }
-
     REALM_ASSERT(m_migration_table);
 
     // Read the migration object if exists, or default to not migrated

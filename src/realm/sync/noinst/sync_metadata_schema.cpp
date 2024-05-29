@@ -165,10 +165,6 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
 
 SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const TransactionRef& tr)
 {
-    TableKey legacy_table_key;
-    ColKey legacy_version_key;
-    std::vector<SyncMetadataTable> legacy_table_def{
-        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
     std::vector<SyncMetadataTable> unified_schema_version_table_def{
         {&m_table,
          c_sync_internal_schemas_table,
@@ -247,10 +243,11 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
          {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
+    DB::TransactStage orig = tr->get_transact_stage();
+    bool modified = false;
+
     // Read and write transactions are allowed, but not frozen
-    REALM_ASSERT_EX(
-        (tr->get_transact_stage() == DB::transact_Reading || tr->get_transact_stage() == DB::transact_Writing),
-        tr->get_transact_stage());
+    REALM_ASSERT_EX((orig == DB::transact_Reading || orig == DB::transact_Writing), orig);
     // If the versions table exists, then m_table would have been initialized by the reader constructor
     // If the versions table doesn't exist, then initialize it now
     if (!m_table) {
@@ -265,6 +262,7 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
                 tr->promote_to_write();
             }
             create_sync_metadata_schema(tr, &unified_schema_version_table_def);
+            modified = true;
         }
     }
 
@@ -277,8 +275,16 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
         // Only the flx subscription store can potentially have the legacy metadata table
         set_version_for(tr, internal_schema_groups::c_flx_subscription_store, *legacy_version);
         tr->remove_table(c_flx_metadata_table);
+        modified = true;
     }
-    // Don't commit changes now - wait for the caller to commit them
+    if (!modified)
+        return; // nothing to commit
+
+    // Commit and revert to the original transact stage
+    if (orig == DB::transact_Reading)
+        tr->commit_and_continue_as_read();
+    else
+        tr->commit_and_continue_writing();
 }
 
 void SyncMetadataSchemaVersions::set_version_for(const TransactionRef& tr, std::string_view schema_group_name,

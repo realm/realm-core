@@ -47,7 +47,7 @@ bool operator==(const sync::PendingReset& lhs, const PendingReset::Action& actio
 class PendingResetStore {
 public:
     // Store the pending reset tracking information - it is an error if the tracking info already
-    // esists in the store
+    // exists in the store
     // Requires a writable transaction and changes must be committed manually
     static void track_reset(const TransactionRef& wr_tr, ClientResyncMode mode, PendingReset::Action action,
                             const std::optional<Status>& error = std::nullopt);

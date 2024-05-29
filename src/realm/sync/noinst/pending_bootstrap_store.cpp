@@ -109,13 +109,14 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
     }
     else {
         tr->promote_to_write();
-        // Create the metadata schema
-        create_sync_metadata_schema(tr, &internal_tables);
-        // Update the schema version (and create the schema versions table, if needed)
+        // Ensure the schema versions table is initialized (may add its own commit)
         SyncMetadataSchemaVersions schema_versions(tr);
+        // Create the metadata schema and set the version (in the same commit)
         schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, c_schema_version);
+        create_sync_metadata_schema(tr, &internal_tables);
         tr->commit_and_continue_as_read();
     }
+    REALM_ASSERT(m_table);
 
     if (auto bootstrap_table = tr->get_table(m_table); !bootstrap_table->is_empty()) {
         m_has_pending = true;

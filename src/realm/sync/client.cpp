@@ -1983,16 +1983,11 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    PendingReset pending_reset;
-    {
-        auto fr_tr = m_db->start_frozen();
-        if (auto has_pending_reset = sync::PendingResetStore::has_pending_reset(fr_tr)) {
-            pending_reset = std::move(*has_pending_reset);
-        }
-        else {
-            return; // nothing to do
-        }
+    auto pending_reset = PendingResetStore::has_pending_reset(m_db->start_frozen());
+    if (!pending_reset) {
+        return; // nothing to do
     }
+
     m_sess->logger.info(util::LogCategory::reset, "Tracking %1", pending_reset);
 
     // Now that the client reset merge is complete, wait for the changes to synchronize with the server

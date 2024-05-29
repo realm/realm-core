@@ -698,6 +698,7 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
         auto tr = db->start_read();
         // Initialize the schema versions table and set a schema version
         SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
         schema_versions.set_version_for(tr, schema_group_name, version);
         tr->commit_and_continue_as_read();
         auto schema_version = schema_versions.get_version_for(tr, schema_group_name);
@@ -757,8 +758,7 @@ TEST(Sync_SyncMetadataSchemaVersions)
         // Initialize the table and write values
         auto tr = db->start_read();
         SyncMetadataSchemaVersions schema_versions(tr);
-        // table was created - transaction is in write mode
-        CHECK(tr->get_transact_stage() == DB::transact_Writing);
+        tr->promote_to_write();
         schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version);
         schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, btstrp_version);
         schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, mig_version);
@@ -783,8 +783,6 @@ TEST(Sync_SyncMetadataSchemaVersions)
         // Write new values and verify the values
         auto tr = db->start_read();
         SyncMetadataSchemaVersions schema_versions(tr);
-        // table was already created - did not write
-        CHECK(tr->get_transact_stage() == DB::transact_Reading);
         tr->promote_to_write();
         schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version2);
         tr->commit_and_continue_writing();
@@ -821,7 +819,6 @@ TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
         auto tr = db->start_read();
         // Converts the legacy table to the unified table
         SyncMetadataSchemaVersions schema_versions(tr);
-        tr->commit_and_continue_as_read();
         auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
         CHECK(schema_version);
         CHECK(*schema_version == version);

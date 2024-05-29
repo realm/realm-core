@@ -194,18 +194,26 @@ PendingResetStore PendingResetStore::load_or_create_schema(const TransactionRef&
         return reset_store;
     }
     // Otherwise, set it up from scratch - Make sure the transaction is set for writing
-    if (wr_tr->get_transact_stage() != DB::TransactStage::transact_Writing) {
+    if (wr_tr->get_transact_stage() == DB::TransactStage::transact_Reading) {
         wr_tr->promote_to_write();
     }
+    // Ensure writing - all other transaction stages are not allowed
+    REALM_ASSERT_EX(wr_tr->get_transact_stage() == DB::TransactStage::transact_Writing, wr_tr->get_transact_stage());
+
+    // Drop the old table and any stale pending resets
     if (wr_tr->has_table(s_meta_reset_table_name)) {
-        // Drop the old table and any stale pending resets
         wr_tr->remove_table(s_meta_reset_table_name);
     }
+
+    // Ensure the schema versions table is initialized (may add its own commit)
+    SyncMetadataSchemaVersions schema_versions(wr_tr);
+    // Create the metadata schema and set the version (in the same commit)
+    schema_versions.set_version_for(wr_tr, internal_schema_groups::c_pending_reset_store, s_pending_reset_version);
     create_sync_metadata_schema(wr_tr, &reset_store.m_internal_tables);
     REALM_ASSERT(reset_store.m_pending_reset_table);
-    SyncMetadataSchemaVersions schema_versions(wr_tr);
-    schema_versions.set_version_for(wr_tr, internal_schema_groups::c_pending_reset_store, s_pending_reset_version);
     reset_store.m_schema_version = s_pending_reset_version;
+
+    // Don't commit yet
     return reset_store;
 }
 
@@ -224,7 +232,7 @@ std::optional<PendingReset> PendingResetStore::read_legacy_pending_reset(const T
         ColKey mode_col = table->get_column_key(s_v1_reset_mode_col_name);
         Obj reset_entry = *table->begin();
 
-        if (version_col && static_cast<int>(reset_entry.get<int64_t>(version_col)) == 1) {
+        if (version_col && reset_entry.get<int64_t>(version_col) == 1LL) {
             REALM_ASSERT(timestamp_col);
             REALM_ASSERT(mode_col);
             PendingReset pending;
