@@ -75,12 +75,12 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 
 bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 {
-#if REALM_COMPRESS
-    return always_compress(origin, arr, NodeHeader::Encoding::Flex);
-#else
     if (origin.m_width < 2 || origin.m_size == 0)
         return false;
 
+#if REALM_COMPRESS
+    return always_compress(origin, arr, NodeHeader::Encoding::Flex);
+#else
     std::vector<int64_t> values;
     std::vector<unsigned> indices;
     compress_values(origin, values, indices);

@@ -131,7 +131,6 @@ inline int64_t FlexCompressor::min(const IntegerCompressor& c)
     const auto sign_mask = c.v_mask();
     BfIterator data_iterator{data, 0, v_w, v_w, 0};
     return sign_extend_field_by_mask(sign_mask, *data_iterator);
-    ;
 }
 
 inline int64_t FlexCompressor::max(const IntegerCompressor& c)
@@ -141,7 +140,6 @@ inline int64_t FlexCompressor::max(const IntegerCompressor& c)
     const auto sign_mask = c.v_mask();
     BfIterator data_iterator{data, 0, v_w, v_w, c.v_size() - 1};
     return sign_extend_field_by_mask(sign_mask, *data_iterator);
-    ;
 }
 
 inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8])
