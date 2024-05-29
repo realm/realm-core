@@ -86,9 +86,7 @@ void transform_transactions(TestContext& test_context)
         };
 
         Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(session_config));
-        session_1.bind();
         Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-        session_2.bind();
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
@@ -167,9 +165,7 @@ void transform_instructions(TestContext& test_context)
             return SyncClientHookAction::NoAction;
         };
         Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(session_config));
-        session_1.bind();
         Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-        session_2.bind();
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
@@ -246,9 +242,7 @@ void connected_objects(TestContext& test_context)
             return SyncClientHookAction::NoAction;
         };
         Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(session_config));
-        session_1.bind();
         Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-        session_2.bind();
 
         // Start server and upload changes of second client.
         fixture.start_server(0);

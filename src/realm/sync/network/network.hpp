@@ -1998,6 +1998,8 @@ protected:
 
 template <class H>
 class Service::PostOper : public PostOperBase {
+    static_assert(std::is_nothrow_move_constructible_v<H>);
+
 public:
     PostOper(std::size_t size, Impl& service, H&& handler)
         : PostOperBase{size, service}
@@ -2009,21 +2011,10 @@ public:
         // Recycle the operation object before the handler is exceuted, such
         // that the memory is available for a new post operation that might be
         // initiated during the execution of the handler.
-        bool was_recycled = false;
-        try {
-            H handler = std::move(m_handler); // Throws
-            // Service::recycle_post_oper() destroys this operation object
-            Service::recycle_post_oper(m_service, this);
-            was_recycled = true;
-            handler(Status::OK()); // Throws
-        }
-        catch (...) {
-            if (!was_recycled) {
-                // Service::recycle_post_oper() destroys this operation object
-                Service::recycle_post_oper(m_service, this);
-            }
-            throw;
-        }
+        H handler = std::move(m_handler);
+        // Service::recycle_post_oper() destroys this operation object
+        Service::recycle_post_oper(m_service, this);
+        handler(Status::OK()); // Throws
     }
 
 private:
