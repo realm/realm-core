@@ -870,6 +870,7 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 break;
             case type_Mixed:
                 REALM_ASSERT(false);
+                REALM_FALLTHROUGH;
             default:
                 if (m.is_type(type_List)) {
                     out << "list";
