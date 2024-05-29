@@ -20,6 +20,7 @@
 ### Internals
 * Removed references to `stitch_` fields in access tokens in sync unit tests ([PR #7769](https://github.com/realm/realm-core/pull/7769)).
 * Added back iOS simulator testing to evergreen after Jenkins went away ([PR #7758](https://github.com/realm/realm-core/pull/7758)).
+* `realm-trawler -c` did not work on Realm using SyncClient history ([PR #7734](https://github.com/realm/realm-core/pull/7734)).
 
 ----------------------------------------------
 
