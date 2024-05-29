@@ -240,7 +240,7 @@ functions:
           set -o errexit
           set -o verbose
           if [ -n "${cmake_bindir|}" ]; then
-              CTEST=$(./evergreen/abspath.sh ${cmake_bindir}/ctest)
+              CTEST="$(./evergreen/abspath.sh "${cmake_bindir}/ctest")"
           else
               CTEST="ctest"
           fi
@@ -763,7 +763,7 @@ tasks:
       script: |-
         set -o errexit
         if [[ -n "${cmake_bindir}" ]]; then
-          CPACK="$(./evergreen/abspath.sh ${cmake_bindir}/cpack)"
+          CPACK="$(./evergreen/abspath.sh "${cmake_bindir}/cpack")"
         else
           CPACK="cpack"
         fi
