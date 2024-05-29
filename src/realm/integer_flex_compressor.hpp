@@ -27,9 +27,6 @@
 
 namespace realm {
 
-struct WordTypeValue {};
-struct WordTypeIndex {};
-
 //
 // Compress array in Flex format
 // Decompress array in WTypeBits formats
@@ -99,7 +96,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     BfIterator data_iterator{data, 0, v_w, v_w, 0};
     auto remaining_bits = ndx_w * range;
     while (remaining_bits >= bit_per_it) {
-        auto word = unaligned_ndx_iterator.get(bit_per_it);
+        auto word = unaligned_ndx_iterator.consume(bit_per_it);
         for (int i = 0; i < values_per_word; ++i) {
             const auto index = word & ndx_mask;
             data_iterator.move(static_cast<size_t>(index));
@@ -108,10 +105,9 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
             word >>= ndx_w;
         }
         remaining_bits -= bit_per_it;
-        unaligned_ndx_iterator.bump(bit_per_it);
     }
     if (remaining_bits) {
-        auto last_word = unaligned_ndx_iterator.get(remaining_bits);
+        auto last_word = unaligned_ndx_iterator.consume(remaining_bits);
         while (remaining_bits) {
             const auto index = last_word & ndx_mask;
             data_iterator.move(static_cast<size_t>(index));
@@ -254,44 +250,6 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     return true;
 }
 
-template <typename Cond, typename Type = WordTypeValue>
-inline uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
-{
-    if constexpr (std::is_same_v<Cond, Equal>)
-        return find_all_fields_EQ(MSBs, a, b);
-    if constexpr (std::is_same_v<Cond, NotEqual>)
-        return find_all_fields_NE(MSBs, a, b);
-
-    if constexpr (std::is_same_v<Cond, Greater>) {
-        if (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        if (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_GT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, GreaterEqual>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_GE(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_GE(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, Less>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_LT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, LessEqual>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_LE(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-}
-
 template <typename CondVal, typename CondIndex>
 inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                                           QueryStateBase* state)
@@ -305,14 +263,14 @@ inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_
 
     auto MSBs = compressor.msb();
     auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(vector_compare<CondVal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+    auto v_start = parallel_subword_find(find_all_fields<CondVal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
     if (v_start == v_size)
         return true;
 
     MSBs = compressor.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find(vector_compare<CondIndex, WordTypeIndex>, data, offset, ndx_width, MSBs,
+        start = parallel_subword_find(find_all_fields_unsigned<CondIndex>, data, offset, ndx_width, MSBs,
                                       search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
