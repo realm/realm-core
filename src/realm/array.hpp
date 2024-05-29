@@ -1068,7 +1068,7 @@ inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_i
         // it only works by accident, because the whole slab area is reinitialized after commit.
         // We should have: Array encoded_array{Allocator::get_default()};
         Array compressed_array{Allocator::get_default()};
-        if (compress_in_flight && size() != 0 && compress_array(compressed_array)) {
+        if (compress_in_flight && compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
             const auto encoding = compressed_array.m_integer_compressor.get_encoding();
             REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
@@ -1101,7 +1101,7 @@ inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterB
 
     if (!array.m_has_refs) {
         Array compressed_array{Allocator::get_default()};
-        if (compress_in_flight && array.size() != 0 && array.compress_array(compressed_array)) {
+        if (compress_in_flight && array.compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
             const auto encoding = compressed_array.m_integer_compressor.get_encoding();
             REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
