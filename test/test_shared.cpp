@@ -2266,6 +2266,30 @@ TEST(Shared_EncryptionPageReadFailure)
 
 #endif // REALM_ENABLE_ENCRYPTION
 
+TEST(Shared_MaxStrings)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    std::string str_a(16 * 1024 * 1024 - 257, 'a');
+    std::string str_b(16 * 1024 * 1024 - 257, 'b');
+    auto o = t->create_object();
+    o.set(ck, str_a);
+    trans->commit_and_continue_as_read();
+    auto v = o.get<StringData>(ck);
+    CHECK_EQUAL(str_a, v);
+    trans->promote_to_write();
+    auto o2 = t->create_object();
+    o2.set(ck, str_b);
+    trans->commit_and_continue_as_read();
+    v = o.get<StringData>(ck);
+    auto v2 = o2.get<StringData>(ck);
+    CHECK_EQUAL(v, str_a);
+    CHECK_EQUAL(v2, str_b);
+}
+
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);

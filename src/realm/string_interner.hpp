@@ -71,6 +71,9 @@ private:
     std::unique_ptr<Array> m_hash_map;
     // the block of compressed strings we're currently appending to:
     std::unique_ptr<ArrayUnsigned> m_current_string_leaf;
+    // an array of strings we're currently appending to. This is used instead
+    // when ever we meet a string too large to be placed inline.
+    std::unique_ptr<Array> m_current_long_string_node;
     void rebuild_internal();
     CompressedStringView& get_compressed(StringID id);
     // return true if the leaf was reloaded

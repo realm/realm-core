@@ -317,13 +317,28 @@ void StringInterner::update_from_parent(bool writable)
     if (m_col_key.value != data_colkey) {
         // new column, new data
         m_compressor.reset();
-        // m_compressed_string_map.clear();
         m_decompressed_strings.clear();
     }
     if (!m_compressor)
         m_compressor = std::make_unique<StringCompressor>(m_top->get_alloc(), *m_top, Pos_Compressor, writable);
     else
         m_compressor->refresh(writable);
+    if (m_data->size()) {
+        auto ref_to_write_buffer = m_data->get_as_ref(m_data->size() - 1);
+        const char* header = m_top->get_alloc().translate(ref_to_write_buffer);
+        bool is_array_of_cprs = NodeHeader::get_hasrefs_from_header(header);
+        if (is_array_of_cprs) {
+            m_current_long_string_node = std::make_unique<Array>(m_top->get_alloc());
+            m_current_long_string_node->set_parent(m_data.get(), m_data->size() - 1);
+            m_current_long_string_node->update_from_parent();
+        }
+        else {
+            m_current_long_string_node.reset();
+        }
+    }
+    else
+        m_current_long_string_node.reset(); // just in case...
+
     // rebuild internal structures......
     rebuild_internal();
     m_current_string_leaf->detach();
@@ -348,11 +363,11 @@ void StringInterner::rebuild_internal()
     for (size_t idx = 0; idx < m_compressed_leafs.size(); ++idx) {
         auto ref = m_data->get_as_ref(idx);
         auto& leaf_meta = m_compressed_leafs[idx];
-        if (ref != leaf_meta.m_leaf_ref) {
-            leaf_meta.m_is_loaded = false;
-            leaf_meta.m_compressed.clear();
-            leaf_meta.m_leaf_ref = ref;
-        }
+        // if (ref != leaf_meta.m_leaf_ref) {
+        leaf_meta.m_is_loaded = false;
+        leaf_meta.m_compressed.clear();
+        leaf_meta.m_leaf_ref = ref;
+        //}
     }
 }
 
@@ -380,38 +395,95 @@ StringID StringInterner::intern(StringData sd)
     add_to_hash_map(*m_hash_map.get(), h, id, 32);
     size_t index = (size_t)m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     REALM_ASSERT_DEBUG(index == id - 1);
-    // Create a new leaf if needed (limit number of entries to 256 pr leaf)
-    if (!m_current_string_leaf->is_attached() || (index & 0xFF) == 0) {
-        m_current_string_leaf->set_parent(m_data.get(), index >> 8);
+    bool need_long_string_node = c_str.size() >= 65536;
+
+    // TODO: update_internal must set up m_current_long_string_node if it is in use
+
+    if (need_long_string_node && !m_current_long_string_node) {
         if ((index & 0xFF) == 0) {
-            m_current_string_leaf->create(0, 65535);
-            m_data->add(m_current_string_leaf->get_ref());
+            // if we're starting on a new leaf, extend parent array for it
+            m_data->add(0);
             m_compressed_leafs.push_back({});
+            m_current_long_string_node = std::make_unique<Array>(m_top->get_alloc());
+            m_current_long_string_node->set_parent(m_data.get(), m_data->size() - 1);
+            m_current_long_string_node->create(NodeHeader::type_HasRefs);
+            m_current_long_string_node->update_parent();
+            m_current_string_leaf->detach();
         }
         else {
-            if (m_current_string_leaf->is_attached()) {
-                m_current_string_leaf->update_from_parent();
+            REALM_ASSERT_DEBUG(m_current_string_leaf);
+            m_current_long_string_node = std::make_unique<Array>(m_top->get_alloc());
+            m_current_long_string_node->set_parent(m_data.get(), m_data->size() - 1);
+            m_current_long_string_node->init_from_parent();
+            size_t index_in_node = 0;
+            // convert the current leaf into a long string node. (array of strings in separate arrays)
+            for (auto s : m_compressed_leafs.back().m_compressed) {
+                ArrayUnsigned arr(m_top->get_alloc());
+                arr.create(s.size, 65535);
+                std::copy_n(s.data, s.size, arr.m_data);
+                m_current_long_string_node->set_as_ref(index_in_node++, arr.get_ref());
             }
-            else {
-                m_current_string_leaf->init_from_ref(m_current_string_leaf->get_ref_from_parent());
-            }
+            m_current_string_leaf->destroy();
+            m_current_string_leaf->detach();
+            // force later reload of leaf
+            m_compressed_leafs.back().m_is_loaded = false;
+            // m_compressed_leafs.back().m_leaf_ref = m_data->get_as_ref(m_data->size() - 1);
         }
     }
-    m_top->adjust(Pos_Size, 2); // type is has_Refs, so increment is by 2
-    REALM_ASSERT(c_str.size() < 65535);
-    m_current_string_leaf->add(c_str.size());
-    for (auto c : c_str) {
-        m_current_string_leaf->add(c);
+    if (m_current_long_string_node) {
+        ArrayUnsigned arr(m_top->get_alloc());
+        arr.create(c_str.size(), 65535);
+        unsigned short* begin = c_str.data();
+        if (begin) {
+            // if the compressed string is empty, 'begin' is zero and we don't copy
+            size_t n = c_str.size();
+            unsigned short* dest = reinterpret_cast<unsigned short*>(arr.m_data);
+            std::copy_n(begin, n, dest);
+        }
+        m_current_long_string_node->add(arr.get_ref());
+        m_current_long_string_node->update_parent();
+        if (m_current_long_string_node->size() == 256) {
+            // exit from  "long string mode"
+            m_current_long_string_node.reset();
+        }
+        CompressionSymbol* p_start = reinterpret_cast<CompressionSymbol*>(arr.m_data);
+        m_compressed_leafs.back().m_compressed.push_back({p_start, arr.size()});
     }
-    REALM_ASSERT_DEBUG(m_compressed_leafs.size());
-    bool reloaded = load_leaf_if_new_ref(m_compressed_leafs.back(), m_current_string_leaf->get_ref());
-    if (!reloaded) {
+    else {
+        // Append to leaf with up to 256 entries.
+        // First create a new leaf if needed (limit number of entries to 256 pr leaf)
+        bool need_new_leaf = !m_current_string_leaf->is_attached() || (index & 0xFF) == 0;
+        if (need_new_leaf) {
+            m_current_string_leaf->set_parent(m_data.get(), index >> 8);
+            if ((index & 0xFF) == 0) {
+                m_current_string_leaf->create(0, 65535);
+                m_data->add(m_current_string_leaf->get_ref());
+                m_compressed_leafs.push_back({});
+            }
+            else {
+                if (m_current_string_leaf->is_attached()) {
+                    m_current_string_leaf->update_from_parent();
+                }
+                else {
+                    m_current_string_leaf->init_from_ref(m_current_string_leaf->get_ref_from_parent());
+                }
+            }
+        }
+        REALM_ASSERT(c_str.size() < 65535);
+        // Add compressed string at end of leaf
+        m_current_string_leaf->add(c_str.size());
+        for (auto c : c_str) {
+            m_current_string_leaf->add(c);
+        }
+        REALM_ASSERT_DEBUG(m_compressed_leafs.size());
         CompressionSymbol* p = reinterpret_cast<CompressionSymbol*>(m_current_string_leaf->m_data);
         auto p_limit = p + m_current_string_leaf->size();
         auto p_start = p_limit - c_str.size();
         m_compressed_leafs.back().m_compressed.push_back({p_start, c_str.size()});
         REALM_ASSERT(m_compressed_leafs.back().m_compressed.size() <= 256);
     }
+    m_top->adjust(Pos_Size, 2); // type is has_Refs, so increment is by 2
+    load_leaf_if_new_ref(m_compressed_leafs.back(), m_data->get(m_data->size() - 1));
     auto csv = get_compressed(id);
     CompressedStringView csv2(c_str);
     REALM_ASSERT_DEBUG(csv == csv2);
@@ -421,24 +493,45 @@ StringID StringInterner::intern(StringData sd)
 bool StringInterner::load_leaf_if_needed(DataLeaf& leaf)
 {
     if (!leaf.m_is_loaded) {
-        // must interpret leaf first
-        size_t leaf_offset = 0;
+        // start with an empty leaf:
         leaf.m_compressed.clear();
         leaf.m_compressed.reserve(256);
-        ArrayUnsigned leaf_array(m_top->get_alloc());
-        leaf_array.init_from_ref(leaf.m_leaf_ref);
-        REALM_ASSERT(NodeHeader::get_encoding(leaf_array.get_header()) == NodeHeader::Encoding::WTypBits);
-        REALM_ASSERT(NodeHeader::get_width_from_header(leaf_array.get_header()) == 16);
-        // This is dangerous if the leaf is for some reason not in the assumed format
-        CompressionSymbol* c = reinterpret_cast<CompressionSymbol*>(leaf_array.m_data);
-        auto leaf_size = leaf_array.size();
-        while (leaf_offset < leaf_size) {
-            size_t length = c[leaf_offset];
-            REALM_ASSERT_DEBUG(length == leaf_array.get(leaf_offset));
-            leaf_offset++;
-            leaf.m_compressed.push_back({c + leaf_offset, length});
-            REALM_ASSERT_DEBUG(leaf.m_compressed.size() <= 256);
-            leaf_offset += length;
+
+        // must interpret leaf first - the leaf is either a single array holding all strings,
+        // or an array with each (compressed) string placed in its own array.
+        const char* header = m_top->get_alloc().translate(leaf.m_leaf_ref);
+        bool is_single_array = !NodeHeader::get_hasrefs_from_header(header);
+        if (is_single_array) {
+            size_t leaf_offset = 0;
+            ArrayUnsigned leaf_array(m_top->get_alloc());
+            leaf_array.init_from_ref(leaf.m_leaf_ref);
+            REALM_ASSERT(NodeHeader::get_encoding(leaf_array.get_header()) == NodeHeader::Encoding::WTypBits);
+            REALM_ASSERT(NodeHeader::get_width_from_header(leaf_array.get_header()) == 16);
+            // This is dangerous if the leaf is for some reason not in the assumed format
+            CompressionSymbol* c = reinterpret_cast<CompressionSymbol*>(leaf_array.m_data);
+            auto leaf_size = leaf_array.size();
+            while (leaf_offset < leaf_size) {
+                size_t length = c[leaf_offset];
+                REALM_ASSERT_DEBUG(length == leaf_array.get(leaf_offset));
+                leaf_offset++;
+                leaf.m_compressed.push_back({c + leaf_offset, length});
+                REALM_ASSERT_DEBUG(leaf.m_compressed.size() <= 256);
+                leaf_offset += length;
+            }
+        }
+        else {
+            // Not a single leaf - instead an array of strings
+            Array arr(m_top->get_alloc());
+            arr.init_from_ref(leaf.m_leaf_ref);
+            for (size_t idx = 0; idx < arr.size(); ++idx) {
+                ArrayUnsigned str_array(m_top->get_alloc());
+                ref_type ref = arr.get_as_ref(idx);
+                str_array.init_from_ref(ref);
+                REALM_ASSERT(NodeHeader::get_encoding(str_array.get_header()) == NodeHeader::Encoding::WTypBits);
+                REALM_ASSERT(NodeHeader::get_width_from_header(str_array.get_header()) == 16);
+                CompressionSymbol* c = reinterpret_cast<CompressionSymbol*>(str_array.m_data);
+                leaf.m_compressed.push_back({c, str_array.size()});
+            }
         }
         leaf.m_is_loaded = true;
         return true;
