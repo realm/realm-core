@@ -352,7 +352,7 @@ endif()
 # On systems without a built-in SHA-2 implementation (or one provided by a dependency)
 # we need to bundle the public domain implementation.
 # Note: This is also used on Windows because Windows lacks a native SHA224 hash needed for realm encryption
-if(NOT APPLE AND NOT REALM_HAVE_OPENSSL OR WIN32)
+if(NOT APPLE AND NOT REALM_HAVE_OPENSSL)
     add_library(sha2 OBJECT ../external/sha-2/sha224.cpp ../external/sha-2/sha256.cpp)
     target_include_directories(Storage PRIVATE ../external/sha-2)
     target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha2>)
@@ -387,7 +387,7 @@ if(REALM_HAVE_BACKTRACE AND NOT CMAKE_GENERATOR STREQUAL Xcode)
     target_link_libraries(Storage PUBLIC ${Backtrace_LIBRARIES})
 endif()
 
-if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
+if(REALM_HAVE_OPENSSL AND (UNIX OR WIN32))
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 

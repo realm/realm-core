@@ -298,7 +298,7 @@ void PriorityQueue<T, Container, Compare>::swap(PriorityQueue& other)
     swap(m_queue, other.m_queue);
     swap(compare(), other.compare());
 }
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_UTIL_PRIORITY_QUEUE_HPP

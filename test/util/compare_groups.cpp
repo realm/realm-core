@@ -28,7 +28,7 @@ public:
     }
     void do_log(const util::LogCategory& category, Level level, const std::string& message) override final
     {
-        ensure_prefix();                                          // Throws
+        ensure_prefix();                                                    // Throws
         Logger::do_log(m_base_logger, category, level, m_prefix + message); // Throws
     }
 
@@ -58,7 +58,7 @@ public:
     }
     void do_log(const util::LogCategory& category, Level level, const std::string& message) override final
     {
-        ensure_prefix();                                          // Throws
+        ensure_prefix();                                                    // Throws
         Logger::do_log(m_base_logger, category, level, m_prefix + message); // Throws
     }
 
@@ -71,8 +71,8 @@ private:
         if (REALM_LIKELY(!m_prefix.empty()))
             return;
         std::ostringstream out;
-        out << m_pk << ": ";                   // Throws
-        m_prefix = out.str();                  // Throws
+        out << m_pk << ": ";  // Throws
+        m_prefix = out.str(); // Throws
     }
 };
 

@@ -129,7 +129,7 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx, Allocator& 
 inline void ArrayBigBlobs::erase(size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
-    if (blob_ref != 0) {                       // nothing to destroy if null
+    if (blob_ref != 0) {                            // nothing to destroy if null
         Array::destroy_deep(blob_ref, get_alloc()); // Deep
     }
     Array::erase(ndx);

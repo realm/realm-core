@@ -29,6 +29,6 @@ namespace realm {
 enum class PayloadPolicy { Copy, Stay, Move };
 
 
-} // end namespace Realm
+} // namespace realm
 
 #endif

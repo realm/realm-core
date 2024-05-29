@@ -51,7 +51,7 @@ public:
         : Base(parent, index)
     {
     }
-    Dictionary(ColKey col_key, size_t level = 1);
+    Dictionary(ColKey col_key, uint8_t level = 1);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
         , CollectionParent(other.get_level())
@@ -219,12 +219,18 @@ public:
     {
         return m_parent_version;
     }
+    void update_content_version() const noexcept override
+    {
+        Base::update_content_version();
+    }
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
     StableIndex build_index(Mixed key) const;
 
     void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
+    LinkCollectionPtr clone_as_obj_list() const final;
 
 private:
     using Base::set_collection;
@@ -271,6 +277,8 @@ private:
     void get_key_type();
 
     UpdateStatus do_update_if_needed(bool allow_create) const;
+    template <class T>
+    std::shared_ptr<T> do_get_collection(const PathElement& path_elem);
 };
 
 class Dictionary::Iterator {

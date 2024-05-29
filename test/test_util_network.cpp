@@ -1031,8 +1031,7 @@ TEST(Network_ThrowFromHandlers)
     // Check that exceptions can propagate correctly out from any type of
     // completion handler
     network::Service service;
-    struct TestException1 {
-    };
+    struct TestException1 {};
     service.post([](Status) {
         throw TestException1();
     });
@@ -1042,8 +1041,7 @@ TEST(Network_ThrowFromHandlers)
         network::Acceptor acceptor{service};
         network::Endpoint ep = bind_acceptor(acceptor);
         network::Socket socket_1{service};
-        struct TestException2 {
-        };
+        struct TestException2 {};
         acceptor.async_accept(socket_1, [](std::error_code) {
             throw TestException2();
         });
@@ -1057,8 +1055,7 @@ TEST(Network_ThrowFromHandlers)
         network::Socket socket_1{service};
         acceptor.async_accept(socket_1, [](std::error_code) {});
         network::Socket socket_2{service};
-        struct TestException3 {
-        };
+        struct TestException3 {};
         socket_2.async_connect(ep, [](std::error_code) {
             throw TestException3();
         });
@@ -1069,8 +1066,7 @@ TEST(Network_ThrowFromHandlers)
         connect_sockets(socket_1, socket_2);
         network::ReadAheadBuffer rab;
         char ch_1;
-        struct TestException4 {
-        };
+        struct TestException4 {};
         socket_1.async_read(&ch_1, 1, rab, [](std::error_code, size_t) {
             throw TestException4();
         });
@@ -1085,8 +1081,7 @@ TEST(Network_ThrowFromHandlers)
         char ch_1;
         socket_1.async_read(&ch_1, 1, rab, [](std::error_code, size_t) {});
         char ch_2 = 0;
-        struct TestException5 {
-        };
+        struct TestException5 {};
         socket_2.async_write(&ch_2, 1, [](std::error_code, size_t) {
             throw TestException5();
         });
@@ -1094,8 +1089,7 @@ TEST(Network_ThrowFromHandlers)
     }
     {
         network::DeadlineTimer timer{service};
-        struct TestException6 {
-        };
+        struct TestException6 {};
         timer.async_wait(std::chrono::seconds(0), [](Status) {
             throw TestException6();
         });

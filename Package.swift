@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "14.2.0"
+let versionStr = "14.8.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -17,6 +17,7 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
     .define("REALM_ENABLE_SYNC", to: "1"),
     .define("REALM_ENABLE_GEOSPATIAL", to: "1"),
+    .define("REALM_APP_SERVICES", to: "1"),
 
     .define("REALM_VERSION_MAJOR", to: String(versionCompontents[0])),
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
@@ -353,8 +354,8 @@ let bidExcludes: [String] = [
 
 let platforms: [SupportedPlatform] = [
     .macOS(.v10_13),
-    .iOS(.v11),
-    .tvOS(.v11),
+    .iOS(.v12),
+    .tvOS(.v12),
     .watchOS(.v4)
 ]
 
@@ -364,7 +365,7 @@ let package = Package(
     products: [
         .library(
             name: "RealmCore",
-            targets: ["RealmCore"]),
+            targets: ["RealmCoreResources"]),
         .library(
             name: "RealmQueryParser",
             targets: ["RealmQueryParser"]),
@@ -417,6 +418,7 @@ let package = Package(
                 "realm/tools",
                 "realm/util/config.h.in",
                 "realm/version_numbers.hpp.in",
+                "spm",
                 "swift",
                 "win32",
             ] + syncExcludes + syncServerSources) as [String],
@@ -430,6 +432,20 @@ let package = Package(
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
                 .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
             ]),
+        // Adding resources to a target makes command line swift build (but not
+        // xcodebuild) force-include Foundation.h without properly excluding
+        // non-objc c++ files. Adding the resources in a separate target which
+        // depends on RealmCore works around this. This target needs a single
+        // source file (dummy.mm) to work around a different bug in xcodebuild
+        // (but not swift build) that makes empty targets not work.
+        .target(
+            name: "RealmCoreResources",
+            dependencies: ["RealmCore"],
+            path: "src/spm",
+            resources: [
+                .copy("PrivacyInfo.xcprivacy")
+            ],
+            publicHeadersPath: "."),
         .target(
             name: "RealmQueryParser",
             dependencies: ["RealmCore"],
@@ -478,10 +494,11 @@ let package = Package(
         .target(
             name: "RealmFFI",
             dependencies: ["Capi"],
-            path: "src/swift"),
+            path: "src/swift",
+            cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "Catch2Generated",
-            path: "external/generated",
+            path: "test/external/generated",
             // this file was manually generated with catch v3.0.1
             // and should be regenerated when catch is upgraded
             resources: [.copy("catch2/catch_user_config.hpp")],
@@ -489,7 +506,7 @@ let package = Package(
         .target(
             name: "Catch2",
             dependencies: ["Catch2Generated"],
-            path: "external/catch/src",
+            path: "test/external/catch/src",
             exclude: [
                 "CMakeLists.txt",
                 "catch2/catch_user_config.hpp.in",

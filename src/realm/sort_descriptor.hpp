@@ -78,16 +78,15 @@ public:
     public:
         Sorter(std::vector<std::vector<ExtendedColumnKey>> const& columns, std::vector<bool> const& ascending,
                Table const& root_table, const IndexPairs& indexes);
-        Sorter()
-        {
-        }
+        Sorter() {}
 
         bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
 
         bool has_links() const
         {
-            return std::any_of(m_columns.begin(), m_columns.end(),
-                               [](auto&& col) { return !col.translated_keys.empty(); });
+            return std::any_of(m_columns.begin(), m_columns.end(), [](auto&& col) {
+                return !col.translated_keys.empty();
+            });
         }
 
         bool any_is_null(IndexPair i) const
@@ -345,10 +344,11 @@ public:
     std::string get_description(ConstTableRef target_table) const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;
+
 private:
     std::vector<std::unique_ptr<BaseDescriptor>> m_descriptors;
     std::vector<TableKey> m_dependencies;
 };
-}
+} // namespace realm
 
 #endif /* REALM_SORT_DESCRIPTOR_HPP */

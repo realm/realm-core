@@ -80,11 +80,6 @@ using namespace realm::util;
 
 namespace {
 
-void increment(int* i)
-{
-    ++*i;
-}
-
 struct Shared {
     Mutex m_mutex;
     int m_value;
@@ -252,30 +247,6 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 } // anonymous namespace
 
 
-TEST(Thread_Join)
-{
-    int i = 0;
-    Thread thread(std::bind(&increment, &i));
-    CHECK(thread.joinable());
-    thread.join();
-    CHECK(!thread.joinable());
-    CHECK_EQUAL(1, i);
-}
-
-
-TEST(Thread_Start)
-{
-    int i = 0;
-    Thread thread;
-    CHECK(!thread.joinable());
-    thread.start(std::bind(&increment, &i));
-    CHECK(thread.joinable());
-    thread.join();
-    CHECK(!thread.joinable());
-    CHECK_EQUAL(1, i);
-}
-
-
 TEST(Thread_MutexLock)
 {
     Mutex mutex;
@@ -304,9 +275,9 @@ TEST(Thread_CriticalSection)
 {
     Shared shared;
     shared.m_value = 0;
-    Thread threads[10];
+    std::thread threads[10];
     for (int i = 0; i < 10; ++i)
-        threads[i].start(std::bind(&Shared::increment_10000_times, &shared));
+        threads[i] = std::thread(&Shared::increment_10000_times, &shared);
     for (int i = 0; i < 10; ++i)
         threads[i].join();
     CHECK_EQUAL(100000, shared.m_value);
@@ -318,9 +289,9 @@ TEST(Thread_EmulatedMutex_CriticalSection)
     TEST_PATH(path);
     SharedWithEmulated shared(path);
     shared.m_value = 0;
-    Thread threads[10];
+    std::thread threads[10];
     for (int i = 0; i < 10; ++i)
-        threads[i].start(std::bind(&SharedWithEmulated::increment_10000_times, &shared));
+        threads[i] = std::thread(&SharedWithEmulated::increment_10000_times, &shared);
     for (int i = 0; i < 10; ++i)
         threads[i].join();
     CHECK_EQUAL(100000, shared.m_value);
@@ -331,9 +302,9 @@ TEST(Thread_CriticalSection2)
 {
     Shared shared;
     shared.m_value = 0;
-    Thread threads[10];
+    std::thread threads[10];
     for (int i = 0; i < 10; ++i)
-        threads[i].start(std::bind(&Shared::increment_10000_times2, &shared));
+        threads[i] = std::thread(&Shared::increment_10000_times2, &shared);
     for (int i = 0; i < 10; ++i)
         threads[i].join();
     CHECK_EQUAL(100000, shared.m_value);
@@ -362,10 +333,7 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
 
     // Check recovery by simulating a death
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death, &robust).join();
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
     robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
@@ -374,10 +342,7 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
 
     // One more round of recovery
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death, &robust).join();
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
     robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
@@ -386,10 +351,7 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
 
     // Simulate a case where recovery fails or is impossible
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death, &robust).join();
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
     CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)), RobustMutex::NotRecoverable);
@@ -419,18 +381,12 @@ TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
 
     // Bring the mutex into the 'inconsistent' state
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death, &robust).join();
     CHECK(!robust.m_recover_called);
 
     // Die while recovering
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death_during_recovery, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death_during_recovery, &robust).join();
     CHECK(robust.m_recover_called);
 
     // The mutex is still in the 'inconsistent' state if another
@@ -449,22 +405,13 @@ TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
 
     // Try a double death during recovery
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death, &robust).join();
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death_during_recovery, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death_during_recovery, &robust).join();
     CHECK(robust.m_recover_called);
     robust.m_recover_called = false;
-    {
-        Thread thread(std::bind(&Robust::simulate_death_during_recovery, &robust));
-        thread.join();
-    }
+    std::thread(&Robust::simulate_death_during_recovery, &robust).join();
     CHECK(robust.m_recover_called);
     robust.m_recover_called = false;
     robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
@@ -482,14 +429,14 @@ TEST(Thread_CondVar)
     QueueMonitor queue;
     const int num_producers = 32;
     const int num_consumers = 32;
-    Thread producers[num_producers], consumers[num_consumers];
+    std::thread producers[num_producers], consumers[num_consumers];
     int consumed_counts[num_consumers][num_producers];
     memset(consumed_counts, 0, sizeof consumed_counts);
 
     for (int i = 0; i < num_producers; ++i)
-        producers[i].start(std::bind(&producer_thread, &queue, i));
+        producers[i] = std::thread(&producer_thread, &queue, i);
     for (int i = 0; i < num_consumers; ++i)
-        consumers[i].start(std::bind(&consumer_thread, &queue, &consumed_counts[i][0]));
+        consumers[i] = std::thread(&consumer_thread, &queue, &consumed_counts[i][0]);
     for (int i = 0; i < num_producers; ++i)
         producers[i].join();
     queue.close(); // Stop consumers when queue is empty
@@ -506,7 +453,6 @@ TEST(Thread_CondVar)
 
 TEST(Thread_MutexTryLock)
 {
-    Thread thread;
     Mutex base_mutex;
     std::unique_lock<Mutex> m(base_mutex, std::defer_lock);
 
@@ -529,7 +475,9 @@ TEST(Thread_MutexTryLock)
             init_done = true;
         }
         cv.notify_one();
-        while(!mutex2.try_lock()) { millisleep(1); }
+        while (!mutex2.try_lock()) {
+            millisleep(1);
+        }
         CHECK(mutex2.owns_lock());
         mutex2.unlock();
     };
@@ -538,10 +486,12 @@ TEST(Thread_MutexTryLock)
     CHECK(!m.owns_lock());
     CHECK(m.try_lock());
     CHECK(m.owns_lock());
-    thread.start(do_async);
+    std::thread thread(do_async);
     {
         std::unique_lock<std::mutex> guard(cv_lock);
-        cv.wait(guard, [&]{return init_done;});
+        cv.wait(guard, [&] {
+            return init_done;
+        });
     }
     m.unlock();
     thread.join();
@@ -554,7 +504,6 @@ TEST(Thread_RobustMutexTryLock)
     if (!RobustMutex::is_robust_on_this_platform)
         return;
 
-    Thread thread;
     RobustMutex m;
     int times_recover_function_was_called = 0;
 
@@ -578,16 +527,20 @@ TEST(Thread_RobustMutexTryLock)
             init_done = true;
         }
         control_cv.notify_one();
-        while(!m.try_lock(recover_function)) { millisleep(1); }
+        while (!m.try_lock(recover_function)) {
+            millisleep(1);
+        }
         // exit the thread with the lock held to check robustness
     };
 
     // Check basic locking across threads.
     CHECK(m.try_lock(recover_function));
-    thread.start(do_async);
+    std::thread thread(do_async);
     {
         std::unique_lock<std::mutex> lock(control_mutex);
-        control_cv.wait(lock, [&]{ return init_done; });
+        control_cv.wait(lock, [&] {
+            return init_done;
+        });
     }
     m.unlock();
     thread.join();
@@ -602,7 +555,6 @@ TEST(Thread_RobustMutexTryLock)
                // because we are going to switch to native API soon and discard win32-pthread entirely
 NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
 {
-    Thread thread;
     InterprocessMutex::SharedPart mutex_part;
 
     InterprocessMutex m;
@@ -628,16 +580,20 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
             init_done = true;
         }
         cv.notify_one();
-        while(!m2.try_lock()) { millisleep(1); }
+        while (!m2.try_lock()) {
+            millisleep(1);
+        }
         m2.unlock();
     };
 
     // Check basic locking across threads.
     CHECK(m.try_lock());
-    thread.start(do_async);
+    std::thread thread(do_async);
     {
         std::unique_lock<std::mutex> ul(cv_mutex);
-        cv.wait(ul, [&]{return init_done;});
+        cv.wait(ul, [&] {
+            return init_done;
+        });
     }
     m.unlock();
     thread.join();
@@ -689,7 +645,6 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv, std::mutex* control_mutex,
             std::condition_variable* control_cv, size_t* num_threads_holding_lock)
 {
@@ -703,7 +658,7 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv, std::mutex* contr
 
     cv->wait(*mutex, nullptr);
 }
-}
+} // namespace
 
 // Verify, that a wait on a condition variable actually waits
 // - this test relies on assumptions about scheduling, which
@@ -720,9 +675,8 @@ NONCONCURRENT_TEST(Thread_CondvarWaits)
     mutex.set_shared_part(mutex_part, path, "Thread_CondvarWaits_Mutex");
     changed.set_shared_part(condvar_part, path, "Thread_CondvarWaits_CondVar", default_options.temp_dir);
     changed.init_shared_part(condvar_part);
-    Thread signal_thread;
     signals = 0;
-    signal_thread.start(std::bind(signaller, &signals, &mutex, &changed));
+    std::thread signal_thread(signaller, &signals, &mutex, &changed);
     {
         std::lock_guard<InterprocessMutex> l(mutex);
         changed.wait(mutex, nullptr);
@@ -753,7 +707,6 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     // Must have names because default_options.temp_dir is empty string on Windows
     mutex.set_shared_part(mutex_part, path, "Thread_CondvarIsStateless_Mutex");
     changed.set_shared_part(condvar_part, path, "Thread_CondvarIsStateless_CondVar", default_options.temp_dir);
-    Thread signal_thread;
     signal_state = 1;
     // send some signals:
     {
@@ -763,7 +716,7 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     }
     // spawn a thread which will later do one more signal in order
     // to wake us up.
-    signal_thread.start(std::bind(wakeup_signaller, &signal_state, &mutex, &changed));
+    std::thread signal_thread(wakeup_signaller, &signal_state, &mutex, &changed);
     // Wait for a signal - the signals sent above should be lost, so
     // that this wait will actually wait for the thread to signal.
     {
@@ -828,14 +781,16 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     std::condition_variable control_cv;
 
     const size_t num_waiters = 10;
-    Thread waiters[num_waiters];
+    std::thread waiters[num_waiters];
     for (size_t i = 0; i < num_waiters; ++i) {
-        waiters[i].start(std::bind(waiter, &mutex, &changed, &control_mutex, &control_cv, &num_threads_holding_lock));
+        waiters[i] = std::thread(waiter, &mutex, &changed, &control_mutex, &control_cv, &num_threads_holding_lock);
     }
     {
         // allow all waiters to start and obtain the InterprocessCondVar
         std::unique_lock<std::mutex> unique_lock(control_mutex);
-        control_cv.wait(unique_lock, [&]{ return num_threads_holding_lock == num_waiters; });
+        control_cv.wait(unique_lock, [&] {
+            return num_threads_holding_lock == num_waiters;
+        });
     }
 
     mutex.lock();
@@ -887,15 +842,15 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
                     signal = true;
 
                     // A gap in wait() could be very tight, so we need a way to preemt it between two instructions.
-                    // Problem is that we have so many/frequent operating system wait calls in this that they might 
-                    // be invoked closer than a thread time slice, so preemption would never occur. So we create 
+                    // Problem is that we have so many/frequent operating system wait calls in this that they might
+                    // be invoked closer than a thread time slice, so preemption would never occur. So we create
                     // some work that some times willsome times bring the current time slice close to its end.
 
                     // Wait between 0 and number of clocks on 100 ms on a on 3 GHz machine (100 ms is Linux default
                     // time slice)
-                    uint64_t clocks_to_wait = fastrand(3ULL * 1000000000ULL / 1000000ULL * 100ULL); 
+                    uint64_t clocks_to_wait = fastrand(3ULL * 1000000000ULL / 1000000ULL * 100ULL);
 
-                    // This loop can wait alot more than 100 ms because each iteration takes many more clocks than 
+                    // This loop can wait alot more than 100 ms because each iteration takes many more clocks than
                     // just 1. That's intentional and will cover other OS'es with bigger time slices.
                     volatile int sum = 0; // must be volatile, else it compiles into no-op
                     for (uint64_t t = 0; t < clocks_to_wait; t++) {
@@ -920,7 +875,7 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
                     mutex.unlock();
                 }
             });
-            
+
             t1.join();
             t2.join();
         }));

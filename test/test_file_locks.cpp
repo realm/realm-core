@@ -156,7 +156,9 @@ TEST(File_NoSpuriousTryLockFailures)
     std::string str_path = path;
     ThreadWrapper slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
-        slaves[i].start([=] { slave(i, str_path); });
+        slaves[i].start([=] {
+            slave(i, str_path);
+        });
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
@@ -190,21 +192,21 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
     // More threads than cores will give OS time slice yields at random places which is good for randomness
     size_t num_slaves = 2 * std::thread::hardware_concurrency(); // The number includes HyperThread cores
 
-    std::atomic<size_t> lock_taken { 0 };
-    std::atomic<size_t> barrier_1 { 0 };
-    std::atomic<size_t> barrier_2 { 0 };
-    std::atomic<size_t> lock_not_taken { 0 };
+    std::atomic<size_t> lock_taken{0};
+    std::atomic<size_t> barrier_1{0};
+    std::atomic<size_t> barrier_2{0};
+    std::atomic<size_t> lock_not_taken{0};
 
     auto slave = [&](std::string path) {
         File file(path, File::mode_Write);
 
-        for(size_t t = 0; t < num_rounds; t++) {
+        for (size_t t = 0; t < num_rounds; t++) {
             lock_taken = 0;
             lock_not_taken = 0;
 
             // Thread barrier
             barrier_1++;
-            while(barrier_1 < num_slaves) {
+            while (barrier_1 < num_slaves) {
             }
 
             // All threads race for the lock
@@ -212,7 +214,7 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
 
             barrier_2 = 0;
 
-            if(owns_lock) {
+            if (owns_lock) {
                 lock_taken++;
             }
             else {
@@ -220,12 +222,12 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
             }
 
             // Thread barrier
-            while(lock_taken + lock_not_taken < num_slaves) {
+            while (lock_taken + lock_not_taken < num_slaves) {
             }
 
             CHECK_EQUAL(lock_taken.load(), size_t(1));
 
-            if(owns_lock) {
+            if (owns_lock) {
                 file.rw_unlock();
             }
 
@@ -233,7 +235,7 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
 
             // Thread barrier. After this barrier, the file is guaranteed to be unlocked regardless who owned it.
             barrier_2++;
-            while(barrier_2 < num_slaves) {
+            while (barrier_2 < num_slaves) {
             }
         }
     };
@@ -242,7 +244,9 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
     std::string str_path = path;
     ThreadWrapper slaves[100];
     for (size_t i = 0; i != num_slaves; ++i) {
-        slaves[i].start([=] { slave(str_path); });
+        slaves[i].start([=] {
+            slave(str_path);
+        });
     }
 
     for (size_t i = 0; i != num_slaves; ++i)

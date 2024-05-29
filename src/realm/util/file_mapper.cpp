@@ -128,7 +128,6 @@ int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
     return PageReclaimGovernor::no_match;
 }
 
-
 /* Default reclaim governor
  *
  */
@@ -242,13 +241,8 @@ static dispatch_queue_t reclaimer_queue;
 static void ensure_reclaimer_thread_runs()
 {
     if (!reclaimer_timer) {
-        if (__builtin_available(iOS 10, macOS 12, tvOS 10, watchOS 3, *)) {
-            reclaimer_queue = dispatch_queue_create_with_target("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL,
-                                                                dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0));
-        }
-        else {
-            reclaimer_queue = dispatch_queue_create("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL);
-        }
+        reclaimer_queue = dispatch_queue_create_with_target("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL,
+                                                            dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0));
         reclaimer_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, reclaimer_queue);
         dispatch_source_set_timer(reclaimer_timer, DISPATCH_TIME_NOW, NSEC_PER_SEC, NSEC_PER_SEC);
         dispatch_source_set_event_handler(reclaimer_timer, ^{
@@ -485,13 +479,14 @@ SharedFileInfo* get_file_info_for_file(File& file)
         return it->info.get();
 }
 
-
 namespace {
 EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes& file, size_t file_offset)
 {
     size_t fs = to_size_t(File::get_size_static(file.fd));
-    if (fs > 0 && fs < page_size())
-        throw DecryptionFailed();
+    if (fs > 0 && fs < c_min_encrypted_file_size)
+        throw DecryptionFailed(
+            util::format("file size %1 is less than the minimum encrypted file size of %2 for '%3'", fs,
+                         c_min_encrypted_file_size, file.path));
 
     LockGuard lock(mapping_mutex);
 

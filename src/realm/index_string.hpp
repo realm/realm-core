@@ -123,9 +123,7 @@ class StringIndex : public SearchIndex {
 public:
     StringIndex(const ClusterColumn& target_column, Allocator&);
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, const ClusterColumn& target_column, Allocator&);
-    ~StringIndex() noexcept
-    {
-    }
+    ~StringIndex() noexcept {}
 
     static bool type_supported(realm::DataType type)
     {
@@ -205,8 +203,7 @@ private:
     // If the header flag is set, references point to a sub-StringIndex (nesting).
     std::unique_ptr<IndexArray> m_array;
 
-    struct inner_node_tag {
-    };
+    struct inner_node_tag {};
     StringIndex(inner_node_tag, Allocator&);
     StringIndex(const ClusterColumn& target_column, std::unique_ptr<IndexArray> root)
         : SearchIndex(target_column, root.get())

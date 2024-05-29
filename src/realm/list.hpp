@@ -260,7 +260,7 @@ protected:
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
         Base::update_content_version();
-        return do_init_from_parent(m_tree.get(), 0, allow_create);
+        return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
     }
 
     template <class Func>
@@ -291,7 +291,7 @@ public:
     {
         this->set_owner(owner, col_key);
     }
-    Lst(ColKey col_key, size_t level = 1)
+    Lst(ColKey col_key, uint8_t level = 1)
         : Base(col_key)
         , CollectionParent(level)
     {
@@ -490,6 +490,10 @@ public:
     {
         return m_parent_version;
     }
+    void update_content_version() const noexcept override
+    {
+        Base::update_content_version();
+    }
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
@@ -537,6 +541,8 @@ private:
         return unresolved_to_null(m_tree->get(ndx));
     }
     bool clear_backlink(size_t ndx, CascadeState& state) const;
+    template <class T>
+    inline std::shared_ptr<T> do_get_collection(const PathElement& path_elem);
 };
 
 // Specialization of Lst<StringData>:

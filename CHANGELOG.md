@@ -1,8 +1,278 @@
 # NEXT RELEASE
 
 ### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Add a missing file from the bid library to the android blueprint. (PR [#7738](https://github.com/realm/realm-core/pull/7738))
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Work around a bug in VC++ that resulted in runtime errors when running the tests in a debug build (#[7741](https://github.com/realm/realm-core/issues/7741)).
+
+----------------------------------------------
+
+# 14.8.0 Release notes
+
+### Enhancements
+* Add vendor support to the Android Blueprint (PR [#7614](https://github.com/realm/realm-core/pull/7614)).
+
+### Fixed
+* A non-streaming progress notifier would not immediately call its callback after registration. Instead you would have to wait for a download message to be received to get your first update - if you were already caught up when you registered the notifier you could end up waiting a long time for the server to deliver a download that would call/expire your notifier ([#7627](https://github.com/realm/realm-core/issues/7627), since v14.6.0).
+* Comparing a numeric property with an argument list containing a string would throw. ([#7714](https://github.com/realm/realm-core/issues/7714), since v14.7.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* `util::Thread` no longer has any functionality other than `get_name()` and `set_name()`. Use `std::thread` instead ([PR #7696](https://github.com/realm/realm-core/pull/7696)).
+
+----------------------------------------------
+
+# 14.7.0 Release notes
+
+### Enhancements
+* Nested collections have full support for automatic client reset ([PR #7683](https://github.com/realm/realm-core/pull/7683)).
+
+### Fixed
+* Having links in a nested collections would leave the file inconsistent if the top object is removed. ([#7657](https://github.com/realm/realm-core/issues/7657), since 14.0.0)
+* Accessing App::current_user() from within a notification produced by App:switch_user() (which includes notifications for a newly logged in user) would deadlock ([#7670](https://github.com/realm/realm-core/issues/7670), since v14.6.0).
+* Inserting the same typed link to the same key in a dictionary more than once would incorrectly create multiple backlinks to the object. This did not appear to cause any crashes later, but would have affecting explicit backlink count queries (eg: `...@links.@count`) and possibly notifications ([#7676](https://github.com/realm/realm-core/issues/7676) since v14.5.2).
+* Automatic client reset recovery would crash when recovering AddInteger instructions on a Mixed property if its type was changed to non-integer ([PR #7683](https://github.com/realm/realm-core/pull/7683), since v11.16.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* (bindgen) Exposing a function `app_user_as_sync_user` to cast the opposite way as `sync_user_as_app_user`. ([PR #7684](https://github.com/realm/realm-core/pull/7684) as a follow-up to [PR #7634](https://github.com/realm/realm-core/pull/7634))
+* Protocol version bumped to 13.
+
+----------------------------------------------
+
+# 14.6.2 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fixed a bug when running a IN query on a String/Int/UUID/ObjectId property that was indexed. ([7642](https://github.com/realm/realm-core/issues/7642) since v14.6.0)
+* Fixed a bug when running a IN query on a integer property where double/float parameters were ignored. ([7642](https://github.com/realm/realm-core/issues/7642) since v14.6.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
+
+# 14.6.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fix assertion failure or wrong results when evaluating a RQL query with multiple IN conditions on the same property. Applies to non-indexed int/string/ObjectId/UUID properties, or if they were indexed and had > 100 conditions. ((RCORE-2098) [PR #7628](https://github.com/realm/realm-core/pull/7628) since v14.6.0).
+* Fixed a bug when running a IN query (or a query of the pattern `x == 1 OR x == 2 OR x == 3`) when evaluating on a string property with an empty string in the search condition. Matches with an empty string would have been evaluated as if searching for a null string instead. ([PR #7628](https://github.com/realm/realm-core/pull/7628) since v10.0.0-beta.9)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Follow on to ([PR #7300](https://github.com/realm/realm-core/pull/7300)) to allow SDKs to construct a fake user for testing SyncManager::get_user -> App::create_fake_user_for_testing ([PR #7632](https://github.com/realm/realm-core/pull/7632))
+* Fix build-apple-device.sh, broken in [#7603](https://github.com/realm/realm-core/pull/7603) ([PR #7640](https://github.com/realm/realm-core/pull/7640)).
+* Added a CAPI interface for SDKs to bring their own managed users with core's app services turned off. ([PR #7615](https://github.com/realm/realm-core/pull/7615)).
+* Bump the minimum deployment targets on Apple platforms to the minimums supported by Xcode 15 and clean up now unused availability checks. ([PR #7648](https://github.com/realm/realm-core/pull/7648)).
+* Build with -Werror on CI to ensure that new warnings don't slip in. ([PR #7646](https://github.com/realm/realm-core/pull/7646))
+
+----------------------------------------------
+
+# 14.6.0 Release notes
+
+### Enhancements
+* Add `SyncClientConfig::security_access_group` which allows specifying the access group to use for the sync metadata Realm's encryption key. Setting this is required when sharing the metadata Realm between apps on Apple platforms ([PR #7552](https://github.com/realm/realm-core/pull/7552)).
+* When connecting to multiple server apps, a unique encryption key is used for each of the metadata Realms rather than sharing one between them ([#7552](https://github.com/realm/realm-core/pull/7552)).
+* Introduce the new `SyncUser` interface which can be implemented by SDKs to use sync without the core App Services implementation (or just for greater control over user behavior in tests). ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Improve perfomance of "chained OR equality" queries for UUID/ObjectId types and RQL parsed "IN" queries on string/int/uuid/objectid types. ([.Net #3566](https://github.com/realm/realm-dotnet/issues/3566), since the introduction of these types)
+* Introducing `Query::in()` which allows SDKs to take advantage of improved performance when building equality conditions against many constants. ([PR #7582](https://github.com/realm/realm-core/pull/7582))
+
+### Fixed
+* SyncUser::all_sessions() included sessions in every state *except* for waiting for access token, which was weirdly inconsistent. It now includes all sessions. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* App::all_users() included logged out users only if they were logged out while the App instance existed. It now always includes all logged out users. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Deleting the active user left the active user unset rather than selecting another logged-in user as the active user like logging out and removing users did. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Fixed several issues around encrypted file portability (copying a "bundled" encrypted Realm from one device to another):
+  * Fixed `Assertion failed: new_size % (1ULL << m_page_shift) == 0` when opening an encrypted Realm less than 64Mb that was generated on a platform with a different page size than the current platform. ([#7322](https://github.com/realm/realm-core/issues/7322), since v13.17.1)
+  * Fixed a `DecryptionFailed` exception thrown when opening a small (<4k of data) Realm generated on a device with a page size of 4k if it was bundled and opened on a device with a larger page size (since the beginning).
+  * Fixed an issue during a subsequent open of an encrypted Realm for some rare allocation patterns when the top ref was within ~50 bytes of the end of a page. This could manifest as a DecryptionFailed exception or as an assertion: `encrypted_file_mapping.hpp:183: Assertion failed: local_ndx < m_page_state.size()`. ([#7319](https://github.com/realm/realm-core/issues/7319))
+* Non-streaming download sync progress notification is fixed for flexible sync Realms where before it was sometimes stopping to emit values right after the registration of the callback ([#7561](https://github.com/realm/realm-core/issues/7561)).
+* Schema initialization could hit an assertion failure if the sync client applied a downloaded changeset while the Realm file was in the process of being opened ([#7041](https://github.com/realm/realm-core/issues/7041), since v11.4.0).
+* Queries using query paths on Mixed values returns inconsistent results ([#7587](https://github.com/realm/realm-core/issues/7587), since v14.0.0)
+* Enabling 'cancel_waits_on_nonfatal_error' does not cancel waits during location update while offline ([#7527](https://github.com/realm/realm-core/issues/7527), since v13.26.0)
+
+### Breaking changes
+* The following things have been renamed or moved as part of moving all of the App Services functionality to the app namespace:
+  - SyncUser -> app::User. Note that there is a new, different type named SyncUser.
+  - SyncUser::identity -> app::User::user_id. The "identity" word was overloaded to mean two unrelated things, and one has been changed to user_id everywhere.
+  - SyncUserSubscriptionToken -> app::UserSubscriptionToken
+  - SyncUserProfile -> app::UserProfile
+  - App::Config -> AppConfig
+  - SyncConfig::MetadataMode -> AppConfig::MetadataMode
+  - MetadataMode::NoMetadata -> MetadataMode::InMemory
+  - SyncUser::session_for_on_disk_path() -> SyncManager::get_existing_session()
+  - SyncUser::all_sessions() -> SyncManager::get_all_sessions_for(User&)
+  - SyncManager::immediately_run_file_actions() -> App::immediately_run_file_actions()
+  - realm_sync_user_subscription_token -> realm_app_user_subscription_token ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* The `ClientAppDeallocated` error code no longer exists as this error code can no longer occur. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Some fields have moved from SyncClientConfig to AppConfig. AppConfig now has a SyncClientConfig field rather than it being passed separately to App::get_app(). ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Sync user management has been removed from SyncManager. This functionality was already additionally available on App. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* AuditConfig now has a base_file_path field which must be set by the SDK rather than inheriting it from the SyncManager. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* App::switch_user() no longer returns a user. The return value was always exactly the passed-in user and any code which needs it can just use that. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Non-streaming download progress callback no longer stops reporting values immediately after the registration (if the progress update has happened earlier), but waits for the next batch of data to start syncing to report its progress, since the previous behaviour was not useful (PR [#7561](https://github.com/realm/realm-core/issues/7561)).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* App metadata storage has been entirely rewritten in preparation for supporting sharing metadata realms between processes. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* The metadata disabled mode has been replaced with an in-memory metadata mode which performs similarly and doesn't work weirdly differently from the normal mode. The new mode is intended for testing purposes, but should be suitable for production usage if there is a scenario where metadata persistence is not needed. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* The ownership relationship between App and User has changed. User now strongly retains App and App has a weak cache of Users. This means that creating a SyncConfig or opening a Realm will keep the parent App alive, rather than things being in a broken state if the App is deallocated. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* A new CMake define `REALM_APP_SERVICES` can be used to compile out core's default implmentation of the application services. ([#7268](https://github.com/realm/realm-core/issues/7268))
+* Fix a race condition in Promise which could result in an assertion failure if it was destroyed immediately after a `get()` on the Future returned. The problematic scenario only occurred in test code and not in library code ([PR #7602](https://github.com/realm/realm-core/pull/7602)).
+* Catch2 is no longer required as a submodule if the `REALM_NO_TESTS` flag is set.
+* Sha-2 is no longer required as a submodule on Windows if linking with OpenSSL.
+* The Catch2 submodule has moved to `test/external/catch`.
+* Fix possible file corruption if using Transaction::copy_to if nested collections are present.
+* Evergreen config was udpated so most linux CI testing is done on ubuntu 22.04 on aarch64 with clang 18, upgrading from clang 11 on ubuntu 20.04 mostly on x86_64 ([PR #7475](https://github.com/realm/realm-core/pull/7475)).
+* Evergreen config was updated to move most MacOS testing to MacOS 14 on arm64 with Xcode 15.2, updating from Macos 11 on x86_64 with Xcode 13.1 ([PR #7618](https://github.com/realm/realm-core/pull/7618)).
+
+----------------------------------------------
+
+# 14.5.2 Release notes
+
+### Fixed
+* Fix compilation errors when using command-line `swift build` ([#7587](https://github.com/realm/realm-core/pull/7587), since v14.5.1).
+* Fixed crash when integrating removal of already removed dictionary key ([#7488](https://github.com/realm/realm-core/issues/7488), since v10.0.0).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* `prior_size` field in Clear instruction is being repurposed as `collection_type` (no protocol changes required)
+
+----------------------------------------------
+
+# 14.5.1 Release notes
+
+### Fixed
+* Clearing a nested collection may end with a crash ([#7556](https://github.com/realm/realm-core/issues/7556), since v14.0.0)
+* Removing nested collections in Mixed for synced realms throws realm::StaleAccessor ([#7573](https://github.com/realm/realm-core/issues/7573), since v14.0.0)
+* Add a privacy manifest to the Swift package ([Swift #8535](https://github.com/realm/realm-swift/issues/8535)).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
+# 14.5.0 Release notes
+
+### Enhancements
+* Introduce sync 'progress_estimate' parameter (value from 0.0 to 1.0) for existing sync 'ProgressNotifierCallback' api to report sync progress on current batch of upload/download until completion ([#7450](https://github.com/realm/realm-core/issues/7450))
+* Support assigning nested collections via templated API (PR [#7478](https://github.com/realm/realm-core/pull/7478))
+
+### Fixed
+* Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).
+* Fixed diverging history due to a bug in the replication code when setting default null values (embedded objects included) ([#7536](https://github.com/realm/realm-core/issues/7536)).
+* Version 19.39.33523 of MSVC would crash when compiling for arm64 in release mode ([PR #7533](https://github.com/realm/realm-core/pull/7533)).
+* Null pointer exception may be triggered when logging out and async commits callbacks not executed ([#7434](https://github.com/realm/realm-core/issues/7434), since v13.26.0)
+* Fixed building for iPhone simulators targeting deployment target 11 ([#7554](https://github.com/realm/realm-core/pull/7554)).
+
+### Breaking changes
+* Updated default base URL to be `https://services.cloud.mongodb.com` to support the new domains (was `https://realm.mongodb.com`). ([PR #7534](https://github.com/realm/realm-core/pull/7534))
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
+* Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
+* Recreating the sync metadata Realm when the encryption key changes is now done in a multi-process safe manner ([PR #7526](https://github.com/realm/realm-core/pull/7526)).
+* Added `App::default_base_url()` static accessor for SDKs to retrieve the default base URL from Core. ([PR #7534](https://github.com/realm/realm-core/pull/7534))
+* Realm2JSON tool will now correctly upgrade file to current fileformat.
+* (bindgen) Remove dependency on the `clang-format` package and rely on a binary provided by the system instead.
+* Protocol version bumped to 12 ([#7124](https://github.com/realm/realm-core/issues/7124))
+
+----------------------------------------------
+
+# 14.4.1 Release notes
+
+### Fixed
+* Fix pass a thread safe reference to init subscription callback. ([#7497](https://github.com/realm/realm-core/issues/7497), since v13.16.0)
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Update Catch2 from v3.3.2 to v3.5.3 ([PR #7297](https://github.com/realm/realm-core/pull/7509)).
+
+----------------------------------------------
+
+# 14.4.0 Release notes
+
+### Enhancements
+* Nested path included in 'OutOfBoundsø error message ([#7438](https://github.com/realm/realm-core/issues/7438))
+* Improve file compaction performance on platforms with page sizes greater than 4k (for example arm64 Apple platforms) for files less than 256 pages in size ([PR #7492](https://github.com/realm/realm-core/pull/7492)).
+
+### Fixed
+* Modifying nested collections left the accessor used to make the modification in a stale state, resulting in some unneccesary work being done when making multiple modifications via one accessor ([PR #7470](https://github.com/realm/realm-core/pull/7470), since v14.0.0).
+* Fix depth level for nested collection in debug mode, set it to the same level as release ([#7484](https://github.com/realm/realm-core/issues/7484), since v14.0.0).
+* Fix opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
+* Fix disallow Sets in ArrayMixed. ([#7502](https://github.com/realm/realm-core/pull/7502), since v14.0.0)
+
+### Breaking changes
+* Update C-API log callback signature to include the log category, and `realm_set_log_callback` to not take a `realm_log_level_e`. ([PR #7494](https://github.com/realm/realm-core/pull/7494)
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
+
+# 14.3.0 Release notes
+
+### Enhancements
 * Add support to synchronize collections embedded in Mixed properties and other collections (except sets) ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
 * Improve performance of change notifications on nested collections somewhat ([PR #7402](https://github.com/realm/realm-core/pull/7402)).
+* Improve performance of aggregate operations on Dictionaries of objects, particularly when the dictionaries are empty ([PR #7418](https://github.com/realm/realm-core/pull/7418))
+* Added Resumption delay configuration to SyncClientTimeouts. ([PR #7441](https://github.com/realm/realm-core/pull/7441))
 
 ### Fixed
 * Fixed conflict resolution bug which may result in an crash when the AddInteger instruction on Mixed properties is merged against updates to a non-integer type ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
@@ -99,7 +369,7 @@
 # 14.0.0 Release notes
 
 ### Enhancements
-* Property keypath in RQL can be substituted with value given as argument. Use '$P<i>' in query string. (Issue [#7033](https://github.com/realm/realm-core/issues/7033))
+* Property keypath in RQL can be substituted with value given as argument. Use '$K\<i\>' in query string. (Issue [#7033](https://github.com/realm/realm-core/issues/7033))
 * You can now use query substitution for the @type argument ([#7289](https://github.com/realm/realm-core/issues/7289))
 
 ### Fixed
@@ -172,7 +442,7 @@
 * Use `clonefile()` when possible in `File::copy()` on Apple platforms for faster copying. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
 
 ### Fixed
-* Fixed queries like `indexed_property == NONE {x}` which mistakenly matched on only x instead of not x. This only applies when an indexed property with equality (==, or IN) matches with `NONE` on a list of one item. If the constant list contained more than one value then it was working correctly. ([realm-js #7862](https://github.com/realm/realm-java/issues/7862), since v12.5.0) 
+* Fixed queries like `indexed_property == NONE {x}` which mistakenly matched on only x instead of not x. This only applies when an indexed property with equality (==, or IN) matches with `NONE` on a list of one item. If the constant list contained more than one value then it was working correctly. ([realm-js #7862](https://github.com/realm/realm-java/issues/7862), since v12.5.0)
 * Uploading the changesets recovered during an automatic client reset recovery may lead to 'Bad server version' errors and a new client reset. ([#7279](https://github.com/realm/realm-core/issues/7279), since v13.24.1)
 * Fixed invalid data in error reason string when registering a subscription change notification after the subscription has already failed. ([#6839](https://github.com/realm/realm-core/issues/6839), since v11.8.0)
 * Fixed crash in fulltext index using prefix search with no matches ([#7309](https://github.com/realm/realm-core/issues/7309), since v13.18.0)
@@ -181,7 +451,7 @@
 * Fixed a crash with `Assertion failed: m_initiated` during sync session startup ([#7074](https://github.com/realm/realm-core/issues/7074), since v10.0.0).
 * Fixed a TSAN violation where the user thread could race to read `m_finalized` with the sync event loop ([#6844](https://github.com/realm/realm-core/issues/6844), since v13.15.1)
 * Fix a minor race condition when backing up Realm files before a client reset which could have lead to overwriting an existing file. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
- 
+
 ### Breaking changes
 * SyncManager no longer supports reconfiguring after calling reset_for_testing(). SyncManager::configure() has been folded into the constructor, and reset_for_testing() has been renamed to tear_down_for_testing(). ([PR #7351](https://github.com/realm/realm-core/pull/7351))
 
@@ -2988,7 +3258,6 @@
 * Added `TableView::update_query()`
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix race potentially allowing frozen transactions to access incomplete search index accessors. (Since v6)
 * Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
 * Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)

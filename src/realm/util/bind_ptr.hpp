@@ -34,8 +34,7 @@ namespace util {
 
 class bind_ptr_base {
 public:
-    struct adopt_tag {
-    };
+    struct adopt_tag {};
 };
 
 
@@ -234,8 +233,7 @@ public:
     }
 
 protected:
-    struct casting_move_tag {
-    };
+    struct casting_move_tag {};
     template <class U>
     bind_ptr(bind_ptr<U>* p, casting_move_tag) noexcept
         : m_ptr(static_cast<T*>(p->release()))

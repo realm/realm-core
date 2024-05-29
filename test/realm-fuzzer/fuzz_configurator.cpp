@@ -38,10 +38,12 @@ void FuzzConfigurator::setup_realm_config()
     m_config.scheduler = realm::util::Scheduler::make_dummy();
     if (m_use_encryption) {
         const char* key = m_fuzzer.get_encryption_key();
-        const char* i = key;
-        while (*i != '\0') {
-            m_config.encryption_key.push_back(*i);
-            i++;
+        if (key) {
+            const char* i = key;
+            while (*i != '\0') {
+                m_config.encryption_key.push_back(*i);
+                i++;
+            }
         }
     }
 }

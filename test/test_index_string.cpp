@@ -1519,12 +1519,33 @@ TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
 
-    const char* strings[] = {
-        "john", "John", "jOhn", "JOhn", "joHn", "JoHn", "jOHn", "JOHn", "johN", "JohN", "jOhN", "JOhN", "joHN", "JoHN", "jOHN", "JOHN", "john" /* yes, an extra to test the "bucket" case as well */,
-        "hans", "Hansapark", "george", "billion dollar startup",
-        "abcde", "abcdE", "Abcde", "AbcdE",
-        "common", "common"
-    };
+    const char* strings[] = {"john",
+                             "John",
+                             "jOhn",
+                             "JOhn",
+                             "joHn",
+                             "JoHn",
+                             "jOHn",
+                             "JOHn",
+                             "johN",
+                             "JohN",
+                             "jOhN",
+                             "JOhN",
+                             "joHN",
+                             "JoHN",
+                             "jOHN",
+                             "JOHN",
+                             "john" /* yes, an extra to test the "bucket" case as well */,
+                             "hans",
+                             "Hansapark",
+                             "george",
+                             "billion dollar startup",
+                             "abcde",
+                             "abcdE",
+                             "Abcde",
+                             "AbcdE",
+                             "common",
+                             "common"};
 
     for (const char* string : strings) {
         col.add(string);
@@ -1558,7 +1579,6 @@ TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_
         for (size_t i = 0; i < results.size(); ++i) {
             auto upper_result = case_map(col.get(results[i]), true);
             CHECK_EQUAL(upper_result, upper_needle);
-
         }
         check_result_order(results, test_context);
         results.clear();
@@ -1681,7 +1701,8 @@ TEST_TYPES(StringIndex_45, string_column, nullable_string_column, enum_column, n
 
 namespace {
 
-std::string create_random_a_string(size_t max_len) {
+std::string create_random_a_string(size_t max_len)
+{
     std::string s;
     size_t len = size_t(fastrand(max_len));
     for (size_t p = 0; p < len; p++) {
@@ -1690,7 +1711,7 @@ std::string create_random_a_string(size_t max_len) {
     return s;
 }
 
-}
+} // namespace
 
 
 // Excluded when run with valgrind because it takes a long time

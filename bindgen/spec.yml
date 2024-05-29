@@ -20,6 +20,7 @@ headers:
   - "realm/object-store/sync/sync_manager.hpp"
   - "realm/object-store/sync/sync_session.hpp"
   - "realm/object-store/sync/sync_user.hpp"
+  - "realm/object-store/sync/app_user.hpp"
   - "realm/object-store/sync/mongo_collection.hpp"
   - "realm/util/bson/bson.hpp"
 
@@ -35,6 +36,7 @@ primitives:
   - void
   - std::string
   - std::string_view
+  - std::chrono::milliseconds
   # TODO: see if we need nullable versions of these. For now null buffers are treated as empty.
   - StringData
   - OwnedBinaryData
@@ -226,11 +228,11 @@ enums:
       - RecoverOrDiscard
 
   MetadataMode:
-    cppName: SyncClientConfig::MetadataMode
+    cppName: app::AppConfig::MetadataMode
     values:
       - NoEncryption
       - Encryption
-      - NoMetadata
+      - InMemory
 
   LoggerLevel:
     cppName: util::Logger::Level
@@ -286,6 +288,12 @@ enums:
       - DeleteRealm
       - ClientReset
       - ClientResetNoRecovery
+
+  SyncFileAction:
+    cppName: SyncFileAction
+    values:
+      - DeleteRealm
+      - BackUpThenDeleteRealm
 
   ProgressDirection:
     cppName: SyncSession::ProgressDirection
@@ -450,7 +458,7 @@ records:
         default: false
 
   UserIdentity:
-    cppName: SyncUserIdentity
+    cppName: app::UserIdentity
     fields:
       id:
         type: std::string
@@ -553,6 +561,22 @@ records:
       before_notify: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>'
       schema_did_change: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>' # new schema available as r.schema
 
+  ResumptionDelayInfo:
+    cppName: sync::ResumptionDelayInfo
+    fields:
+      max_resumption_delay_interval:
+        type: std::chrono::milliseconds
+        default: 3000000
+      resumption_delay_interval:
+        type: std::chrono::milliseconds
+        default: 1000
+      resumption_delay_backoff_multiplier:
+        type: int
+        default: 2
+      delay_jitter_divisor:
+        type: int
+        default: 4
+
   SyncClientTimeouts:
     fields:
       connect_timeout:
@@ -570,14 +594,12 @@ records:
       fast_reconnect_limit:
         type: uint64_t
         default: 60000
+      reconnect_backoff_info:
+        type: ResumptionDelayInfo
+        default: {}
 
   SyncClientConfig:
     fields:
-      base_file_path: std::string
-      metadata_mode:
-        type: MetadataMode
-        default: MetadataMode::Encryption
-      custom_encryption_key: std::optional<EncryptionKey>
       logger_factory: Nullable<LoggerFactory>
       log_level:
         type: LoggerLevel
@@ -636,7 +658,7 @@ records:
       body: std::string
 
   DeviceInfo:
-    cppName: app::App::Config::DeviceInfo
+    cppName: app::AppConfig::DeviceInfo
     fields:
       platform_version: std::string
       sdk_version: std::string
@@ -648,13 +670,22 @@ records:
       bundle_id: std::string
 
   AppConfig:
-    cppName: app::App::Config
+    cppName: app::AppConfig
     fields:
       app_id: std::string
       transport: SharedGenericNetworkTransport
       base_url: std::optional<std::string>
       default_request_timeout_ms: std::optional<uint64_t>
       device_info: DeviceInfo
+      base_file_path: std::string
+      sync_client_config: SyncClientConfig
+      metadata_mode:
+        type: MetadataMode
+        default: MetadataMode::Encryption
+      custom_encryption_key: std::optional<EncryptionKey>
+      security_access_group:
+        type: std::string
+        default: ""
 
   CompensatingWriteErrorInfo:
    cppName: sync::CompensatingWriteErrorInfo
@@ -708,6 +739,8 @@ classes:
       # TODO: Consider making preverify_ok a bool.
       make_ssl_verify_callback: '(callback: (server_address: const std::string&, server_port: int, pem_data: std::string_view, preverify_ok: int, depth: int) off_thread -> bool) -> SSLVerifyCallback'
       needs_file_format_upgrade: '(config: const RealmConfig&) -> bool'
+      sync_user_as_app_user: '(sync_user: Nullable<std::shared_ptr<SyncUser>>) -> Nullable<std::shared_ptr<User>>'
+      app_user_as_sync_user: '(sync_user: Nullable<std::shared_ptr<User>>) -> Nullable<std::shared_ptr<SyncUser>>'
 
   LogCategoryRef:
     cppName: util::LogCategoryRef
@@ -725,7 +758,7 @@ classes:
     properties:
       get_default_logger: SharedLogger
     staticMethods:
-      set_default_logger: '(logger: SharedLogger)'
+      set_default_logger: '(logger: Nullable<SharedLogger>)'
 
   ConstTableRef:
     needsDeref: true
@@ -1170,36 +1203,47 @@ classes:
       provider: AuthProvider
       provider_as_string: std::string
 
-  SyncUserSubscriptionToken:
-    cppName: SyncUser::Token
+  UserSubscriptionToken:
+    cppName: app::User::Token
 
   SyncUser:
+    cppName: SyncUser
     sharedPtrWrapped: SharedSyncUser
     properties:
-      all_sessions: std::vector<SharedSyncSession>
       is_logged_in: bool
-      identity: const std::string&
-      provider_type: const std::string&
-      local_identity: const std::string&
+
+  User:
+    cppName: app::User
+    sharedPtrWrapped: SharedUser
+    properties:
+      user_id: std::string
+      app_id: std::string
+      legacy_identities: std::vector<std::string>
       access_token: std::string
       refresh_token: std::string
+      state: SyncUserState
+      is_anonymous: bool
       device_id: std::string
       has_device_id: bool
       user_profile: UserProfile
       identities: std::vector<UserIdentity>
       custom_data: std::optional<bson::BsonDocument>
-      sync_manager: SharedSyncManager
-      state: SyncUserState
       subscribers_count: count_t
+      app: SharedApp
     methods:
       log_out: ()
-      session_for_on_disk_path: '(path: StringData) -> Nullable<SharedSyncSession>'
-      subscribe: '(observer: (user: IgnoreArgument<const SyncUser&>)) -> SyncUserSubscriptionToken'
-      unsubscribe: '(token: SyncUserSubscriptionToken)'
-      # TODO update methods?
+      subscribe: '(observer: (user: IgnoreArgument<const User&>)) -> UserSubscriptionToken'
+      unsubscribe: '(token: UserSubscriptionToken)'
+      path_for_realm: '(config: SyncConfig&, custom_file_name: std::optional<std::string>&) -> std::string'
+      access_token_refresh_required: '() -> bool'
+# #      request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      track_realm: '(path: std::string_view)'
+      create_file_action: '(action: SyncFileAction, original_path: std::string_view, requested_recovery_dir: std::optional<std::string>, partition_value: std::string_view) -> std::string'
 
   UserProfile:
-    cppName: SyncUserProfile
+    cppName: app::UserProfile
     methods:
       name: '() -> std::optional<std::string>'
       email: '() -> std::optional<std::string>'
@@ -1220,27 +1264,27 @@ classes:
     sharedPtrWrapped: SharedApp
     properties:
       config: const AppConfig&
-      current_user: Nullable<SharedSyncUser>
-      all_users: std::vector<SharedSyncUser>
+      current_user: Nullable<SharedUser>
+      all_users: std::vector<SharedUser>
       sync_manager: SharedSyncManager
       subscribers_count: count_t
     staticMethods:
-      get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
+      get_app: '(mode: AppCacheMode, config: const AppConfig&) -> SharedApp'
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
       clear_cached_apps: ()
       close_all_sync_sessions: ()
 
     methods:
-      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: std::optional<AppError>)>&&)'
+      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedUser>&, err: std::optional<AppError>)>&&)'
       log_out:
         - '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-        - sig: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+        - sig: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
           suffix: user
-      refresh_custom_data: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      link_user: '(user: SharedSyncUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: std::optional<AppError>)>&&)'
-      switch_user: '(user: SharedSyncUser)'
-      remove_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      delete_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      refresh_custom_data: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      link_user: '(user: SharedUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedUser>&, err: std::optional<AppError>)>&&)'
+      switch_user: '(user: SharedUser)'
+      remove_user: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      delete_user: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       usernamePasswordProviderClient:
         - sig: () -> UsernamePasswordProviderClient
           cppName: provider_client<app::App::UsernamePasswordProviderClient>
@@ -1250,10 +1294,11 @@ classes:
       push_notification_client: '(service_name: const std::string&) -> PushClient'
       subscribe: '(observer: (app: IgnoreArgument<const App&>)) -> AppSubscriptionToken'
       unsubscribe: '(token: AppSubscriptionToken)'
-      call_function: '(user: const SharedSyncUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
-      make_streaming_request: '(user: SharedSyncUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
-      update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      call_function: '(user: const SharedUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
+      make_streaming_request: '(user: SharedUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
+      update_base_url: '(base_url: std::string_view, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       get_base_url: '() const -> std::string'
+      immediately_run_file_actions: '(realm_path: std::string) -> bool'
 
   WatchStream:
     cppName: app::WatchStream
@@ -1268,8 +1313,8 @@ classes:
   PushClient:
     cppName: app::PushClient
     methods:
-      register_device: '(registration_token: const std::string&, sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      deregister_device: '(sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      register_device: '(registration_token: const std::string&, sync_user: const SharedUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      deregister_device: '(sync_user: const SharedUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   UsernamePasswordProviderClient:
     cppName: app::App::UsernamePasswordProviderClient
@@ -1285,12 +1330,12 @@ classes:
   UserAPIKeyProviderClient:
     cppName: app::App::UserAPIKeyProviderClient
     methods:
-      create_api_key: '(name: const std::string&, user: SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
-      fetch_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
-      fetch_api_keys: '(user: const SharedSyncUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: std::optional<AppError>)>&&)'
-      delete_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      enable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      disable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      create_api_key: '(name: const std::string&, user: SharedUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_keys: '(user: const SharedUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: std::optional<AppError>)>&&)'
+      delete_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      enable_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      disable_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   # See Helpers::make_loger_factory to construct one.
   # Using an opaque class here rather than exposing the factory to avoid having to
@@ -1307,7 +1352,6 @@ classes:
       log_level: LoggerLevel
       has_existing_sessions: bool
     methods:
-      immediately_run_file_actions: '(original_name: std::string) -> bool'
       set_session_multiplexing: '(allowed: bool)'
       set_log_level: '(level: LoggerLevel)'
       set_logger_factory: '(factory: LoggerFactory)'
@@ -1315,8 +1359,8 @@ classes:
       set_timeouts: '(timeouts: SyncClientTimeouts)'
       reconnect: ()
       wait_for_sessions_to_terminate: ()
-      path_for_realm: '(config: SyncConfig, custom_file_name: std::optional<std::string>) -> StringData'
-      get_existing_active_session: '(path: const std::string&) -> SharedSyncSession'
+      get_existing_active_session: '(path: const std::string&) -> Nullable<SharedSyncSession>'
+      get_all_sessions_for: '(user: const User&) -> std::vector<SharedSyncSession>'
 
   ThreadSafeReference: {}
   AsyncOpenTask:
@@ -1324,7 +1368,7 @@ classes:
     methods:
       start: '(callback: AsyncCallback<(realm: Nullable<ThreadSafeReference>, error: Nullable<std::exception_ptr>) off_thread>)'
       cancel: ()
-      register_download_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t) off_thread) -> uint64_t'
+      register_download_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t, progress_estimate: double) off_thread) -> uint64_t'
       unregister_download_progress_notifier: '(token: uint64_t)'
 
   SyncSession:
@@ -1335,11 +1379,11 @@ classes:
       path: std::string
       user: SharedSyncUser
       config: SyncConfig
-      full_realm_url: std::optional<std::string>
+      full_realm_url: std::string
     methods:
       wait_for_upload_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
       wait_for_download_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
-      register_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t) off_thread, direction: ProgressDirection, is_streaming: bool) -> uint64_t'
+      register_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t, progress_estimate: double) off_thread, direction: ProgressDirection, is_streaming: bool) -> uint64_t'
       unregister_progress_notifier: '(token: uint64_t)'
       register_connection_change_callback: '(callback: (old_state: SyncSessionConnectionState, new_state: SyncSessionConnectionState) off_thread) -> uint64_t'
       unregister_connection_change_callback: '(token: uint64_t)'

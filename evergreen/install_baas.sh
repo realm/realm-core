@@ -107,6 +107,19 @@ function setup_baas_dependencies() {
                 DISTRO_NAME="$(. /etc/os-release ; echo "${ID}")"
                 DISTRO_VERSION="$(. /etc/os-release ; echo "${VERSION_ID}")"
                 DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}")"
+                if [[ "${DISTRO_NAME}" == "linuxmint" ]]; then
+                    CODENAME="$(. /etc/os-release ; echo "${UBUNTU_CODENAME}")"
+                    case "${CODENAME}" in
+                        bionic) DISTRO_VERSION_MAJOR=18;;
+                        focal) DISTRO_VERSION_MAJOR=20;;
+                        jammy) DISTRO_VERSION_MAJOR=22;;
+                        # noble) DISTRO_VERSION_MAJOR=24;;
+                        *)
+                            echo "Error: unsupported version of linuxmint ${DISTRO_VERSION}"
+                            exit 1
+                        ;;
+                    esac
+                fi
             elif [[ -e /etc/redhat-release ]]; then
                 # /etc/redhat-release covers RHEL
                 DISTRO_NAME=rhel

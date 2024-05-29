@@ -169,20 +169,15 @@ private:
  * function pointers. We don't currently support r-value-qualified call operators.
  */
 template <typename>
-struct UFDeductionHelper {
-};
+struct UFDeductionHelper {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...)> : TypeIdentity<Ret(Args...)> {
-};
+struct UFDeductionHelper<Ret (Class::*)(Args...)> : TypeIdentity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...)&> : TypeIdentity<Ret(Args...)> {
-};
+struct UFDeductionHelper<Ret (Class::*)(Args...)&> : TypeIdentity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...) const> : TypeIdentity<Ret(Args...)> {
-};
+struct UFDeductionHelper<Ret (Class::*)(Args...) const> : TypeIdentity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : TypeIdentity<Ret(Args...)> {
-};
+struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : TypeIdentity<Ret(Args...)> {};
 
 /**
  * Deduction guides for UniqueFunction<Sig> that pluck the signature off of function pointers and

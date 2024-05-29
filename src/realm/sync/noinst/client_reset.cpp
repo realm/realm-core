@@ -616,8 +616,8 @@ bool perform_client_reset_diff(DB& db_local, DB& db_remote, sync::SaltedFileIden
 
     // now that the state of the fresh and local Realms are identical,
     // reset the local sync history and steal the fresh Realm's ident
-    history_local.set_client_reset_adjustments(logger, wt_local->get_version(), client_file_ident,
-                                               fresh_server_version, recovered);
+    history_local.set_history_adjustments(logger, wt_local->get_version(), client_file_ident, fresh_server_version,
+                                          recovered);
 
     int64_t subscription_version = 0;
     if (sub_store) {

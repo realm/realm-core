@@ -810,13 +810,8 @@ Query Results::do_get_query() const
             return Query(m_table, std::make_unique<TableView>(m_table_view));
         }
         case Mode::Collection:
-            if (auto list = dynamic_cast<ObjList*>(m_collection.get())) {
-                return m_table->where(*list);
-            }
-            if (auto dict = dynamic_cast<Dictionary*>(m_collection.get())) {
-                if (dict->get_value_data_type() == type_Link) {
-                    return m_table->where(*dict);
-                }
+            if (auto objlist = m_collection->clone_as_obj_list()) {
+                return m_table->where(std::move(objlist));
             }
             return m_query;
         case Mode::Table:

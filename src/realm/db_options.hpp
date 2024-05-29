@@ -88,6 +88,9 @@ struct DBOptions {
     /// Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change = true;
 
+    /// Disable creating new files if the DB to open does not already exist.
+    bool no_create = false;
+
     /// List of versions we can upgrade from
     BackupHandler::VersionList accepted_versions = BackupHandler::accepted_versions_;
 
@@ -98,6 +101,10 @@ struct DBOptions {
     /// this will make *all* writes async and then wait on the result, which has
     /// a performance impact.
     bool enable_async_writes = false;
+
+    /// If set, opening a file which is not a Realm file or cannot be decrypted
+    /// will clear and reinitialize the file.
+    bool clear_on_invalid_file = false;
 
     /// sys_tmp_dir will be used if the temp_dir is empty when creating DBOptions.
     /// It must be writable and allowed to create pipe/fifo file on it.
