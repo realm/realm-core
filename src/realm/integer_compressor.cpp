@@ -130,10 +130,8 @@ bool IntegerCompressor::decompress(Array& arr) const
             }
             return res;
         }
-        // in flex format this is faster.
         min_v = FlexCompressor::min(*this);
         max_v = FlexCompressor::max(*this);
-
         return FlexCompressor::get_all(*this, 0, sz);
     };
     const auto& values = values_fetcher();
@@ -290,10 +288,11 @@ int64_t IntegerCompressor::get(size_t ndx) const
 void IntegerCompressor::compress_values(const Array& arr, std::vector<int64_t>& values,
                                         std::vector<unsigned>& indices) const
 {
-    // The main idea is to encode the values in flex format. If Packed is better it will chosen by
-    // ArrayEncode::encode. The algorithm is O(n lg n), it gives us nice properties, but we could use an efficient
-    // hash table and try to boost perf during insertion. The two formats are represented as following, the array is
-    // mutated in either of these 2 formats:
+    // The main idea is to compress the values in flex format. If Packed is better it will be chosen by
+    // IntegerCompressor::compress. The algorithm is O(n lg n), it gives us nice properties, but we could use an
+    // efficient hash table and try to boost perf during insertion, although leaf arrays are relatively small in
+    // general (256 entries). The two compresion formats are packed and flex, and the data in the array is re-arranged
+    // in the following ways (if compressed):
     //  Packed: || node header || ..... values ..... ||
     //  Flex:   || node header || ..... values ..... || ..... indices ..... ||
 
