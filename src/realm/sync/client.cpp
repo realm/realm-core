@@ -1983,41 +1983,43 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    auto pending_reset = PendingResetStore::has_pending_reset(m_db->start_frozen());
-    if (!pending_reset) {
+    auto has_pending_reset = PendingResetStore::has_pending_reset(m_db->start_frozen());
+    if (!has_pending_reset) {
         return; // nothing to do
     }
 
-    m_sess->logger.info(util::LogCategory::reset, "Tracking %1", pending_reset);
+    m_sess->logger.info(util::LogCategory::reset, "Tracking %1", *has_pending_reset);
 
     // Now that the client reset merge is complete, wait for the changes to synchronize with the server
-    async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset](Status status) {
-        if (status == ErrorCodes::OperationAborted) {
-            return;
-        }
-        auto& logger = self->m_sess->logger;
-        if (!status.is_ok()) {
-            logger.error(util::LogCategory::reset, "Error while tracking client reset acknowledgement: %1", status);
-            return;
-        }
+    async_wait_for(
+        true, true, [self = util::bind_ptr(this), pending_reset = std::move(*has_pending_reset)](Status status) {
+            if (status == ErrorCodes::OperationAborted) {
+                return;
+            }
+            auto& logger = self->m_sess->logger;
+            if (!status.is_ok()) {
+                logger.error(util::LogCategory::reset, "Error while tracking client reset acknowledgement: %1",
+                             status);
+                return;
+            }
 
-        logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
+            logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
 
-        auto tr = self->m_db->start_write();
-        auto cur_pending_reset = PendingResetStore::has_pending_reset(tr);
-        if (!cur_pending_reset) {
-            logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
-            return;
-        }
-        if (*cur_pending_reset == pending_reset) {
-            logger.debug(util::LogCategory::reset, "Removing client reset cycle detection tracker.");
-        }
-        else {
-            logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
-        }
-        PendingResetStore::clear_pending_reset(tr);
-        tr->commit();
-    });
+            auto tr = self->m_db->start_write();
+            auto cur_pending_reset = PendingResetStore::has_pending_reset(tr);
+            if (!cur_pending_reset) {
+                logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
+                return;
+            }
+            if (*cur_pending_reset == pending_reset) {
+                logger.debug(util::LogCategory::reset, "Removing client reset cycle detection tracker.");
+            }
+            else {
+                logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
+            }
+            PendingResetStore::clear_pending_reset(tr);
+            tr->commit();
+        });
 }
 
 void SessionWrapper::update_subscription_version_info()
