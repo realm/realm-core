@@ -88,7 +88,7 @@ functions:
               set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh "${cxx_compiler}")
           fi
 
-          if [ -z "${disable_tests_against_baas|}" && -z "${no_tests|}" ]; then
+          if [[ -z "${disable_tests_against_baas|}" && -z "${no_tests|}" ]]; then
               scheme="http"
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               if [ -n "${baas_admin_port|}" ]; then
@@ -165,7 +165,7 @@ functions:
             set_cmake_var realm_vars CMAKE_GENERATOR_PLATFORM STRING "${cmake_generator_platform}"
           fi
 
-          if [ -n "${curl_base|}" && -z "${no_tests|}" ]; then
+          if [[ -n "${curl_base|}" && -z "${no_tests|}" ]]; then
               set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
               set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
               set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/curl-ca-bundle.crt")"
