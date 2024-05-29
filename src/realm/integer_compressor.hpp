@@ -24,6 +24,7 @@
 #include <vector>
 #include <realm/query_conditions.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/node.hpp>
 
 namespace realm {
 

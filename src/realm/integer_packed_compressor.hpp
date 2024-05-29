@@ -82,16 +82,15 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     UnalignedWordIter unaligned_data_iterator(data, starting_bit);
     auto cnt_bits = starting_bit;
     while (cnt_bits + bit_per_it < total_bits) {
-        auto word = unaligned_data_iterator.get(bit_per_it);
+        auto word = unaligned_data_iterator.consume(bit_per_it);
         for (int i = 0; i < values_per_word; ++i) {
             res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
             word >>= v_w;
         }
         cnt_bits += bit_per_it;
-        unaligned_data_iterator.bump(bit_per_it);
     }
     if (cnt_bits < total_bits) {
-        auto last_word = unaligned_data_iterator.get(static_cast<unsigned>(total_bits - cnt_bits));
+        auto last_word = unaligned_data_iterator.consume(static_cast<unsigned>(total_bits - cnt_bits));
         while (cnt_bits < total_bits) {
             res.push_back(sign_extend_field_by_mask(sign_mask, last_word & mask));
             cnt_bits += v_w;
@@ -172,26 +171,12 @@ inline bool PackedCompressor::find_parallel(const Array& arr, int64_t value, siz
     // see if there is a match with what we are looking for. Reducing the number of comparison by ~logk(N) where K is
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
 
-    // apparently the compiler is not able to deduce the type of a global function after moving stuff in the header
-    // (no so sure why)
-    static auto vector_compare = [](uint64_t MSBs, uint64_t a, uint64_t b) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return find_all_fields_EQ(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, NotEqual>)
-            return find_all_fields_NE(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Greater>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    };
-
     const auto data = (const uint64_t*)arr.m_data;
     const auto width = arr.m_width;
     const auto MSBs = arr.integer_compressor().msb();
     const auto search_vector = populate(arr.m_width, value);
     while (start < end) {
-        start = parallel_subword_find(vector_compare, data, 0, width, MSBs, search_vector, start, end);
+        start = parallel_subword_find(find_all_fields<Cond>, data, 0, width, MSBs, search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
