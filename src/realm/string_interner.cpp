@@ -97,8 +97,8 @@ struct HashMapIter {
     }
 };
 
-// Build a hash leaf from a smaller hash leaf or a non-hash leaf.
-static void rehash(Array& from, Array& to, uint8_t hash_size)
+// Attempt to build a hash leaf from a smaller hash leaf or a non-hash leaf.
+static bool rehash(Array& from, Array& to, uint8_t hash_size)
 {
     REALM_ASSERT_DEBUG(from.size() * 2 == to.size());
 
@@ -112,10 +112,14 @@ static void rehash(Array& from, Array& to, uint8_t hash_size)
         while (it.is_valid() && !it.empty()) {
             ++it;
         }
-        REALM_ASSERT(it.is_valid());
+        if (!it.is_valid()) {
+            // abort rehashing, we need a larger to-space
+            return false;
+        }
         REALM_ASSERT(it.empty());
         it.set(entry);
     }
+    return true;
 }
 
 // Add a binding from hash value to id.
@@ -156,13 +160,19 @@ static void add_to_hash_map(Array& node, uint64_t hash, uint64_t id, uint8_t has
             }
             if (node.size() >= hash_node_max_size)
                 break;
-            // No free spot found - rehash into twice as big hash table
-            auto new_size = 2 * node.size();
+            // No free spot found - rehash into bigger and bigger tables
+            auto new_size = node.size();
+            bool need_to_rehash = true;
             Array new_node(node.get_alloc());
-            new_node.create(NodeHeader::type_Normal, false, new_size, 0);
+            while (need_to_rehash && new_size < hash_node_max_size) {
+                new_size *= 2;
+                new_node.create(NodeHeader::type_Normal, false, new_size, 0);
+                need_to_rehash = !rehash(node, new_node, hash_size);
+                if (need_to_rehash) // we failed, try again - or shift to radix
+                    new_node.destroy();
+            }
             new_node.set_parent(node.get_parent(), node.get_ndx_in_parent());
             new_node.update_parent();
-            rehash(node, new_node, hash_size);
             node.destroy();
             node.init_from_parent();
         }
