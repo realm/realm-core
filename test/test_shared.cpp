@@ -2275,6 +2275,13 @@ TEST(Shared_MaxStrings)
     ColKey ck = t->add_column(type_String, "MyStrings");
     std::string str_a(16 * 1024 * 1024 - 257, 'a');
     std::string str_b(16 * 1024 * 1024 - 257, 'b');
+    // make it harder to compress:
+    for (auto& e : str_a) {
+        e = std::rand() % 256;
+    }
+    for (auto& e : str_b) {
+        e = std::rand() % 256;
+    }
     auto o = t->create_object();
     o.set(ck, str_a);
     trans->commit_and_continue_as_read();

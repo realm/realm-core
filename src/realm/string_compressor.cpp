@@ -139,7 +139,8 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
     while (i < limit) {
         result[i++] = 0xFF & *d++;
     }
-    // iteratively compress array of symbols. Each run compresses pairs into single symbols
+    // iteratively compress array of symbols. Each run compresses pairs into single symbols.
+    // 6 runs give a max compression of 64x - on average it will be much less :-)
     constexpr int run_limit = 6;
     CompressionSymbol* to;
     for (int run = 0; run < run_limit; ++run) {
@@ -158,6 +159,8 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
                 else {
                     // some other symbol is defined here, we can't compress
                     *to++ = *from++;
+                    // In a normal hash table we'd have buckets and add a translation
+                    // to a bucket. This is slower generally, but yields better compression.
                 }
             }
             else {
