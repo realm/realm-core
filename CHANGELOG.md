@@ -6,6 +6,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Add a missing file from the bid library to the android blueprint. (PR [#7738](https://github.com/realm/realm-core/pull/7738))
+* After compacting, a file upgrade would be triggered. This could cause loss of data if schema mode is SoftResetFile ([#7747](https://github.com/realm/realm-core/issues/7747), since 14.0.0)
 
 ### Breaking changes
 * None.
