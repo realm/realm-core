@@ -385,8 +385,9 @@ TestAppSession::TestAppSession(AppSession session, Config config, DeleteApp dele
     m_app->sync_manager()->get_sync_client();
     // If no user creds are supplied, then create the user and log in
     if (!m_config.user_creds) {
-        auto creds_user = create_user_and_log_in();
-        m_config.user_creds = creds_user.first;
+        auto result = create_user_and_log_in();
+        REALM_ASSERT(result.is_ok());
+        m_config.user_creds = result.get_value();
     }
     // If creds are supplied, it is up to the caller to log in separately
 }
@@ -413,31 +414,35 @@ TestAppSession::~TestAppSession()
     }
 }
 
-std::pair<realm::app::AppCredentials, std::shared_ptr<realm::SyncUser>> TestAppSession::create_user_and_log_in()
+StatusWith<realm::app::AppCredentials> TestAppSession::create_user_and_log_in()
 {
     REALM_ASSERT(m_app);
     AutoVerifiedEmailCredentials creds;
-    auto pf = util::make_promise_future<std::shared_ptr<realm::SyncUser>>();
+    auto pf = util::make_promise_future<void>();
     m_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
         creds.email, creds.password,
-        [this, &creds,
-         promise = util::CopyablePromiseHolder<std::shared_ptr<realm::SyncUser>>(std::move(pf.promise))](
+        [this, &creds, promise = util::CopyablePromiseHolder<void>(std::move(pf.promise))](
             util::Optional<app::AppError> error) mutable {
             if (error) {
                 promise.get_promise().set_error(error->to_status());
                 return;
             }
-            promise.get_promise().emplace_value(log_in_user(creds));
+            auto result = log_in_user(creds);
+            if (!result.is_ok()) {
+                promise.get_promise().set_error(result.get_status());
+                return;
+            }
+            promise.get_promise().emplace_value();
         });
     auto result = pf.future.get_no_throw();
     if (!result.is_ok()) {
-        throw RuntimeError(result.get_status().code(),
-                           util::format("Failed to create user: %1", result.get_status()));
+        return result;
     }
-    return std::make_pair(creds, result.get_value());
+    return creds;
 }
 
-std::shared_ptr<realm::SyncUser> TestAppSession::log_in_user(std::optional<realm::app::AppCredentials> user_creds)
+StatusWith<std::shared_ptr<realm::SyncUser>>
+TestAppSession::log_in_user(std::optional<realm::app::AppCredentials> user_creds)
 {
     REALM_ASSERT(m_app);
     REALM_ASSERT((user_creds || m_config.user_creds));
@@ -451,11 +456,7 @@ std::shared_ptr<realm::SyncUser> TestAppSession::log_in_user(std::optional<realm
             }
             promise.get_promise().emplace_value(user);
         });
-    auto result = pf.future.get_no_throw();
-    if (!result.is_ok()) {
-        throw RuntimeError(result.get_status().code(), util::format("Failed to log in: %1", result.get_status()));
-    }
-    return result.get_value();
+    return pf.future.get_no_throw();
 }
 
 std::vector<bson::BsonDocument> TestAppSession::get_documents(app::User& user, const std::string& object_type,

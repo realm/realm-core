@@ -143,7 +143,6 @@ void subscribe_to_all_and_bootstrap(Realm& realm);
 
 #if REALM_APP_SERVICES
 struct AutoVerifiedEmailCredentials : app::AppCredentials {
-    // Prefix can be set to a custom string for the test (e.g. client_app_id)
     AutoVerifiedEmailCredentials();
     std::string email;
     std::string password;

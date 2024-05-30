@@ -326,8 +326,8 @@ public:
     struct Config {
         Config(std::shared_ptr<realm::app::GenericNetworkTransport> transport = nullptr,
                realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal,
-               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr,
-               bool delete_storage = false, std::optional<std::string_view> storage_path = std::nullopt);
+               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr, bool delete_storage = true,
+               std::optional<std::string_view> storage_path = std::nullopt);
         std::optional<realm::app::AppCredentials> user_creds;
         std::optional<std::string> storage_path;
         bool delete_storage = true;
@@ -344,9 +344,21 @@ public:
 
     ~TestAppSession();
 
+    const Config& config() const noexcept
+    {
+        return m_config;
+    }
     std::shared_ptr<realm::app::App> app() const noexcept
     {
         return m_app;
+    }
+    const realm::AppSession& app_session() const noexcept
+    {
+        return *m_app_session;
+    }
+    realm::app::GenericNetworkTransport* transport()
+    {
+        return m_config.transport.get();
     }
     const std::shared_ptr<realm::SyncManager>& sync_manager() const
     {
@@ -359,17 +371,10 @@ public:
         REALM_ASSERT(m_app);
         return m_app->current_user();
     }
-    std::pair<realm::app::AppCredentials, std::shared_ptr<realm::SyncUser>> create_user_and_log_in();
-    std::shared_ptr<realm::SyncUser> log_in_user(std::optional<realm::app::AppCredentials> user_creds = std::nullopt);
-
-    const realm::AppSession& app_session() const noexcept
-    {
-        return *m_app_session;
-    }
-    const Config& config() const noexcept
-    {
-        return m_config;
-    }
+    realm::StatusWith<realm::app::AppCredentials> create_user_and_log_in();
+    // The user_creds from the Config structure will be used if not provided
+    realm::StatusWith<std::shared_ptr<realm::SyncUser>>
+    log_in_user(std::optional<realm::app::AppCredentials> user_creds = std::nullopt);
 
     std::vector<realm::bson::BsonDocument> get_documents(realm::app::User& user, const std::string& object_type,
                                                          size_t expected_count) const;

@@ -227,7 +227,7 @@ std::string get_compile_time_admin_url()
 AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
 {
     // emails with this prefix will pass through the baas app due to the register function
-    email = util::format("realm_tests_do_autoverify-%1@%2.com", random_string(10), random_string(10));
+    email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     password = random_string(10);
     static_cast<AppCredentials&>(*this) = AppCredentials::username_password(email, password);
 }
