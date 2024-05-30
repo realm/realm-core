@@ -5797,7 +5797,7 @@ TEST_TYPES(Query_IntCompressed, Equal, NotEqual, Less, LessEqual, Greater, Great
 
     wt->commit_and_continue_as_read();
     char query_str[20];
-    sprintf(query_str, "id %s 2", c.description().c_str());
+    snprintf(query_str, 20, "id %s 2", c.description().c_str());
     CHECK_EQUAL(t->query(query_str).count(), num_matches);
 }
 
