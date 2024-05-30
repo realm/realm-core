@@ -5772,4 +5772,33 @@ TEST(Query_NestedLinkCount)
     CHECK_EQUAL(q.count(), 3);
 }
 
+TEST_TYPES(Query_IntCompressed, Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual)
+{
+    TEST_TYPE c;
+    size_t num_matches = 0;
+    SHARED_GROUP_TEST_PATH(path);
+    auto db = DB::create(make_in_realm_history(), path);
+
+    auto wt = db->start_write();
+
+    auto t = wt->add_table("table");
+    auto col = t->add_column(type_Int, "id");
+
+    int64_t values[] = {-120, -111, -70, -61, -55, -45, -22, -15, -3, 2, 7, 18, 25, 33, 55, 56, 66, 78, 104, 127};
+
+    for (int j = 1; j < 21; j++) {
+        for (int i = 0; i < j; i++) {
+            auto val = values[i];
+            t->create_object().set(col, val);
+            if (c(val, 2))
+                num_matches++;
+        }
+    }
+
+    wt->commit_and_continue_as_read();
+    char query_str[20];
+    sprintf(query_str, "id %s 2", c.description().c_str());
+    CHECK_EQUAL(t->query(query_str).count(), num_matches);
+}
+
 #endif // TEST_QUERY

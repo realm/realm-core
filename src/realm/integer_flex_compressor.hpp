@@ -193,7 +193,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
         return do_find_all<Equal, Equal, Equal>(arr, value, start, end, baseindex, state);
     }
     else if constexpr (std::is_same_v<NotEqual, Cond>) {
-        return do_find_all<NotEqual, NotEqual, LessEqual>(arr, value, start, end, baseindex, state);
+        return do_find_all<NotEqual, Equal, NotEqual>(arr, value, start, end, baseindex, state);
     }
     else if constexpr (std::is_same_v<Less, Cond>) {
         return do_find_all<Less, GreaterEqual, Less>(arr, value, start, end, baseindex, state);

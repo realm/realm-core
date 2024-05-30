@@ -1077,6 +1077,12 @@ inline uint64_t find_all_fields_unsigned<Equal>(uint64_t MSBs, uint64_t A, uint6
 }
 
 template <>
+inline uint64_t find_all_fields_unsigned<NotEqual>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return find_all_fields<NotEqual>(MSBs, A, B);
+}
+
+template <>
 inline uint64_t find_all_fields_unsigned<Less>(uint64_t MSBs, uint64_t A, uint64_t B)
 {
     return unsigned_LT_vector(MSBs, A, B);
