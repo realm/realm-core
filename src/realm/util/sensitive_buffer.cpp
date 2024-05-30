@@ -26,8 +26,10 @@
 
 #ifdef _WIN32
 #include <Windows.h>
+#if !REALM_UWP
 #include <wincrypt.h>
 #pragma comment(lib, "crypt32.lib")
+#endif
 #include <limits>
 #include <mutex>
 #else
@@ -38,6 +40,7 @@ using namespace realm::util;
 
 #ifdef _WIN32
 
+#if !REALM_UWP
 /*
  * try to lock allocated buffer, or grow working set size if default quota was reached
  * make multiple attemps to handle multi-threaded allocation
@@ -108,14 +111,21 @@ static void lock_or_grow_working_size(void* buffer, size_t size)
     REALM_ASSERT_RELEASE_EX(res != 0 && "VirtualLock()", err, mem.ullAvailPhys, mem.ullTotalPhys, mem.dwMemoryLoad,
                             mem.ullAvailPageFile, mem.ullAvailVirtual);
 }
+#endif // REALM_UWP
 
 SensitiveBufferBase::SensitiveBufferBase(size_t size)
+#if REALM_UWP
+    : m_size(size)
+#else
     : m_size(size_t(ceil((long double)size / CRYPTPROTECTMEMORY_BLOCK_SIZE) * CRYPTPROTECTMEMORY_BLOCK_SIZE))
+#endif
 {
     m_buffer = VirtualAlloc(nullptr, m_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     REALM_ASSERT_RELEASE_EX(m_buffer != NULL && "VirtualAlloc()", GetLastError());
 
+#if !REALM_UWP
     lock_or_grow_working_size(m_buffer, m_size);
+#endif
 }
 
 SensitiveBufferBase::~SensitiveBufferBase()
@@ -125,8 +135,12 @@ SensitiveBufferBase::~SensitiveBufferBase()
 
     secure_erase(m_buffer, m_size);
 
-    BOOL ret = VirtualUnlock(m_buffer, m_size);
+    BOOL ret = FALSE;
+
+#if !REALM_UWP
+    ret = VirtualUnlock(m_buffer, m_size);
     REALM_ASSERT_RELEASE_EX((ret != 0 || GetLastError() == ERROR_NOT_LOCKED) && "VirtualUnlock()", GetLastError());
+#endif
 
     ret = VirtualFree(m_buffer, 0, MEM_RELEASE);
     REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualFree()", GetLastError());
@@ -136,18 +150,22 @@ SensitiveBufferBase::~SensitiveBufferBase()
 
 void SensitiveBufferBase::protect() const
 {
+#if !REALM_UWP
     // MEMO even though we try to lock the page with the buffer, and that should prevent it to be swapped,
     //      locking is not reliable and may fail under high demand in the system due to some opaque reason,
     //      which we can't recover from, so use second layer to protect the buffer if it is swapped
     //      note: look at attempt_to_lock where it's expected
     BOOL ret = CryptProtectMemory(m_buffer, DWORD(m_size), CRYPTPROTECTMEMORY_SAME_PROCESS);
     REALM_ASSERT_RELEASE_EX(ret == TRUE && "CryptProtectMemory()", GetLastError());
+#endif
 }
 
 void SensitiveBufferBase::unprotect() const
 {
+#if !REALM_UWP
     BOOL ret = CryptUnprotectMemory(m_buffer, DWORD(m_size), CRYPTPROTECTMEMORY_SAME_PROCESS);
     REALM_ASSERT_RELEASE_EX(ret == TRUE && "CryptUnprotectMemory()", GetLastError());
+#endif
 }
 
 #else
