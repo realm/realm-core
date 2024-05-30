@@ -2295,6 +2295,31 @@ TEST(Shared_MaxStrings)
     auto v2 = o2.get<StringData>(ck);
     CHECK_EQUAL(v, str_a);
     CHECK_EQUAL(v2, str_b);
+    trans->close();
+    sg.reset();
+}
+
+TEST(Shared_RandomMaxStrings)
+{
+
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    trans->commit_and_continue_as_read();
+    for (int run = 0; run < 100; ++run) {
+        trans->promote_to_write();
+        size_t str_length = std::rand() % (16 * 1024 * 1024 - 257);
+        std::string str(str_length, 'X');
+        for (auto& e : str) {
+            e = std::rand() % 256;
+        }
+        auto o = t->create_object();
+        o.set(ck, str);
+        trans->commit_and_continue_as_read();
+    }
+    trans->close();
 }
 
 TEST(Shared_VersionCount)

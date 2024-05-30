@@ -408,21 +408,23 @@ StringID StringInterner::intern(StringData sd)
             m_current_long_string_node->set_parent(m_data.get(), m_data->size() - 1);
             m_current_long_string_node->create(NodeHeader::type_HasRefs);
             m_current_long_string_node->update_parent();
+            REALM_ASSERT_DEBUG(!m_current_string_leaf->is_attached() || m_current_string_leaf->size() == 0);
             m_current_string_leaf->detach();
         }
         else {
             REALM_ASSERT_DEBUG(m_current_string_leaf);
+            REALM_ASSERT_DEBUG(m_current_string_leaf->size() > 0);
             m_current_long_string_node = std::make_unique<Array>(m_top->get_alloc());
             m_current_long_string_node->set_parent(m_data.get(), m_data->size() - 1);
-            m_current_long_string_node->init_from_parent();
-            size_t index_in_node = 0;
+            m_current_long_string_node->create(NodeHeader::type_HasRefs);
+            m_current_long_string_node->update_parent();
             // convert the current leaf into a long string node. (array of strings in separate arrays)
             for (auto s : m_compressed_leafs.back().m_compressed) {
                 ArrayUnsigned arr(m_top->get_alloc());
                 arr.create(s.size, 65535);
                 unsigned short* dest = reinterpret_cast<unsigned short*>(arr.m_data);
                 std::copy_n(s.data, s.size, dest);
-                m_current_long_string_node->set_as_ref(index_in_node++, arr.get_ref());
+                m_current_long_string_node->add(arr.get_ref());
             }
             m_current_string_leaf->destroy();
             m_current_string_leaf->detach();
