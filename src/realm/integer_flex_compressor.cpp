@@ -30,15 +30,15 @@
 
 using namespace realm;
 
-void FlexCompressor::init_array(char* h, uint8_t flags, uint8_t v_width, uint8_t ndx_width, size_t v_size,
-                                size_t ndx_size) const
+void FlexCompressor::init_header(char* h, uint8_t flags, uint8_t v_width, uint8_t ndx_width, size_t v_size,
+                                 size_t ndx_size)
 {
     using Encoding = NodeHeader::Encoding;
-    init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
+    ::init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
 }
 
 void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& values,
-                               const std::vector<size_t>& indices) const
+                               const std::vector<unsigned>& indices)
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
@@ -67,7 +67,7 @@ void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& val
     }
 }
 
-bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
     const auto process = state->limit() - state->match_count();

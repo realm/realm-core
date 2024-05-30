@@ -35,8 +35,8 @@ void ArrayWithFind::find_all(IntegerColumn* result, int64_t value, size_t col_of
 }
 
 
-bool ArrayWithFind::find(int cond, int64_t value, size_t start, size_t end, size_t baseindex,
-                         QueryStateBase* state) const
+bool ArrayWithFind::_find(int cond, int64_t value, size_t start, size_t end, size_t baseindex,
+                          QueryStateBase* state) const
 {
     if (cond == cond_Equal) {
         return find<Equal>(value, start, end, baseindex, state);

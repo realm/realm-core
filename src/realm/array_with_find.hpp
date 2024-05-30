@@ -89,7 +89,7 @@ public:
     }
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
-    bool find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    bool _find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <class cond>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
@@ -574,7 +574,7 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
     size_t ee = round_up(start, v);
     ee = ee > end ? end : ee;
     for (; start < ee; ++start) {
-        auto v = m_array.get<width>(start);
+        auto v = Array::get<width>(m_array, start);
         if (eq ? (v == value) : (v != value)) {
             if (!state->match(start + baseindex))
                 return false;
@@ -629,7 +629,7 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
     }
 
     while (start < end) {
-        if (eq ? m_array.get<width>(start) == value : m_array.get<width>(start) != value) {
+        if (eq ? Array::get<width>(m_array, start) == value : Array::get<width>(m_array, start) != value) {
             if (!state->match(start + baseindex)) {
                 return false;
             }
@@ -908,8 +908,8 @@ bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, si
     size_t ee = round_up(start, 64 / no0(bitwidth));
     ee = ee > end ? end : ee;
     for (; start < ee; start++) {
-        if (gt ? (m_array.get<bitwidth>(start) > value) : (m_array.get<bitwidth>(start) < value)) {
-            if (!state->match(start + baseindex, m_array.get<bitwidth>(start)))
+        if (gt ? (Array::get<bitwidth>(m_array, start) > value) : (Array::get<bitwidth>(m_array, start) < value)) {
+            if (!state->match(start + baseindex, Array::get<bitwidth>(m_array, start)))
                 return false;
         }
     }
@@ -974,7 +974,7 @@ bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, si
 
     // Test unaligned end and/or values of width > 16 manually
     while (start < end) {
-        if (gt ? m_array.get<bitwidth>(start) > value : m_array.get<bitwidth>(start) < value) {
+        if (gt ? Array::get<bitwidth>(m_array, start) > value : Array::get<bitwidth>(m_array, start) < value) {
             if (!state->match(start + baseindex))
                 return false;
         }
