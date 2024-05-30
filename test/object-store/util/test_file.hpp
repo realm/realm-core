@@ -324,23 +324,19 @@ using DeleteApp = realm::util::TaggedBool<struct DeleteAppTag>;
 class TestAppSession {
 public:
     struct Config {
-        Config(std::shared_ptr<realm::app::GenericNetworkTransport> transport = nullptr,
-               realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal,
-               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr, bool delete_storage = true,
-               std::optional<std::string_view> storage_path = std::nullopt);
-        std::optional<realm::app::AppCredentials> user_creds;
-        std::optional<std::string> storage_path;
-        bool delete_storage = true;
-        std::optional<std::string> base_url;
-        realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal;
-        realm::app::AppConfig::MetadataMode metadata_mode = realm::app::AppConfig::MetadataMode::NoEncryption;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
+        realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal;
         std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider;
+        realm::app::AppConfig::MetadataMode metadata_mode = realm::app::AppConfig::MetadataMode::NoEncryption;
+        std::optional<std::string> base_url;
+        std::optional<std::string> storage_path;
+        // If user_creds are supplied, caller must explicitly call log_in_user() after TestAppSession creation
+        std::optional<realm::app::AppCredentials> user_creds;
     };
 
     TestAppSession();
     TestAppSession(realm::AppSession);
-    TestAppSession(realm::AppSession, Config, DeleteApp = true);
+    TestAppSession(realm::AppSession, Config, DeleteApp = true, bool delete_storage = true);
 
     ~TestAppSession();
 
@@ -383,6 +379,7 @@ private:
     std::unique_ptr<realm::AppSession> m_app_session;
     Config m_config;
     bool m_delete_app;
+    bool m_delete_storage;
     std::shared_ptr<realm::app::App> m_app;
 };
 #endif // REALM_ENABLE_AUTH_TESTS

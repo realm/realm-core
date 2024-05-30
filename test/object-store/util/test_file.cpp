@@ -328,18 +328,6 @@ void set_app_config_defaults(app::AppConfig& app_config,
 
 #if REALM_ENABLE_AUTH_TESTS
 
-TestAppSession::Config::Config(std::shared_ptr<realm::app::GenericNetworkTransport> transport,
-                               realm::ReconnectMode reconnect_mode,
-                               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider, bool delete_storage,
-                               std::optional<std::string_view> storage_path)
-    : storage_path(storage_path)
-    , delete_storage(delete_storage)
-    , reconnect_mode(reconnect_mode)
-    , transport(transport)
-    , socket_provider(socket_provider)
-{
-}
-
 TestAppSession::TestAppSession()
     // Don't delete the global runtime app session
     : TestAppSession(get_runtime_app_session(), {}, DeleteApp{false})
@@ -351,10 +339,11 @@ TestAppSession::TestAppSession(AppSession session)
 {
 }
 
-TestAppSession::TestAppSession(AppSession session, Config config, DeleteApp delete_app)
+TestAppSession::TestAppSession(AppSession session, Config config, DeleteApp delete_app, bool delete_storage)
     : m_app_session(std::make_unique<AppSession>(session))
     , m_config(config)
     , m_delete_app(delete_app)
+    , m_delete_storage(delete_storage)
 {
     if (!m_config.storage_path || m_config.storage_path->empty()) {
         m_config.storage_path.emplace(util::make_temp_dir() + random_string(10));
@@ -400,7 +389,7 @@ TestAppSession::~TestAppSession()
     }
     app::App::clear_cached_apps();
     // If the app session is being deleted or the config tells us to, delete the storage path
-    if ((m_delete_app || m_config.delete_storage) && util::File::exists(*m_config.storage_path)) {
+    if ((m_delete_app || m_delete_storage) && util::File::exists(*m_config.storage_path)) {
         try {
             util::try_remove_dir_recursive(*m_config.storage_path);
         }

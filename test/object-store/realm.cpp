@@ -1513,8 +1513,9 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     std::string identity;
     TestAppSession::Config tas_config;
     {
-        TestAppSession session(app_session, {transport, realm::ReconnectMode::normal, socket_provider, false},
-                               DeleteApp{false});
+        // Keep the app and realm storage
+        TestAppSession session(app_session, {transport, realm::ReconnectMode::normal, socket_provider},
+                               DeleteApp{false}, false);
         auto user = session.current_user();
         REQUIRE(user);
         REQUIRE(user->is_logged_in());
@@ -1522,7 +1523,6 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
         tas_config = session.config(); // get config with storage path and user creds populated
     }
     REQUIRE_FALSE(identity.empty());
-    tas_config.delete_storage = true;
     TestAppSession session(app_session, tas_config);
     auto user = session.app()->get_existing_logged_in_user(identity);
 
