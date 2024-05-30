@@ -42,7 +42,7 @@ static const char* to_hex(char c)
 int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bool enable_logging,
                            const std::string& path)
 {
-    auto configure = [&](auto fuzzer) {
+    auto configure = [&](auto& fuzzer) {
         try {
             FuzzConfigurator cnf(fuzzer, input, false, name);
             if (enable_logging) {
@@ -52,16 +52,19 @@ int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bo
             return cnf;
         }
         catch (const EndOfFile& e) {
-            throw std::runtime_error{"Realm cnf is invalid"};
+            throw e;
         }
     };
 
     try {
         FuzzObject fuzzer;
-        auto cnf = configure(fuzzer);
+        FuzzConfigurator cnf = configure(fuzzer);
+        REALM_ASSERT(&fuzzer == &cnf.get_fuzzer());
         do_fuzz(cnf);
     }
-    catch (const EndOfFile&) {
+    catch (const EndOfFile& e) {
+    }
+    catch (...) {
     }
     return 0;
 }

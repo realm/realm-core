@@ -1225,7 +1225,7 @@ private:
  * Returns a bound Promise and Future in a struct with friendly names (promise and future) that also
  * works well with C++17 structured bindings.
  */
-template <typename T>
+template <typename T = void>
 inline auto make_promise_future()
 {
     return Promise<T>::make_promise_future_impl();
