@@ -7,6 +7,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Add a missing file from the bid library to the android blueprint. (PR [#7738](https://github.com/realm/realm-core/pull/7738))
 * Add missing `REALM_APP_SERVICES` flag to the android blueprint. (PR [#7755](https://github.com/realm/realm-core/pull/7755))
+* Version 19.39.33523 of MSVC would crash when compiling for UWP arm64 in release mode ([PR #7757](https://github.com/realm/realm-core/pull/7757)).
 
 ### Breaking changes
 * None.
