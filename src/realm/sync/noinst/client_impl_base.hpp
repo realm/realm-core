@@ -16,8 +16,8 @@
 #include <realm/sync/subscriptions.hpp>
 #include <realm/sync/trigger.hpp>
 #include <realm/util/buffer_stream.hpp>
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/util/span.hpp>
 
 #include <cstdint>
@@ -31,11 +31,10 @@
 
 namespace realm::sync {
 
-// (protocol, address, port, session_multiplex_ident)
+// (protocol, address, port, user_id)
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-
 struct ServerEndpoint {
     ProtocolEnvelope envelope;
     std::string address;
@@ -47,6 +46,8 @@ struct ServerEndpoint {
 private:
     auto to_tuple() const
     {
+        // Does not include server_mode because all endpoints for a single Client
+        // must have the same mode. is_verified is not part of an endpoint's identity.
         return std::make_tuple(server_mode, envelope, std::ref(address), port, std::ref(user_id));
     }
 
@@ -55,7 +56,6 @@ public:
     {
         return lhs.to_tuple() == rhs.to_tuple();
     }
-
 
     friend inline bool operator<(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
     {
@@ -71,13 +71,9 @@ public:
     void push(util::bind_ptr<SessionWrapper>) noexcept;
     util::bind_ptr<SessionWrapper> pop() noexcept;
     void clear() noexcept;
+    bool erase(SessionWrapper*) noexcept;
     SessionWrapperStack() noexcept = default;
-    SessionWrapperStack(SessionWrapperStack&&) noexcept;
     ~SessionWrapperStack();
-    friend void swap(SessionWrapperStack& q_1, SessionWrapperStack& q_2) noexcept
-    {
-        std::swap(q_1.m_back, q_2.m_back);
-    }
 
 private:
     SessionWrapper* m_back = nullptr;
@@ -207,9 +203,9 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    void shutdown() noexcept;
+    void shutdown() noexcept REQUIRES(!m_mutex, !m_drain_mutex);
 
-    void shutdown_and_wait();
+    void shutdown_and_wait() REQUIRES(!m_mutex, !m_drain_mutex);
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
@@ -217,9 +213,11 @@ public:
 
     // Functions to post onto the event loop and create an event loop timer using the
     // SyncSocketProvider
-    void post(SyncSocketProvider::FunctionHandler&& handler);
+    void post(SyncSocketProvider::FunctionHandler&& handler) REQUIRES(!m_drain_mutex);
+    void post(util::UniqueFunction<void()>&& handler) REQUIRES(!m_drain_mutex);
     SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
-                                               SyncSocketProvider::FunctionHandler&& handler);
+                                               SyncSocketProvider::FunctionHandler&& handler)
+        REQUIRES(!m_drain_mutex);
     using SyncTrigger = std::unique_ptr<Trigger<ClientImpl>>;
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
@@ -229,11 +227,11 @@ public:
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                               port_type& port, std::string& path) const;
 
-    void cancel_reconnect_delay();
-    bool wait_for_session_terminations_or_client_stopped();
+    void cancel_reconnect_delay() REQUIRES(!m_drain_mutex);
+    bool wait_for_session_terminations_or_client_stopped() REQUIRES(!m_mutex, !m_drain_mutex);
     // Async version of wait_for_session_terminations_or_client_stopped().
-    util::Future<void> notify_session_terminated();
-    void voluntary_disconnect_all_connections();
+    util::Future<void> notify_session_terminated() REQUIRES(!m_drain_mutex);
+    void voluntary_disconnect_all_connections() REQUIRES(!m_drain_mutex);
 
 private:
     using connection_ident_type = std::int_fast64_t;
@@ -261,10 +259,10 @@ private:
     SyncTrigger m_actualize_and_finalize;
 
     // Note: There is one server slot per server endpoint (hostname, port,
-    // session_multiplex_ident), and it survives from one connection object to
-    // the next, which is important because it carries information about a
-    // possible reconnect delay applying to the new connection object (server
-    // hammering protection).
+    // user_id), and it survives from one connection object to the next, which
+    // is important because it carries information about a possible reconnect
+    // delay applying to the new connection object (server hammering
+    // protection).
     struct ServerSlot {
         explicit ServerSlot(ReconnectInfo reconnect_info);
         ~ServerSlot();
@@ -283,36 +281,32 @@ private:
     // Must be accessed only by event loop thread
     connection_ident_type m_prev_connection_ident = 0;
 
-    std::mutex m_drain_mutex;
+    util::CheckedMutex m_drain_mutex;
     std::condition_variable m_drain_cv;
-    bool m_drained = false;
-    uint64_t m_outstanding_posts = 0;
-    uint64_t m_num_connections = 0;
+    bool m_drained GUARDED_BY(m_drain_mutex) = false;
+    uint64_t m_outstanding_posts GUARDED_BY(m_drain_mutex) = 0;
+    uint64_t m_num_connections GUARDED_BY(m_drain_mutex) = 0;
 
-    std::mutex m_mutex;
+    util::CheckedMutex m_mutex;
 
-    bool m_stopped = false;             // Protected by `m_mutex`
-    bool m_sessions_terminated = false; // Protected by `m_mutex`
+    bool m_stopped GUARDED_BY(m_mutex) = false;
+    bool m_sessions_terminated GUARDED_BY(m_mutex) = false;
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
-    //
-    // Protected by `m_mutex`.
-    std::map<SessionWrapper*, ServerEndpoint> m_unactualized_session_wrappers;
+    SessionWrapperStack m_unactualized_session_wrappers GUARDED_BY(m_mutex);
 
     // The set of session wrappers that were successfully actualized, but are
     // now abandoned (no longer referenced by the application), and have not yet
     // been finalized. Order in queue is immaterial.
-    //
-    // Protected by `m_mutex`.
-    SessionWrapperStack m_abandoned_session_wrappers;
+    SessionWrapperStack m_abandoned_session_wrappers GUARDED_BY(m_mutex);
 
-    // Protected by `m_mutex`.
+    // Used with m_mutex
     std::condition_variable m_wait_or_client_stopped_cond;
 
-    void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
-    void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
-    void actualize_and_finalize_session_wrappers();
+    void register_unactualized_session_wrapper(SessionWrapper*) REQUIRES(!m_mutex);
+    void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept REQUIRES(!m_mutex);
+    void actualize_and_finalize_session_wrappers() REQUIRES(!m_mutex);
 
     // Get or create a connection. If a connection exists for the specified
     // endpoint, it will be returned, otherwise a new connection will be
@@ -328,25 +322,22 @@ private:
     // approach would be to allow for per-endpoint SSL parameters to be
     // specifiable through public member functions of ClientImpl from where they
     // could then be picked up as new connections are created on demand.
-    //
-    // FIXME: `session_multiplex_ident` should be eliminated from ServerEndpoint
-    // as it effectively disables part of the hammering protection scheme if it
-    // is used to ensure that each session gets a separate connection. With the
-    // alternative approach outlined in the previous FIXME (specify per endpoint
-    // SSL parameters at the client object level), there seems to be no more use
-    // for `session_multiplex_ident`.
     ClientImpl::Connection& get_connection(ServerEndpoint, const std::string& authorization_header_name,
                                            const std::map<std::string, std::string>& custom_http_headers,
                                            bool verify_servers_ssl_certificate,
                                            util::Optional<std::string> ssl_trust_certificate_path,
                                            std::function<SyncConfig::SSLVerifyCallback>,
-                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created);
+                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created)
+        REQUIRES(!m_drain_mutex);
 
     // Destroys the specified connection.
-    void remove_connection(ClientImpl::Connection&) noexcept;
+    void remove_connection(ClientImpl::Connection&) noexcept REQUIRES(!m_drain_mutex);
 
     void drain_connections();
-    void drain_connections_on_loop();
+    void drain_connections_on_loop() REQUIRES(!m_drain_mutex);
+
+    void incr_outstanding_posts() REQUIRES(!m_drain_mutex);
+    void decr_outstanding_posts() REQUIRES(!m_drain_mutex);
 
     session_ident_type get_next_session_ident() noexcept;
 
@@ -951,13 +942,9 @@ private:
                                        const SyncProgress& progress, const ReceivedChangesets&);
 
     /// See request_upload_completion_notification().
-    ///
-    /// The default implementation does nothing.
     void on_upload_completion();
 
     /// See request_download_completion_notification().
-    ///
-    /// The default implementation does nothing.
     void on_download_completion();
 
     //@{
@@ -967,8 +954,6 @@ private:
     ///
     /// A switch to the suspended state only happens when an error occurs,
     /// and information about that error is passed to on_suspended().
-    ///
-    /// The default implementations of these functions do nothing.
     ///
     /// These functions are always called by the event loop thread of the
     /// associated client object.
@@ -1287,6 +1272,9 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
+    if (m_state == ConnectionState::disconnected) {
+        return;
+    }
     m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
     SessionErrorInfo error_info{Status{ErrorCodes::ConnectionClosed, "Connection closed"}, IsFatal{false}};
     error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;

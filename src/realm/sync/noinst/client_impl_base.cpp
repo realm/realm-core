@@ -230,23 +230,49 @@ ClientImpl::ClientImpl(ClientConfig config)
     });
 }
 
+void ClientImpl::incr_outstanding_posts()
+{
+    util::CheckedLockGuard lock(m_drain_mutex);
+    ++m_outstanding_posts;
+    m_drained = false;
+}
+
+void ClientImpl::decr_outstanding_posts()
+{
+    util::CheckedLockGuard lock(m_drain_mutex);
+    REALM_ASSERT(m_outstanding_posts);
+    if (--m_outstanding_posts <= 0) {
+        // Notify must happen with lock held or another thread could destroy
+        // ClientImpl between when we release the lock and when we call notify
+        m_drain_cv.notify_all();
+    }
+}
 
 void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
-    {
-        std::lock_guard lock(m_drain_mutex);
-        ++m_outstanding_posts;
-        m_drained = false;
-    }
+    incr_outstanding_posts();
     m_socket_provider->post([handler = std::move(handler), this](Status status) {
         auto decr_guard = util::make_scope_exit([&]() noexcept {
-            std::lock_guard lock(m_drain_mutex);
-            REALM_ASSERT(m_outstanding_posts);
-            --m_outstanding_posts;
-            m_drain_cv.notify_all();
+            decr_outstanding_posts();
         });
         handler(status);
+    });
+}
+
+void ClientImpl::post(util::UniqueFunction<void()>&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    incr_outstanding_posts();
+    m_socket_provider->post([handler = std::move(handler), this](Status status) {
+        auto decr_guard = util::make_scope_exit([&]() noexcept {
+            decr_outstanding_posts();
+        });
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        if (!status.is_ok())
+            throw Exception(status);
+        handler();
     });
 }
 
@@ -274,18 +300,12 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
                                                        SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
-    {
-        std::lock_guard lock(m_drain_mutex);
-        ++m_outstanding_posts;
-        m_drained = false;
-    }
+    incr_outstanding_posts();
     return m_socket_provider->create_timer(delay, [handler = std::move(handler), this](Status status) {
+        auto decr_guard = util::make_scope_exit([&]() noexcept {
+            decr_outstanding_posts();
+        });
         handler(status);
-
-        std::lock_guard lock(m_drain_mutex);
-        REALM_ASSERT(m_outstanding_posts);
-        --m_outstanding_posts;
-        m_drain_cv.notify_all();
     });
 }
 
