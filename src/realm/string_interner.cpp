@@ -420,7 +420,8 @@ StringID StringInterner::intern(StringData sd)
             for (auto s : m_compressed_leafs.back().m_compressed) {
                 ArrayUnsigned arr(m_top->get_alloc());
                 arr.create(s.size, 65535);
-                std::copy_n(s.data, s.size, arr.m_data);
+                unsigned short* dest = reinterpret_cast<unsigned short*>(arr.m_data);
+                std::copy_n(s.data, s.size, dest);
                 m_current_long_string_node->set_as_ref(index_in_node++, arr.get_ref());
             }
             m_current_string_leaf->destroy();
@@ -483,7 +484,7 @@ StringID StringInterner::intern(StringData sd)
         REALM_ASSERT(m_compressed_leafs.back().m_compressed.size() <= 256);
     }
     m_top->adjust(Pos_Size, 2); // type is has_Refs, so increment is by 2
-    load_leaf_if_new_ref(m_compressed_leafs.back(), m_data->get(m_data->size() - 1));
+    load_leaf_if_new_ref(m_compressed_leafs.back(), m_data->get_as_ref(m_data->size() - 1));
     auto csv = get_compressed(id);
     CompressedStringView csv2(c_str);
     REALM_ASSERT_DEBUG(csv == csv2);
