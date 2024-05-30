@@ -387,7 +387,7 @@ inline ChunkedRangeVectorIterator<T> ChunkedRangeVectorIterator<T>::operator--(i
 }
 
 template <typename T>
-#if REALM_WINDOWS && REALM_ARCHITECTURE_ARM64
+#if defined(_MSC_VER) && REALM_ARCHITECTURE_ARM64
 // Inlining this function crashes msvc when targeting arm64 in as of 19.39.33523
 __declspec(noinline)
 #endif
