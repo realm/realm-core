@@ -1762,9 +1762,8 @@ TEST(VerifyIterationAcrossWords)
         // unaligned iterator
         UnalignedWordIter u_it(a, 0);
         for (size_t i = 0; i < 51; ++i) {
-            const auto v = sign_extend_value(5, u_it.get(5) & 0x1F);
+            const auto v = sign_extend_value(5, u_it.consume(5) & 0x1F);
             CHECK_EQUAL(v, values[i]);
-            u_it.bump(5);
         }
     }
 }
@@ -1911,7 +1910,7 @@ TEST(ParallelSearchEqualMatch)
 
             // Now use the optimized version
             static auto vector_compare_eq = [](auto msb, auto a, auto b) {
-                return find_all_fields_EQ(msb, a, b);
+                return find_all_fields<Equal>(msb, a, b);
             };
 
             start = 0;
@@ -1953,7 +1952,7 @@ TEST(ParallelSearchEqualNoMatch)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_eq = [](auto msb, auto a, auto b) {
-        return find_all_fields_EQ(msb, a, b);
+        return find_all_fields<Equal>(msb, a, b);
     };
 
     size_t start = 0;
@@ -2003,7 +2002,7 @@ TEST(ParallelSearchNotEqual)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_neq = [](auto msb, auto a, auto b) {
-        return find_all_fields_NE(msb, a, b);
+        return find_all_fields<NotEqual>(msb, a, b);
     };
 
     size_t start = 0;
@@ -2054,7 +2053,7 @@ TEST(ParallelSearchLessThan)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_lt = [](auto msb, auto a, auto b) {
-        return find_all_fields_signed_LT(msb, a, b);
+        return find_all_fields<Less>(msb, a, b);
     };
 
     size_t start = 0;
@@ -2104,7 +2103,7 @@ TEST(ParallelSearchGreaterThan)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_gt = [](auto msb, auto a, auto b) {
-        return find_all_fields_signed_GT(msb, a, b);
+        return find_all_fields<Greater>(msb, a, b);
     };
 
     size_t start = 0;

@@ -1002,6 +1002,155 @@ struct GreaterEqual : public HackClass {
     static const int condition = -1;
 };
 
+/* Unsigned LT.
+
+ This can be determined by trial subtaction. However, some care must be exercised
+ since simply subtracting one vector from another will allow carries from one
+ bitfield to flow into the next one. To avoid this, we isolate bitfields by clamping
+ the MSBs to 1 in A and 0 in B before subtraction. After the subtraction the MSBs in
+ the result indicate borrows from the MSB. We then compute overflow (borrow OUT of MSB)
+ using boolean logic as described below.
+
+ Unsigned LT is also used to find all zero fields or all non-zero fields, so it is
+ the backbone of all comparisons returning vectors.
+ */
+
+// compute the overflows in unsigned trial subtraction A-B. The overflows
+// will be marked by 1 in the sign bit of each field in the result. Other
+// bits in the result are zero.
+// Overflow are detected for each field pair where A is less than B.
+inline uint64_t unsigned_LT_vector(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // 1. compute borrow from most significant bit
+    // Isolate bitfields inside A and B before subtraction (prevent carries from spilling over)
+    // do this by clamping most significant bit in A to 1, and msb in B to 0
+    auto A_isolated = A | MSBs;                              // 1 op
+    auto B_isolated = B & ~MSBs;                             // 2 ops
+    auto borrows_into_sign_bit = ~(A_isolated - B_isolated); // 2 ops (total latency 4)
+
+    // 2. determine what subtraction against most significant bit would give:
+    // A B borrow-in:   (A-B-borrow-in)
+    // 0 0 0            (0-0-0) = 0
+    // 0 0 1            (0-0-1) = 1 + borrow-out
+    // 0 1 0            (0-1-0) = 1 + borrow-out
+    // 0 1 1            (0-1-1) = 0 + borrow-out
+    // 1 0 0            (1-0-0) = 1
+    // 1 0 1            (1-0-1) = 0
+    // 1 1 0            (1-1-0) = 0
+    // 1 1 1            (1-1-1) = 1 + borrow-out
+    // borrow-out = (~A & B) | (~A & borrow-in) | (A & B & borrow-in)
+    // The overflows are simply the borrow-out, now encoded into the sign bits of each field.
+    auto overflows = (~A & B) | (~A & borrows_into_sign_bit) | (A & B & borrows_into_sign_bit);
+    // ^ 6 ops, total latency 6 (4+2)
+    return overflows & MSBs; // 1 op, total latency 7
+    // total of 12 ops and a latency of 7. On a beefy CPU 3-4 of those can run in parallel
+    // and still reach a combined latency of 10 or less.
+}
+
+template <typename Cond>
+uint64_t find_all_fields_unsigned(uint64_t MSBs, uint64_t A, uint64_t B);
+
+template <typename Cond>
+uint64_t find_all_fields(uint64_t MSBs, uint64_t A, uint64_t B);
+
+template <>
+inline uint64_t find_all_fields<NotEqual>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // 0 != A^B, same as asking 0 - (A^B) overflows.
+    return unsigned_LT_vector(MSBs, 0, A ^ B);
+}
+
+template <>
+inline uint64_t find_all_fields<Equal>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // get the fields which are EQ and negate the result
+    auto all_fields_NE = find_all_fields<NotEqual>(MSBs, A, B);
+    auto all_fields_NE_negated = ~all_fields_NE;
+    // must filter the negated vector so only MSB are left.
+    return MSBs & all_fields_NE_negated;
+}
+
+template <>
+inline uint64_t find_all_fields_unsigned<Equal>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return find_all_fields<Equal>(MSBs, A, B);
+}
+
+template <>
+inline uint64_t find_all_fields_unsigned<NotEqual>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return find_all_fields<NotEqual>(MSBs, A, B);
+}
+
+template <>
+inline uint64_t find_all_fields_unsigned<Less>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return unsigned_LT_vector(MSBs, A, B);
+}
+
+template <>
+inline uint64_t find_all_fields_unsigned<LessEqual>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // Now A <= B is the same as !(A > B) so...
+    // reverse A and B to turn (A>B) --> (B<A)
+    auto GT = unsigned_LT_vector(MSBs, B, A);
+    // Negate the matches
+    auto GT_negated = ~GT;
+    // and since this negates all bits, filter so we only have MSBs again
+    return MSBs & GT_negated;
+}
+
+template <>
+inline uint64_t find_all_fields_unsigned<GreaterEqual>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return find_all_fields_unsigned<LessEqual>(MSBs, B, A);
+}
+
+template <>
+inline uint64_t find_all_fields_unsigned<Greater>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return find_all_fields_unsigned<Less>(MSBs, B, A);
+}
+
+/*
+ Handling signed values
+
+ Trial subtraction only works as is for unsigned. We simply transform signed into unsigned
+ by pusing all values up by 1<<(field_width-1). This makes all negative values positive and positive
+ values remain positive, although larger. Any overflow during the push can be ignored.
+ After that transformation Trial subtraction should correctly detect the LT condition.
+
+ */
+
+
+template <>
+inline uint64_t find_all_fields<Less>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    auto sign_bits = MSBs;
+    return unsigned_LT_vector(MSBs, A ^ sign_bits, B ^ sign_bits);
+}
+
+template <>
+inline uint64_t find_all_fields<LessEqual>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    auto sign_bits = MSBs;
+    return find_all_fields_unsigned<LessEqual>(MSBs, A ^ sign_bits, B ^ sign_bits);
+}
+
+template <>
+inline uint64_t find_all_fields<Greater>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // A > B is the same as B < A
+    return find_all_fields<Less>(MSBs, B, A);
+}
+
+template <>
+inline uint64_t find_all_fields<GreaterEqual>(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // A >= B is the same as B <= A
+    return find_all_fields<LessEqual>(MSBs, B, A);
+}
+
 } // namespace realm
 
 #endif // REALM_QUERY_CONDITIONS_HPP
