@@ -657,7 +657,6 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
 
 NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
 {
-    // GT subword parallel search is not working... TODO : investigate
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
@@ -994,6 +993,26 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
     std::cout << "   Positive values - ArrayCompress::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = start_value + i;
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v == compressed_a.get(k)) {
+                    found = true;
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - Compressed Array Linear::find<Equal>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Positive values - Compressed Array Linear::find<Equal>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
     std::cout << std::endl;
 
     a.destroy();
@@ -1049,6 +1068,26 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
     std::cout << "   Negative values - ArrayCompress::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
     std::cout << "   Negative values - ArrayCompress::find<Equal>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = -(start_value + i);
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v == compressed_a.get(k)) {
+                    found = true;
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - Compressed Array Linear::find<Equal>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Negative values - Compressed Array Linear::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
@@ -1123,6 +1162,30 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
     std::cout << "   Positive values - ArrayCompress::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = start_value + i;
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v != compressed_a.get(k)) {
+                    found = true;
+                    state2.match(k);
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - Compressed Array Linear::find<NotEqual>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Positive values - Compressed Array Linear::find<NotEqual>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
     std::cout << std::endl;
 
     a.destroy();
@@ -1178,6 +1241,30 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
               << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
     std::cout << "   Negative values - ArrayCompress::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = -(start_value + i);
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v != compressed_a.get(k)) {
+                    found = true;
+                    state2.match(k);
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - Compressed Array Linear::find<NotEqual>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Negative values - Compressed Array Linear::find<NotEqual>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
 
     a.destroy();
     compressed_a.destroy();
@@ -1253,6 +1340,29 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     std::cout << "   Positive values - ArrayCompress::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = (start_value + i);
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v < compressed_a.get(k)) {
+                    found = true;
+                    state2.match(k);
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - Compressed Array Linear::find<Less>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Positive values - Compressed Array Linear::find<Less>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
     std::cout << std::endl;
 
     a.destroy();
@@ -1307,6 +1417,29 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     std::cout << "   Negative values - ArrayCompress::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
     std::cout << "   Negative values - ArrayCompress::find<Less>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = -(start_value + i);
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v < compressed_a.get(k)) {
+                    found = true;
+                    state2.match(k);
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - Compressed Array Linear::find<Less>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Negative values - Compressed Array Linear::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
@@ -1384,6 +1517,29 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
     std::cout << "   Positive values - ArrayCompress::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = (start_value + i);
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v > compressed_a.get(k)) {
+                    found = true;
+                    state2.match(k);
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - Compressed Array Linear::find<Greater>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Positive values - Compressed Array Linear::find<Greater>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
     std::cout << std::endl;
 
     a.destroy();
@@ -1439,6 +1595,30 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
               << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
     std::cout << "   Negative values - ArrayCompress::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            const int64_t searching_v = -(start_value + i);
+            bool found = false;
+            for (size_t k = 0; k < n_values; ++k) {
+                if (searching_v > compressed_a.get(k)) {
+                    found = true;
+                    state2.match(k);
+                    break;
+                }
+            }
+            REALM_ASSERT(found);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - Compressed Array Linear::find<Greater>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Negative values - Compressed Array Linear::find<Greater>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
 
     a.destroy();
     compressed_a.destroy();
