@@ -54,10 +54,10 @@ private:
     template <typename Cond>
     static bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
-    template <typename CondVal, typename CondIndex>
+    template <typename VectorCond1, typename VectorCond2>
     static bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
-    template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
+    template <typename LinearCond, typename VectorCond1, typename VectorCond2>
     static bool do_find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename Cond>
@@ -204,7 +204,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
     return true;
 }
 
-template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
+template <typename LinearCond, typename VectorCond1, typename VectorCond2>
 inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                                         QueryStateBase* state)
 {
@@ -213,7 +213,7 @@ inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t 
     const auto ndx_range = end - start;
     if (!run_parallel_subscan<LinearCond>(v_width, v_range, ndx_range))
         return find_linear<LinearCond>(arr, value, start, end, baseindex, state);
-    return find_parallel<ParallelCond1, ParallelCond2>(arr, value, start, end, baseindex, state);
+    return find_parallel<VectorCond1, VectorCond2>(arr, value, start, end, baseindex, state);
 }
 
 template <typename Cond>
@@ -250,10 +250,16 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     return true;
 }
 
-template <typename CondVal, typename CondIndex>
+template <typename VectorCond1, typename VectorCond2>
 inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                                           QueryStateBase* state)
 {
+    //
+    // algorithm idea: first try to find in the array of values (should be shorter in size but more bits) using
+    // VectorCond1.
+    //                 Then match the index found in the array of indices using VectorCond2
+    //
+
     const auto& compressor = arr.integer_compressor();
     const auto v_width = compressor.v_width();
     const auto v_size = compressor.v_size();
@@ -263,18 +269,22 @@ inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_
 
     auto MSBs = compressor.msb();
     auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(find_all_fields<CondVal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
-    if (v_start == v_size)
-        return true;
+    auto v_start =
+        parallel_subword_find(find_all_fields<VectorCond1>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+
+    if constexpr (!std::is_same_v<VectorCond2, NotEqual>) {
+        if (start == v_size)
+            return true;
+    }
 
     MSBs = compressor.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find(find_all_fields_unsigned<CondIndex>, data, offset, ndx_width, MSBs,
+        start = parallel_subword_find(find_all_fields_unsigned<VectorCond2>, data, offset, ndx_width, MSBs,
                                       search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
-                return false;
+
+        if (start < end && !state->match(start + baseindex))
+            return false;
 
         ++start;
     }
