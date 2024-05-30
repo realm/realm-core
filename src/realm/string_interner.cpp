@@ -185,6 +185,8 @@ static void add_to_hash_map(Array& node, uint64_t hash, uint64_t id, uint8_t has
             auto element = node.get(index);
             auto hash = element & (0xFFFFFFFF >> (32 - hash_size));
             auto string_id = element >> hash_size;
+            if (string_id == 0)
+                continue;
             auto remaining_hash = hash >> radix_node_consumes_bits;
             add_to_hash_map(new_node, remaining_hash, string_id, hash_size - 8);
         }
