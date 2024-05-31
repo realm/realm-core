@@ -3167,6 +3167,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 
     SECTION("pausing a session does not hold the DB open") {
+        auto logger = util::Logger::get_default_logger();
         SyncTestFile config(app->current_user(), partition, schema);
         DBRef dbref;
         std::shared_ptr<SyncSession> sync_sess_ext_ref;
@@ -3179,29 +3180,38 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
             sync_sess_ext_ref = realm->sync_session()->external_reference();
             dbref = TestHelper::get_db(*realm);
-            // One ref each for the
+            // An active PBS realm should have one ref each for:
             // - RealmCoordinator
             // - SyncSession
+            // - MigrationStore
             // - SessionWrapper
             // - local dbref
-            REQUIRE(dbref.use_count() >= 4);
+            logger->trace("DBRef ACTIVE use count: %1", dbref.use_count());
+            REQUIRE(dbref.use_count() >= 5);
 
             realm->sync_session()->pause();
             state = realm->sync_session()->state();
             REQUIRE(state == SyncSession::State::Paused);
+            logger->trace("DBRef PAUSING called use count: %1", dbref.use_count());
         }
 
-        // Closing the realm should leave one ref for the SyncSession and one for the local dbref.
+        // Closing the realm should leave one ref each for:
+        // - SyncSession
+        // - MigrationStore
+        // - local dbref
         REQUIRE_THAT(
             [&] {
+                logger->trace("DBRef PAUSED use count: %1", dbref.use_count());
                 return dbref.use_count() < 4;
             },
             ReturnsTrueWithinTimeLimit{});
 
-        // Releasing the external reference should leave one ref (the local dbref) only.
+        // Releasing the external reference should leave one ref for:
+        // - local dbref
         sync_sess_ext_ref.reset();
         REQUIRE_THAT(
             [&] {
+                logger->trace("DBRef TEARDOWN use count: %1", dbref.use_count());
                 return dbref.use_count() == 1;
             },
             ReturnsTrueWithinTimeLimit{});

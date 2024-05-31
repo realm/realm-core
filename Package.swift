@@ -121,6 +121,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/compact_changesets.cpp",
     "realm/sync/noinst/migration_store.cpp",
     "realm/sync/noinst/pending_bootstrap_store.cpp",
+    "realm/sync/noinst/pending_reset_store.cpp",
     "realm/sync/noinst/protocol_codec.cpp",
     "realm/sync/noinst/sync_metadata_schema.cpp",
     "realm/sync/noinst/sync_schema_migration.cpp",

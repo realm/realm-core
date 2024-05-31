@@ -62,7 +62,8 @@ class SyncSocketProvider;
 struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
-    bool recovery_is_allowed = true;
+    Status error;
+    sync::ProtocolErrorInfo::Action action = sync::ProtocolErrorInfo::Action::ClientReset;
     util::UniqueFunction<VersionID()> notify_before_client_reset;
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };

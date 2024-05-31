@@ -4,6 +4,7 @@
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/pending_bootstrap_store.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/util/bind_ptr.hpp>
@@ -1869,41 +1870,43 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    auto pending_reset = _impl::client_reset::has_pending_reset(*m_db->start_frozen());
-    REALM_ASSERT(pending_reset);
-    m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
-                        pending_reset->time);
-    async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset = *pending_reset](Status status) {
-        if (status == ErrorCodes::OperationAborted) {
-            return;
-        }
-        auto& logger = self->m_sess->logger;
-        if (!status.is_ok()) {
-            logger.error("Error while tracking client reset acknowledgement: %1", status);
-            return;
-        }
+    auto has_pending_reset = PendingResetStore::has_pending_reset(m_db->start_frozen());
+    if (!has_pending_reset) {
+        return; // nothing to do
+    }
 
-        auto wt = self->m_db->start_write();
-        auto cur_pending_reset = _impl::client_reset::has_pending_reset(*wt);
-        if (!cur_pending_reset) {
-            logger.debug(
-                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
-                pending_reset.type, pending_reset.time);
-            return;
-        }
-        else if (cur_pending_reset->type != pending_reset.type || cur_pending_reset->time != pending_reset.time) {
-            logger.debug(
-                "Was going to remove client reset tracker for type \"%1\" from %2, but found type \"%3\" from %4.",
-                pending_reset.type, pending_reset.time, cur_pending_reset->type, cur_pending_reset->time);
-        }
-        else {
-            logger.debug("Client reset of type \"%1\" from %2 has been acknowledged by the server. "
-                         "Removing cycle detection tracker.",
-                         pending_reset.type, pending_reset.time);
-        }
-        _impl::client_reset::remove_pending_client_resets(*wt);
-        wt->commit();
-    });
+    m_sess->logger.info(util::LogCategory::reset, "Tracking %1", *has_pending_reset);
+
+    // Now that the client reset merge is complete, wait for the changes to synchronize with the server
+    async_wait_for(
+        true, true, [self = util::bind_ptr(this), pending_reset = std::move(*has_pending_reset)](Status status) {
+            if (status == ErrorCodes::OperationAborted) {
+                return;
+            }
+            auto& logger = self->m_sess->logger;
+            if (!status.is_ok()) {
+                logger.error(util::LogCategory::reset, "Error while tracking client reset acknowledgement: %1",
+                             status);
+                return;
+            }
+
+            logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
+
+            auto tr = self->m_db->start_write();
+            auto cur_pending_reset = PendingResetStore::has_pending_reset(tr);
+            if (!cur_pending_reset) {
+                logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
+                return;
+            }
+            if (*cur_pending_reset == pending_reset) {
+                logger.debug(util::LogCategory::reset, "Removing client reset cycle detection tracker.");
+            }
+            else {
+                logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
+            }
+            PendingResetStore::clear_pending_reset(tr);
+            tr->commit();
+        });
 }
 
 void SessionWrapper::update_subscription_version_info()
