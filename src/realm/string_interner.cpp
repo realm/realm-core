@@ -168,9 +168,14 @@ static void add_to_hash_map(Array& node, uint64_t hash, uint64_t id, uint8_t has
                 new_size *= 2;
                 new_node.create(NodeHeader::type_Normal, false, new_size, 0);
                 need_to_rehash = !rehash(node, new_node, hash_size);
-                if (need_to_rehash) // we failed, try again - or shift to radix
+                if (need_to_rehash) { // we failed, try again - or shift to radix
+                    // TODO: Prove that this cannot happen
                     new_node.destroy();
+                    std::cout << "Repeated rehash from " << node.size() << " to " << new_size << std::endl;
+                }
             }
+            if (need_to_rehash)
+                break;
             new_node.set_parent(node.get_parent(), node.get_ndx_in_parent());
             new_node.update_parent();
             node.destroy();
@@ -424,7 +429,14 @@ StringID StringInterner::intern(StringData sd)
             m_current_string_leaf->detach();
         }
         else {
-            REALM_ASSERT_DEBUG(m_current_string_leaf);
+            // we have been building an existing leaf and need to shift representation.
+            // but first we need to update leaf accessor for existing leaf
+            if (m_current_string_leaf->is_attached()) {
+                m_current_string_leaf->update_from_parent();
+            }
+            else {
+                m_current_string_leaf->init_from_ref(m_current_string_leaf->get_ref_from_parent());
+            }
             REALM_ASSERT_DEBUG(m_current_string_leaf->size() > 0);
             m_current_long_string_node = std::make_unique<Array>(m_top->get_alloc());
             m_current_long_string_node->set_parent(m_data.get(), m_data->size() - 1);
@@ -467,15 +479,17 @@ StringID StringInterner::intern(StringData sd)
     else {
         // Append to leaf with up to 256 entries.
         // First create a new leaf if needed (limit number of entries to 256 pr leaf)
-        bool need_new_leaf = !m_current_string_leaf->is_attached() || (index & 0xFF) == 0;
-        if (need_new_leaf) {
+        bool need_leaf_update = !m_current_string_leaf->is_attached() || (index & 0xFF) == 0;
+        if (need_leaf_update) {
             m_current_string_leaf->set_parent(m_data.get(), index >> 8);
             if ((index & 0xFF) == 0) {
+                // create new leaf
                 m_current_string_leaf->create(0, 65535);
                 m_data->add(m_current_string_leaf->get_ref());
                 m_compressed_leafs.push_back({});
             }
             else {
+                // just setup leaf accessor
                 if (m_current_string_leaf->is_attached()) {
                     m_current_string_leaf->update_from_parent();
                 }
@@ -499,9 +513,11 @@ StringID StringInterner::intern(StringData sd)
     }
     m_top->adjust(Pos_Size, 2); // type is has_Refs, so increment is by 2
     load_leaf_if_new_ref(m_compressed_leafs.back(), m_data->get_as_ref(m_data->size() - 1));
+#ifdef REALM_DEBUG
     auto csv = get_compressed(id);
     CompressedStringView csv2(c_str);
-    REALM_ASSERT_DEBUG(csv == csv2);
+    REALM_ASSERT(csv == csv2);
+#endif
     return id;
 }
 
