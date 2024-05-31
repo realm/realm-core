@@ -2356,7 +2356,8 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         logger.error(err_msg.c_str());
         ProtocolErrorInfo prot_info = {ErrorCodes::AutoClientResetFailed, err_msg, IsFatal{true}};
         call_debug_hook(SyncClientHookEvent::ClientResetMergeFailed, prot_info);
-        suspend({prot_info});
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
+        suspend(err_info);
         return Status::OK();
     }
     if (!did_client_reset) {
