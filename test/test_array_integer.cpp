@@ -1815,220 +1815,9 @@ TEST(ArrayRef_Basic)
     a.destroy();
 }
 
-TEST(Test_ArrayInt_comparison_equal)
+TEST_TYPES(ArrayInt_comparison, Equal, NotEqual, Less, Greater)
 {
-    ArrayInteger a(Allocator::get_default());
-    ArrayInteger a1(Allocator::get_default());
-    a.create();
-
-    // check first positive values < 32 bits
-
-    constexpr auto N = 300;
-    constexpr auto M = 3;
-    for (size_t i = 0; i < N; i++)
-        for (size_t j = 0; j < M; ++j)
-            a.add(i);
-
-    auto sz = a.size();
-    CHECK(sz == M * N);
-
-    CHECK(a.try_compress(a1));
-    CHECK(a1.is_compressed());
-
-    //  Array should be in compressed form now and values should match
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    for (int i = (int)(sz)-1; i >= 0; --i)
-        CHECK(a.find_first(i) == a1.find_first(i));
-
-    IntegerColumn accu1(Allocator::get_default());
-    IntegerColumn accu2(Allocator::get_default());
-    accu1.create();
-    accu2.create();
-
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<Equal>(i, 0, sz, &m1) == a1.find<Equal>(i, 0, sz, &m2));
-        CHECK(m1.match_count() == m2.match_count());
-    }
-
-    // check negative numbers now.
-    a1.destroy();
-    a.clear();
-
-    for (size_t i = 0; i < N; i++)
-        for (size_t j = 0; j < M; ++j)
-            a.add(-i);
-
-    sz = a.size();
-    CHECK(sz == M * N);
-
-    CHECK(a.try_compress(a1));
-    CHECK(a1.is_compressed());
-
-    //  Array should be in compressed form now and values should match
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    for (int i = (int)(sz)-1; i >= 0; --i)
-        CHECK(a.find_first(-i) == a1.find_first(-i));
-
-    accu1.clear();
-    accu2.clear();
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<Equal>(-i, 0, sz, &m1) == a1.find<Equal>(-i, 0, sz, &m2));
-        CHECK(m1.match_count() == m2.match_count());
-    }
-
-    accu1.destroy();
-    accu2.destroy();
-    a.destroy();
-    a1.destroy();
-
-#if REALM_COMPRESS
-    // insert randomly and call find equal
-    a.create();
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    const auto min_range_t = (size_t)std::numeric_limits<int>::min();
-    const auto max_range_t = (size_t)std::numeric_limits<int>::max();
-    std::uniform_int_distribution<std::mt19937::result_type> dist(min_range_t, max_range_t);
-    sz = 100;
-    for (size_t i = 0; i < sz; ++i) {
-        auto v = (int)dist(rng);
-        a.add(v);
-    }
-    a.try_compress(a1);
-
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    CHECK(a1.is_compressed());
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.find_first(a.get(i)) == a1.find_first(a1.get(i)));
-
-    a.destroy();
-    a1.destroy();
-#endif
-
-    CHECK_NOT(a.is_attached());
-    CHECK_NOT(a1.is_attached());
-}
-
-TEST(Test_ArrayInt_comparison_not_equal)
-{
-    ArrayInteger a(Allocator::get_default());
-    ArrayInteger a1(Allocator::get_default());
-    a.create();
-
-    // check first positive values < 32 bits
-
-    constexpr auto N = 300;
-    constexpr auto M = 3;
-    for (size_t i = 0; i < N; i++)
-        for (size_t j = 0; j < M; ++j)
-            a.add(i);
-
-    auto sz = a.size();
-    CHECK(sz == M * N);
-
-    CHECK(a.try_compress(a1));
-    CHECK(a1.is_compressed());
-
-    //  Array should be in compressed form now and values should match
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<NotEqual>(i, 0, sz, &m_first1) == a1.find<NotEqual>(i, 0, sz, &m_first2));
-        CHECK(m_first1.m_state == m_first2.m_state);
-    }
-
-    IntegerColumn accu1(Allocator::get_default());
-    IntegerColumn accu2(Allocator::get_default());
-    accu1.create();
-    accu2.create();
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<NotEqual>(i, 0, sz, &m1) == a1.find<NotEqual>(i, 0, sz, &m2));
-        CHECK(m1.match_count() == m2.match_count());
-    }
-
-    // check negative numbers now.
-    a1.destroy();
-    a.clear();
-
-    for (size_t i = 0; i < N; i++)
-        for (size_t j = 0; j < M; ++j)
-            a.add(-i);
-
-    sz = a.size();
-    CHECK(sz == M * N);
-
-    CHECK(a.try_compress(a1));
-    CHECK(a1.is_compressed());
-
-    //  Array should be in compressed form now and values should match
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    for (int64_t i = (int64_t)(sz)-1; i >= 0; --i) {
-        QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<NotEqual>(-i, 0, sz, &m_first1) == a1.find<NotEqual>(-i, 0, sz, &m_first2));
-        CHECK(m_first1.m_state == m_first2.m_state);
-    }
-
-    accu1.clear();
-    accu2.clear();
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<NotEqual>(-i, 0, sz, &m1) == a1.find<NotEqual>(-i, 0, sz, &m2));
-        CHECK(m1.match_count() == m2.match_count());
-    }
-
-    accu1.destroy();
-    accu2.destroy();
-    a.destroy();
-    a1.destroy();
-
-#if REALM_COMPRESS
-    a.create();
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    const auto min_range_t = (size_t)std::numeric_limits<int>::min();
-    const auto max_range_t = (size_t)std::numeric_limits<int>::max();
-    std::uniform_int_distribution<std::mt19937::result_type> dist(min_range_t, max_range_t);
-    sz = 100;
-    for (size_t i = 0; i < sz; ++i) {
-        auto v = (int)dist(rng);
-        a.add(v);
-    }
-    a.try_compress(a1);
-
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    CHECK(a1.is_compressed());
-    for (size_t i = 0; i < sz; ++i) {
-        QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<NotEqual>(a.get(i), 0, sz, &m_first1) == a1.find<NotEqual>(a1.get(i), 0, sz, &m_first2));
-        CHECK(m_first1.m_state == m_first2.m_state);
-        CHECK(a.get(m_first1.m_state) == a1.get(m_first2.m_state));
-    }
-
-    a.destroy();
-    a1.destroy();
-#endif
-
-    CHECK_NOT(a.is_attached());
-    CHECK_NOT(a1.is_attached());
-}
-
-TEST(Test_ArrayInt_comparison_less)
-{
+    using Cond = TEST_TYPE;
     ArrayInteger a(Allocator::get_default());
     ArrayInteger a1(Allocator::get_default());
     a.create();
@@ -2062,7 +1851,7 @@ TEST(Test_ArrayInt_comparison_less)
     accu2.create();
     for (int i = (int)(sz)-1; i >= 0; --i) {
         QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<Less>(i, 0, sz, &m1) == a1.find<Less>(i, 0, sz, &m2));
+        CHECK(a.find<Cond>(i, 0, sz, &m1) == a1.find<Cond>(i, 0, sz, &m2));
         CHECK(m1.match_count() == m2.match_count());
     }
 
@@ -2086,7 +1875,7 @@ TEST(Test_ArrayInt_comparison_less)
 
     for (int64_t i = (int64_t)(sz)-1; i >= 0; --i) {
         QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<Less>(-i, 0, sz, &m_first1) == a1.find<Less>(-i, 0, sz, &m_first2));
+        CHECK(a.find<Cond>(-i, 0, sz, &m_first1) == a1.find<Cond>(-i, 0, sz, &m_first2));
         CHECK(m_first1.m_state == m_first2.m_state);
     }
 
@@ -2094,7 +1883,7 @@ TEST(Test_ArrayInt_comparison_less)
     accu2.clear();
     for (int i = (int)(sz)-1; i >= 0; --i) {
         QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<Less>(-i, 0, sz, &m1) == a1.find<Less>(-i, 0, sz, &m2));
+        CHECK(a.find<Cond>(-i, 0, sz, &m1) == a1.find<Cond>(-i, 0, sz, &m2));
         CHECK(m1.match_count() == m2.match_count());
     }
 
@@ -2123,118 +1912,7 @@ TEST(Test_ArrayInt_comparison_less)
     CHECK(a1.is_compressed());
     for (size_t i = 0; i < sz; ++i) {
         QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<Less>(a.get(i), 0, sz, &m_first1) == a1.find<Less>(a1.get(i), 0, sz, &m_first2));
-        CHECK(m_first1.m_state == m_first2.m_state);
-        if (m_first1.m_state != realm::not_found)
-            CHECK(a.get(m_first1.m_state) == a1.get(m_first2.m_state));
-    }
-
-    a.destroy();
-    a1.destroy();
-#endif
-
-    CHECK_NOT(a.is_attached());
-    CHECK_NOT(a1.is_attached());
-}
-
-TEST(Test_ArrayInt_comparison_Greater)
-{
-    ArrayInteger a(Allocator::get_default());
-    ArrayInteger a1(Allocator::get_default());
-    a.create();
-
-    // check first positive values < 32 bits
-
-    constexpr auto N = 300;
-    constexpr auto M = 3;
-    for (size_t i = 0; i < N; i++)
-        for (size_t j = 0; j < M; ++j)
-            a.add(i);
-
-    auto sz = a.size();
-    CHECK(sz == M * N);
-
-    CHECK(a.try_compress(a1));
-    CHECK(a1.is_compressed());
-
-    //  Array should be in compressed form now and values should match
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<Greater>(i, 0, sz, &m_first1) == a1.find<Greater>(i, 0, sz, &m_first2));
-        CHECK(m_first1.m_state == m_first2.m_state);
-    }
-
-    IntegerColumn accu1(Allocator::get_default());
-    IntegerColumn accu2(Allocator::get_default());
-    accu1.create();
-    accu2.create();
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<Greater>(i, 0, sz, &m1) == a1.find<Greater>(i, 0, sz, &m2));
-        CHECK(m1.match_count() == m2.match_count());
-    }
-
-    // check negative numbers now.
-    a1.destroy();
-    a.clear();
-
-    for (size_t i = 0; i < N; i++)
-        for (size_t j = 0; j < M; ++j)
-            a.add(-i);
-
-    sz = a.size();
-    CHECK(sz == M * N);
-
-    CHECK(a.try_compress(a1));
-    CHECK(a1.is_compressed());
-
-    //  Array should be in compressed form now and values should match
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    for (int64_t i = (int64_t)(sz)-1; i >= 0; --i) {
-        QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<Greater>(-i, 0, sz, &m_first1) == a1.find<Greater>(-i, 0, sz, &m_first2));
-        CHECK(m_first1.m_state == m_first2.m_state);
-    }
-
-    accu1.clear();
-    accu2.clear();
-    for (int i = (int)(sz)-1; i >= 0; --i) {
-        QueryStateFindAll m1{accu1}, m2{accu2};
-        CHECK(a.find<Greater>(-i, 0, sz, &m1) == a1.find<Greater>(-i, 0, sz, &m2));
-        CHECK(m1.match_count() == m2.match_count());
-    }
-
-    accu1.destroy();
-    accu2.destroy();
-    a.destroy();
-    a1.destroy();
-
-#if REALM_COMPRESS
-    a.create();
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    const auto min_range_t = (size_t)std::numeric_limits<int>::min();
-    const auto max_range_t = (size_t)std::numeric_limits<int>::max();
-    std::uniform_int_distribution<std::mt19937::result_type> dist(min_range_t, max_range_t);
-    sz = 100;
-    for (size_t i = 0; i < sz; ++i) {
-        auto v = (int)dist(rng);
-        a.add(v);
-    }
-    a.try_compress(a1);
-
-    for (size_t i = 0; i < sz; ++i)
-        CHECK(a.get(i) == a1.get(i));
-
-    CHECK(a1.is_compressed());
-    for (size_t i = 0; i < sz; ++i) {
-        QueryStateFindFirst m_first1, m_first2;
-        CHECK(a.find<Greater>(a.get(i), 0, sz, &m_first1) == a1.find<Greater>(a1.get(i), 0, sz, &m_first2));
+        CHECK(a.find<Cond>(a.get(i), 0, sz, &m_first1) == a1.find<Cond>(a1.get(i), 0, sz, &m_first2));
         CHECK(m_first1.m_state == m_first2.m_state);
         if (m_first1.m_state != realm::not_found)
             CHECK(a.get(m_first1.m_state) == a1.get(m_first2.m_state));
