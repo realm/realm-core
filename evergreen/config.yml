@@ -73,7 +73,7 @@ functions:
           export CMAKE_VARS_DIR=$(./evergreen/abspath.sh cmake_vars)
           source evergreen/cmake_vars_utils.sh
           if [ -n "${cmake_bindir|}" ]; then
-            export CMAKE=$(./evergreen/abspath.sh ${cmake_bindir}/cmake)
+            export CMAKE="$(./evergreen/abspath.sh "${cmake_bindir}/cmake")"
           else
             export CMAKE="cmake"
           fi
@@ -84,11 +84,11 @@ functions:
 
           if [ -n "${c_compiler}" ]; then
               [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
-              set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
-              set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
+              set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh "${c_compiler}")
+              set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh "${cxx_compiler}")
           fi
 
-          if [ -z "${disable_tests_against_baas|}" ]; then
+          if [[ -z "${disable_tests_against_baas|}" && -z "${no_tests|}" ]]; then
               scheme="http"
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               if [ -n "${baas_admin_port|}" ]; then
@@ -165,7 +165,7 @@ functions:
             set_cmake_var realm_vars CMAKE_GENERATOR_PLATFORM STRING "${cmake_generator_platform}"
           fi
 
-          if [ -n "${curl_base|}" ]; then
+          if [[ -n "${curl_base|}" && -z "${no_tests|}" ]]; then
               set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
               set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
               set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/curl-ca-bundle.crt")"
@@ -174,11 +174,11 @@ functions:
           set_cmake_var realm_vars REALM_NO_TESTS BOOL ${no_tests|Off}
           set_cmake_var realm_vars CMAKE_COMPILE_WARNING_AS_ERROR BOOL On
 
-          echo "Running cmake with these vars:"
+          echo "Running cmake at \"$CMAKE\" with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
 
-          $CMAKE \
+          "$CMAKE" \
             -B build \
             -C cmake_vars.txt ${extra_flags} \
             -G "$GENERATOR"
@@ -191,7 +191,7 @@ functions:
               target="$target -- ${cmake_build_tool_options}"
           fi
 
-          $CMAKE \
+          "$CMAKE" \
               --build build \
               --config ${cmake_build_type|Debug} \
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
@@ -240,7 +240,7 @@ functions:
           set -o errexit
           set -o verbose
           if [ -n "${cmake_bindir|}" ]; then
-              CTEST=$(./evergreen/abspath.sh ${cmake_bindir}/ctest)
+              CTEST="$(./evergreen/abspath.sh "${cmake_bindir}/ctest")"
           else
               CTEST="ctest"
           fi
@@ -320,7 +320,7 @@ functions:
           export UBSAN_OPTIONS="print_stacktrace=1"
 
           cd build
-          if ! $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS; then
+          if ! "$CTEST" -C ${cmake_build_type|Debug} $TEST_FLAGS; then
             BAAS_PID=$(pgrep baas_server)
             if [[ -n "$BAAS_PID" ]]; then
               echo "Dumping baas to log file"
@@ -755,7 +755,7 @@ tasks:
       script: |-
         set -o errexit
         if [[ -n "${cmake_bindir}" ]]; then
-          CPACK="$(./evergreen/abspath.sh ${cmake_bindir}/cpack)"
+          CPACK="$(./evergreen/abspath.sh "${cmake_bindir}/cpack")"
         else
           CPACK="cpack"
         fi
@@ -1317,6 +1317,20 @@ task_groups:
   tasks:
   - fuzzer
 
+- name: compile_only
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  - func: "upload baas artifacts"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+
 buildvariants:
 - name: ubuntu
   display_name: "Ubuntu"
@@ -1735,6 +1749,7 @@ buildvariants:
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-apple-darwin.tar.bz2"
   tasks:
   - name: compile_test_coverage
+
 - name: ubuntu-coverage
   display_name: "Ubuntu (Code Coverage)"
   run_on: ubuntu2204-large
@@ -1753,12 +1768,25 @@ buildvariants:
   - name: compile_test_coverage
   - name: finalize_coverage_data
 
+- name: ubuntu-no-app-services
+  display_name: "Ubuntu (AppServices Disabled)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    extra_flags: "-DREALM_APP_SERVICES=OFF"
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
+
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
@@ -1772,8 +1800,7 @@ buildvariants:
   display_name: "Windows x86_64 (Encryption enabled)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
@@ -1788,8 +1815,7 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 Release build)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Release"
@@ -1805,8 +1831,7 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 ASAN)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Debug"
@@ -1822,8 +1847,7 @@ buildvariants:
   display_name: "Windows X86 (Release)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     cmake_generator_platform: "Win32"
     cmake_build_type: "Release"
@@ -1834,17 +1858,53 @@ buildvariants:
   tasks:
   - name: compile_local_tests
 
-- name: ubuntu-no-app-services
-  display_name: "Ubuntu (AppServices Disabled)"
-  run_on: ubuntu2204-arm64-large
+- name: windows-x86-uwp
+  display_name: "Windows X86 (UWP)"
+  run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+    cmake_generator: "Visual Studio 16 2019"
+    cmake_generator_platform: "Win32"
+    cmake_build_type: "Debug"
+    extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
-    c_compiler: "/opt/clang+llvm/bin/clang"
-    cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    extra_flags: "-DREALM_APP_SERVICES=OFF"
-    disable_tests_against_baas: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    no_tests: On
   tasks:
-  - name: compile_local_tests
+  - name: compile_only
+
+# TODO(DEVPROD-5151) Enabling these is blocked by the availability of an ARM64 compiler
+# on windows.
+# - name: windows-arm64
+#   display_name: "Windows ARM64"
+#   run_on: windows-vsCurrent-large
+#   expansions:
+#     cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+#     cmake_generator: "Visual Studio 16 2019"
+#     cmake_generator_platform: "ARM64"
+#     cmake_build_type: "Debug"
+#     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+#     fetch_missing_dependencies: On
+#     python3: "/cygdrive/c/python/python37/python.exe"
+#     no_tests: on
+#   tasks:
+#   - name: compile_only
+#
+# - name: windows-arm64-uwp
+#   display_name: "Windows ARM64 (UWP)"
+#   run_on: windows-vsCurrent-large
+#   expansions:
+#     cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+#     cmake_generator: "Visual Studio 16 2019"
+#     cmake_generator_platform: "ARM64"
+#     cmake_build_type: "Debug"
+#     extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+#     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+#     fetch_missing_dependencies: On
+#     python3: "/cygdrive/c/python/python37/python.exe"
+#     no_tests: On
+#   tasks:
+#   - name: compile_only
+
 
