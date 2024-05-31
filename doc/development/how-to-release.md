@@ -1,8 +1,8 @@
 The core release process is automated with github [actions](https://github.com/realm/realm-core/actions)
 
 1. Go to the prepare-release [action](https://github.com/realm/realm-core/actions/workflows/prepare-release.yml) and click the "Run workflow" dropdown.
-  - Input the base branch that you would like to make a release from (usually this will be "master").
-  - Input the release version (eg. "10.14.7")
+  - Select the base branch that you would like to make a release from (usually this will be "master") in the drop down.
+  - Enter the version of the new release (eg. "10.123.1" or "4.5.0-CustDemo")
 
 2. This will create a PR, which you should look over and get someone else on the team to review. Verify the changelog by checking the PR description which has a list of commits since the last tag was made. If any changes are required, commit them to this PR's branch.
 

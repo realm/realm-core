@@ -24,6 +24,7 @@ jobs:
         run: tools/release-init.sh ${{ inputs.version }}
         shell: bash
       - name: Create Release PR
+        id: prepare-pr
         uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e #! 6.0.5
         with:
           branch: release/automated_v${{ inputs.version }}
@@ -37,3 +38,5 @@ jobs:
             dependencies.yml
             Package.swift
             CHANGELOG.md
+      - name: Output PR URL
+        run: echo "Prepare release PR created: ${{ steps.prepare-pr.outputs.pull-request-url }}" >> $GITHUB_STEP_SUMMARY
