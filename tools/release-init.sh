@@ -51,7 +51,8 @@ sed -i.bak -e "/.*\[#????\](https.*/d" "${project_dir}/CHANGELOG.md"
 rm "${project_dir}/CHANGELOG.md.bak" || exit 1
 
 # assumes that tags and history have been fetched
-git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-merges > changes-since-last-tag.txt
+echo "commits since last tag:\n" > changes-since-last-tag.txt
+git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-merges >> changes-since-last-tag.txt
 echo changes since last tag are
 cat changes-since-last-tag.txt
 
