@@ -22,6 +22,7 @@
 * Refactor `sync::Session` to eliminate the bind() step of session creation ([#7609](https://github.com/realm/realm-core/pull/7609)).
 * Add ScopeExitFail which only calls the handler if exiting the scope via an uncaught exception ([#7609](https://github.com/realm/realm-core/pull/7609)).
 * Add the originating error and server requests action that caused a client reset to occur to the client reset tracking metadata storage. ([PR #7649](https://github.com/realm/realm-core/pull/7649))
+* Fix client reset failure during sync migration due to previous incomplete client reset. ([PR #7542](https://github.com/realm/realm-core/pull/7542), since v13.11.0)
 
 ----------------------------------------------
 

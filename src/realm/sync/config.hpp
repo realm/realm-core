@@ -132,6 +132,11 @@ enum class SyncClientHookEvent {
     SessionActivating,
     SessionSuspended,
     BindMessageSent,
+    IdentMessageReceived,
+    IdentMessageSent,
+    ClientResetMergeStarting,
+    ClientResetMergeComplete,
+    ClientResetMergeFailed,
     BootstrapBatchAboutToProcess,
 };
 
