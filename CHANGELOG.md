@@ -5,11 +5,8 @@
 
 ### Fixed
 * Add a missing file from the bid library to the android blueprint. (PR [#7738](https://github.com/realm/realm-core/pull/7738))
-<<<<<<< HEAD
 * After compacting, a file upgrade would be triggered. This could cause loss of data if schema mode is SoftResetFile ([#7747](https://github.com/realm/realm-core/issues/7747), since 14.0.0)
-=======
 * Add missing `REALM_APP_SERVICES` flag to the android blueprint. (PR [#7755](https://github.com/realm/realm-core/pull/7755))
->>>>>>> master
 
 ### Breaking changes
 * None.
