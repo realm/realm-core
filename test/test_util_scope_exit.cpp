@@ -58,12 +58,57 @@ namespace {
 TEST(Util_ScopeExit_Basics)
 {
     bool called = false;
-    auto handler = [&]() noexcept {
-        called = true;
-    };
     {
-        auto seg = util::make_scope_exit(handler);
+        util::ScopeExit se([&]() noexcept {
+            called = true;
+        });
         CHECK_NOT(called);
+    }
+    CHECK(called);
+
+    called = false;
+    try {
+        util::ScopeExit se([&]() noexcept {
+            called = true;
+        });
+        CHECK_NOT(called);
+        throw 0;
+    }
+    catch (int) {
+    }
+    CHECK(called);
+
+    called = false;
+    {
+        util::ScopeExit se([&]() noexcept {
+            called = true;
+        });
+        CHECK_NOT(called);
+        se.cancel();
+    }
+    CHECK_NOT(called);
+}
+
+TEST(Util_ScopeExit_Fail)
+{
+    bool called = false;
+    {
+        util::ScopeExitFail se([&]() noexcept {
+            called = true;
+        });
+        CHECK_NOT(called);
+    }
+    CHECK_NOT(called);
+
+    called = false;
+    try {
+        util::ScopeExit se([&]() noexcept {
+            called = true;
+        });
+        CHECK_NOT(called);
+        throw 0;
+    }
+    catch (int) {
     }
     CHECK(called);
 }

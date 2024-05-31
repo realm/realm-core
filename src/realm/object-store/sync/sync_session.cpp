@@ -108,10 +108,7 @@ void SyncSession::become_active()
     }
 
     // when entering from the Dying state the session will still be bound
-    if (!m_session) {
-        create_sync_session();
-        m_session->bind();
-    }
+    create_sync_session();
 
     // Register all the pending wait-for-completion blocks. This can
     // potentially add a redundant callback if we're coming from the Dying
@@ -901,6 +898,8 @@ void SyncSession::create_sync_session()
     SyncConfig& sync_config = *m_config.sync_config;
     REALM_ASSERT(sync_config.user);
 
+    std::weak_ptr<SyncSession> weak_self = weak_from_this();
+
     sync::Session::Config session_config;
     session_config.signed_user_token = sync_config.user->access_token();
     session_config.user_id = sync_config.user->user_id();
@@ -917,8 +916,8 @@ void SyncSession::create_sync_session()
 
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
-                                                    anchor = weak_from_this()](const SyncClientHookData& data) {
-            return hook(anchor, data);
+                                                    weak_self](const SyncClientHookData& data) {
+            return hook(weak_self, data);
         };
     }
 
@@ -957,46 +956,41 @@ void SyncSession::create_sync_session()
         }
     }
 
-    m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, std::move(session_config));
-
-    std::weak_ptr<SyncSession> weak_self = weak_from_this();
-
-    // Set up the wrapped progress handler callback
-    m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
-                                                uint_fast64_t uploaded, uint_fast64_t uploadable,
-                                                uint_fast64_t snapshot_version, double download_estimate,
-                                                double upload_estimate, int64_t query_version) {
+    session_config.progress_handler = [weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
+                                                  uint_fast64_t uploaded, uint_fast64_t uploadable,
+                                                  uint_fast64_t snapshot_version, double download_estimate,
+                                                  double upload_estimate, int64_t query_version) {
         if (auto self = weak_self.lock()) {
             self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, snapshot_version,
                                          download_estimate, upload_estimate, query_version);
         }
-    });
+    };
 
-    // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
-    // the connection state.
-    m_session->set_connection_state_change_listener(
-        [weak_self](sync::ConnectionState state, std::optional<sync::SessionErrorInfo> error) {
-            using cs = sync::ConnectionState;
-            ConnectionState new_state = [&] {
-                switch (state) {
-                    case cs::disconnected:
-                        return ConnectionState::Disconnected;
-                    case cs::connecting:
-                        return ConnectionState::Connecting;
-                    case cs::connected:
-                        return ConnectionState::Connected;
-                }
-                REALM_UNREACHABLE();
-            }();
-            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
-            // nothing useful we can do with them.
-            if (auto self = weak_self.lock()) {
-                self->update_connection_state(new_state);
-                if (error) {
-                    self->handle_error(std::move(*error));
-                }
+    session_config.connection_state_change_listener = [weak_self](sync::ConnectionState state,
+                                                                  std::optional<sync::SessionErrorInfo> error) {
+        using cs = sync::ConnectionState;
+        ConnectionState new_state = [&] {
+            switch (state) {
+                case cs::disconnected:
+                    return ConnectionState::Disconnected;
+                case cs::connecting:
+                    return ConnectionState::Connecting;
+                case cs::connected:
+                    return ConnectionState::Connected;
             }
-        });
+            REALM_UNREACHABLE();
+        }();
+        // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
+        // nothing useful we can do with them.
+        if (auto self = weak_self.lock()) {
+            self->update_connection_state(new_state);
+            if (error) {
+                self->handle_error(std::move(*error));
+            }
+        }
+    };
+
+    m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, std::move(session_config));
 }
 
 void SyncSession::update_connection_state(ConnectionState new_state)

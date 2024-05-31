@@ -123,7 +123,7 @@ struct SyncClient {
     std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,
                                                 std::shared_ptr<sync::SubscriptionStore> flx_sub_store,
                                                 std::shared_ptr<sync::MigrationStore> migration_store,
-                                                sync::Session::Config config)
+                                                sync::Session::Config&& config)
     {
         return std::make_unique<sync::Session>(m_client, std::move(db), std::move(flx_sub_store),
                                                std::move(migration_store), std::move(config));
