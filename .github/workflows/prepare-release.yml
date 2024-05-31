@@ -39,7 +39,8 @@ jobs:
             Package.swift
             CHANGELOG.md
       - name: Output PR URL
-        run: echo "Prepare release PR created: $PREPARE_PR_URL" >> $GITHUB_STEP_SUMMARY
+        run: |
+          echo "Prepare release PR created: $PREPARE_PR_URL" >> $GITHUB_STEP_SUMMARY
         shell: bash
         env:
           PREPARE_PR_URL: ${{ steps.prepare-pr.outputs.pull-request-url }}
