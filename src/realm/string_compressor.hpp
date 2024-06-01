@@ -70,9 +70,9 @@ public:
 
 private:
     struct SymbolDef {
-        CompressionSymbol id;
-        CompressionSymbol expansion_a;
-        CompressionSymbol expansion_b;
+        CompressionSymbol id = 0;
+        CompressionSymbol expansion_a = 0;
+        CompressionSymbol expansion_b = 0;
     };
 
     struct ExpandedSymbolDef {

@@ -26,7 +26,7 @@ namespace realm {
 
 StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index, bool writable)
 {
-    m_compression_map.resize(65536, {0, 0, 0});
+    m_compression_map.resize(65536);
     m_symbols.reserve(65536);
     m_data = std::make_unique<ArrayUnsigned>(alloc);
     m_data->set_parent(&parent, index);

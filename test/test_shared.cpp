@@ -2322,6 +2322,33 @@ TEST(Shared_RandomMaxStrings)
     trans->close();
 }
 
+TEST(Shared_RandomSmallStrings)
+{
+
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    std::cout << "Writing " << path << std::endl;
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    trans->commit_and_continue_as_read();
+    std::string str(500, 'X');
+    // insert a million objects with at most 4000 different strings
+    for (int run = 0; run < 100; ++run) {
+        trans->promote_to_write();
+        for (int i = 0; i < 10000; ++i) {
+            // size_t str_length = std::rand() % (1 + 500);
+            // std::string str(str_length, 'X');
+            size_t offset = std::rand() % str.size();
+            str[offset] = 'a' + (std::rand() & 0x7);
+            auto o = t->create_object();
+            o.set(ck, str);
+        }
+        trans->commit_and_continue_as_read();
+    }
+    trans->close();
+}
+
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
