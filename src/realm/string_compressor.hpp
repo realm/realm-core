@@ -85,6 +85,7 @@ private:
     };
 
     void rebuild_internal();
+    void expand_compression_map();
     void add_expansion(SymbolDef def);
     std::vector<ExpandedSymbolDef> m_symbols; // map from symbol -> symbolpair, 2 elements pr entry
     std::vector<SymbolDef> m_compression_map; // perfect hash from symbolpair to its symbol

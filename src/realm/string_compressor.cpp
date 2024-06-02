@@ -26,7 +26,7 @@ namespace realm {
 
 StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index, bool writable)
 {
-    m_compression_map.resize(65536);
+    m_compression_map.resize(16); // start with a very small compression map
     m_symbols.reserve(65536);
     m_data = std::make_unique<ArrayUnsigned>(alloc);
     m_data->set_parent(&parent, index);
@@ -91,6 +91,24 @@ void StringCompressor::add_expansion(SymbolDef def)
     m_symbols.push_back({def, expansion, (uint32_t)m_expansion_storage.size() - 1, start_index});
 }
 
+void StringCompressor::expand_compression_map()
+{
+    size_t old_size = m_compression_map.size();
+    REALM_ASSERT(old_size <= 16384);
+    size_t new_size = 4 * old_size;
+    std::vector<SymbolDef> map(new_size);
+    for (size_t i = 0; i < m_compression_map.size(); ++i) {
+        auto& entry = m_compression_map[i];
+        if (entry.id == 0)
+            continue;
+        auto hash = symbol_pair_hash(entry.expansion_a, entry.expansion_b);
+        auto new_hash = hash & (new_size - 1);
+        REALM_ASSERT(map[new_hash].id == 0);
+        map[new_hash] = entry;
+    }
+    m_compression_map.swap(map);
+}
+
 void StringCompressor::rebuild_internal()
 {
     auto num_symbols = m_data->size();
@@ -101,6 +119,7 @@ void StringCompressor::rebuild_internal()
         while (num_symbols < m_symbols.size()) {
             auto& symbol = m_symbols.back();
             auto hash = symbol_pair_hash(symbol.def.expansion_a, symbol.def.expansion_b);
+            hash &= m_compression_map.size() - 1;
             REALM_ASSERT(m_compression_map[hash].id == symbol.def.id);
             m_compression_map[hash] = {0, 0, 0};
             if (symbol.storage_index < m_expansion_storage.size() - 1) {
@@ -119,8 +138,11 @@ void StringCompressor::rebuild_internal()
         def.expansion_a = 0xFFFF & (pair >> 16);
         def.expansion_b = 0xFFFF & pair;
         auto hash = symbol_pair_hash(def.expansion_a, def.expansion_b);
-        REALM_ASSERT_DEBUG(m_compression_map[hash].id == 0);
-        m_compression_map[hash] = def;
+        while (m_compression_map[hash & (m_compression_map.size() - 1)].id) {
+            expand_compression_map();
+        }
+        // REALM_ASSERT_DEBUG(m_compression_map[hash].id == 0);
+        m_compression_map[hash & (m_compression_map.size() - 1)] = def;
         add_expansion(def);
     }
 }
@@ -148,6 +170,7 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
         CompressionSymbol* limit = from + result.size() - 1;
         while (from < limit) {
             auto hash = symbol_pair_hash(from[0], from[1]);
+            hash &= m_compression_map.size() - 1;
             auto& def = m_compression_map[hash];
             if (def.id) {
                 // existing symbol
@@ -156,8 +179,15 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
                     *to++ = def.id;
                     from += 2;
                 }
+                else if (m_compression_map.size() < 65536) {
+                    // Conflict: some other symbol is defined here - but we can expand the compression map
+                    // and hope to find room!
+                    expand_compression_map();
+                    // simply retry:
+                    continue;
+                }
                 else {
-                    // some other symbol is defined here, we can't compress
+                    // also conflict: some other symbol is defined here, we can't compress
                     *to++ = *from++;
                     // In a normal hash table we'd have buckets and add a translation
                     // to a bucket. This is slower generally, but yields better compression.
