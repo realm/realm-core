@@ -48,7 +48,7 @@ public:
 private:
     static bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state);
 
-    template <typename Cond>
+    template <typename VectorCond>
     static bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename Cond>
@@ -82,16 +82,15 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     UnalignedWordIter unaligned_data_iterator(data, starting_bit);
     auto cnt_bits = starting_bit;
     while (cnt_bits + bit_per_it < total_bits) {
-        auto word = unaligned_data_iterator.get(bit_per_it);
+        auto word = unaligned_data_iterator.consume(bit_per_it);
         for (int i = 0; i < values_per_word; ++i) {
             res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
             word >>= v_w;
         }
         cnt_bits += bit_per_it;
-        unaligned_data_iterator.bump(bit_per_it);
     }
     if (cnt_bits < total_bits) {
-        auto last_word = unaligned_data_iterator.get(static_cast<unsigned>(total_bits - cnt_bits));
+        auto last_word = unaligned_data_iterator.consume(static_cast<unsigned>(total_bits - cnt_bits));
         while (cnt_bits < total_bits) {
             res.push_back(sign_extend_field_by_mask(sign_mask, last_word & mask));
             cnt_bits += v_w;
@@ -155,7 +154,7 @@ inline bool PackedCompressor::find_all(const Array& arr, int64_t value, size_t s
     return find_parallel<Cond>(arr, value, start, end, baseindex, state);
 }
 
-template <typename Cond>
+template <typename VectorCond>
 inline bool PackedCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end,
                                             size_t baseindex, QueryStateBase* state)
 {
@@ -165,36 +164,21 @@ inline bool PackedCompressor::find_parallel(const Array& arr, int64_t value, siz
     // contain in parallel. Once we have found the starting point, keep matching values as much as we can between
     // start and end.
     //
-    // EG: we store the value 6, with width 4bits (0110), 6 is 4 bits because, 110 (6) + sign bit 0.
+    // EG: let's store 6, it gets stored in 4 bits (0110). 6 is 4 bits because 110 (6) + sign bit 0.
     // Inside 64bits we can fit max 16 times 6. If we go from index 0 to 15 throughout the same 64 bits, we need to
-    // apply a mask and a shift bits every time, then compare the values.
-    // This is not the cheapest thing to do. Instead we can compare all values contained within 64 bits in one go and
+    // apply a mask and a shift bits every time, then compare the extracted values.
+    // This is not the cheapest thing to do. Instead we can compare all values contained within 64 bits in one go, and
     // see if there is a match with what we are looking for. Reducing the number of comparison by ~logk(N) where K is
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
-
-    // apparently the compiler is not able to deduce the type of a global function after moving stuff in the header
-    // (no so sure why)
-    static auto vector_compare = [](uint64_t MSBs, uint64_t a, uint64_t b) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return find_all_fields_EQ(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, NotEqual>)
-            return find_all_fields_NE(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Greater>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    };
 
     const auto data = (const uint64_t*)arr.m_data;
     const auto width = arr.m_width;
     const auto MSBs = arr.integer_compressor().msb();
     const auto search_vector = populate(arr.m_width, value);
     while (start < end) {
-        start = parallel_subword_find(vector_compare, data, 0, width, MSBs, search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
-                return false;
+        start = parallel_subword_find(find_all_fields<VectorCond>, data, 0, width, MSBs, search_vector, start, end);
+        if (start < end && !state->match(start + baseindex))
+            return false;
         ++start;
     }
     return true;

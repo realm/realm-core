@@ -27,9 +27,6 @@
 
 namespace realm {
 
-struct WordTypeValue {};
-struct WordTypeIndex {};
-
 //
 // Compress array in Flex format
 // Decompress array in WTypeBits formats
@@ -57,10 +54,10 @@ private:
     template <typename Cond>
     static bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
-    template <typename CondVal, typename CondIndex>
+    template <typename VectorCond1, typename VectorCond2>
     static bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
-    template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
+    template <typename LinearCond, typename VectorCond1, typename VectorCond2>
     static bool do_find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
 
     template <typename Cond>
@@ -99,7 +96,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     BfIterator data_iterator{data, 0, v_w, v_w, 0};
     auto remaining_bits = ndx_w * range;
     while (remaining_bits >= bit_per_it) {
-        auto word = unaligned_ndx_iterator.get(bit_per_it);
+        auto word = unaligned_ndx_iterator.consume(bit_per_it);
         for (int i = 0; i < values_per_word; ++i) {
             const auto index = word & ndx_mask;
             data_iterator.move(static_cast<size_t>(index));
@@ -108,10 +105,9 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
             word >>= ndx_w;
         }
         remaining_bits -= bit_per_it;
-        unaligned_ndx_iterator.bump(bit_per_it);
     }
     if (remaining_bits) {
-        auto last_word = unaligned_ndx_iterator.get(remaining_bits);
+        auto last_word = unaligned_ndx_iterator.consume(remaining_bits);
         while (remaining_bits) {
             const auto index = last_word & ndx_mask;
             data_iterator.move(static_cast<size_t>(index));
@@ -197,7 +193,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
         return do_find_all<Equal, Equal, Equal>(arr, value, start, end, baseindex, state);
     }
     else if constexpr (std::is_same_v<NotEqual, Cond>) {
-        return do_find_all<NotEqual, NotEqual, LessEqual>(arr, value, start, end, baseindex, state);
+        return do_find_all<NotEqual, Equal, NotEqual>(arr, value, start, end, baseindex, state);
     }
     else if constexpr (std::is_same_v<Less, Cond>) {
         return do_find_all<Less, GreaterEqual, Less>(arr, value, start, end, baseindex, state);
@@ -208,7 +204,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
     return true;
 }
 
-template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
+template <typename LinearCond, typename VectorCond1, typename VectorCond2>
 inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                                         QueryStateBase* state)
 {
@@ -217,7 +213,7 @@ inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t 
     const auto ndx_range = end - start;
     if (!run_parallel_subscan<LinearCond>(v_width, v_range, ndx_range))
         return find_linear<LinearCond>(arr, value, start, end, baseindex, state);
-    return find_parallel<ParallelCond1, ParallelCond2>(arr, value, start, end, baseindex, state);
+    return find_parallel<VectorCond1, VectorCond2>(arr, value, start, end, baseindex, state);
 }
 
 template <typename Cond>
@@ -254,48 +250,16 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     return true;
 }
 
-template <typename Cond, typename Type = WordTypeValue>
-inline uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
-{
-    if constexpr (std::is_same_v<Cond, Equal>)
-        return find_all_fields_EQ(MSBs, a, b);
-    if constexpr (std::is_same_v<Cond, NotEqual>)
-        return find_all_fields_NE(MSBs, a, b);
-
-    if constexpr (std::is_same_v<Cond, Greater>) {
-        if (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        if (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_GT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, GreaterEqual>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_GE(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_GE(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, Less>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_LT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, LessEqual>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_LE(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-}
-
-template <typename CondVal, typename CondIndex>
+template <typename VectorCond1, typename VectorCond2>
 inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                                           QueryStateBase* state)
 {
+    //
+    // algorithm idea: first try to find in the array of values (should be shorter in size but more bits) using
+    // VectorCond1.
+    //                 Then match the index found in the array of indices using VectorCond2
+    //
+
     const auto& compressor = arr.integer_compressor();
     const auto v_width = compressor.v_width();
     const auto v_size = compressor.v_size();
@@ -305,18 +269,22 @@ inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_
 
     auto MSBs = compressor.msb();
     auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(vector_compare<CondVal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
-    if (v_start == v_size)
-        return true;
+    auto v_start =
+        parallel_subword_find(find_all_fields<VectorCond1>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+
+    if constexpr (!std::is_same_v<VectorCond2, NotEqual>) {
+        if (start == v_size)
+            return true;
+    }
 
     MSBs = compressor.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find(vector_compare<CondIndex, WordTypeIndex>, data, offset, ndx_width, MSBs,
+        start = parallel_subword_find(find_all_fields_unsigned<VectorCond2>, data, offset, ndx_width, MSBs,
                                       search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
-                return false;
+
+        if (start < end && !state->match(start + baseindex))
+            return false;
 
         ++start;
     }

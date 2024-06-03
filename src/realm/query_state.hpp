@@ -22,8 +22,6 @@
 #include <cstdlib> // size_t
 #include <cstdint> // unint8_t etc
 
-#include <realm/node.hpp>
-
 namespace realm {
 
 enum Action { act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_Average };
@@ -34,6 +32,7 @@ enum { cond_Equal, cond_NotEqual, cond_Greater, cond_Less, cond_VTABLE_FINDER_CO
 
 class ArrayUnsigned;
 class Mixed;
+class ArrayPayload;
 
 class QueryStateBase {
 public:
