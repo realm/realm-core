@@ -408,7 +408,7 @@ private:
 
     void download_fresh_realm(const sync::SessionErrorInfo& error_info)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, StatusWith<sync::SessionErrorInfo> error_info,
+    void handle_fresh_realm_downloaded(DBRef db, Status result, const sync::SessionErrorInfo& cr_error_info,
                                        std::optional<sync::SubscriptionSet> new_subs = std::nullopt)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
