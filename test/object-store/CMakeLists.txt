@@ -238,8 +238,6 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
     endif()
 endif()
 
-add_subdirectory(notifications-fuzzer)
-
 if(NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
     add_subdirectory(benchmarks)
 endif()
