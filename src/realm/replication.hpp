@@ -112,70 +112,34 @@ public:
     /// \defgroup replication_transactions
     //@{
 
-    /// From the point of view of the Replication class, a transaction is
-    /// initiated when, and only when the associated Transaction object calls
-    /// initiate_transact() and the call is successful. The associated
-    /// Transaction object must terminate every initiated transaction either by
-    /// calling finalize_commit() or by calling abort_transact(). It may only
-    /// call finalize_commit(), however, after calling prepare_commit(), and
-    /// only when prepare_commit() succeeds. If prepare_commit() fails (i.e.,
-    /// throws) abort_transact() must still be called.
+    /// From the point of view of the Replication class, a write transaction
+    /// has the following steps:
     ///
-    /// The associated Transaction object is supposed to terminate a transaction
-    /// as soon as possible, and is required to terminate it before attempting
-    /// to initiate a new one.
+    /// 1. The parent Transaction acquires exclusive write access to the local Realm.
+    /// 2. initiate_transact() is called and succeeds.
+    /// 3. Mutations in the Realm occur, each of which is reported to
+    ///    Replication via one of the member functions at the top of the class
+    ///    (`set()` and friends).
+    /// 4. prepare_commit() is called as the first phase of two-phase commit.
+    ///    This writes the produced replication log to whatever form of persisted
+    ///    storage the specific Replication subclass uses. As this may be the
+    ///    Realm file itself, this must be called while the write transaction is
+    ///    still active. After this function is called, no more modifications
+    ///    which require replication may be performed until the next transaction
+    ///    is initiated. If this step fails (by throwing an exception), the
+    ///    transaction cannot be committed and must be rolled back.
+    /// 5. The parent Transaction object performs the commit operation on the local Realm.
+    /// 6. finalize_commit() is called by the Transaction object. With
+    ///    out-of-Realm replication logs this was used to mark the logs written in
+    ///    step 4 as being valid. With modern in-Realm storage it is merely used
+    ///    to clean up temporary state.
     ///
-    /// initiate_transact() is called by the associated Transaction object as
-    /// part of the initiation of a transaction, and at a time where the caller
-    /// has acquired exclusive write access to the local Realm. The Replication
-    /// implementation is allowed to perform "precursor transactions" on the
-    /// local Realm at this time. During the initiated transaction, the
-    /// associated DB object must inform the Replication object of all
-    /// modifying operations by calling set_value() and friends.
-    ///
-    /// FIXME: There is currently no way for implementations to perform
-    /// precursor transactions, since a regular transaction would cause a dead
-    /// lock when it tries to acquire a write lock. Consider giving access to
-    /// special non-locking precursor transactions via an extra argument to this
-    /// function.
-    ///
-    /// prepare_commit() serves as the first phase of a two-phase commit. This
-    /// function is called by the associated Transaction object immediately
-    /// before the commit operation on the local Realm. The associated
-    /// Transaction object will then, as the second phase, either call
-    /// finalize_commit() or abort_transact() depending on whether the commit
-    /// operation succeeded or not. The Replication implementation is allowed to
-    /// modify the Realm via the associated Transaction object at this time
-    /// (important to in-Realm histories).
-    ///
-    /// initiate_transact() and prepare_commit() are allowed to block the
-    /// calling thread if, for example, they need to communicate over the
-    /// network. If a calling thread is blocked in one of these functions, it
-    /// must be possible to interrupt the blocking operation by having another
-    /// thread call interrupt(). The contract is as follows: When interrupt() is
-    /// called, then any execution of initiate_transact() or prepare_commit(),
-    /// initiated before the interruption, must complete without blocking, or
-    /// the execution must be aborted by throwing an Interrupted exception. If
-    /// initiate_transact() or prepare_commit() throws Interrupted, it counts as
-    /// a failed operation.
-    ///
-    /// finalize_commit() is called by the associated Transaction object
-    /// immediately after a successful commit operation on the local Realm. This
-    /// happens at a time where modification of the Realm is no longer possible
-    /// via the associated Transaction object. In the case of in-Realm
-    /// histories, the changes are automatically finalized as part of the commit
-    /// operation performed by the caller prior to the invocation of
-    /// finalize_commit(), so in that case, finalize_commit() might not need to
-    /// do anything.
-    ///
-    /// abort_transact() is called by the associated Transaction object to
-    /// terminate a transaction without committing. That is, any transaction
-    /// that is not terminated by finalize_commit() is terminated by
-    /// abort_transact(). This could be due to an explicit rollback, or due to a
-    /// failed commit attempt.
-    ///
-    /// Note that finalize_commit() and abort_transact() are not allowed to
-    /// throw.
+    /// In previous versions every call to initiate_transact() had to be
+    /// paired with either a call to finalize_commit() or abort_transaction().
+    /// This is no longer the case, and aborted write transactions are no
+    /// longer reported to Replication. This means that initiate_transact()
+    /// must discard any pending state and begin a fresh transaction if it is
+    /// called twice without an intervening finalize_commit().
     ///
     /// \param current_version The version of the snapshot that the current
     /// transaction is based on.
@@ -184,10 +148,6 @@ public:
     /// updated to reflect the currently bound snapshot, such as when
     /// _impl::History::update_early_from_top_ref() was called during the
     /// transition from a read transaction to the current write transaction.
-    ///
-    /// \throw Interrupted Thrown by initiate_transact() and prepare_commit() if
-    /// a blocking operation was interrupted.
-
     void initiate_transact(Group& group, version_type current_version, bool history_updated);
     /// \param current_version The version of the snapshot that the current
     /// transaction is based on.
