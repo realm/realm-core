@@ -10,7 +10,6 @@
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
-#include <realm/sync/noinst/migration_store.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>

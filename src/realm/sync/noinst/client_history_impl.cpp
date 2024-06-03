@@ -273,7 +273,7 @@ util::UniqueFunction<SyncReplication::WriteValidator> ClientReplication::make_wr
 }
 
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
-                               SyncProgress& progress, bool* has_pending_client_reset) const
+                               SyncProgress& progress) const
 {
     TransactionRef rt = m_db->start_read(); // Throws
     version_type current_client_version_2 = rt->get_version();
@@ -306,10 +306,6 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
     REALM_ASSERT(current_client_version >= s_initial_version + 0);
     if (current_client_version == s_initial_version + 0)
         current_client_version = 0;
-
-    if (has_pending_client_reset) {
-        *has_pending_client_reset = _impl::client_reset::has_pending_reset(*rt).has_value();
-    }
 }
 
 void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)

@@ -697,6 +697,22 @@ inline int DB::get_file_format_version() const noexcept
     return m_file_format_version;
 }
 
+inline std::ostream& operator<<(std::ostream& os, const DB::TransactStage& stage)
+{
+    switch (stage) {
+        case DB::TransactStage::transact_Ready:
+            return os << "transact_Ready";
+        case DB::TransactStage::transact_Reading:
+            return os << "transact_Reading";
+        case DB::TransactStage::transact_Frozen:
+            return os << "transact_Frozen";
+        case DB::TransactStage::transact_Writing:
+            return os << "transact_Writing";
+    }
+    REALM_UNREACHABLE();
+}
+
+
 } // namespace realm
 
 #endif // REALM_DB_HPP
