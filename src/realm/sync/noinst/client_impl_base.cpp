@@ -1729,8 +1729,7 @@ void Session::activate()
     reset_protocol_state();
     m_state = Active;
 
-    call_debug_hook(SyncClientHookEvent::SessionActivating, m_progress, m_last_sent_flx_query_version,
-                    DownloadBatchState::SteadyState, 0);
+    call_debug_hook(SyncClientHookEvent::SessionActivating);
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -1828,18 +1827,19 @@ void Session::send_message()
     if (!m_bind_message_sent)
         return send_bind_message(); // Throws
 
-    if (!m_ident_message_sent) {
-        if (have_client_file_ident())
-            send_ident_message(); // Throws
-        return;
-    }
-
+    // Pending test commands can be sent any time after the BIND message is sent
     const auto has_pending_test_command = std::any_of(m_pending_test_commands.begin(), m_pending_test_commands.end(),
                                                       [](const PendingTestCommand& command) {
                                                           return command.pending;
                                                       });
     if (has_pending_test_command) {
         return send_test_command_message();
+    }
+
+    if (!m_ident_message_sent) {
+        if (have_client_file_ident())
+            send_ident_message(); // Throws
+        return;
     }
 
     if (m_error_to_send)
@@ -1948,8 +1948,7 @@ void Session::send_bind_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
-    call_debug_hook(SyncClientHookEvent::BindMessageSent, m_progress, m_last_sent_flx_query_version,
-                    DownloadBatchState::SteadyState, 0);
+    call_debug_hook(SyncClientHookEvent::BindMessageSent);
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -2394,11 +2393,11 @@ Status Session::receive_download_message(const DownloadMessage& message)
         logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                      "latest_server_version=%3, latest_server_version_salt=%4, "
                      "upload_client_version=%5, upload_server_version=%6, progress_estimate=%7, "
-                     "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
+                     "batch_state=%8, query_version=%9, num_changesets=%10, ...)",
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.progress_estimate, *message.last_in_batch, query_version,
+                     message.progress_estimate, message.batch_state, query_version,
                      message.changesets.size()); // Throws
     }
     else {
@@ -2432,8 +2431,6 @@ Status Session::receive_download_message(const DownloadMessage& message)
     // download message must have a remote version greater than (or equal to for FLX) this value.
     version_type last_remote_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    version_type last_changeset_version = 0; // skips checking the first time through the loop
-    bool has_duplicate_changeset_versions = false;
 
     for (const RemoteChangeset& changeset : message.changesets) {
         // Check that per-changeset server version is strictly increasing since the last download server version,
@@ -2448,16 +2445,8 @@ Status Session::receive_download_message(const DownloadMessage& message)
                                  changeset.remote_version, last_remote_version, progress.download.server_version)};
         }
 
-        if (last_changeset_version == changeset.remote_version) {
-            // last_changeset_version is 0 first time through the loop to prevent comparing the
-            // changeset remote_version to the download_server_version, which may lead to a false
-            // positive when checking for changesets with duplicate remote_version values
-            has_duplicate_changeset_versions = true;
-        }
-
         // Save the remote version for the current changeset to compare against the next changeset
         last_remote_version = changeset.remote_version;
-        last_changeset_version = changeset.remote_version;
 
         // Check that per-changeset last integrated client version is "weakly"
         // increasing.
@@ -2483,10 +2472,8 @@ Status Session::receive_download_message(const DownloadMessage& message)
         }
     }
 
-    auto batch_state = derive_download_batch_state(message, has_duplicate_changeset_versions);
-
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
-                                       batch_state, message.changesets.size());
+                                       message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2495,16 +2482,16 @@ Status Session::receive_download_message(const DownloadMessage& message)
     if (is_flx)
         update_download_estimate(message.progress_estimate);
 
-    if (process_flx_bootstrap_message(progress, batch_state, query_version, message.changesets)) {
+    if (process_flx_bootstrap_message(progress, message.batch_state, query_version, message.changesets)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
 
     uint64_t downloadable_bytes = is_flx ? 0 : message.downloadable_bytes;
-    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, message.changesets); // Throws
+    initiate_integrate_changesets(downloadable_bytes, message.batch_state, progress, message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                  batch_state, message.changesets.size());
+                                  message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2614,7 +2601,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     // Can't process debug hook actions once the Session is undergoing deactivation, since
     // the SessionWrapper may not be available
     if (m_state == Active) {
-        auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+        auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, &info);
         if (debug_action == SyncClientHookAction::EarlyReturn) {
             return Status::OK();
         }
@@ -2674,7 +2661,7 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
+        call_debug_hook(SyncClientHookEvent::SessionSuspended, &info);
         m_conn.one_less_active_unsuspended_session(); // Throws
         on_suspended(info);                           // Throws
     }

@@ -346,6 +346,8 @@ public:
             return session.get_appservices_connection_id();
         }
 
+        // Supported commands can be found in `handleTestCommandMessage()`
+        // in baas/devicesync/server/qbs_client_handler_functions.go
         static util::Future<std::string> send_test_command(SyncSession& session, std::string request)
         {
             return session.send_test_command(std::move(request));

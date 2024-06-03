@@ -43,12 +43,11 @@ public:
     app::Response patch(std::string body) const;
     app::Response post(std::string body) const;
     app::Response put(std::string body) const;
-    app::Response del(std::string body = {}) const;
+    app::Response del() const;
     nlohmann::json get_json(const std::vector<std::pair<std::string, std::string>>& params = {}) const;
     nlohmann::json patch_json(nlohmann::json body) const;
     nlohmann::json post_json(nlohmann::json body) const;
     nlohmann::json put_json(nlohmann::json body) const;
-    nlohmann::json del_json(nlohmann::json body) const;
 
     AdminAPIEndpoint operator[](StringData name) const;
 
@@ -147,7 +146,6 @@ public:
     MigrationStatus get_migration_status(const std::string& app_id) const;
     nlohmann::json get_app_settings(const std::string& app_id) const;
     bool patch_app_settings(const std::string& app_id, nlohmann::json&& new_settings) const;
-    bool update_app_settings(const std::string& app_id, nlohmann::json&& new_settings) const;
 
     const std::string& admin_url() const noexcept
     {

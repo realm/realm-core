@@ -179,9 +179,9 @@ struct DownloadCursor {
 };
 
 enum class DownloadBatchState {
-    MoreToCome,
-    LastInBatch,
-    SteadyState,
+    MoreToCome = 0,
+    LastInBatch = 1,
+    SteadyState = 2,
 };
 
 /// Checks that `dc.last_integrated_client_version` is zero if
@@ -465,6 +465,19 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "MigrateSchema";
     }
     return o << "Invalid error action: " << int64_t(action);
+}
+
+inline std::ostream& operator<<(std::ostream& o, DownloadBatchState batch_state)
+{
+    switch (batch_state) {
+        case DownloadBatchState::MoreToCome:
+            return o << "MoreToCome";
+        case DownloadBatchState::LastInBatch:
+            return o << "LastInBatch";
+        case DownloadBatchState::SteadyState:
+            return o << "SteadyState";
+    }
+    return o << "Invalid batch state: " << int(batch_state);
 }
 
 } // namespace sync

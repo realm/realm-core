@@ -704,21 +704,12 @@ app::Response AdminAPIEndpoint::get(const std::vector<std::pair<std::string, std
     return do_request(std::move(req));
 }
 
-app::Response AdminAPIEndpoint::del(std::string body) const
+app::Response AdminAPIEndpoint::del() const
 {
     app::Request req;
     req.method = app::HttpMethod::del;
     req.url = m_url;
-    req.body = std::move(body);
     return do_request(std::move(req));
-}
-
-nlohmann::json AdminAPIEndpoint::del_json(nlohmann::json body) const
-{
-    auto resp = del(body.dump());
-    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(),
-                    resp.http_status_code, resp.body);
-    return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
 nlohmann::json AdminAPIEndpoint::get_json(const std::vector<std::pair<std::string, std::string>>& params) const

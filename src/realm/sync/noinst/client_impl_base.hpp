@@ -827,7 +827,7 @@ public:
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
     void integrate_changesets(const SyncProgress&, std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
-                              VersionInfo&, DownloadBatchState last_in_batch);
+                              VersionInfo&, DownloadBatchState batch_state);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -1179,11 +1179,8 @@ private:
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
-    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* = nullptr);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
-
-    DownloadBatchState derive_download_batch_state(const DownloadMessage& message,
-                                                   bool has_duplicate_changeset_versons);
 
     void init_progress_handler();
     void enable_progress_notifications();
