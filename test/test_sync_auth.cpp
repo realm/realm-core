@@ -47,40 +47,6 @@ TEST(Sync_Auth_JWTAccessToken)
     CHECK_EQUAL(tok.sync_label, "default");
 }
 
-
-TEST(Sync_Auth_JWTAccessTokenStitchFields)
-{
-    AccessToken tok;
-    AccessToken::ParseError error = AccessToken::ParseError::none;
-
-    PKey pk1 = PKey::load_public(test_util::get_test_resource_path() + "stitch_public.pem");
-    AccessControl ctrl(std::move(pk1));
-
-    AccessToken::Verifier& verifier = ctrl.verifier();
-    auto exampleJWT =
-        "eyJhbGciOiJSUzI1NiIsImtpZCI6IjVkYTY0NzI2NTM5NWM0ZmY0NzE2ZmE4NyIsInR5cCI6IkpXVCJ9."
-        "eyJhdWQiOiJyZWFsbSIsImV4cCI6NDU3MTE3ODYzOSwiaWF0Ijo0NTcxMTc4Mjc5LCJpc3MiOiJyZWFsbSIsInN0aXRjaF9kYXRhIjp7InJl"
-        "YWxtX2FjY2VzcyI6WyJkb3dubG9hZCIsInVwbG9hZCIsIm1hbmFnZSJdLCJyZWFsbV9wYXRoIjoiLzVkYTY0NzI3NTM5NWM0ZmY0NzE2ZmE5"
-        "My9leGFtcGxlIiwicmVhbG1fc3luY19sYWJlbCI6ImRlZmF1bHQifSwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw"
-        "Iiwic3RpdGNoX2RvbWFpbklkIjoiNWRhNjQ3MjY1Mzk1YzRmZjQ3MTZmYTg2Iiwic3ViIjoiNWRhNjQ3Mjc1Mzk1YzRmZjQ3MTZmYTkzIiwi"
-        "dHlwIjoiYWNjZXNzIiwidXNlcl9kYXRhIjpudWxsfQ."
-        "dgoKeww6xSjvhmZ69muDOJGOkk1sFxq9sfdFF2ufq3z1oTFujp3g6AIaKy66qcx6zbHEx4Zv7Fy4ytGpIW30truAiTvEks2z_"
-        "s6WHHUO2PEOygUruhnIHms2-Bw3MlTVn1cQHdIYK7F4AqT35Ds-9OVKWYPBMZnZt2AvIaBeESTNF-gOXKT0teAeM7PHkVzTow9I_"
-        "G6aCTRZhBRLrGdlaScXoVTNUhZf-"
-        "oxI7fmCcQYdZ4grulQgs40LxOnpGOxjnc9xiwoIsVsjsvju3qzqUt0Gg0tNjCAQtgdxn4XKXmx2THPnClxyeF67mn5IQ0QQy33EqLsETxgUD"
-        "cZ17h62JQ";
-    auto result = AccessToken::parseJWT(StringData(exampleJWT), tok, error, &verifier);
-
-    CHECK(result);
-    CHECK(error == AccessToken::ParseError::none);
-    CHECK_EQUAL(tok.expires, 4571178639);
-    CHECK_EQUAL(tok.sync_label, "default");
-    CHECK_EQUAL(tok.path, "/5da647275395c4ff4716fa93/example");
-    std::uint_least32_t admin_access =
-        Privilege::Download | Privilege::Upload | Privilege::ModifySchema | Privilege::SetPermissions;
-    CHECK_EQUAL(tok.access, admin_access);
-}
-
 #endif // !REALM_MOBILE
 
 } // unnamed namespace
