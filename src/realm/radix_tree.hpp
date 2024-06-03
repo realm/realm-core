@@ -148,11 +148,11 @@ struct IndexIterator {
         }
         for (size_t i = 0; i < m_positions.size() && i < other.m_positions.size(); ++i) {
             if (m_positions[i].array_ref == other.m_positions[i].array_ref &&
-                m_positions[i].position <= other.m_positions[i].position) {
-                return true;
+                m_positions[i].position > other.m_positions[i].position) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
 private:
@@ -218,6 +218,43 @@ struct InsertResult {
     size_t real_index;
 };
 
+struct SearchResult {
+    enum class Type { Match, NotFound };
+    Type result = Type::NotFound;
+    size_t index = realm::npos;
+    bool operator==(const SearchResult& other)
+    {
+        if (result == other.result) {
+            if (result == Type::NotFound) {
+                return true;
+            }
+            return index == other.index;
+        }
+        return false;
+    }
+    bool operator!=(const SearchResult& other)
+    {
+        return !(*this == other);
+    }
+
+    explicit operator bool() const
+    {
+        return result == Type::Match;
+    }
+    size_t operator*() const
+    {
+        REALM_ASSERT(result == Type::Match);
+        return index;
+    }
+};
+
+static inline std::ostream& operator<<(std::ostream& ostr, const SearchResult& result)
+{
+    ostr << "{" << ((result.result == SearchResult::Type::Match) ? "Match" : "NotFound") << ", " << result.index
+         << "}";
+    return ostr;
+}
+
 /// Each RadixTree node contains an array of this type
 template <size_t ChunkWidth>
 class IndexNode : public Array {
@@ -242,11 +279,13 @@ public:
     void insert(const ObjKey& value, IndexKey<ChunkWidth>& key);
     void erase(const ObjKey& value, IndexKey<ChunkWidth>& key);
     IndexIterator find_first(IndexKey<ChunkWidth> key, ObjKey optional_known_key = ObjKey()) const;
+    IndexIterator find_last(IndexKey<ChunkWidth> key, ObjKey optional_known_key = ObjKey()) const;
     void find_all(std::vector<ObjKey>& results, IndexKey<ChunkWidth> key) const;
     FindRes find_all_no_copy(IndexKey<ChunkWidth> value, InternalFindResult& result) const;
     void find_all_insensitive(std::vector<ObjKey>& results, const Mixed& value) const;
     void find_all(IndexIterator begin, IndexIterator end, std::vector<ObjKey>& results) const;
     IndexIterator begin() const;
+    IndexIterator begin_past_null() const;
     IndexIterator end() const;
     void increment(IndexIterator& it) const;
     void clear();
@@ -299,7 +338,7 @@ private:
     InsertResult insert_to_population(IndexKey<ChunkWidth>& key);
     InsertResult do_insert_to_population(uint64_t population_value);
 
-    std::optional<size_t> index_of(const IndexKey<ChunkWidth>& key) const;
+    SearchResult index_of(const IndexKey<ChunkWidth>& key) const;
     void do_erase(const ObjKey& value, IndexKey<ChunkWidth>& key, IndexNode<ChunkWidth>* parent);
     void do_remove(size_t index_raw);
 
@@ -307,7 +346,8 @@ private:
         Firsts,
         Lasts,
     };
-    void descend(IndexIterator& it, Order order) const;
+    // returns true if an advance took place, false if only descent occured
+    bool descend(IndexIterator& it, Order order) const;
 
     ClusterColumn m_cluster;
     const size_t m_compact_threshold;

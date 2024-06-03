@@ -649,7 +649,7 @@ void IndexNode<ChunkWidth>::do_erase(const ObjKey& value, IndexKey<ChunkWidth>& 
     // because we assert on the final match of the ObjKey before removing it.
     key.set_offset(payload_offset + cur_prefix_size);
 
-    std::optional<size_t> ndx = this->index_of(key);
+    auto ndx = this->index_of(key);
     REALM_ASSERT_EX(ndx, value);
     auto rot = this->get_as_ref_or_tagged(*ndx);
     if (rot.is_tagged()) {
@@ -703,7 +703,7 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
             if (rot.is_ref()) {
                 ref_type ref = rot.get_as_ref();
                 if (!ref) {
-                    return {}; // no nulls
+                    return ret; // not found: no nulls
                 }
                 const IntegerColumn list(m_alloc, ref); // Throws
                 REALM_ASSERT(list.size());
@@ -730,27 +730,28 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
         size_t cur_prefix_size = cur_node.get_prefix_size();
         if (cur_prefix_size > key.num_chunks_to_penultimate()) {
             // the prefix at this node is larger than the remaining key length
-            return {}; // not found
+            return ret; // not found
         }
         IndexKey<ChunkWidth> cur_prefix = cur_node.get_prefix();
         for (size_t i = 0; i < cur_prefix_size; ++i) {
             auto key_chunk = key.get();
             if (!key_chunk || *key_chunk != cur_prefix.get()) {
-                return {}; // not found
+                return ret; // not found
             }
             key.next();
             cur_prefix.next();
         }
-        std::optional<size_t> ndx = cur_node.index_of(key);
+        auto ndx = cur_node.index_of(key);
         if (!ndx) {
-            return {}; // no index entry
+            ret.m_positions.push_back({cur_node.get_ref(), ndx.index});
+            return ret; // not found: no index entry
         }
         auto rot = cur_node.get_as_ref_or_tagged(*ndx);
         ret.m_positions.push_back({cur_node.get_ref(), *ndx});
         if (rot.is_tagged()) {
-            if (ndx != c_ndx_of_null && key.get_next()) {
+            if (*ndx != c_ndx_of_null && key.get_next()) {
                 // there is a prefix here, but not the entire value we are searching for
-                return {};
+                return ret; // not found
             }
             ret.m_key = ObjKey(rot.get_as_int());
             ret.m_type = IndexIterator::ResultType::Exhaustive;
@@ -761,7 +762,7 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
             // ref to sorted list
             if (is_sorted_list(ref, m_alloc)) {
                 if (key.get_next()) {
-                    return {}; // there is a list here and no sub nodes
+                    return ret; // not found: there is a list here and no sub nodes
                 }
                 const IntegerColumn sub(m_alloc, ref); // Throws
                 REALM_ASSERT(sub.size());
@@ -788,6 +789,31 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
     }
     return ret;
 }
+
+template <size_t ChunkWidth>
+IndexIterator IndexNode<ChunkWidth>::find_last(IndexKey<ChunkWidth> key, ObjKey optional_known_key) const
+{
+    IndexIterator it = find_first(key, optional_known_key);
+
+    if (it) {
+        if (it.m_type == IndexIterator::ResultType::List) {
+            ref_type node_ref = it.m_positions.back().array_ref;
+            REALM_ASSERT(is_sorted_list(node_ref, m_alloc));
+            const IntegerColumn list(m_alloc, node_ref); // Throws
+            REALM_ASSERT(list.size());
+            it.m_positions.back().position = list.size() - 1;
+            it.m_key = ObjKey(list.get(it.m_positions.back().position));
+        }
+#if COMPACT_NODE_OPTIMIZATION
+        if (m_type == ResultType::CompactList) {
+            REALM_UNREACHABLE(); // FIXME: implement if needed
+        }
+#endif
+    }
+
+    return it;
+}
+
 
 template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::find_all(std::vector<ObjKey>& results, IndexKey<ChunkWidth> key) const
@@ -954,11 +980,11 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
                 }
             }
         };
-        std::optional<size_t> ndx_upper = cur_node.index_of(upper_key);
+        auto ndx_upper = cur_node.index_of(upper_key);
         if (ndx_upper) {
             check_existing(*ndx_upper, upper_key);
         }
-        if (std::optional<size_t> ndx_lower = cur_node.index_of(lower_key)) {
+        if (auto ndx_lower = cur_node.index_of(lower_key)) {
             // no need to check again if the case mapping is identical for this key chunk.
             if (ndx_lower != ndx_upper) {
                 check_existing(*ndx_lower, lower_key);
@@ -971,6 +997,9 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
 template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::find_all(IndexIterator begin, IndexIterator end, std::vector<ObjKey>& results) const
 {
+    if (!begin) {
+        descend(begin, Order::Lasts);
+    }
     while (!begin.m_positions.empty() && begin.less_equal_to(end)) {
         results.push_back(begin.m_key);
         increment(begin);
@@ -987,6 +1016,15 @@ IndexIterator IndexNode<ChunkWidth>::begin() const
 }
 
 template <size_t ChunkWidth>
+IndexIterator IndexNode<ChunkWidth>::begin_past_null() const
+{
+    IndexIterator ret;
+    ret.m_positions = {ArrayChainLink{m_ref, c_ndx_of_null + 1}};
+    descend(ret, Order::Firsts);
+    return ret;
+}
+
+template <size_t ChunkWidth>
 IndexIterator IndexNode<ChunkWidth>::end() const
 {
     return IndexIterator{};
@@ -995,6 +1033,13 @@ IndexIterator IndexNode<ChunkWidth>::end() const
 template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::increment(IndexIterator& it) const
 {
+    if (!it) {
+        REALM_ASSERT(it.m_positions.size());
+        bool did_advance = descend(it, Order::Lasts);
+        if (!it || did_advance) {
+            return;
+        }
+    }
     IndexNode<ChunkWidth> node = IndexNode<ChunkWidth>(m_alloc, m_cluster, m_compact_threshold);
     while (!it.m_positions.empty()) {
         ref_type node_ref = it.m_positions.back().array_ref;
@@ -1019,7 +1064,7 @@ void IndexNode<ChunkWidth>::increment(IndexIterator& it) const
 }
 
 template <size_t ChunkWidth>
-void IndexNode<ChunkWidth>::descend(IndexIterator& it, Order order) const
+bool IndexNode<ChunkWidth>::descend(IndexIterator& it, Order order) const
 {
     auto get_next_ndx = [&order](IndexNode<ChunkWidth>& node) -> size_t {
         size_t ndx_to_explore = realm::npos;
@@ -1048,12 +1093,22 @@ void IndexNode<ChunkWidth>::descend(IndexIterator& it, Order order) const
         return ndx_to_explore;
     };
 
+    if (!it.m_positions.size()) {
+        if (order == Order::Lasts) {
+            it.m_positions.push_back(ArrayChainLink{this->get_ref(), this->size() - 1});
+        }
+        else {
+            it.m_positions.push_back(ArrayChainLink{this->get_ref(), c_ndx_of_null});
+        }
+    }
+
+    bool did_advance = false;
     REALM_ASSERT(it.m_positions.size());
     IndexNode<ChunkWidth> node = IndexNode<ChunkWidth>(m_alloc, m_cluster, m_compact_threshold);
     while (true) {
         ref_type node_ref = it.m_positions.back().array_ref;
         if (node_ref == 0) {
-            return; // empty tree
+            return did_advance; // empty tree
         }
         if (is_sorted_list(node_ref, m_alloc)) {
             REALM_ASSERT_3(it.m_positions.back().position, ==, realm::npos);
@@ -1063,16 +1118,17 @@ void IndexNode<ChunkWidth>::descend(IndexIterator& it, Order order) const
             it.m_key = ObjKey(*(list.cbegin() + offset_in_list));
             it.m_type = IndexIterator::ResultType::List;
             it.m_positions.back().position = offset_in_list;
-            return;
+            return did_advance;
         }
         node.init_from_ref(node_ref);
 
         size_t ndx_to_explore = it.m_positions.back().position;
-        if (ndx_to_explore == realm::npos) {
+        if (ndx_to_explore == realm::npos || (ndx_to_explore == c_ndx_of_null && node.get(c_ndx_of_null) == 0)) {
             ndx_to_explore = get_next_ndx(node);
             if (ndx_to_explore == realm::npos) {
-                return; // empty tree
+                return did_advance; // empty tree
             }
+            did_advance = true;
             it.m_positions.back().position = ndx_to_explore;
         }
 
@@ -1080,12 +1136,12 @@ void IndexNode<ChunkWidth>::descend(IndexIterator& it, Order order) const
         if (rot.is_tagged()) {
             it.m_key = ObjKey(rot.get_as_int());
             it.m_type = IndexIterator::ResultType::Exhaustive;
-            return;
+            return did_advance;
         }
         it.m_positions.push_back(ArrayChainLink{rot.get_as_ref(), realm::npos});
     }
     REALM_UNREACHABLE();
-    return;
+    return did_advance;
 }
 
 template <size_t ChunkWidth>
@@ -1485,26 +1541,32 @@ InsertResult IndexNode<ChunkWidth>::insert_to_population(IndexKey<ChunkWidth>& k
 }
 
 template <size_t ChunkWidth>
-std::optional<size_t> IndexNode<ChunkWidth>::index_of(const IndexKey<ChunkWidth>& key) const
+SearchResult IndexNode<ChunkWidth>::index_of(const IndexKey<ChunkWidth>& key) const
 {
+    SearchResult ret;
     auto optional_value = key.get();
     if (!optional_value) {
-        return Array::get(c_ndx_of_null) ? std::make_optional(c_ndx_of_null) : std::nullopt;
+        if (Array::get(c_ndx_of_null)) {
+            ret.index = c_ndx_of_null;
+            ret.result = SearchResult::Type::Match;
+        }
+        return ret;
     }
     size_t value = *optional_value;
     size_t population_entry = value / c_num_bits_per_tagged_int;
     uint64_t population = get_population(population_entry);
     size_t value_in_pop_entry = (value - (c_num_bits_per_tagged_int * population_entry));
 
-    if ((population & (uint64_t(1) << value_in_pop_entry)) == 0) {
-        return std::nullopt;
+    if ((population & (uint64_t(1) << value_in_pop_entry)) != 0) {
+        ret.result = SearchResult::Type::Match;
     }
     size_t prior_populations = 0;
     for (size_t i = 0; i < population_entry; ++i) {
         prior_populations += fast_popcount64(get_population(i));
     }
-    return c_num_metadata_entries + prior_populations +
-           fast_popcount64(population << (c_num_bits_per_tagged_int - value_in_pop_entry)) - 1;
+    ret.index = c_num_metadata_entries + prior_populations +
+                fast_popcount64(population << (c_num_bits_per_tagged_int - value_in_pop_entry)) - 1;
+    return ret;
 }
 
 template <size_t ChunkWidth>
@@ -1794,6 +1856,9 @@ void RadixTree<ChunkWidth>::find_all_greater_equal(const Mixed& value, std::vect
 {
     m_array->update_from_parent();
     IndexIterator begin = m_array->find_first(IndexKey<ChunkWidth>(value));
+    if (!begin) {
+        m_array->increment(begin);
+    }
     IndexIterator end = m_array->end();
     results.clear();
     m_array->find_all(begin, end, results);
@@ -1803,8 +1868,11 @@ template <size_t ChunkWidth>
 void RadixTree<ChunkWidth>::find_all_less_equal(const Mixed& value, std::vector<ObjKey>& results) const
 {
     m_array->update_from_parent();
-    IndexIterator begin = m_array->begin();
-    IndexIterator end = m_array->find_first(IndexKey<ChunkWidth>(value));
+    IndexIterator begin = m_array->begin_past_null();
+    if (value.is_null()) {
+        begin = m_array->begin();
+    }
+    IndexIterator end = m_array->find_last(IndexKey<ChunkWidth>(value));
     results.clear();
     m_array->find_all(begin, end, results);
 }
@@ -1815,7 +1883,10 @@ void RadixTree<ChunkWidth>::find_all_between_inclusive(const Mixed& begin, const
 {
     m_array->update_from_parent();
     IndexIterator begin_it = m_array->find_first(IndexKey<ChunkWidth>(begin));
-    IndexIterator end_it = m_array->find_first(IndexKey<ChunkWidth>(end));
+    if (!begin_it) {
+        m_array->increment(begin_it);
+    }
+    IndexIterator end_it = m_array->find_last(IndexKey<ChunkWidth>(end));
     results.clear();
     m_array->find_all(begin_it, end_it, results);
 }

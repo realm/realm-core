@@ -706,9 +706,21 @@ TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableInde
     auto values = gen.values_from_int<underlying_type>({-1, 0, 1, 4294967295ll, -4294967295ll, 4294967296ll,
                                                         -4294967296ll, std::numeric_limits<int64_t>::max(),
                                                         std::numeric_limits<int64_t>::lowest()});
+    size_t num_positives = 0;
+    size_t num_negatives = 0;
+    size_t num_zeros = 0;
     std::vector<Mixed> args;
     for (auto val : values) {
         args.push_back(Mixed{val});
+        if (val < Mixed{0}) {
+            ++num_negatives;
+        }
+        else if (val > Mixed{0}) {
+            ++num_positives;
+        }
+        else {
+            ++num_zeros;
+        }
     }
 
     for (size_t i = 0; i < values.size(); ++i) {
@@ -756,6 +768,13 @@ TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableInde
     verify_query(test_context, t, "values != ALL {-1, 0}", sz - 2);
     verify_query(test_context, t, "values != ALL {-1}", sz - 1);
     verify_query(test_context, t, "values != ALL {}", sz);
+
+    verify_query(test_context, t, "values < 0", num_negatives);
+    verify_query(test_context, t, "values > 0", num_positives);
+    verify_query(test_context, t, "values == 0", num_zeros);
+    verify_query(test_context, t, "values <= 0", num_zeros + num_negatives);
+    verify_query(test_context, t, "values >= 0", num_zeros + num_positives);
+    verify_query(test_context, t, "values != 0", sz - num_zeros);
 }
 
 TEST(Parser_LinksToSameTable)

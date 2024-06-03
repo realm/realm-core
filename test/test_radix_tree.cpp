@@ -90,7 +90,7 @@ TEST_TYPES(IndexKey_Get, ChunkOf<4>, ChunkOf<5>, ChunkOf<6>, ChunkOf<7>, ChunkOf
 
 TEST(RadixTree_BuildIndexInt)
 {
-    std::vector<Mixed> values = {0, 1, 2, 3, 4, 4, 5, 5, 5, Mixed{}, -1};
+    std::vector<Mixed> values = {0, 1, 2, 3, 4, 4, 5, 5, 5, 9, Mixed{}, -1};
     Table table;
     ColKey col_pk = table.add_column(type_ObjectId, "pk");
     table.set_primary_key_column(col_pk);
@@ -128,10 +128,48 @@ TEST(RadixTree_BuildIndexInt)
     CHECK_EQUAL(col.get(res.start_ndx), obj_keys[4].value);
     CHECK_EQUAL(col.get(res.start_ndx + 1), obj_keys[5].value);
 
+    auto verify_values = [&](std::vector<ObjKey>& results, std::vector<std::optional<int64_t>> expected) {
+        std::vector<std::optional<int64_t>> actual;
+        for (auto key : results) {
+            actual.push_back(table.get_object(key).get<std::optional<Int>>(col_key));
+        }
+        CHECK_EQUAL(actual, expected);
+    };
+
     int_index->find_all_greater_equal(Mixed{4}, results);
-    std::vector<ObjKey> expected;
-    expected.insert(expected.begin(), obj_keys.begin() + 4, obj_keys.begin() + 9);
-    CHECK_EQUAL(results, expected);
+    verify_values(results, {4, 4, 5, 5, 5, 9});
+    int_index->find_all_greater_equal(Mixed{10}, results);
+    verify_values(results, {});
+    int_index->find_all_greater_equal(Mixed{-2}, results);
+    verify_values(results, {-1, 0, 1, 2, 3, 4, 4, 5, 5, 5, 9});
+    int_index->find_all_greater_equal(Mixed{}, results);
+    verify_values(results, {{}, -1, 0, 1, 2, 3, 4, 4, 5, 5, 5, 9});
+    int_index->find_all_greater_equal(Mixed{8}, results);
+    verify_values(results, {9});
+
+    int_index->find_all_less_equal(Mixed{3}, results);
+    verify_values(results, {-1, 0, 1, 2, 3});
+    int_index->find_all_less_equal(Mixed{8}, results);
+    verify_values(results, {-1, 0, 1, 2, 3, 4, 4, 5, 5, 5});
+    int_index->find_all_less_equal(Mixed{9}, results);
+    verify_values(results, {-1, 0, 1, 2, 3, 4, 4, 5, 5, 5, 9});
+    int_index->find_all_less_equal(Mixed{10}, results);
+    verify_values(results, {-1, 0, 1, 2, 3, 4, 4, 5, 5, 5, 9});
+    int_index->find_all_less_equal(Mixed{}, results);
+    verify_values(results, {{}});
+
+    int_index->find_all_between_inclusive(Mixed{2}, Mixed{5}, results);
+    verify_values(results, {2, 3, 4, 4, 5, 5, 5});
+    int_index->find_all_between_inclusive(Mixed{8}, Mixed{11}, results);
+    verify_values(results, {9});
+    int_index->find_all_between_inclusive(Mixed{2}, Mixed{2}, results); // same upper/lower
+    verify_values(results, {2});
+    int_index->find_all_between_inclusive(Mixed{-1}, Mixed{1}, results); // negative crossing
+    verify_values(results, {-1, 0, 1});
+    int_index->find_all_between_inclusive(Mixed{1}, Mixed{-1}, results); // invalid range
+    verify_values(results, {});
+    int_index->find_all_between_inclusive(Mixed{}, Mixed{}, results);
+    verify_values(results, {{}});
 
     while (table.size()) {
         table.remove_object(table.begin());
@@ -369,15 +407,24 @@ void do_test_type(Table& table, TestContext& test_context)
             });
             return result_values;
         };
+        auto verify_values = [&](std::vector<ObjKey>& results, std::vector<int64_t> expected) {
+            std::vector<int64_t> actual;
+            for (auto key : results) {
+                std::optional<int64_t> actual_val = table.get_object(key).get<std::optional<Int>>(col);
+                REALM_ASSERT(actual_val); // expect no nulls
+                actual.push_back(*actual_val);
+            }
+            CHECK_EQUAL(actual, expected);
+        };
+
         std::sort(values.begin(), values.end());
         std::vector<ObjKey> results;
-        constexpr bool should_contain_null = true;
         constexpr bool should_not_contain_null = false;
         RadixTree<ChunkWidth>* int_index = dynamic_cast<RadixTree<ChunkWidth>*>(ndx);
         CHECK(int_index);
         if (int_index) {
             int_index->find_all_less_equal(values.back(), results);
-            std::vector<int64_t> result_values = get_result_values(results, should_contain_null);
+            std::vector<int64_t> result_values = get_result_values(results, should_not_contain_null);
             CHECK_EQUAL(values, result_values);
             int_index->find_all_greater_equal(values.front(), results);
             result_values = get_result_values(results, should_not_contain_null);
@@ -385,6 +432,23 @@ void do_test_type(Table& table, TestContext& test_context)
             int_index->find_all_between_inclusive(values.front(), values.back(), results);
             result_values = get_result_values(results, should_not_contain_null);
             CHECK_EQUAL(values, result_values);
+
+            std::vector<int64_t> expected_values;
+            for (int64_t val : values) {
+                expected_values.clear();
+                std::copy_if(values.begin(), values.end(), std::back_inserter(expected_values), [&](auto v) {
+                    return v >= val;
+                });
+                int_index->find_all_greater_equal(val, results);
+                verify_values(results, expected_values);
+
+                expected_values.clear();
+                std::copy_if(values.begin(), values.end(), std::back_inserter(expected_values), [&](auto v) {
+                    return v <= val;
+                });
+                int_index->find_all_less_equal(val, results);
+                verify_values(results, expected_values);
+            }
         }
     }
 
