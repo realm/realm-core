@@ -2348,11 +2348,21 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     // if a client reset happens, it will take care of setting the file ident
     // and if not, we do it here
     bool did_client_reset = false;
+
+    // Save some of the client reset info for reporting to the client if an error occurs.
+    Status cr_status(Status::OK()); // Start with no client reset
+    ProtocolErrorInfo::Action cr_action = ProtocolErrorInfo::Action::NoAction;
+    if (auto& cr_config = get_client_reset_config()) {
+        cr_status = cr_config->error;
+        cr_action = cr_config->action;
+    }
+
     try {
         did_client_reset = client_reset_if_needed();
     }
     catch (const std::exception& e) {
-        auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
+        auto err_msg = util::format("A fatal error occurred during '%1' client reset for %2: '%3'", cr_action,
+                                    cr_status, e.what());
         logger.error(err_msg.c_str());
         ProtocolErrorInfo prot_info = {ErrorCodes::AutoClientResetFailed, err_msg, IsFatal{true}};
         call_debug_hook(SyncClientHookEvent::ClientResetMergeFailed, prot_info);
