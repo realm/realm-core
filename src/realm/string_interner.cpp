@@ -169,9 +169,8 @@ static void add_to_hash_map(Array& node, uint64_t hash, uint64_t id, uint8_t has
                 new_node.create(NodeHeader::type_Normal, false, new_size, 0);
                 need_to_rehash = !rehash(node, new_node, hash_size);
                 if (need_to_rehash) { // we failed, try again - or shift to radix
-                    // TODO: Prove that this cannot happen
+                    // I find it counter-intuitive. But it CAN happen.
                     new_node.destroy();
-                    std::cout << "Repeated rehash from " << node.size() << " to " << new_size << std::endl;
                 }
             }
             if (need_to_rehash)
