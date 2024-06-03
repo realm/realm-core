@@ -50,18 +50,7 @@ public:
 
 private:
     static bool find_all_match(size_t, size_t, size_t, QueryStateBase*);
-
-    template <typename Cond>
-    static bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
-
-    template <typename VectorCond1, typename VectorCond2>
-    static bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
-
-    template <typename LinearCond, typename VectorCond1, typename VectorCond2>
-    static bool do_find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
-
-    template <typename Cond>
-    static bool run_parallel_subscan(size_t, size_t, size_t);
+    static size_t lower_bound(size_t, int64_t, uint64_t, BfIterator&) noexcept;
 };
 
 inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx)
@@ -164,6 +153,18 @@ inline void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, i
     data_iterator.set_value(value);
 }
 
+template <typename T>
+class IndexCond {
+public:
+    using type = T;
+};
+
+template <>
+class IndexCond<Greater> {
+public:
+    using type = GreaterEqual;
+};
+
 template <typename Cond>
 inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                                      QueryStateBase* state)
@@ -174,7 +175,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
     if (end == npos)
         end = arr.m_size;
 
-    if (!(arr.m_size > start && start < end))
+    if (start >= arr.m_size || start >= end)
         return true;
 
     const auto lbound = arr.m_lbound;
@@ -189,116 +190,99 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
 
     REALM_ASSERT_DEBUG(arr.m_width != 0);
 
-    if constexpr (std::is_same_v<Equal, Cond>) {
-        return do_find_all<Equal, Equal, Equal>(arr, value, start, end, baseindex, state);
-    }
-    else if constexpr (std::is_same_v<NotEqual, Cond>) {
-        return do_find_all<NotEqual, Equal, NotEqual>(arr, value, start, end, baseindex, state);
-    }
-    else if constexpr (std::is_same_v<Less, Cond>) {
-        return do_find_all<Less, GreaterEqual, Less>(arr, value, start, end, baseindex, state);
-    }
-    else if constexpr (std::is_same_v<Greater, Cond>) {
-        return do_find_all<Greater, Greater, GreaterEqual>(arr, value, start, end, baseindex, state);
-    }
-    return true;
-}
-
-template <typename LinearCond, typename VectorCond1, typename VectorCond2>
-inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                        QueryStateBase* state)
-{
-    const auto v_width = arr.m_width;
-    const auto v_range = arr.integer_compressor().v_size();
-    const auto ndx_range = end - start;
-    if (!run_parallel_subscan<LinearCond>(v_width, v_range, ndx_range))
-        return find_linear<LinearCond>(arr, value, start, end, baseindex, state);
-    return find_parallel<VectorCond1, VectorCond2>(arr, value, start, end, baseindex, state);
-}
-
-template <typename Cond>
-inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                        QueryStateBase* state)
-{
-    const auto cmp = [](int64_t item, int64_t key) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return item == key;
-        if constexpr (std::is_same_v<Cond, NotEqual>)
-            return item != key;
-        if constexpr (std::is_same_v<Cond, Less>)
-            return item < key;
-        if constexpr (std::is_same_v<Cond, Greater>)
-            return item > key;
-        REALM_UNREACHABLE();
-    };
-
-    const auto& c = arr.integer_compressor();
-    const auto offset = c.v_width() * c.v_size();
-    const auto ndx_w = c.ndx_width();
-    const auto v_w = c.v_width();
-    const auto data = c.data();
-    const auto mask = c.v_mask();
-    BfIterator ndx_iterator{data, offset, ndx_w, ndx_w, start};
-    BfIterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
-    while (start < end) {
-        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
-        if (cmp(sv, value) && !state->match(start + baseindex))
-            return false;
-        ndx_iterator.move(++start);
-        data_iterator.move(static_cast<size_t>(*ndx_iterator));
-    }
-    return true;
-}
-
-template <typename VectorCond1, typename VectorCond2>
-inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                          QueryStateBase* state)
-{
-    //
-    // algorithm idea: first try to find in the array of values (should be shorter in size but more bits) using
-    // VectorCond1.
-    //                 Then match the index found in the array of indices using VectorCond2
-    //
-
     const auto& compressor = arr.integer_compressor();
-    const auto v_width = compressor.v_width();
+    const auto v_width = arr.m_width;
     const auto v_size = compressor.v_size();
-    const auto ndx_width = compressor.ndx_width();
-    const auto offset = v_size * v_width;
+    const auto mask = compressor.v_mask();
     uint64_t* data = (uint64_t*)arr.m_data;
+    size_t v_start = realm::not_found;
 
-    auto MSBs = compressor.msb();
-    auto search_vector = populate(v_width, value);
-    auto v_start =
-        parallel_subword_find(find_all_fields<VectorCond1>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+    {
+        int64_t v = value;
+        if constexpr (std::is_same_v<Cond, Greater>) {
+            v++; // We use GreaterEqual below, so this will effectively be Greater
+        }
 
-    if constexpr (!std::is_same_v<VectorCond2, NotEqual>) {
-        if (start == v_size)
-            return true;
+        if (v_width <= 16 && v_size >= 20) {
+            auto search_vector = populate(v_width, v);
+            v_start = parallel_subword_find(find_all_fields<GreaterEqual>, data, 0, v_width, compressor.msb(),
+                                            search_vector, 0, v_size);
+        }
+        else {
+            BfIterator data_iterator{data, 0, v_width, v_width, 0};
+            size_t idx = 0;
+            while (idx < v_size) {
+                if (sign_extend_field_by_mask(mask, *data_iterator) >= v) {
+                    break;
+                }
+                data_iterator.move(++idx);
+            }
+            v_start = idx;
+            /*
+            // Binary search alternative
+            v_start = lower_bound(v_size, v, mask, data_iterator);
+            */
+        }
     }
 
-    MSBs = compressor.ndx_msb();
-    search_vector = populate(ndx_width, v_start);
-    while (start < end) {
-        start = parallel_subword_find(find_all_fields_unsigned<VectorCond2>, data, offset, ndx_width, MSBs,
-                                      search_vector, start, end);
+    if constexpr (realm::is_any_v<Cond, Equal, NotEqual>) {
+        // Check for equality.
+        if (v_start < v_size) {
+            BfIterator it{data, 0, v_width, v_width, v_start};
+            if (sign_extend_field_by_mask(mask, *it) > value) {
+                v_start = v_size; // Mark as not found
+            }
+        }
+    }
 
-        if (start < end && !state->match(start + baseindex))
-            return false;
+    if (v_start == v_size) {
+        if constexpr (realm::is_any_v<Cond, Equal, Greater>) {
+            return true; // No Matches
+        }
+        if constexpr (realm::is_any_v<Cond, NotEqual, Less>) {
+            return find_all_match(start, end, baseindex, state); // All matches
+        }
+    }
+    else if (v_start == 0) {
+        if constexpr (std::is_same_v<Cond, Less>) {
+            // No index is less than 0
+            return true; // No Matches
+        }
+        if constexpr (std::is_same_v<Cond, Greater>) {
+            // All index is greater than or equal to 0
+            return find_all_match(start, end, baseindex, state);
+        }
+    }
 
-        ++start;
+    // Search the indexes
+    using U = typename IndexCond<Cond>::type;
+    const auto ndx_range = end - start;
+    const auto ndx_width = compressor.ndx_width();
+    const auto v_offset = v_size * v_width;
+    if (ndx_range >= 20) {
+        auto search_vector = populate(ndx_width, v_start);
+        while (start < end) {
+            start = parallel_subword_find(find_all_fields_unsigned<U>, data, v_offset, ndx_width,
+                                          compressor.ndx_msb(), search_vector, start, end);
+            if (start < end) {
+                if (!state->match(start + baseindex))
+                    return false;
+            }
+            ++start;
+        }
+    }
+    else {
+        U index_c;
+        BfIterator ndx_iterator{data, v_offset, ndx_width, ndx_width, start};
+        while (start < end) {
+            if (index_c(int64_t(*ndx_iterator), int64_t(v_start))) {
+                if (!state->match(start + baseindex))
+                    return false;
+            }
+            ndx_iterator.move(++start);
+        }
     }
     return true;
-}
-
-template <typename Cond>
-inline bool FlexCompressor::run_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_range)
-{
-    if constexpr (std::is_same_v<Cond, Equal> || std::is_same_v<Cond, NotEqual>) {
-        return v_width < 32 && v_range >= 20 && ndx_range >= 20;
-    }
-    // > and < need looks slower in parallel scan for large values
-    return v_width <= 16 && v_range >= 20 && ndx_range >= 20;
 }
 
 } // namespace realm
