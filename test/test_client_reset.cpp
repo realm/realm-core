@@ -730,12 +730,12 @@ TEST(ClientReset_DoNotRecoverSchema)
     // schema change is not allowed and so fails with a client reset error.
     {
         Session::Config session_config;
+        std::string error_msg = "Some bad client file identifier (IDENT)";
         {
-            Session::Config::ClientReset cr_config{
-                ClientResyncMode::DiscardLocal,
-                sg_fresh1,
-                {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"},
-                sync::ProtocolErrorInfo::Action::ClientReset};
+            Session::Config::ClientReset cr_config{ClientResyncMode::DiscardLocal,
+                                                   sg_fresh1,
+                                                   {ErrorCodes::SyncClientResetRequired, error_msg},
+                                                   sync::ProtocolErrorInfo::Action::ClientReset};
             session_config.client_reset_config = std::move(cr_config);
         }
 
@@ -746,6 +746,7 @@ TEST(ClientReset_DoNotRecoverSchema)
                 return;
             REALM_ASSERT(error_info);
             CHECK_EQUAL(error_info->status, ErrorCodes::AutoClientResetFailed);
+            CHECK(error_info->status.reason().find(error_msg) != std::string::npos);
             bowl.add_stone();
         };
         Session session = fixture.make_session(path_1, server_path_2, std::move(session_config));
