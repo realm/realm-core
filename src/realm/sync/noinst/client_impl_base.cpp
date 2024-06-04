@@ -2271,6 +2271,8 @@ bool Session::client_reset_if_needed()
     bool did_reset =
         client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config), m_client_file_ident,
                                            get_flx_subscription_store(), on_flx_version_complete);
+
+    call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
     if (!did_reset) {
         return false;
     }
