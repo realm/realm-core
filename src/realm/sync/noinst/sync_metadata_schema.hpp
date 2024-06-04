@@ -36,6 +36,7 @@ namespace internal_schema_groups {
 constexpr static std::string_view c_flx_subscription_store("flx_subscription_store");
 constexpr static std::string_view c_pending_bootstraps("pending_bootstraps");
 constexpr static std::string_view c_flx_migration_store("flx_migration_store");
+constexpr static std::string_view c_pending_reset_store("pending_reset_store");
 } // namespace internal_schema_groups
 
 /*
@@ -128,6 +129,8 @@ public:
     explicit SyncMetadataSchemaVersionsReader(const TransactionRef& ref);
 
     std::optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
+
+    std::optional<int64_t> get_legacy_version(const TransactionRef& tr);
 
 protected:
     TableKey m_table;

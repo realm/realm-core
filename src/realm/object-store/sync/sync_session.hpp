@@ -22,6 +22,7 @@
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/sync/client_base.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/subscriptions.hpp>
 
@@ -40,7 +41,6 @@ class SyncUser;
 
 namespace sync {
 class Session;
-struct SessionErrorInfo;
 class MigrationStore;
 } // namespace sync
 
@@ -406,10 +406,9 @@ private:
     void apply_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex, !m_state_mutex);
     void save_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex);
 
-    void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
+    void download_fresh_realm(const sync::SessionErrorInfo& error_info)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, Status status,
-                                       sync::ProtocolErrorInfo::Action server_requests_action,
+    void handle_fresh_realm_downloaded(DBRef db, Status result, const sync::SessionErrorInfo& cr_error_info,
                                        std::optional<sync::SubscriptionSet> new_subs = std::nullopt)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
@@ -504,8 +503,7 @@ private:
     std::shared_ptr<SyncConfig> m_migrated_sync_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<sync::MigrationStore> m_migration_store;
     std::optional<int64_t> m_migration_sentinel_query_version GUARDED_BY(m_state_mutex);
-    sync::ProtocolErrorInfo::Action
-        m_server_requests_action GUARDED_BY(m_state_mutex) = sync::ProtocolErrorInfo::Action::NoAction;
+    std::optional<sync::SessionErrorInfo> m_client_reset_error GUARDED_BY(m_state_mutex);
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;

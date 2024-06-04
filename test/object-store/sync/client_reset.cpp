@@ -37,6 +37,7 @@
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/network/websocket.hpp>
 
 #include <realm/util/flat_map.hpp>
@@ -1666,21 +1667,26 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     } // end discard local section
 
     SECTION("cycle detection") {
-        auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<_impl::client_reset::PendingReset> {
+        auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<sync::PendingReset> {
             auto db = TestHelper::get_db(realm);
-            auto rt = db->start_read();
-            return _impl::client_reset::has_pending_reset(*rt);
+            auto rd_tr = db->start_frozen();
+            return sync::PendingResetStore::has_pending_reset(rd_tr);
         };
+        auto logger = util::Logger::get_default_logger();
         ThreadSafeSyncError err;
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            logger->error("Detected cycle detection error: %1", error.status);
             err = error;
         };
-        auto make_fake_previous_reset = [&local_config](ClientResyncMode type) {
-            local_config.sync_config->notify_before_client_reset = [previous_type = type](SharedRealm realm) {
+        auto make_fake_previous_reset = [&local_config](ClientResyncMode mode,
+                                                        sync::ProtocolErrorInfo::Action action =
+                                                            sync::ProtocolErrorInfo::Action::ClientReset) {
+            local_config.sync_config->notify_before_client_reset = [mode, action](SharedRealm realm) {
                 auto db = TestHelper::get_db(realm);
-                auto wt = db->start_write();
-                _impl::client_reset::track_reset(*wt, previous_type);
-                wt->commit();
+                auto wr_tr = db->start_write();
+                sync::PendingResetStore::track_reset(
+                    wr_tr, mode, action, {{ErrorCodes::SyncClientResetRequired, "Bad client file ident"}});
+                wr_tr->commit();
             };
         };
         SECTION("a normal reset adds and removes a cycle detection flag") {
@@ -1695,7 +1701,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref), util::Scheduler::make_default());
                 auto flag = has_reset_cycle_flag(realm);
                 REQUIRE(bool(flag));
-                REQUIRE(flag->type == ClientResyncMode::Recover);
+                REQUIRE(flag->mode == ClientResyncMode::Recover);
                 REQUIRE(did_recover);
                 std::lock_guard lock(mtx);
                 ++after_callback_invocations;
@@ -1723,7 +1729,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             auto realm = Realm::get_shared_realm(local_config);
             auto flag = has_reset_cycle_flag(realm);
             REQUIRE(flag);
-            CHECK(flag->type == ClientResyncMode::Recover);
+            CHECK(flag->mode == ClientResyncMode::Recover);
         }
 
         SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {

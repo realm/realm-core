@@ -538,7 +538,7 @@ REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::strin
     std::string full_message =
         util::format("Unable to automatically recover local changes during client reset: '%1'", message);
     m_logger.error(util::LogCategory::reset, full_message.c_str());
-    throw realm::_impl::client_reset::ClientResetFailed(full_message);
+    throw realm::sync::ClientResetFailed(full_message);
 }
 
 util::AppendBuffer<char> RecoverLocalChangesetsHandler::process_changeset(const ChunkedBinaryData& changeset)
