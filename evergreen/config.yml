@@ -1364,6 +1364,7 @@ task_groups:
   timeout:
   - func: "run hang analyzer"
   tasks:
+  - compile
   - combined-tests-ios-simulator
 
 - name: compile_only
