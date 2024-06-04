@@ -416,38 +416,49 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
 {
     if (auto previous_reset = sync::PendingResetStore::has_pending_reset(wt_local)) {
         logger.info(util::LogCategory::reset, "Found a previous %1", *previous_reset);
-        switch (previous_reset->mode) {
-            case ClientResyncMode::Manual:
-                REALM_UNREACHABLE();
-            case ClientResyncMode::DiscardLocal:
-                throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
-                                                     "giving up on '%3' mode to prevent a cycle",
-                                                     previous_reset->mode, previous_reset->time, mode));
-            case ClientResyncMode::Recover:
-                switch (mode) {
-                    case ClientResyncMode::Recover:
-                        throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
-                                                             "giving up on '%3' mode to prevent a cycle",
-                                                             previous_reset->mode, previous_reset->time, mode));
-                    case ClientResyncMode::RecoverOrDiscard:
-                        mode = ClientResyncMode::DiscardLocal;
-                        logger.info(util::LogCategory::reset,
-                                    "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
-                                    previous_reset->mode, previous_reset->time, mode);
-                        sync::PendingResetStore::clear_pending_reset(wt_local);
-                        break;
-                    case ClientResyncMode::DiscardLocal:
-                        sync::PendingResetStore::clear_pending_reset(wt_local);
-                        // previous mode Recover and this mode is Discard, this is not a cycle yet
-                        break;
-                    case ClientResyncMode::Manual:
-                        REALM_UNREACHABLE();
-                }
-                break;
-            case ClientResyncMode::RecoverOrDiscard:
-                throw ClientResetFailed(util::format("Unexpected previous '%1' mode reset from %2 did not "
-                                                     "succeed, giving up on '%3' mode to prevent a cycle",
-                                                     previous_reset->mode, previous_reset->time, mode));
+        if (action != previous_reset->action) {
+            // IF a different client reset is being performed, cler the pending client reset and start over.
+            logger.info(util::LogCategory::reset,
+                        "New '%1' client reset of type: '%2' is incompatible - clearing previous reset", action,
+                        mode);
+            sync::PendingResetStore::clear_pending_reset(wt_local);
+        }
+        else {
+            switch (previous_reset->mode) {
+                case ClientResyncMode::Manual:
+                    REALM_UNREACHABLE();
+                case ClientResyncMode::DiscardLocal:
+                    throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
+                                                         "giving up on '%3' mode to prevent a cycle",
+                                                         previous_reset->mode, previous_reset->time, mode));
+                case ClientResyncMode::Recover:
+                    switch (mode) {
+                        case ClientResyncMode::Recover:
+                            throw ClientResetFailed(
+                                util::format("A previous '%1' mode reset from %2 did not succeed, "
+                                             "giving up on '%3' mode to prevent a cycle",
+                                             previous_reset->mode, previous_reset->time, mode));
+                        case ClientResyncMode::RecoverOrDiscard:
+                            mode = ClientResyncMode::DiscardLocal;
+                            logger.info(
+                                util::LogCategory::reset,
+                                "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
+                                previous_reset->mode, previous_reset->time, mode);
+                            sync::PendingResetStore::clear_pending_reset(wt_local);
+                            break;
+                        case ClientResyncMode::DiscardLocal:
+                            sync::PendingResetStore::clear_pending_reset(wt_local);
+                            // previous mode Recover and this mode is Discard, this is not a cycle yet
+                            break;
+                        case ClientResyncMode::Manual:
+                            REALM_UNREACHABLE();
+                    }
+                    break;
+                case ClientResyncMode::RecoverOrDiscard:
+                    throw ClientResetFailed(util::format("Unexpected previous '%1' mode reset from %2 did not "
+                                                         "succeed, giving up on '%3' mode to prevent a cycle",
+                                                         previous_reset->mode, previous_reset->time, mode));
+            }
         }
     }
     if (action == PendingReset::Action::ClientResetNoRecovery) {
