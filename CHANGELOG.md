@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* Any `stitch_` prefixed fields in the `BsonDocument` returned from `app::User::custom_data()` are being renamed on the server to have a `baas_` prefix instead ([PR #7769](https://github.com/realm/realm-core/pull/7769)).
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Removed references to `stitch_` fields in access tokens in sync unit tests ([PR #7769](https://github.com/realm/realm-core/pull/7769)).
 
 ----------------------------------------------
 
