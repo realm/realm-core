@@ -2389,8 +2389,9 @@ Status Session::receive_download_message(const DownloadMessage& message)
     bool is_flx = m_conn.is_flx_sync_connection();
     int64_t query_version = is_flx ? *message.query_version : 0;
     sync::DownloadBatchState batch_state = message.batch_state;
+    /// TODO: Remove this check after the server is updated to send the query 0 download message as a bootstrap
     // Handle the case for the FLX query version 0 bootstrap message, which is reported as a steady state message
-    if (is_flx && query_version != flx_active_version() && batch_state == sync::DownloadBatchState::SteadyState) {
+    if (is_flx && query_version > flx_active_version() && batch_state == sync::DownloadBatchState::SteadyState) {
         batch_state = sync::DownloadBatchState::LastInBatch;
     }
 
