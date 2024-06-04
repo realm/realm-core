@@ -364,11 +364,24 @@ void StringInterner::rebuild_internal()
 {
     std::lock_guard lock(m_mutex);
     // release old decompressed strings
-    for (auto& e : m_decompressed_strings) {
-        e.m_weight >>= 1;
-        if (e.m_weight == 0 && e.m_decompressed)
-            e.m_decompressed.reset();
+    for (size_t idx = 0; idx < m_in_memory_strings.size(); ++idx) {
+        StringID id = m_in_memory_strings[idx];
+        if (id > m_decompressed_strings.size()) {
+            m_in_memory_strings[idx] = m_in_memory_strings.back();
+            m_in_memory_strings.pop_back();
+            continue;
+        }
+        if (auto& w = m_decompressed_strings[id - 1].m_weight) {
+            w >>= 1;
+        }
+        else {
+            m_decompressed_strings[id - 1].m_decompressed.reset();
+            m_in_memory_strings[idx] = m_in_memory_strings.back();
+            m_in_memory_strings.pop_back();
+            continue;
+        }
     }
+
     size_t target_size = (size_t)m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     m_decompressed_strings.resize(target_size);
     if (m_data->size() != m_compressed_leafs.size()) {
@@ -408,6 +421,7 @@ StringID StringInterner::intern(StringData sd)
     auto c_str = m_compressor->compress(sd, learn);
     m_decompressed_strings.push_back({64, std::make_unique<std::string>(sd)});
     auto id = m_decompressed_strings.size();
+    m_in_memory_strings.push_back(id);
     add_to_hash_map(*m_hash_map.get(), h, id, 32);
     size_t index = (size_t)m_top->get_as_ref_or_tagged(Pos_Size).get_as_int();
     REALM_ASSERT_DEBUG(index == id - 1);
@@ -660,6 +674,7 @@ StringData StringInterner::get(StringID id)
     }
     cs.m_weight = 64;
     cs.m_decompressed = std::make_unique<std::string>(m_compressor->decompress(get_compressed(id)));
+    m_in_memory_strings.push_back(id);
     return {cs.m_decompressed->c_str(), cs.m_decompressed->size()};
 }
 

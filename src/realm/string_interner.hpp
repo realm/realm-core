@@ -86,6 +86,7 @@ private:
     // returned to the caller, since we're handing
     // out StringData references to their storage. This is a temporary solution.
     std::vector<CachedString> m_decompressed_strings;
+    std::vector<StringID> m_in_memory_strings;
     // Mutual exclusion is needed for frozen transactions only. Live objects are
     // only used in single threaded contexts so don't need them. For now, just use always.
     std::mutex m_mutex;
