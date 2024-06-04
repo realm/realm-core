@@ -71,16 +71,9 @@ bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, 
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
     while (start < end) {
-        if (!state->match(start++ + baseindex))
+        if (!state->match(start + baseindex))
             return false;
+        start++;
     }
     return true;
-}
-
-size_t FlexCompressor::lower_bound(size_t size, int64_t value, uint64_t mask, BfIterator& data_iterator) noexcept
-{
-    return impl::lower_bound(nullptr, 0, size, value, [&](auto, size_t ndx) {
-        data_iterator.move(ndx);
-        return sign_extend_field_by_mask(mask, *data_iterator);
-    });
 }
