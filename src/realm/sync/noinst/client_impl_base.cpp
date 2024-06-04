@@ -1992,7 +1992,6 @@ void Session::send_ident_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_ident_message_sent = true;
-    call_debug_hook(SyncClientHookEvent::IdentMessageSent);
 
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
@@ -2269,7 +2268,6 @@ bool Session::client_reset_if_needed()
     auto on_flx_version_complete = [this](int64_t version) {
         this->on_flx_sync_version_complete(version);
     };
-    call_debug_hook(SyncClientHookEvent::ClientResetMergeStarting);
     bool did_reset =
         client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config), m_client_file_ident,
                                            get_flx_subscription_store(), on_flx_version_complete);
@@ -2337,7 +2335,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     }
 
     m_client_file_ident = client_file_ident;
-    call_debug_hook(SyncClientHookEvent::IdentMessageReceived);
 
     if (REALM_UNLIKELY(get_client().is_dry_run())) {
         // Ready to send the IDENT message
@@ -2364,8 +2361,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         auto err_msg = util::format("A fatal error occurred during '%1' client reset for %2: '%3'", cr_action,
                                     cr_status, e.what());
         logger.error(err_msg.c_str());
-        ProtocolErrorInfo prot_info = {ErrorCodes::AutoClientResetFailed, err_msg, IsFatal{true}};
-        call_debug_hook(SyncClientHookEvent::ClientResetMergeFailed, prot_info);
         SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
         suspend(err_info);
         return Status::OK();
