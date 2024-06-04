@@ -546,7 +546,6 @@ let package = Package(
                 "benchmarks",
                 "c_api",
                 "geospatial.cpp",
-                "notifications-fuzzer",
                 "query.json",
                 "sync-metadata-v4.realm",
                 "sync-metadata-v5.realm",
