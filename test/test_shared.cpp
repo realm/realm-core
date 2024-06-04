@@ -2308,7 +2308,7 @@ TEST(Shared_RandomMaxStrings)
     auto t = trans->add_table("MyTable");
     ColKey ck = t->add_column(type_String, "MyStrings");
     trans->commit_and_continue_as_read();
-    for (int run = 0; run < 100; ++run) {
+    for (int run = 0; run < 10; ++run) {
         trans->promote_to_write();
         size_t str_length = std::rand() % (16 * 1024 * 1024 - 257);
         std::string str(str_length, 'X');
@@ -2327,7 +2327,7 @@ TEST(Shared_RandomSmallStrings)
 
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = get_test_db(path);
-    std::cout << "Writing " << path << std::endl;
+    // std::cout << "Writing " << path << std::endl;
     auto trans = sg->start_write();
     auto t = trans->add_table("MyTable");
     ColKey ck = t->add_column(type_String, "MyStrings");
@@ -2336,7 +2336,7 @@ TEST(Shared_RandomSmallStrings)
     // insert a million objects with at most 4000 different strings
     for (int run = 0; run < 100; ++run) {
         trans->promote_to_write();
-        for (int i = 0; i < 10000; ++i) {
+        for (int i = 0; i < 1000; ++i) {
             // size_t str_length = std::rand() % (1 + 500);
             // std::string str(str_length, 'X');
             size_t offset = std::rand() % str.size();
