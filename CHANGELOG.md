@@ -18,6 +18,7 @@
 
 ### Internals
 * Removed references to `stitch_` fields in access tokens in sync unit tests ([PR #7769](https://github.com/realm/realm-core/pull/7769)).
+* Added back iOS simulator testing to evergreen after Jenkins went away ([PR #7758](https://github.com/realm/realm-core/pull/7758)).
 * Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
 
 ----------------------------------------------

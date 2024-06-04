@@ -1131,6 +1131,42 @@ tasks:
       script: |-
         ${cmake_build_type|Debug}/realm-libfuzz -rss_limit_mb=0 -max_total_time=3600
 
+- name: combined-tests-ios-simulator
+  tags: [ "for_pull_requests" ]
+  exec_timeout_secs: 1800
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+            export SIMCTL_CHILD_DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        if [[ -n "${verbose_test_output}" ]]; then
+            TEST_FLAGS="$TEST_FLAGS -VV"
+            export SIMCTL_CHILD_UNITTEST_THREADS=1
+            export SIMCTL_CHILD_UNITTEST_LOG_LEVEL="${test_logging_level|debug}"
+        fi
+
+        TEST_RESULTS_FILE="$(./evergreen/abspath.sh ${task_name}_results.json)"
+        export SIMCTL_CHILD_UNITTEST_EVERGREEN_TEST_RESULTS="$TEST_RESULTS_FILE"
+        if [[ -f "$TEST_RESULTS_FILE" ]]; then
+            rm "$TEST_RESULTS_FILE"
+        fi
+        export SIMCTL_CHILD_UNITTEST_PROGRESS=1
+        export SIMCTL_CHILD_UNITTEST_ENCRYPT_ALL="${run_with_encryption|0}"
+
+        ./tools/run-in-simulator.sh \
+            ./build/test/${cmake_build_type|Debug}-iphonesimulator/realm-combined-tests.app \
+            'io.realm.CombinedTests' \
+            $TEST_RESULTS_FILE
+ 
 - name: generate-sync-corpus
   tags: [ "for_nightly_tests" ]
   exec_timeout_secs: 1800
@@ -1317,6 +1353,20 @@ task_groups:
   tasks:
   - fuzzer
 
+- name: ios-simulator-tests
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - combined-tests-ios-simulator
+
 - name: compile_only
   max_hosts: 1
   setup_group_can_fail_task: true
@@ -1325,7 +1375,6 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
-  - func: "upload baas artifacts"
   timeout:
   - func: "run hang analyzer"
   tasks:
@@ -1618,6 +1667,24 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
   tasks:
   - name: compile_test_and_package
+
+- name: ios-simulator
+  display_name: "iOS Simulator (combined tests w/Xcode 15)"
+  run_on: macos-14-arm64
+  expansions:
+    cmake_bindir: "/opt/homebrew/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    extra_flags: "-DCMAKE_XCODE_ATTRIBUTE_SDKROOT=iphoneos"
+    cmake_build_tool_options: "-sdk iphonesimulator -arch arm64"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    build_command_line_tools: Off
+    disable_tests_against_baas: On
+    disable_sync: On
+    target_to_build: CombinedTests
+  tasks:
+  - name: ios-simulator-tests
 
 - name: macos-encrypted
   display_name: "MacOS 14.0 arm64 (Encryption enabled)"
