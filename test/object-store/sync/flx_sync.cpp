@@ -908,6 +908,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 REQUIRE(before_reset_count == 1);
                 REQUIRE(after_reset_count == 0);
                 REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
+                REQUIRE(sync_error.status.reason().find(
+                            "SyncClientResetRequired: Bad client file identifier (IDENT)") != std::string::npos);
                 REQUIRE(sync_error.is_client_reset_requested());
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
@@ -1133,6 +1135,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 auto sync_error = wait_for_future(std::move(err_future)).get();
                 INFO(sync_error.status);
                 CHECK(sync_error.status == ErrorCodes::AutoClientResetFailed);
+                REQUIRE(sync_error.status.reason().find(
+                            "SyncClientResetRequired: Bad client file identifier (IDENT)") != std::string::npos);
             })
             ->run();
     }
@@ -1420,8 +1424,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             REQUIRE(!ref);
             REQUIRE(error);
             REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                                      "A fatal error occurred during client reset: 'Client reset cannot recover when "
-                                      "classes have been removed: {AddedClass}'");
+                                      "'Client reset cannot recover when classes have been removed: {AddedClass}'");
         });
         error_future.get();
         CHECK(before_reset_count == 1);
@@ -1441,8 +1444,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             REQUIRE(error);
             REQUIRE_THROWS_CONTAINING(
                 std::rethrow_exception(error),
-                "A fatal error occurred during client reset: 'The following changes cannot be "
-                "made in additive-only schema mode:\n"
+                "'The following changes cannot be made in additive-only schema mode:\n"
                 "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.\nIf your app is running in "
                 "development mode, you can delete the realm and restart the app to update your schema.'");
         });

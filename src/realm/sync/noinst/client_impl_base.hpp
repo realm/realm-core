@@ -10,7 +10,6 @@
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
-#include <realm/sync/noinst/migration_store.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
@@ -1181,6 +1180,7 @@ private:
                                          size_t);
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event);
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 

@@ -18,6 +18,7 @@
 
 #include <util/sync/sync_test_utils.hpp>
 
+#include <util/test_file.hpp>
 #include <util/sync/baas_admin_api.hpp>
 
 #include <realm/object-store/binding_context.hpp>
@@ -28,6 +29,8 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 
+#include <realm/sync/client_base.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 
@@ -208,7 +211,7 @@ std::string get_compile_time_base_url()
     return unquote_string(REALM_QUOTE(REALM_MONGODB_ENDPOINT));
 #else
     return {};
-#endif
+#endif // REALM_MONGODB_ENDPOINT
 }
 
 std::string get_compile_time_admin_url()
@@ -218,10 +221,9 @@ std::string get_compile_time_admin_url()
     return unquote_string(REALM_QUOTE(REALM_ADMIN_ENDPOINT));
 #else
     return {};
-#endif
+#endif // REALM_ADMIN_ENDPOINT
 }
 #endif // REALM_ENABLE_AUTH_TESTS
-#endif // REALM_ENABLE_SYNC
 
 #if REALM_APP_SERVICES
 AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
@@ -306,6 +308,8 @@ void async_open_realm(const Realm::Config& config,
     task->cancel(); // don't run the above notifier again on this session
     finish(std::move(tsr), err);
 }
+
+#endif // REALM_ENABLE_SYNC
 
 class TestHelper {
 public:
@@ -424,13 +428,13 @@ struct FakeLocalClientReset : public TestClientReset {
 
             sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
-            auto remote_db = TestHelper::get_db(remote_realm);
             auto logger = util::Logger::get_default_logger();
+            sync::ClientReset reset_config{m_mode,
+                                           TestHelper::get_db(remote_realm),
+                                           {ErrorCodes::SyncClientResetRequired, "Bad client file ident"}};
 
             using _impl::client_reset::perform_client_reset_diff;
-            constexpr bool recovery_is_allowed = true;
-            perform_client_reset_diff(*local_db, *remote_db, fake_ident, *logger, m_mode, recovery_is_allowed,
-                                      nullptr, [](int64_t) {});
+            perform_client_reset_diff(*local_db, reset_config, fake_ident, *logger, nullptr, [](int64_t) {});
 
             remote_realm->close();
             if (m_on_post_reset) {

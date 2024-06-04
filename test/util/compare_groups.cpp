@@ -951,12 +951,16 @@ bool compare_groups(const Transaction& group_1, const Transaction& group_2)
 bool compare_groups(const Transaction& group_1, const Transaction& group_2,
                     util::FunctionRef<bool(StringData)> filter_func, util::Logger& logger)
 {
+    std::vector<std::string_view> ignored_tables = {"pk", "metadata", "client_reset_metadata", "flx_metadata",
+                                                    "sync_internal_schemas"};
+
     auto filter = [&](const Group& group, std::vector<StringData>& tables) {
         auto table_keys = group.get_table_keys();
         for (auto i : table_keys) {
             ConstTableRef table = group.get_table(i);
             StringData name = table->get_name();
-            if (name != "pk" && name != "metadata" && name != "client_reset_metadata" && filter_func(name))
+            if (std::find(ignored_tables.begin(), ignored_tables.end(), name) == ignored_tables.end() &&
+                filter_func(name))
                 tables.push_back(name);
         }
     };

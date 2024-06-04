@@ -495,25 +495,48 @@ TEST(Shared_CompactingOnTheFly)
 TEST(Shared_ReadAfterCompact)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = get_test_db(path);
     {
+        DBRef sg = DB::create(make_in_realm_history(), path);
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
         table->add_column(type_Int, "col");
         table->create_object().set_all(1);
         wt.commit();
+        sg->compact();
     }
-    sg->compact();
-    auto rt = sg->start_read();
-    auto table = rt->get_table("table");
-    for (int i = 2; i < 4; ++i) {
-        WriteTransaction wt(sg);
-        wt.get_table("table")->create_object().set_all(i);
-        wt.commit();
-    }
+    {
+        DBOptions options;
+        options.allow_file_format_upgrade = false;
+        DBRef sg = DB::create(make_in_realm_history(), path, options);
+        auto rt = sg->start_read();
+        auto table = rt->get_table("table");
+        for (int i = 2; i < 4; ++i) {
+            WriteTransaction wt(sg);
+            wt.get_table("table")->create_object().set_all(i);
+            wt.commit();
+        }
 
-    CHECK_EQUAL(table->size(), 1);
-    CHECK_EQUAL(table->get_object(0).get<int64_t>("col"), 1);
+        CHECK_EQUAL(table->size(), 1);
+        auto obj = table->get_object(0);
+        CHECK_EQUAL(obj.get<int64_t>("col"), 1);
+
+        struct Parser : _impl::NoOpTransactionLogParser {
+            bool create_object(ObjKey)
+            {
+                nb_objects++;
+                return true;
+            }
+            bool modify_object(ColKey, ObjKey)
+            {
+                return true;
+            }
+            void parse_complete() {}
+            int nb_objects = 0;
+        } parser;
+
+        rt->advance_read(&parser);
+        CHECK_EQUAL(parser.nb_objects, 2);
+    }
 }
 
 TEST(Shared_ReadOverRead)
