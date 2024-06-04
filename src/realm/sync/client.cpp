@@ -1067,6 +1067,11 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     return call_debug_hook(data);
 }
 
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event)
+{
+    return call_debug_hook(event, m_progress, m_last_sent_flx_query_version, DownloadBatchState::SteadyState, 0);
+}
+
 bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
 {
     // Should never be called if session is not active

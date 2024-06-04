@@ -6,10 +6,10 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix some client resets (such as migrating to flexible sync) potentially failing with AutoClientResetFailed if a new client reset condition (such as rolling back a flexible sync migration) occurred before the first one completed. ([PR #7542](https://github.com/realm/realm-core/pull/7542), since v13.11.0)
 
 ### Breaking changes
-* None.
+* Any `stitch_` prefixed fields in the `BsonDocument` returned from `app::User::custom_data()` are being renamed on the server to have a `baas_` prefix instead ([PR #7769](https://github.com/realm/realm-core/pull/7769)).
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
@@ -17,6 +17,7 @@
 -----------
 
 ### Internals
+* Removed references to `stitch_` fields in access tokens in sync unit tests ([PR #7769](https://github.com/realm/realm-core/pull/7769)).
 * Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
 
 ----------------------------------------------

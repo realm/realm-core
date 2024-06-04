@@ -1727,8 +1727,7 @@ void Session::activate()
     reset_protocol_state();
     m_state = Active;
 
-    call_debug_hook(SyncClientHookEvent::SessionActivating, m_progress, m_last_sent_flx_query_version,
-                    DownloadBatchState::SteadyState, 0);
+    call_debug_hook(SyncClientHookEvent::SessionActivating);
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -1946,8 +1945,7 @@ void Session::send_bind_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
-    call_debug_hook(SyncClientHookEvent::BindMessageSent, m_progress, m_last_sent_flx_query_version,
-                    DownloadBatchState::SteadyState, 0);
+    call_debug_hook(SyncClientHookEvent::BindMessageSent);
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -2273,6 +2271,8 @@ bool Session::client_reset_if_needed()
     bool did_reset =
         client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config), m_client_file_ident,
                                            get_flx_subscription_store(), on_flx_version_complete);
+
+    call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
     if (!did_reset) {
         return false;
     }
