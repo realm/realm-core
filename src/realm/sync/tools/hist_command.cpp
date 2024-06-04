@@ -2242,7 +2242,7 @@ int main(int argc, char* argv[])
     Group group{realm_path, encryption_key_3}; // Throws
     using gf = _impl::GroupFriend;
     int file_format_version = gf::get_file_format_version(group);
-    if (file_format_version != 23) {
+    if (file_format_version != 24) {
         std::cerr << "ERROR: Unexpected file format version "
                      ""
                   << file_format_version << "\n"; // Throws
