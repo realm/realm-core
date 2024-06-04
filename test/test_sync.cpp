@@ -2998,7 +2998,6 @@ TEST(Sync_UploadDownloadProgress_1)
         fixture.start();
 
         int number_of_handler_calls = 0;
-
         auto pf = util::make_promise_future<int>();
         Session::Config config;
         config.progress_handler = [&](uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
@@ -3013,9 +3012,6 @@ TEST(Sync_UploadDownloadProgress_1)
         };
 
         Session session = fixture.make_session(db, "/test", std::move(config));
-        write_transaction(db, [](WriteTransaction& wt) {
-            wt.get_table("class_table")->create_object_with_primary_key(2);
-        });
         CHECK_EQUAL(pf.future.get(), 1);
     }
 }
