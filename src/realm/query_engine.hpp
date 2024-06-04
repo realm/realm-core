@@ -425,6 +425,17 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
+        TConditionFunction c;
+        if (end - start == 1) {
+            if constexpr (std::is_same_v<TConditionValue, int64_t>) {
+                return c(this->m_leaf->get(start), this->m_value) ? start : realm::not_found;
+            }
+            else {
+                std::optional<int64_t> opt_int = this->m_leaf->get(start);
+                return c(opt_int, this->m_value, !opt_int, !this->m_value) ? start : realm::not_found;
+            }
+        }
+
         return this->m_leaf->template find_first<TConditionFunction>(this->m_value, start, end);
     }
 
