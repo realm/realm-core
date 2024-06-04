@@ -2388,8 +2388,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
     int64_t query_version = is_flx ? *message.query_version : 0;
     sync::DownloadBatchState batch_state = message.batch_state;
     // Handle the case for the FLX query version 0 bootstrap message, which is reported as a steady state message
-    if (is_flx && query_version == 0 && batch_state == sync::DownloadBatchState::SteadyState &&
-        needs_initial_bootstrap()) {
+    if (is_flx && query_version != flx_active_version() && batch_state == sync::DownloadBatchState::SteadyState) {
         batch_state = sync::DownloadBatchState::LastInBatch;
     }
 
