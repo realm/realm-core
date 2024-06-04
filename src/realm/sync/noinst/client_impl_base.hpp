@@ -1181,6 +1181,9 @@ private:
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* = nullptr);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
+    // Return true if the session hasn't received the initial (version 0) bootstrap yet in FLX sync.
+    bool needs_initial_bootstrap();
+
     void init_progress_handler();
     void enable_progress_notifications();
     void notify_upload_progress();

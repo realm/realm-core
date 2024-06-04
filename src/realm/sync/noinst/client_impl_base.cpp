@@ -2386,6 +2386,12 @@ Status Session::receive_download_message(const DownloadMessage& message)
 
     bool is_flx = m_conn.is_flx_sync_connection();
     int64_t query_version = is_flx ? *message.query_version : 0;
+    sync::DownloadBatchState batch_state = message.batch_state;
+    // Handle the case for the FLX query version 0 bootstrap message, which is reported as a steady state message
+    if (is_flx && query_version == 0 && batch_state == sync::DownloadBatchState::SteadyState &&
+        needs_initial_bootstrap()) {
+        batch_state = sync::DownloadBatchState::LastInBatch;
+    }
 
     if (!is_flx || query_version > 0)
         enable_progress_notifications();
@@ -2399,7 +2405,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.progress_estimate, message.batch_state, query_version,
+                     message.progress_estimate, batch_state, query_version,
                      message.changesets.size()); // Throws
     }
     else {
@@ -2429,26 +2435,21 @@ Status Session::receive_download_message(const DownloadMessage& message)
         return status;
     }
 
-    // Start with the download server version from the last download message, since the changesets in the new
-    // download message must have a remote version greater than (or equal to for FLX) this value.
-    version_type last_remote_version = m_progress.download.server_version;
+    version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-
     for (const RemoteChangeset& changeset : message.changesets) {
-        // Check that per-changeset server version is strictly increasing since the last download server version,
-        // except in FLX sync where the server version must be increasing, but can stay the same during bootstraps.
-        bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= last_remote_version)
-                                                         : (changeset.remote_version > last_remote_version);
+        // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
+        // version must be increasing, but can stay the same during bootstraps.
+        bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
+                                                         : (changeset.remote_version > server_version);
         // Each server version cannot be greater than the one in the header of the download message.
         good_server_version = good_server_version && (changeset.remote_version <= progress.download.server_version);
         if (!good_server_version) {
             return {ErrorCodes::SyncProtocolInvariantFailed,
                     util::format("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)",
-                                 changeset.remote_version, last_remote_version, progress.download.server_version)};
+                                 changeset.remote_version, server_version, progress.download.server_version)};
         }
-
-        // Save the remote version for the current changeset to compare against the next changeset
-        last_remote_version = changeset.remote_version;
+        server_version = changeset.remote_version;
 
         // Check that per-changeset last integrated client version is "weakly"
         // increasing.
@@ -2475,7 +2476,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
-                                       message.batch_state, message.changesets.size());
+                                       batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2484,16 +2485,16 @@ Status Session::receive_download_message(const DownloadMessage& message)
     if (is_flx)
         update_download_estimate(message.progress_estimate);
 
-    if (process_flx_bootstrap_message(progress, message.batch_state, query_version, message.changesets)) {
+    if (process_flx_bootstrap_message(progress, batch_state, query_version, message.changesets)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
 
     uint64_t downloadable_bytes = is_flx ? 0 : message.downloadable_bytes;
-    initiate_integrate_changesets(downloadable_bytes, message.batch_state, progress, message.changesets); // Throws
+    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                  message.batch_state, message.changesets.size());
+                                  batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }

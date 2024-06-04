@@ -989,6 +989,11 @@ void SessionImpl::on_flx_sync_version_complete(int64_t version)
     }
 }
 
+bool SessionImpl::needs_initial_bootstrap()
+{
+    return m_wrapper.m_flx_active_version < 0;
+}
+
 SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
 {
     // Should never be called if session is not active
