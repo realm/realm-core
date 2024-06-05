@@ -118,9 +118,6 @@ private:
         REQUIRE(m_list.is_attached());
 
         // and make sure we end up with the same end result
-        if (m_initial.size() != m_list.size()) {
-            std::cout << "Error " << m_list.size() << std::endl;
-        }
         REQUIRE(m_initial.size() == m_list.size());
         for (size_t i = 0; i < m_initial.size(); ++i)
             CHECK(m_initial[i] == m_list.get_key(i));
@@ -392,7 +389,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         }
     }
 
-    SECTION("LinkView change information") {
+    SECTION("List change information") {
         auto r = Realm::get_shared_realm(config);
         r->update_schema({
             {"origin", {{"array", PropertyType::Array | PropertyType::Object, "target"}}},

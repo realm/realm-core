@@ -340,7 +340,7 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
                        bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
     }
 
-    m_has_pending = (bootstrap_table->is_empty() == false);
+    m_has_pending = !bootstrap_table->is_empty();
 }
 
 } // namespace realm::sync
