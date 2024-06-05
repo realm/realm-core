@@ -5006,7 +5006,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
     enum TestState { not_ready, start, reconnect_received, downloading, downloaded, complete };
     TestingStateMachine<TestState> state_machina(TestState::not_ready);
-    std::mutex callback_mutex;
     int64_t query_version = 0;
     bool did_client_reset = false;
     BootstrapMode bootstrap_mode = BootstrapMode::None;
@@ -5072,7 +5071,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                         return TestState::reconnect_received;
 
                     case Event::DownloadMessageReceived: {
-                        std::lock_guard lock(callback_mutex);
                         // multi-message bootstrap in progress..
                         ++download_msg_count;
                         if (cur_state != TestState::reconnect_received && cur_state != TestState::downloading)
@@ -5105,7 +5103,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                     case Event::BootstrapMessageProcessed: {
                         REQUIRE(data.batch_state != BatchState::SteadyState);
                         REQUIRE((cur_state == TestState::downloading || cur_state == TestState::downloaded));
-                        std::lock_guard lock(callback_mutex);
                         ++bootstrap_msg_count;
                         if (data.query_version == query_version) {
                             role_change_bootstrap = true;
@@ -5126,7 +5123,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
         // Add client reset callback to verify a client reset doesn't happen
         config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
-            std::lock_guard lock(callback_mutex);
             did_client_reset = true;
         };
     };
@@ -5173,18 +5169,14 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
     auto update_perms_and_verify = [&](FLXSyncTestHarness& harness, SharedRealm check_realm, nlohmann::json new_rules,
                                        ExpectedResults expected) {
-        {
-            // Reset the test state
-            std::lock_guard lock(callback_mutex);
+        // Reset the state machine
+        state_machina.transition_with([&](TestState cur_state) {
+            REQUIRE(cur_state == TestState::not_ready);
             did_client_reset = false;
             bootstrap_msg_count = 0;
             download_msg_count = 0;
             role_change_bootstrap = false;
             query_version = check_realm->get_active_subscription_set().version();
-        }
-        // Reset the state machine
-        state_machina.transition_with([&](TestState cur_state) {
-            REQUIRE(cur_state == TestState::not_ready);
             return TestState::start;
         });
 
@@ -5208,48 +5200,46 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
         // Now that the server initiated bootstrap should be complete, verify the operation
         // performed matched what was expected.
-        auto cur_state = state_machina.get(); // grab before locking callback_mutex
-        switch (expected.bootstrap) {
-            case BootstrapMode::NoReconnect: {
-                // Confirm that the session did receive an error and a bootstrap did not occur
-                std::lock_guard lock(callback_mutex);
-                REQUIRE(cur_state == TestState::start);
-                REQUIRE_FALSE(role_change_bootstrap);
-                REQUIRE_FALSE(did_client_reset);
-            } break;
-            case BootstrapMode::None: {
-                // Confirm that a bootstrap nor a client reset did not occur
-                std::lock_guard lock(callback_mutex);
-                REQUIRE(cur_state == TestState::reconnect_received);
-                REQUIRE_FALSE(role_change_bootstrap);
-                REQUIRE_FALSE(did_client_reset);
-            } break;
-            case BootstrapMode::Any: {
-                // Doesn't matter which one, just that a bootstrap occurred and not a client reset
-                std::lock_guard lock(callback_mutex);
-                REQUIRE(cur_state == TestState::complete);
-                REQUIRE(role_change_bootstrap);
-                REQUIRE_FALSE(did_client_reset);
-            } break;
-            default: {
-                // By the time the MARK response is received and wait_for_download()
-                // returns, the bootstrap should have already been applied.
-                std::lock_guard lock(callback_mutex);
-                REQUIRE(expected.bootstrap == bootstrap_mode);
-                REQUIRE(role_change_bootstrap);
-                REQUIRE(cur_state == TestState::complete);
-                if (expected.bootstrap == BootstrapMode::SingleMessageMulti ||
-                    expected.bootstrap == BootstrapMode::SingleMessage) {
-                    REQUIRE(bootstrap_msg_count == 1);
-                }
-                else if (expected.bootstrap == BootstrapMode::MultiMessage) {
-                    REQUIRE(bootstrap_msg_count > 1);
-                }
-                // Make sure a client reset did not occur while waiting for the role change to
-                // be applied
-                REQUIRE_FALSE(did_client_reset);
-            } break;
-        }
+        state_machina.transition_with([&](TestState cur_state) {
+            switch (expected.bootstrap) {
+                case BootstrapMode::NoReconnect:
+                    // Confirm that the session did receive an error and a bootstrap did not occur
+                    REQUIRE(cur_state == TestState::start);
+                    REQUIRE_FALSE(role_change_bootstrap);
+                    REQUIRE_FALSE(did_client_reset);
+                    break;
+                case BootstrapMode::None:
+                    // Confirm that a bootstrap nor a client reset did not occur
+                    REQUIRE(cur_state == TestState::reconnect_received);
+                    REQUIRE_FALSE(role_change_bootstrap);
+                    REQUIRE_FALSE(did_client_reset);
+                    break;
+                case BootstrapMode::Any:
+                    // Doesn't matter which one, just that a bootstrap occurred and not a client reset
+                    REQUIRE(cur_state == TestState::complete);
+                    REQUIRE(role_change_bootstrap);
+                    REQUIRE_FALSE(did_client_reset);
+                    break;
+                default:
+                    // By the time the MARK response is received and wait_for_download()
+                    // returns, the bootstrap should have already been applied.
+                    REQUIRE(expected.bootstrap == bootstrap_mode);
+                    REQUIRE(role_change_bootstrap);
+                    REQUIRE(cur_state == TestState::complete);
+                    if (expected.bootstrap == BootstrapMode::SingleMessageMulti ||
+                        expected.bootstrap == BootstrapMode::SingleMessage) {
+                        REQUIRE(bootstrap_msg_count == 1);
+                    }
+                    else if (expected.bootstrap == BootstrapMode::MultiMessage) {
+                        REQUIRE(bootstrap_msg_count > 1);
+                    }
+                    // Make sure a client reset did not occur while waiting for the role change to
+                    // be applied
+                    REQUIRE_FALSE(did_client_reset);
+                    break;
+            }
+            return std::nullopt; // Don't transition
+        });
 
         // Validate the expected number of entries for each role type after the role change
         wait_for_advance(*check_realm);
