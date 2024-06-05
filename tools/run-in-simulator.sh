@@ -6,6 +6,7 @@ appPath="$1"
 bundleId="$2"
 outputFile="$3"
 
+xcrun simctl list runtimes
 id="$(echo $RANDOM | shasum | cut -f 1 -d ' ')"
 # Sample output: "iOS 15.5 (15.5 - 19F70) - com.apple.CoreSimulator.SimRuntime.iOS-15-5"
 # We're extracting the part starting with com.apple, looking for a runtime that's iOS 13 or newer

@@ -9,6 +9,7 @@ set(SYNC_SOURCES
     noinst/compact_changesets.cpp
     noinst/migration_store.cpp
     noinst/pending_bootstrap_store.cpp
+    noinst/pending_reset_store.cpp
     noinst/protocol_codec.cpp
     noinst/sync_metadata_schema.cpp
     noinst/sync_schema_migration.cpp

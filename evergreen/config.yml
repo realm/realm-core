@@ -73,7 +73,7 @@ functions:
           export CMAKE_VARS_DIR=$(./evergreen/abspath.sh cmake_vars)
           source evergreen/cmake_vars_utils.sh
           if [ -n "${cmake_bindir|}" ]; then
-            export CMAKE=$(./evergreen/abspath.sh ${cmake_bindir}/cmake)
+            export CMAKE="$(./evergreen/abspath.sh "${cmake_bindir}/cmake")"
           else
             export CMAKE="cmake"
           fi
@@ -84,11 +84,11 @@ functions:
 
           if [ -n "${c_compiler}" ]; then
               [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
-              set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
-              set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
+              set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh "${c_compiler}")
+              set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh "${cxx_compiler}")
           fi
 
-          if [ -z "${disable_tests_against_baas|}" ]; then
+          if [[ -z "${disable_tests_against_baas|}" && -z "${no_tests|}" ]]; then
               scheme="http"
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               if [ -n "${baas_admin_port|}" ]; then
@@ -173,7 +173,7 @@ functions:
             set_cmake_var realm_vars CMAKE_GENERATOR_PLATFORM STRING "${cmake_generator_platform}"
           fi
 
-          if [ -n "${curl_base|}" ]; then
+          if [[ -n "${curl_base|}" && -z "${no_tests|}" ]]; then
               set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
               set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
               set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/curl-ca-bundle.crt")"
@@ -182,11 +182,11 @@ functions:
           set_cmake_var realm_vars REALM_NO_TESTS BOOL ${no_tests|Off}
           set_cmake_var realm_vars CMAKE_COMPILE_WARNING_AS_ERROR BOOL On
 
-          echo "Running cmake with these vars:"
+          echo "Running cmake at \"$CMAKE\" with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
 
-          $CMAKE \
+          "$CMAKE" \
             -B build \
             -C cmake_vars.txt ${extra_flags} \
             -G "$GENERATOR"
@@ -199,7 +199,7 @@ functions:
               target="$target -- ${cmake_build_tool_options}"
           fi
 
-          $CMAKE \
+          "$CMAKE" \
               --build build \
               --config ${cmake_build_type|Debug} \
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
@@ -248,7 +248,7 @@ functions:
           set -o errexit
           set -o verbose
           if [ -n "${cmake_bindir|}" ]; then
-              CTEST=$(./evergreen/abspath.sh ${cmake_bindir}/ctest)
+              CTEST="$(./evergreen/abspath.sh "${cmake_bindir}/ctest")"
           else
               CTEST="ctest"
           fi
@@ -328,7 +328,7 @@ functions:
           export UBSAN_OPTIONS="print_stacktrace=1"
 
           cd build
-          if ! $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS; then
+          if ! "$CTEST" -C ${cmake_build_type|Debug} $TEST_FLAGS; then
             BAAS_PID=$(pgrep baas_server)
             if [[ -n "$BAAS_PID" ]]; then
               echo "Dumping baas to log file"
@@ -517,20 +517,22 @@ functions:
   - command: shell.exec
     params:
       shell: bash
+      working_dir: realm-core
       script: |-
         set -o errexit
         set -o verbose
 
-        TOP_DIR=$(pwd)/realm-core
+        TOP_DIR=$(pwd)
+        
         HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
         REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
 
-        if [[ ! -d $TOP_DIR || ! -d $REQUIREMENTS_PATH ]]; then
+        if [[ ! -d $TOP_DIR || ! -f $REQUIREMENTS_PATH ]]; then
           echo "No source directory exists. Not running hang analyzer"
           exit 1
         fi
 
-        mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
+        mkdir hang_analyzer_workdir; cd hang_analyzer_workdir
         ${python3|python3} -m venv venv
 
         # venv creates its Scripts/activate file with CLRF endings, which
@@ -555,16 +557,6 @@ functions:
         python=python
 
         echo "python set to $(which $python)"
-
-        echo "Upgrading pip to 21.0.1"
-
-        # ref: https://github.com/grpc/grpc/issues/25082#issuecomment-778392661
-        if [ "$(uname -m)" = "arm64" ] && [ "$(uname)" == "Darwin" ]; then
-          export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-          export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-        fi
-
-        python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 
         if [ "Windows_NT" = "$OS" ]; then
           REQUIREMENTS_PATH=$(cygpath -w $REQUIREMENTS_PATH)
@@ -771,13 +763,13 @@ tasks:
       script: |-
         set -o errexit
         if [[ -n "${cmake_bindir}" ]]; then
-          CPACK="$(./evergreen/abspath.sh ${cmake_bindir}/cpack)"
+          CPACK="$(./evergreen/abspath.sh "${cmake_bindir}/cpack")"
         else
           CPACK="cpack"
         fi
 
         cd build
-        $CPACK -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
+        "$CPACK" -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
   - command: s3.put
     params:
       aws_key: '${artifacts_aws_access_key}'
@@ -1147,6 +1139,42 @@ tasks:
       script: |-
         ${cmake_build_type|Debug}/realm-libfuzz -rss_limit_mb=0 -max_total_time=3600
 
+- name: combined-tests-ios-simulator
+  tags: [ "for_pull_requests" ]
+  exec_timeout_secs: 1800
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+            export SIMCTL_CHILD_DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        if [[ -n "${verbose_test_output}" ]]; then
+            TEST_FLAGS="$TEST_FLAGS -VV"
+            export SIMCTL_CHILD_UNITTEST_THREADS=1
+            export SIMCTL_CHILD_UNITTEST_LOG_LEVEL="${test_logging_level|debug}"
+        fi
+
+        TEST_RESULTS_FILE="$(./evergreen/abspath.sh ${task_name}_results.json)"
+        export SIMCTL_CHILD_UNITTEST_EVERGREEN_TEST_RESULTS="$TEST_RESULTS_FILE"
+        if [[ -f "$TEST_RESULTS_FILE" ]]; then
+            rm "$TEST_RESULTS_FILE"
+        fi
+        export SIMCTL_CHILD_UNITTEST_PROGRESS=1
+        export SIMCTL_CHILD_UNITTEST_ENCRYPT_ALL="${run_with_encryption|0}"
+
+        ./tools/run-in-simulator.sh \
+            ./build/test/${cmake_build_type|Debug}-iphonesimulator/realm-combined-tests.app \
+            'io.realm.CombinedTests' \
+            $TEST_RESULTS_FILE
+ 
 - name: generate-sync-corpus
   tags: [ "for_nightly_tests" ]
   exec_timeout_secs: 1800
@@ -1332,6 +1360,33 @@ task_groups:
   - func: "upload fuzzer results"
   tasks:
   - fuzzer
+
+- name: ios-simulator-tests
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - combined-tests-ios-simulator
+
+- name: compile_only
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
 
 buildvariants:
 - name: ubuntu
@@ -1621,6 +1676,24 @@ buildvariants:
   tasks:
   - name: compile_test_and_package
 
+- name: ios-simulator
+  display_name: "iOS Simulator (combined tests w/Xcode 15)"
+  run_on: macos-14-arm64
+  expansions:
+    cmake_bindir: "/opt/homebrew/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    extra_flags: "-DCMAKE_XCODE_ATTRIBUTE_SDKROOT=iphoneos"
+    cmake_build_tool_options: "-sdk iphonesimulator -arch arm64"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    build_command_line_tools: Off
+    disable_tests_against_baas: On
+    disable_sync: On
+    target_to_build: CombinedTests
+  tasks:
+  - name: ios-simulator-tests
+
 - name: macos-encrypted
   display_name: "MacOS 14.0 arm64 (Encryption enabled)"
   run_on: macos-14-arm64
@@ -1751,6 +1824,7 @@ buildvariants:
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-apple-darwin.tar.bz2"
   tasks:
   - name: compile_test_coverage
+
 - name: ubuntu-coverage
   display_name: "Ubuntu (Code Coverage)"
   run_on: ubuntu2204-large
@@ -1786,12 +1860,25 @@ buildvariants:
   tasks:
   - name: compile_test
 
+- name: ubuntu-no-app-services
+  display_name: "Ubuntu (AppServices Disabled)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    extra_flags: "-DREALM_APP_SERVICES=OFF"
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
+
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
@@ -1805,8 +1892,7 @@ buildvariants:
   display_name: "Windows x86_64 (Encryption enabled)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
@@ -1821,8 +1907,7 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 Release build)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Release"
@@ -1838,8 +1923,7 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 ASAN)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Debug"
@@ -1855,8 +1939,7 @@ buildvariants:
   display_name: "Windows X86 (Release)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     cmake_generator_platform: "Win32"
     cmake_build_type: "Release"
@@ -1867,17 +1950,53 @@ buildvariants:
   tasks:
   - name: compile_local_tests
 
-- name: ubuntu-no-app-services
-  display_name: "Ubuntu (AppServices Disabled)"
-  run_on: ubuntu2204-arm64-large
+- name: windows-x86-uwp
+  display_name: "Windows X86 (UWP)"
+  run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+    cmake_generator: "Visual Studio 16 2019"
+    cmake_generator_platform: "Win32"
+    cmake_build_type: "Debug"
+    extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
-    c_compiler: "/opt/clang+llvm/bin/clang"
-    cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    extra_flags: "-DREALM_APP_SERVICES=OFF"
-    disable_tests_against_baas: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    no_tests: On
   tasks:
-  - name: compile_local_tests
+  - name: compile_only
+
+# TODO(DEVPROD-5151) Enabling these is blocked by the availability of an ARM64 compiler
+# on windows.
+# - name: windows-arm64
+#   display_name: "Windows ARM64"
+#   run_on: windows-vsCurrent-large
+#   expansions:
+#     cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+#     cmake_generator: "Visual Studio 16 2019"
+#     cmake_generator_platform: "ARM64"
+#     cmake_build_type: "Debug"
+#     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+#     fetch_missing_dependencies: On
+#     python3: "/cygdrive/c/python/python37/python.exe"
+#     no_tests: on
+#   tasks:
+#   - name: compile_only
+#
+# - name: windows-arm64-uwp
+#   display_name: "Windows ARM64 (UWP)"
+#   run_on: windows-vsCurrent-large
+#   expansions:
+#     cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+#     cmake_generator: "Visual Studio 16 2019"
+#     cmake_generator_platform: "ARM64"
+#     cmake_build_type: "Debug"
+#     extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+#     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+#     fetch_missing_dependencies: On
+#     python3: "/cygdrive/c/python/python37/python.exe"
+#     no_tests: On
+#   tasks:
+#   - name: compile_only
+
 

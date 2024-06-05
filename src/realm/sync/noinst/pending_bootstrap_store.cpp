@@ -97,8 +97,10 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
          }}};
 
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_pending_bootstraps)) {
+    // Start with a reader so it doesn't try to write until we are ready
+    SyncMetadataSchemaVersionsReader schema_versions_reader(tr);
+    if (auto schema_version =
+            schema_versions_reader.get_version_for(tr, internal_schema_groups::c_pending_bootstraps)) {
         if (*schema_version != c_schema_version) {
             throw RuntimeError(ErrorCodes::SchemaVersionMismatch,
                                "Invalid schema version for FLX sync pending bootstrap table group");
@@ -107,10 +109,14 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
     }
     else {
         tr->promote_to_write();
-        create_sync_metadata_schema(tr, &internal_tables);
+        // Ensure the schema versions table is initialized (may add its own commit)
+        SyncMetadataSchemaVersions schema_versions(tr);
+        // Create the metadata schema and set the version (in the same commit)
         schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, c_schema_version);
+        create_sync_metadata_schema(tr, &internal_tables);
         tr->commit_and_continue_as_read();
     }
+    REALM_ASSERT(m_table);
 
     if (auto bootstrap_table = tr->get_table(m_table); !bootstrap_table->is_empty()) {
         m_has_pending = true;
@@ -135,39 +141,44 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     }
 
     auto tr = m_db->start_write();
-    auto bootstrap_table = tr->get_table(m_table);
-    auto incomplete_bootstraps = Query(bootstrap_table).not_equal(m_query_version, query_version).find_all();
-    incomplete_bootstraps.for_each([&](Obj obj) {
-        m_logger.debug(util::LogCategory::changeset, "Clearing incomplete bootstrap for query version %1",
-                       obj.get<int64_t>(m_query_version));
-        return IteratorControl::AdvanceToNext;
-    });
-    incomplete_bootstraps.clear();
-
     bool did_create = false;
-    auto bootstrap_obj = bootstrap_table->create_object_with_primary_key(Mixed{query_version}, &did_create);
-    if (progress) {
-        auto progress_obj = bootstrap_obj.create_and_set_linked_object(m_progress);
-        progress_obj.set(m_progress_latest_server_version, int64_t(progress->latest_server_version.version));
-        progress_obj.set(m_progress_latest_server_version_salt, int64_t(progress->latest_server_version.salt));
-        progress_obj.set(m_progress_download_server_version, int64_t(progress->download.server_version));
-        progress_obj.set(m_progress_download_client_version,
-                         int64_t(progress->download.last_integrated_client_version));
-        progress_obj.set(m_progress_upload_server_version, int64_t(progress->upload.last_integrated_server_version));
-        progress_obj.set(m_progress_upload_client_version, int64_t(progress->upload.client_version));
-    }
 
-    auto changesets_list = bootstrap_obj.get_linklist(m_changesets);
-    for (size_t idx = 0; idx < changesets.size(); ++idx) {
-        auto cur_changeset = changesets_list.create_and_insert_linked_object(changesets_list.size());
-        cur_changeset.set(m_changeset_remote_version, int64_t(changesets[idx].remote_version));
-        cur_changeset.set(m_changeset_last_integrated_client_version,
-                          int64_t(changesets[idx].last_integrated_local_version));
-        cur_changeset.set(m_changeset_origin_file_ident, int64_t(changesets[idx].origin_file_ident));
-        cur_changeset.set(m_changeset_origin_timestamp, int64_t(changesets[idx].origin_timestamp));
-        cur_changeset.set(m_changeset_original_changeset_size, int64_t(changesets[idx].original_changeset_size));
-        BinaryData compressed_data(compressed_changesets[idx].data(), compressed_changesets[idx].size());
-        cur_changeset.set(m_changeset_data, compressed_data);
+    {
+        DisableReplication disable_replication(*tr);
+        auto bootstrap_table = tr->get_table(m_table);
+        auto incomplete_bootstraps = Query(bootstrap_table).not_equal(m_query_version, query_version).find_all();
+        incomplete_bootstraps.for_each([&](Obj obj) {
+            m_logger.debug(util::LogCategory::changeset, "Clearing incomplete bootstrap for query version %1",
+                           obj.get<int64_t>(m_query_version));
+            return IteratorControl::AdvanceToNext;
+        });
+        incomplete_bootstraps.clear();
+
+        auto bootstrap_obj = bootstrap_table->create_object_with_primary_key(Mixed{query_version}, &did_create);
+        if (progress) {
+            auto progress_obj = bootstrap_obj.create_and_set_linked_object(m_progress);
+            progress_obj.set(m_progress_latest_server_version, int64_t(progress->latest_server_version.version));
+            progress_obj.set(m_progress_latest_server_version_salt, int64_t(progress->latest_server_version.salt));
+            progress_obj.set(m_progress_download_server_version, int64_t(progress->download.server_version));
+            progress_obj.set(m_progress_download_client_version,
+                             int64_t(progress->download.last_integrated_client_version));
+            progress_obj.set(m_progress_upload_server_version,
+                             int64_t(progress->upload.last_integrated_server_version));
+            progress_obj.set(m_progress_upload_client_version, int64_t(progress->upload.client_version));
+        }
+
+        auto changesets_list = bootstrap_obj.get_linklist(m_changesets);
+        for (size_t idx = 0; idx < changesets.size(); ++idx) {
+            auto cur_changeset = changesets_list.create_and_insert_linked_object(changesets_list.size());
+            cur_changeset.set(m_changeset_remote_version, int64_t(changesets[idx].remote_version));
+            cur_changeset.set(m_changeset_last_integrated_client_version,
+                              int64_t(changesets[idx].last_integrated_local_version));
+            cur_changeset.set(m_changeset_origin_file_ident, int64_t(changesets[idx].origin_file_ident));
+            cur_changeset.set(m_changeset_origin_timestamp, int64_t(changesets[idx].origin_timestamp));
+            cur_changeset.set(m_changeset_original_changeset_size, int64_t(changesets[idx].original_changeset_size));
+            BinaryData compressed_data(compressed_changesets[idx].data(), compressed_changesets[idx].size());
+            cur_changeset.set(m_changeset_data, compressed_data);
+        }
     }
 
     tr->commit();
@@ -303,6 +314,7 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
     if (bootstrap_table->is_empty()) {
         return;
     }
+    DisableReplication disable_replication(*tr);
 
     // We should only have one pending bootstrap at a time.
     REALM_ASSERT(bootstrap_table->size() == 1);
@@ -330,7 +342,7 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
                        bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
     }
 
-    m_has_pending = (bootstrap_table->is_empty() == false);
+    m_has_pending = !bootstrap_table->is_empty();
 }
 
 } // namespace realm::sync

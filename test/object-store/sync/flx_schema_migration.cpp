@@ -498,7 +498,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
 
-        realm->sync_session()->pause();
+        realm->sync_session()->shutdown_and_wait();
 
         // Subscription to recover when upgrading the schema.
         auto subs = realm->get_latest_subscription_set().make_mutable_copy();
@@ -771,7 +771,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
 
-        realm->sync_session()->pause();
+        realm->sync_session()->shutdown_and_wait();
 
         realm->begin_transaction();
         CppContext c(realm);
@@ -862,7 +862,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
 
-        realm->sync_session()->pause();
+        realm->sync_session()->shutdown_and_wait();
 
         realm->begin_transaction();
         CppContext c(realm);
@@ -1011,7 +1011,7 @@ TEST_CASE("Client reset and schema migration", "[sync][flx][flx schema migration
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
 
-        realm->sync_session()->pause();
+        realm->sync_session()->shutdown_and_wait();
 
         realm->begin_transaction();
         CppContext c(realm);
@@ -1088,7 +1088,7 @@ TEST_CASE("Multiple async open tasks trigger a schema migration", "[sync][flx][f
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
 
-        realm->sync_session()->pause();
+        realm->sync_session()->shutdown_and_wait();
 
         // Subscription to recover when upgrading the schema.
         auto subs = realm->get_latest_subscription_set().make_mutable_copy();
@@ -1181,7 +1181,7 @@ TEST_CASE("Upgrade schema version with no subscription initializer", "[sync][flx
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
 
-        realm->sync_session()->pause();
+        realm->sync_session()->shutdown_and_wait();
 
         // Object to recover when upgrading the schema.
         realm->begin_transaction();

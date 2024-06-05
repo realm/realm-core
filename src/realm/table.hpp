@@ -415,9 +415,6 @@ public:
     TableKey get_key() const noexcept;
 
     uint64_t allocate_sequence_number();
-    // Used by upgrade
-    void set_sequence_number(uint64_t seq);
-    void set_collision_map(ref_type ref);
     // Used for testing purposes.
     void set_col_key_sequence_number(uint64_t seq);
 
