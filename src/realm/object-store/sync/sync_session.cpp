@@ -39,8 +39,6 @@
 #include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 
-#include <ostream>
-
 using namespace realm;
 using namespace realm::_impl;
 
@@ -48,23 +46,6 @@ using SessionWaiterPointer = void (sync::Session::*)(util::UniqueFunction<void(s
 
 constexpr const char SyncError::c_original_file_path_key[];
 constexpr const char SyncError::c_recovery_file_path_key[];
-
-namespace realm {
-
-std::ostream& operator<<(std::ostream& out, const SyncSession::ConnectionState& val)
-{
-    switch (val) {
-        case SyncSession::ConnectionState::Disconnected:
-            return out << "DISCONNECTED";
-        case SyncSession::ConnectionState::Connecting:
-            return out << "CONNECTING";
-        case SyncSession::ConnectionState::Connected:
-            return out << "CONNECTED";
-    }
-    return out << "UNKNOWN";
-}
-
-} // namespace realm
 
 /// STATES:
 ///

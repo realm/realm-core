@@ -4967,30 +4967,26 @@ TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
     CHECK(nested_list.get_any(1) == "foo");
 }
 
-const Schema g_person_schema{{"Person",
-                              {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                               {"role", PropertyType::String},
-                               {"firstName", PropertyType::String},
-                               {"lastName", PropertyType::String}}}};
-
-auto fill_person_schema = [](SharedRealm realm, std::string role, size_t count) {
-    CppContext c(realm);
-    for (size_t i = 0; i < count; ++i) {
-        // Recreate the context (transaction) for every 100 entries
-        if (count % 100 == 0) {
-            c = CppContext(realm);
-        }
-        auto obj = Object::create(c, realm, "Person",
-                                  std::any(AnyDict{
-                                      {"_id", ObjectId::gen()},
-                                      {"role", role},
-                                      {"firstName", util::format("%1-%2", role, i)},
-                                      {"lastName", util::format("last-name-%1", i)},
-                                  }));
-    }
-};
-
 TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstrap]") {
+    const Schema g_person_schema{{"Person",
+                                  {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                   {"role", PropertyType::String},
+                                   {"firstName", PropertyType::String},
+                                   {"lastName", PropertyType::String}}}};
+
+    auto fill_person_schema = [](SharedRealm realm, std::string role, size_t count) {
+        CppContext c(realm);
+        for (size_t i = 0; i < count; ++i) {
+            auto obj = Object::create(c, realm, "Person",
+                                      std::any(AnyDict{
+                                          {"_id", ObjectId::gen()},
+                                          {"role", role},
+                                          {"firstName", util::format("%1-%2", role, i)},
+                                          {"lastName", util::format("last-name-%1", i)},
+                                      }));
+        }
+    };
+
     enum BootstrapMode { NoReconnect, None, SingleMessage, SingleMessageMulti, MultiMessage, Any };
 
     struct TestParams {
@@ -5109,12 +5105,10 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                     case Event::BootstrapMessageProcessed: {
                         REQUIRE(data.batch_state != BatchState::SteadyState);
                         REQUIRE((cur_state == TestState::downloading || cur_state == TestState::downloaded));
-                        if (data.batch_state != BatchState::SteadyState) {
-                            std::lock_guard lock(callback_mutex);
-                            ++bootstrap_msg_count;
-                            if (data.query_version == query_version) {
-                                role_change_bootstrap = true;
-                            }
+                        std::lock_guard lock(callback_mutex);
+                        ++bootstrap_msg_count;
+                        if (data.query_version == query_version) {
+                            role_change_bootstrap = true;
                         }
                         return std::nullopt;
                     }
@@ -5317,6 +5311,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             /// TODO: Update this test to use the PAUSE_DOWNLOAD_BUILDER test command
             ///       once it can be sent prior to the IDENT message
             // 500 emps, 500 mgrs, 125 dirs
+            // num_objects_before_bootstrap_flush: 100
+            // download_loop_sleep_millis: 2000
             TestParams params{500, 500, 125, 100, 2000};
             update_role(test_rules, {{"role", "employee"}});
             auto realm = setup_test(harness, params, test_rules, params.num_emps);

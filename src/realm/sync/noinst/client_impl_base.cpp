@@ -2388,12 +2388,6 @@ Status Session::receive_download_message(const DownloadMessage& message)
 
     bool is_flx = m_conn.is_flx_sync_connection();
     int64_t query_version = is_flx ? *message.query_version : 0;
-    sync::DownloadBatchState batch_state = message.batch_state;
-    /// TODO: Remove this check after the server is updated to send the query 0 download message as a bootstrap
-    // Handle the case for the FLX query version 0 bootstrap message, which is reported as a steady state message
-    if (is_flx && query_version > flx_active_version() && batch_state == sync::DownloadBatchState::SteadyState) {
-        batch_state = sync::DownloadBatchState::LastInBatch;
-    }
 
     if (!is_flx || query_version > 0)
         enable_progress_notifications();
@@ -2407,7 +2401,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.progress_estimate, batch_state, query_version,
+                     message.progress_estimate, message.batch_state, query_version,
                      message.changesets.size()); // Throws
     }
     else {
@@ -2478,7 +2472,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
-                                       batch_state, message.changesets.size());
+                                       message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2487,16 +2481,16 @@ Status Session::receive_download_message(const DownloadMessage& message)
     if (is_flx)
         update_download_estimate(message.progress_estimate);
 
-    if (process_flx_bootstrap_message(progress, batch_state, query_version, message.changesets)) {
+    if (process_flx_bootstrap_message(progress, message.batch_state, query_version, message.changesets)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
 
     uint64_t downloadable_bytes = is_flx ? 0 : message.downloadable_bytes;
-    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, message.changesets); // Throws
+    initiate_integrate_changesets(downloadable_bytes, message.batch_state, progress, message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                  batch_state, message.changesets.size());
+                                  message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }

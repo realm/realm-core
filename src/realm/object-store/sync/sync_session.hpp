@@ -30,7 +30,6 @@
 #include <realm/util/future.hpp>
 #include <realm/version_id.hpp>
 
-#include <iosfwd>
 #include <map>
 #include <mutex>
 #include <unordered_map>
@@ -536,8 +535,6 @@ private:
     std::optional<uint64_t> m_previous_schema_version GUARDED_BY(m_state_mutex);
     bool m_schema_migration_in_progress GUARDED_BY(m_state_mutex) = false;
 };
-
-std::ostream& operator<<(std::ostream& out, const SyncSession::ConnectionState& val);
 
 } // namespace realm
 

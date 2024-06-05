@@ -1181,8 +1181,6 @@ private:
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* = nullptr);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
-    int64_t flx_active_version();
-
     void init_progress_handler();
     void enable_progress_notifications();
     void notify_upload_progress();
