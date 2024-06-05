@@ -50,6 +50,9 @@ public:
 
 private:
     static bool find_all_match(size_t, size_t, size_t, QueryStateBase*);
+
+    template <typename Cond>
+    static bool find_all_linear(BfIterator&, BfIterator&, int64_t, uint64_t, size_t, size_t, size_t, QueryStateBase*);
 };
 
 inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx)
@@ -192,14 +195,26 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
 
     REALM_ASSERT_DEBUG(arr.m_width != 0);
 
+    /**************** Search the values ****************/
+
     const auto& compressor = arr.integer_compressor();
-    const auto v_width = arr.m_width;
+    const auto v_width = compressor.v_width();
     const auto v_size = compressor.v_size();
     const auto mask = compressor.v_mask();
+    const auto ndx_range = end - start;
     uint64_t* data = (uint64_t*)arr.m_data;
     size_t v_start = realm::not_found;
 
-    /**************** Search the values ****************/
+    // special handling for greater and less if bit width is reasonably large
+    if constexpr (realm::is_any_v<Cond, Greater, Less>) {
+        if (v_width >= WIDTH_LIMIT) {
+            const auto ndx_width = compressor.ndx_width();
+            const auto v_offset = v_size * v_width;
+            BfIterator ndx_iterator{data, v_offset, ndx_width, ndx_width, start};
+            BfIterator data_iterator{data, 0, v_width, v_width, static_cast<size_t>(*ndx_iterator)};
+            return find_all_linear<Cond>(data_iterator, ndx_iterator, value, mask, start, end, baseindex, state);
+        }
+    }
 
     int64_t modified_value = value;
     if constexpr (std::is_same_v<Cond, Greater>) {
@@ -207,7 +222,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
     }
 
     if (v_width <= WIDTH_LIMIT && v_size >= RANGE_LIMIT) {
-        auto search_vector = populate(v_width, modified_value);
+        const auto search_vector = populate(v_width, modified_value);
         v_start = parallel_subword_find(find_all_fields<GreaterEqual>, data, 0, v_width, compressor.msb(),
                                         search_vector, 0, v_size);
     }
@@ -257,11 +272,10 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
     /*************** Search the indexes ****************/
 
     using U = typename IndexCond<Cond>::type;
-    const auto ndx_range = end - start;
     const auto ndx_width = compressor.ndx_width();
     const auto v_offset = v_size * v_width;
     if (ndx_range >= RANGE_LIMIT) {
-        auto search_vector = populate(ndx_width, v_start);
+        const auto search_vector = populate(ndx_width, v_start);
         while (start < end) {
             start = parallel_subword_find(find_all_fields_unsigned<U>, data, v_offset, ndx_width,
                                           compressor.ndx_msb(), search_vector, start, end);
@@ -273,7 +287,7 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
         }
     }
     else {
-        U index_c;
+        const U index_c;
         BfIterator ndx_iterator{data, v_offset, ndx_width, ndx_width, start};
         while (start < end) {
             if (index_c(int64_t(*ndx_iterator), int64_t(v_start))) {
@@ -284,6 +298,21 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
         }
     }
 
+    return true;
+}
+
+template <typename Cond>
+bool FlexCompressor::find_all_linear(BfIterator& data_iterator, BfIterator& ndx_iterator, int64_t value,
+                                     uint64_t mask, size_t start, size_t end, size_t baseindex, QueryStateBase* state)
+{
+    Cond c;
+    while (start < end) {
+        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
+        if (c(sv, value) && !state->match(start + baseindex))
+            return false;
+        ndx_iterator.move(++start);
+        data_iterator.move(static_cast<size_t>(*ndx_iterator));
+    }
     return true;
 }
 
