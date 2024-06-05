@@ -50,11 +50,26 @@ sed -i.bak -e "1s/.*/$RELEASE_HEADER/" "${project_dir}/CHANGELOG.md" || exit 1
 sed -i.bak -e "/.*\[#????\](https.*/d" "${project_dir}/CHANGELOG.md"
 rm "${project_dir}/CHANGELOG.md.bak" || exit 1
 
+# make the PR description
+PR_BODY_FILE="pr-body.txt"
 # assumes that tags and history have been fetched
-echo "commits since last tag:\n" > changes-since-last-tag.txt
-git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-merges >> changes-since-last-tag.txt
-echo changes since last tag are
-cat changes-since-last-tag.txt
+GIT_HASH=$(git rev-parse HEAD)
+# if you wish to run this locally you need to install the github cli (https://cli.github.com/manual)
+# both the gh and jq are available in github actions natively
+GH_STATUS_FOR_COMMIT=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/realm/realm-core/commits/$GIT_HASH/status)
+GH_CHECK_STATE=$(echo $GH_STATUS_FOR_COMMIT | jq '.state')
+echo "CI checks for $GIT_HASH:" > $PR_BODY_FILE
+if [ "$GH_CHECK_STATE" = '"success"' ]; then
+  echo "    succeeded! :white_check_mark:" >> $PR_BODY_FILE
+else
+  echo "    failed! :x:" >> $PR_BODY_FILE
+fi
+echo "You may also want to manually verify the [evergreen checks](https://spruce.mongodb.com/commits/realm-core-stable)" >> $PR_BODY_FILE
+echo "" >> $PR_BODY_FILE
+echo "commits since last tag:" >> $PR_BODY_FILE
+git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-merges >> $PR_BODY_FILE
+echo "The PR body file contains:"
+cat $PR_BODY_FILE
 
 echo Ready to make "${realm_version}"
 
