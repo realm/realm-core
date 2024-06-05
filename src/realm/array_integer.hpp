@@ -174,7 +174,6 @@ inline ArrayIntNull::~ArrayIntNull() noexcept {}
 
 inline size_t ArrayIntNull::size() const noexcept
 {
-    // this cannot be right, what if size is 0
     return Array::size() - 1;
 }
 

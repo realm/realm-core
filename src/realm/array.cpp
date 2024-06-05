@@ -262,8 +262,6 @@ MemRef Array::get_mem() const noexcept
 
 void Array::update_from_parent() noexcept
 {
-    // checking the parent should have nothhing to do with m_data, decoding while updating the parent may be needed if
-    // I am wrong. REALM_ASSERT_DEBUG(is_attached());
     ArrayParent* parent = get_parent();
     REALM_ASSERT_DEBUG(parent);
     ref_type new_ref = get_ref_from_parent();
@@ -607,14 +605,6 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
         int64_t v = old_getter(*this, i);
         m_vtable->setter(*this, i, v);
     }
-}
-
-size_t Array::size() const noexcept
-{
-    // in case the array is in compressed format. Never read directly
-    // from the header the size, since it will result very likely in a cache miss.
-    // For compressed arrays m_size should always be kept updated, due to init_from_mem
-    return m_size;
 }
 
 bool Array::compress_array(Array& arr) const
@@ -1011,14 +1001,12 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
         uint_least8_t width = get_width_from_header(header);
         return get_direct(data, width, ndx);
     }
-    static IntegerCompressor s_compressor;
-    // we don't want to construct a compressor, every time we end up here.
-    // however since the compressor is usually unique per array, it caches a
-    // bunch of masks that are expensive to compute over and over again.
-    // In this case we need to compute the masks again at least once, so we
-    // need to call init and reset the compressor.
-    // If we don't do this, the values extracted from the arrays could be wrong,
-    // and lead to either wrong query results or even corrupting the data in the file.
+    // Ideally, we would not want to construct a compressor every time we end up here.
+    // However the compressor initalization should be fast enough. Creating an array,
+    // which owns a compressor internally, is the better approach if we intend to access
+    // the same data over and over again. The compressor basically caches the most important
+    // information about the layuot of the data itself.
+    IntegerCompressor s_compressor;
     s_compressor.init(header);
     return s_compressor.get(ndx);
 }
