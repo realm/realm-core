@@ -1656,11 +1656,12 @@ AppSession create_app(const AppCreateConfig& config)
         return object_schema.table_type == ObjectSchema::ObjectType::TopLevel;
     });
     if (any_sync_types) {
+        // Increasing timeout due to occasional slow startup of the translator on baasaas
         timed_sleeping_wait_for(
             [&] {
                 return session.is_initial_sync_complete(app_id);
             },
-            std::chrono::seconds(30), std::chrono::seconds(1));
+            std::chrono::seconds(60), std::chrono::seconds(1));
     }
 
     return {client_app_id, app_id, session, config};
