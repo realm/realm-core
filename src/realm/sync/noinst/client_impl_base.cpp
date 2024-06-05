@@ -230,23 +230,49 @@ ClientImpl::ClientImpl(ClientConfig config)
     });
 }
 
+void ClientImpl::incr_outstanding_posts()
+{
+    util::CheckedLockGuard lock(m_drain_mutex);
+    ++m_outstanding_posts;
+    m_drained = false;
+}
+
+void ClientImpl::decr_outstanding_posts()
+{
+    util::CheckedLockGuard lock(m_drain_mutex);
+    REALM_ASSERT(m_outstanding_posts);
+    if (--m_outstanding_posts <= 0) {
+        // Notify must happen with lock held or another thread could destroy
+        // ClientImpl between when we release the lock and when we call notify
+        m_drain_cv.notify_all();
+    }
+}
 
 void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
-    {
-        std::lock_guard lock(m_drain_mutex);
-        ++m_outstanding_posts;
-        m_drained = false;
-    }
+    incr_outstanding_posts();
     m_socket_provider->post([handler = std::move(handler), this](Status status) {
         auto decr_guard = util::make_scope_exit([&]() noexcept {
-            std::lock_guard lock(m_drain_mutex);
-            REALM_ASSERT(m_outstanding_posts);
-            --m_outstanding_posts;
-            m_drain_cv.notify_all();
+            decr_outstanding_posts();
         });
         handler(status);
+    });
+}
+
+void ClientImpl::post(util::UniqueFunction<void()>&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    incr_outstanding_posts();
+    m_socket_provider->post([handler = std::move(handler), this](Status status) {
+        auto decr_guard = util::make_scope_exit([&]() noexcept {
+            decr_outstanding_posts();
+        });
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        if (!status.is_ok())
+            throw Exception(status);
+        handler();
     });
 }
 
@@ -274,18 +300,12 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
                                                        SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
-    {
-        std::lock_guard lock(m_drain_mutex);
-        ++m_outstanding_posts;
-        m_drained = false;
-    }
+    incr_outstanding_posts();
     return m_socket_provider->create_timer(delay, [handler = std::move(handler), this](Status status) {
+        auto decr_guard = util::make_scope_exit([&]() noexcept {
+            decr_outstanding_posts();
+        });
         handler(status);
-
-        std::lock_guard lock(m_drain_mutex);
-        REALM_ASSERT(m_outstanding_posts);
-        --m_outstanding_posts;
-        m_drain_cv.notify_all();
     });
 }
 
@@ -1680,15 +1700,13 @@ void Session::activate()
 
     logger.debug("Activating"); // Throws
 
-    bool has_pending_client_reset = false;
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         bool file_exists = util::File::exists(get_realm_path());
         m_performing_client_reset = get_client_reset_config().has_value();
 
         logger.info("client_reset_config = %1, Realm exists = %2 ", m_performing_client_reset, file_exists);
         if (!m_performing_client_reset) {
-            get_history().get_status(m_last_version_available, m_client_file_ident, m_progress,
-                                     &has_pending_client_reset); // Throws
+            get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1709,8 +1727,7 @@ void Session::activate()
     reset_protocol_state();
     m_state = Active;
 
-    call_debug_hook(SyncClientHookEvent::SessionActivating, m_progress, m_last_sent_flx_query_version,
-                    DownloadBatchState::SteadyState, 0);
+    call_debug_hook(SyncClientHookEvent::SessionActivating);
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -1725,9 +1742,8 @@ void Session::activate()
         on_integration_failure(IntegrationException(exception_to_status()));
     }
 
-    if (has_pending_client_reset) {
-        handle_pending_client_reset_acknowledgement();
-    }
+    // Checks if there is a pending client reset
+    handle_pending_client_reset_acknowledgement();
 }
 
 
@@ -1929,8 +1945,7 @@ void Session::send_bind_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
-    call_debug_hook(SyncClientHookEvent::BindMessageSent, m_progress, m_last_sent_flx_query_version,
-                    DownloadBatchState::SteadyState, 0);
+    call_debug_hook(SyncClientHookEvent::BindMessageSent);
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -2253,11 +2268,11 @@ bool Session::client_reset_if_needed()
     auto on_flx_version_complete = [this](int64_t version) {
         this->on_flx_sync_version_complete(version);
     };
-    bool did_reset = client_reset::perform_client_reset(
-        logger, *get_db(), *client_reset_config->fresh_copy, client_reset_config->mode,
-        std::move(client_reset_config->notify_before_client_reset),
-        std::move(client_reset_config->notify_after_client_reset), m_client_file_ident, get_flx_subscription_store(),
-        on_flx_version_complete, client_reset_config->recovery_is_allowed);
+    bool did_reset =
+        client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config), m_client_file_ident,
+                                           get_flx_subscription_store(), on_flx_version_complete);
+
+    call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
     if (!did_reset) {
         return false;
     }
@@ -2266,9 +2281,7 @@ bool Session::client_reset_if_needed()
     logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
     SaltedFileIdent client_file_ident;
-    bool has_pending_client_reset = false;
-    get_history().get_status(m_last_version_available, client_file_ident, m_progress,
-                             &has_pending_client_reset); // Throws
+    get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
     REALM_ASSERT_3(m_client_file_ident.ident, ==, client_file_ident.ident);
     REALM_ASSERT_3(m_client_file_ident.salt, ==, client_file_ident.salt);
     REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
@@ -2285,9 +2298,8 @@ bool Session::client_reset_if_needed()
     m_allow_upload = true;
     REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
-    if (has_pending_client_reset) {
-        handle_pending_client_reset_acknowledgement();
-    }
+    // Checks if there is a pending client reset
+    handle_pending_client_reset_acknowledgement();
 
     update_subscription_version_info();
 
@@ -2333,11 +2345,21 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     // if a client reset happens, it will take care of setting the file ident
     // and if not, we do it here
     bool did_client_reset = false;
+
+    // Save some of the client reset info for reporting to the client if an error occurs.
+    Status cr_status(Status::OK()); // Start with no client reset
+    ProtocolErrorInfo::Action cr_action = ProtocolErrorInfo::Action::NoAction;
+    if (auto& cr_config = get_client_reset_config()) {
+        cr_status = cr_config->error;
+        cr_action = cr_config->action;
+    }
+
     try {
         did_client_reset = client_reset_if_needed();
     }
     catch (const std::exception& e) {
-        auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
+        auto err_msg = util::format("A fatal error occurred during '%1' client reset for %2: '%3'", cr_action,
+                                    cr_status, e.what());
         logger.error(err_msg.c_str());
         SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
         suspend(err_info);

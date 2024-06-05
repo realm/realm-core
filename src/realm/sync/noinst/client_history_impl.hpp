@@ -136,8 +136,8 @@ public:
     /// The returned SyncProgress is the one that was last stored by
     /// set_sync_progress(), or `SyncProgress{}` if set_sync_progress() has
     /// never been called.
-    void get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident, SyncProgress& progress,
-                    bool* has_pending_client_reset = nullptr) const;
+    void get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
+                    SyncProgress& progress) const;
 
     /// Stores the server assigned client file identifier in the associated
     /// Realm file, such that it is available via get_status() during future

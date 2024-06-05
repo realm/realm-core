@@ -464,6 +464,8 @@ public:
         std::set<file_ident_type> server_disable_download_for;
 
         std::function<Server::SessionBootstrapCallback> server_session_bootstrap_callback;
+
+        std::shared_ptr<BindingCallbackThreadObserver> socket_provider_observer;
     };
 
 
@@ -541,7 +543,8 @@ public:
             Client::Config config_2;
 
             m_client_socket_providers.push_back(std::make_shared<websocket::DefaultSocketProvider>(
-                m_client_loggers[i], "", nullptr, websocket::DefaultSocketProvider::AutoStart{false}));
+                m_client_loggers[i], "", config.socket_provider_observer,
+                websocket::DefaultSocketProvider::AutoStart{false}));
             config_2.socket_provider = m_client_socket_providers.back();
             config_2.logger = m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;
@@ -696,17 +699,15 @@ public:
                          Session::Config config = {})
     {
         //  *ClientServerFixture uses the service identifier "/realm-sync" to distinguish Sync
-        //  connections, while the MongoDB/Stitch-based Sync server does not.
+        //  connections, while BaaS does not.
         config.service_identifier = "/realm-sync";
         config.realm_identifier = std::move(realm_identifier);
         config.server_port = m_server_ports[server_index];
         config.server_address = "localhost";
-
-        Session session{*m_clients[client_index], std::move(db), nullptr, nullptr, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
-            session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
+            config.connection_state_change_listener = m_connection_state_change_listeners[client_index];
         }
-        else {
+        else if (!config.connection_state_change_listener) {
             auto fallback_listener = [this](ConnectionState state, std::optional<SessionErrorInfo> error) {
                 if (state != ConnectionState::disconnected)
                     return;
@@ -717,9 +718,10 @@ public:
                 CHECK_NOT(client_error_occurred);
                 stop();
             };
-            session.set_connection_state_change_listener(fallback_listener);
+            config.connection_state_change_listener = fallback_listener;
         }
-        return session;
+
+        return Session{*m_clients[client_index], std::move(db), nullptr, nullptr, std::move(config)};
     }
 
     Session make_bound_session(int client_index, DBRef db, int server_index, std::string server_path,
@@ -733,10 +735,7 @@ public:
                                std::string signed_user_token, Session::Config config = {})
     {
         config.signed_user_token = std::move(signed_user_token);
-        Session session =
-            make_session(client_index, server_index, std::move(db), std::move(server_path), std::move(config));
-        session.bind();
-        return session;
+        return make_session(client_index, server_index, std::move(db), std::move(server_path), std::move(config));
     }
 
     void cancel_reconnect_delay(int client_index)
@@ -942,7 +941,7 @@ public:
     using ErrorHandler = MultiClientServerFixture::ErrorHandler;
 
     struct Config : Session::Config {
-        std::function<ErrorHandler> error_handler;
+        util::UniqueFunction<ErrorHandler> error_handler;
     };
 
     RealmFixture(ClientServerFixture&, const std::string& real_path, const std::string& virt_path, Config = {});
@@ -981,19 +980,16 @@ private:
     DBRef m_db;
     sync::Session m_session;
 
-    void setup_error_handler(util::UniqueFunction<ErrorHandler>);
+    Config setup_error_handler(Config&&);
 };
 
 
 inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, const std::string& real_path,
                                   const std::string& virt_path, Config config)
-    : m_self_ref{std::make_shared<SelfRef>(this)}                                       // Throws
-    , m_db{DB::create(make_client_replication(), real_path)}                            // Throws
-    , m_session{client_server_fixture.make_session(m_db, virt_path, std::move(config))} // Throws
+    : m_self_ref{std::make_shared<SelfRef>(this)}                                                            // Throws
+    , m_db{DB::create(make_client_replication(), real_path)}                                                 // Throws
+    , m_session{client_server_fixture.make_session(m_db, virt_path, setup_error_handler(std::move(config)))} // Throws
 {
-    if (config.error_handler)
-        setup_error_handler(std::move(config.error_handler));
-    m_session.bind();
 }
 
 
@@ -1001,12 +997,9 @@ inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixtur
                                   const std::string& real_path, const std::string& virt_path, Config config)
     : m_self_ref{std::make_shared<SelfRef>(this)}            // Throws
     , m_db{DB::create(make_client_replication(), real_path)} // Throws
-    , m_session{client_server_fixture.make_session(client_index, server_index, m_db, virt_path, std::move(config))}
-// Throws
+    , m_session{client_server_fixture.make_session(client_index, server_index, m_db, virt_path,
+                                                   setup_error_handler(std::move(config)))} // Throws
 {
-    if (config.error_handler)
-        setup_error_handler(std::move(config.error_handler));
-    m_session.bind();
 }
 
 inline RealmFixture::~RealmFixture() noexcept
@@ -1070,15 +1063,18 @@ inline void RealmFixture::async_wait_for_download_completion(WaitOperCompletionH
     m_session.async_wait_for_download_completion(std::move(handler));
 }
 
-inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler> handler)
+inline RealmFixture::Config RealmFixture::setup_error_handler(Config&& config)
 {
-    auto listener = [handler = std::move(handler)](ConnectionState state,
-                                                   const std::optional<SessionErrorInfo>& error_info) {
-        if (state != ConnectionState::disconnected)
-            return;
-        REALM_ASSERT(error_info);
-        handler(error_info->status, error_info->is_fatal);
-    };
-    m_session.set_connection_state_change_listener(std::move(listener));
+    if (config.error_handler) {
+        config.connection_state_change_listener =
+            [handler = std::move(config.error_handler)](ConnectionState state,
+                                                        const std::optional<SessionErrorInfo>& error_info) {
+                if (state != ConnectionState::disconnected)
+                    return;
+                REALM_ASSERT(error_info);
+                handler(error_info->status, error_info->is_fatal);
+            };
+    }
+    return std::move(config);
 }
 } // namespace realm::fixtures

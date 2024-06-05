@@ -24,6 +24,7 @@ jobs:
         run: tools/release-init.sh ${{ inputs.version }}
         shell: bash
       - name: Create Release PR
+        id: prepare-pr
         uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e #! 6.0.5
         with:
           branch: release/automated_v${{ inputs.version }}
@@ -32,8 +33,14 @@ jobs:
           body-path: changes-since-last-tag.txt
           labels: no-jira-ticket
           commit-message: Prepare for release ${{ inputs.version }}
-          token: ${{ secrets.REALM_CI_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           add-paths: |
             dependencies.yml
             Package.swift
             CHANGELOG.md
+      - name: Output PR URL
+        run: |
+          echo "Prepare release PR created: $PREPARE_PR_URL" >> $GITHUB_STEP_SUMMARY
+        shell: bash
+        env:
+          PREPARE_PR_URL: ${{ steps.prepare-pr.outputs.pull-request-url }}

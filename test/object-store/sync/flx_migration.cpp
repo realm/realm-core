@@ -320,6 +320,8 @@ TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas
 
 TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx migration][baas]") {
     auto logger_ptr = util::Logger::get_default_logger();
+    enum TestState { idle, wait_for_merge, merge_complete, rollback_complete };
+    TestingStateMachine<TestState> test_state(TestState::idle);
 
     const std::string partition = "migration-test";
     const Schema mig_schema{
@@ -331,6 +333,20 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
     SyncTestFile config(session.app()->current_user(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     config.schema_version = 0;
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
+        test_state.transition_with([data](TestState cur_state) -> std::optional<TestState> {
+            if (data.event == SyncClientHookEvent::ClientResetMergeComplete &&
+                cur_state == TestState::wait_for_merge) {
+                return TestState::merge_complete;
+            }
+            return std::nullopt;
+        });
+        if (test_state.get() == TestState::merge_complete) {
+            // Wait for the FLX->PBS rollback to complete before continuing
+            test_state.wait_for(TestState::rollback_complete, std::chrono::seconds(25));
+        }
+        return SyncClientHookAction::NoAction;
+    };
 
     // Fill some objects
     auto objects = fill_test_data(config); // 5 objects starting at 1 with no partition value set
@@ -437,15 +453,16 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
         REALM_ASSERT(result.get_value() == sync::SubscriptionSet::State::Superseded);
     }
 
+    test_state.transition_to(TestState::wait_for_merge);
+
     //  Migrate back to FLX - and keep the realm session open
     trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
-    // wait for the subscription store to initialize after downloading
-    timed_wait_for(
-        [&outer_realm]() {
-            return outer_realm->sync_session() && outer_realm->sync_session()->get_flx_subscription_store();
-        },
-        std::chrono::seconds(180));
+    // Cancel any connect waits (since sync session is still active) and try to connect now
+    outer_realm->sync_session()->handle_reconnect();
+
+    // wait for the fresh realm to download and merge with the current local realm
+    test_state.wait_for(TestState::merge_complete, std::chrono::seconds(180));
 
     // Verify data has been sync'ed and there is only 1 subscription for the Object table
     {
@@ -460,9 +477,18 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
         REQUIRE(active_subs.find("flx_migrated_Object"));
     }
 
-    // Roll back to PBS once again - and keep the realm session open
+    // Roll back to PBS once again before the client reset is complete and keep the realm session open
+    // NOTE: the realm session is blocked in the hook callback until the rollback is complete
     trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
+    // Release the realm session; will reconnect and perform the rollback to PBS client reset
+    test_state.transition_to(TestState::rollback_complete);
+
+    // Cancel any connect waits (since sync session is still active) and try to connect now
+    outer_realm->sync_session()->handle_reconnect();
+
+    // During the rollback client reset, the previous migrate to flx client reset operation is still
+    // tracked, but will be removed since the new rollback server requests action is incompatible.
     REQUIRE(!wait_for_upload(*outer_realm));
     REQUIRE(!wait_for_download(*outer_realm));
 

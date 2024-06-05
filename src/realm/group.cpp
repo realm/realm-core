@@ -1033,8 +1033,7 @@ auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> Histo
                                                          m_group->m_top.get_ref(), version, history_type,
                                                          history_schema_version);
         REALM_ASSERT(history_type != Replication::hist_None);
-        if (!m_should_write_history ||
-            (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
+        if (!m_should_write_history || history_type == Replication::hist_None) {
             return info; // Only sync history should be preserved when writing to a new file
         }
         info.type = history_type;

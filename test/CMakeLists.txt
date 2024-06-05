@@ -68,7 +68,6 @@ set(CORE_TEST_SOURCES
     test_list.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
-    test_optional.cpp
     test_priority_queue.cpp
     test_replication.cpp
     test_safe_int_ops.cpp

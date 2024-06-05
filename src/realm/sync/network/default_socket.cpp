@@ -523,41 +523,24 @@ DefaultSocketProvider::~DefaultSocketProvider()
 
 void DefaultSocketProvider::start()
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
+    util::CheckedUniqueLock lock(m_mutex);
     // Has the thread already been started or is running
     if (m_state == State::Starting || m_state == State::Running)
         return; // early return
 
     // If the thread has been previously run, make sure it has been joined first
-    if (m_state == State::Stopping) {
+    if (m_thread.joinable()) {
         state_wait_for(lock, State::Stopped);
+        m_thread.join();
     }
 
     m_logger_ptr->trace("Default event loop: start()");
     REALM_ASSERT(m_state == State::Stopped);
 
-    do_state_update(lock, State::Starting);
+    do_state_update(State::Starting);
     m_thread = std::thread{&DefaultSocketProvider::event_loop, this};
     // Wait for the thread to start before continuing
     state_wait_for(lock, State::Running);
-}
-
-void DefaultSocketProvider::OnlyForTesting::run_event_loop_on_current_thread(DefaultSocketProvider* provider)
-{
-    {
-        std::unique_lock<std::mutex> lk(provider->m_mutex);
-        REALM_ASSERT(provider->m_state == State::Stopped);
-        provider->do_state_update(lk, State::Starting);
-    }
-
-    provider->event_loop();
-}
-
-void DefaultSocketProvider::OnlyForTesting::prep_event_loop_for_restart(DefaultSocketProvider* provider)
-{
-    std::unique_lock<std::mutex> lk(provider->m_mutex);
-    REALM_ASSERT(provider->m_state == State::Stopped);
-    provider->m_service.reset();
 }
 
 void DefaultSocketProvider::event_loop()
@@ -569,13 +552,14 @@ void DefaultSocketProvider::event_loop()
         if (m_observer_ptr)
             m_observer_ptr->will_destroy_thread();
 
-        std::unique_lock<std::mutex> lock(m_mutex);
-        // Did we get here due to an unhandled exception?
-        if (m_state != State::Stopping) {
-            m_logger_ptr->error("Default event loop: thread exited unexpectedly");
+        {
+            util::CheckedLockGuard lock(m_mutex);
+            // Did we get here due to an unhandled exception?
+            if (m_state != State::Stopping) {
+                m_logger_ptr->error("Default event loop: thread exited unexpectedly");
+            }
+            m_state = State::Stopped;
         }
-        m_state = State::Stopped;
-        lock.unlock();
         m_state_cv.notify_all();
     });
 
@@ -583,7 +567,7 @@ void DefaultSocketProvider::event_loop()
         m_observer_ptr->did_create_thread();
 
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        util::CheckedLockGuard lock(m_mutex);
         REALM_ASSERT(m_state == State::Starting);
     }
 
@@ -596,7 +580,7 @@ void DefaultSocketProvider::event_loop()
 
         REALM_ASSERT(status.is_ok());
 
-        std::unique_lock<std::mutex> lock(m_mutex);
+        util::CheckedLockGuard lock(m_mutex);
         // This is a callback from a previous generation
         if (m_event_loop_generation != my_generation) {
             return;
@@ -606,7 +590,7 @@ void DefaultSocketProvider::event_loop()
         }
         m_logger_ptr->trace("Default event loop: service run");
         REALM_ASSERT(m_state == State::Starting);
-        do_state_update(lock, State::Running);
+        do_state_update(State::Running);
     });
 
     // If there is no event loop observer or handle_error function registered, then just
@@ -619,11 +603,12 @@ void DefaultSocketProvider::event_loop()
             m_service.run_until_stopped(); // Throws
         }
         catch (const std::exception& e) {
-            REALM_ASSERT(m_observer_ptr); // should not change while event loop is running
-            std::unique_lock<std::mutex> lock(m_mutex);
-            // Service is no longer running, event loop thread is stopping
-            do_state_update(lock, State::Stopping);
-            lock.unlock();
+            {
+                util::CheckedLockGuard lock(m_mutex);
+                // Service is no longer running, event loop thread is stopping
+                m_state = State::Stopping;
+            }
+            m_state_cv.notify_all();
             m_logger_ptr->error("Default event loop exception: ", e.what());
             // If the error was not handled by the thread loop observer, then rethrow
             if (!m_observer_ptr->handle_error(e))
@@ -634,12 +619,12 @@ void DefaultSocketProvider::event_loop()
 
 void DefaultSocketProvider::stop(bool wait_for_stop)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
+    util::CheckedUniqueLock lock(m_mutex);
 
     // Do nothing if the thread is not started or running or stop has already been called
     if (m_state == State::Starting || m_state == State::Running) {
         m_logger_ptr->trace("Default event loop: stop()");
-        do_state_update(lock, State::Stopping);
+        do_state_update(State::Stopping);
         // Updating state to Stopping will free a start() if it is waiting for the thread to
         // start and may cause the thread to exit early before calling service.run()
         m_service.stop(); // Unblocks m_service.run()
@@ -661,24 +646,16 @@ void DefaultSocketProvider::stop(bool wait_for_stop)
 //                              |           |          ^
 //                              +----------------------+
 
-void DefaultSocketProvider::do_state_update(std::unique_lock<std::mutex>&, State new_state)
+void DefaultSocketProvider::do_state_update(State new_state)
 {
-    // m_state_mutex should already be locked...
     m_state = new_state;
     m_state_cv.notify_all(); // Let any waiters check the state
 }
 
-void DefaultSocketProvider::state_wait_for(std::unique_lock<std::mutex>& lock, State expected_state)
+void DefaultSocketProvider::state_wait_for(util::CheckedUniqueLock& lock, State expected_state)
 {
-    // Check for condition already met or superseded
-    if (m_state >= expected_state)
-        return;
-
-    m_state_cv.wait(lock, [this, expected_state]() {
-        // are we there yet?
-        if (m_state < expected_state)
-            return false;
-        return true;
+    m_state_cv.wait(lock.native_handle(), [this, expected_state]() REQUIRES(m_mutex) {
+        return m_state >= expected_state;
     });
 }
 

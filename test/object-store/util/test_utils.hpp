@@ -68,10 +68,10 @@ public:
         m_cv.notify_one();
     }
 
-    void wait_for(E target)
+    bool wait_for(E target, std::chrono::milliseconds period = std::chrono::seconds(15))
     {
         std::unique_lock lock{m_mutex};
-        m_cv.wait(lock, [&] {
+        return m_cv.wait_for(lock, period, [&] {
             return m_cur_state == target;
         });
     }

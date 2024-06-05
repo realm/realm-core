@@ -238,48 +238,6 @@ struct value_copier<Timestamp, Timestamp> {
 };
 } // namespace
 
-#ifdef JAVA_MANY_COLUMNS_CRASH
-
-REALM_TABLE_3(SubtableType, year, Int, daysSinceLastVisit, Int, conceptId, String)
-
-REALM_TABLE_7(MainTableType, patientId, String, gender, Int, ethnicity, Int, yearOfBirth, Int, yearOfDeath, Int,
-              zipCode, String, events, Subtable<SubtableType>)
-
-TEST(Table_ManyColumnsCrash2)
-{
-    // Trying to reproduce Java crash.
-    for (int a = 0; a < 10; a++) {
-        Group group;
-
-        MainTableType::Ref mainTable = group.add_table<MainTableType>("PatientTable");
-        TableRef dynPatientTable = group.add_table("PatientTable");
-        dynPatientTable->add_empty_row();
-
-        for (int counter = 0; counter < 20000; counter++) {
-#if 0
-            // Add row to subtable through typed interface
-            SubtableType::Ref subtable = mainTable[0].events->get_table_ref();
-            REALM_ASSERT(subtable->is_attached());
-            subtable->add(0, 0, "");
-            REALM_ASSERT(subtable->is_attached());
-
-#else
-            // Add row to subtable through dynamic interface. This mimics Java closest
-            TableRef subtable2 = dynPatientTable->get_subtable(6, 0);
-            REALM_ASSERT(subtable2->is_attached());
-            size_t subrow = subtable2->add_empty_row();
-            REALM_ASSERT(subtable2->is_attached());
-
-#endif
-            if ((counter % 1000) == 0) {
-                //     std::cerr << counter << "\n";
-            }
-        }
-    }
-}
-
-#endif // JAVA_MANY_COLUMNS_CRASH
-
 TEST(Table_Null)
 {
     {
