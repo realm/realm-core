@@ -228,7 +228,8 @@ private:
     std::vector<WaitOperCompletionHandler> m_download_completion_handlers;
     std::vector<WaitOperCompletionHandler> m_sync_completion_handlers;
 
-    void on_upload_completion();
+    version_type m_upload_completion_requested_version = -1;
+
     void on_download_completion();
     void on_suspended(const SessionErrorInfo& error_info);
     void on_resumed();
@@ -238,7 +239,9 @@ private:
     void on_flx_sync_version_complete(int64_t version);
 
     void init_progress_handler();
-    void report_progress();
+    void check_progress();
+    void report_progress(ReportedProgress& p, DownloadableProgress downloadable);
+    void report_upload_completion(version_type);
 
     friend class SessionWrapperStack;
     friend class ClientImpl::Session;
@@ -736,19 +739,10 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
             // Fake it for "dry run" mode
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(client_version, progress, !changesets.empty()); // Throws
+        on_changesets_integrated(client_version, progress); // Throws
     }
     catch (const IntegrationException& e) {
         on_integration_failure(e);
-    }
-}
-
-
-void SessionImpl::on_upload_completion()
-{
-    // Ignore the call if the session is not active
-    if (m_state == State::Active) {
-        m_wrapper.on_upload_completion(); // Throws
     }
 }
 
@@ -842,7 +836,6 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
     if (batch_state == DownloadBatchState::MoreToCome) {
-        notify_sync_progress();
         return true;
     }
 
@@ -935,7 +928,7 @@ void SessionImpl::process_pending_flx_bootstrap()
     REALM_ASSERT_3(query_version, !=, -1);
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 
-    on_changesets_integrated(new_version.realm_version, progress, changesets_processed > 0);
+    on_changesets_integrated(new_version.realm_version, progress);
     auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
                                   DownloadBatchState::LastInBatch, changesets_processed);
     // NoAction/EarlyReturn are both valid no-op actions to take here.
@@ -1088,14 +1081,6 @@ void SessionImpl::init_progress_handler()
 void SessionImpl::enable_progress_notifications()
 {
     m_wrapper.m_reliable_download_progress = true;
-}
-
-void SessionImpl::notify_sync_progress()
-{
-    if (m_state != State::Active)
-        return;
-
-    m_wrapper.report_progress();
 }
 
 util::Future<std::string> SessionImpl::send_test_command(std::string body)
@@ -1301,7 +1286,7 @@ void SessionWrapper::on_commit(version_type new_version)
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
         sess.recognize_sync_version(new_version); // Throws
-        self->report_progress();                  // Throws
+        self->check_progress();                   // Throws
     });
 }
 
@@ -1343,6 +1328,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
             return;
         }
         if (upload_completion) {
+            self->m_upload_completion_requested_version = self->m_db->get_version_of_latest_snapshot();
             if (download_completion) {
                 // Wait for upload and download completion
                 self->m_sync_completion_handlers.push_back(std::move(handler)); // Throws
@@ -1358,7 +1344,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
         }
         SessionImpl& sess = *self->m_sess;
         if (upload_completion)
-            sess.request_upload_completion_notification(); // Throws
+            self->check_progress();
         if (download_completion)
             sess.request_download_completion_notification(); // Throws
     });                                                      // Throws
@@ -1484,7 +1470,7 @@ void SessionWrapper::actualize()
     }
 
     if (!m_client_reset_config)
-        report_progress(); // Throws
+        check_progress(); // Throws
 }
 
 void SessionWrapper::force_close()
@@ -1569,24 +1555,14 @@ inline void SessionWrapper::finalize_before_actualization() noexcept
     m_db = nullptr;
 }
 
-void SessionWrapper::on_upload_completion()
-{
-    REALM_ASSERT(!m_finalized);
-    while (!m_upload_completion_handlers.empty()) {
-        auto handler = std::move(m_upload_completion_handlers.back());
-        m_upload_completion_handlers.pop_back();
-        handler(Status::OK()); // Throws
-    }
-    while (!m_sync_completion_handlers.empty()) {
-        auto handler = std::move(m_sync_completion_handlers.back());
-        m_download_completion_handlers.push_back(std::move(handler)); // Throws
-        m_sync_completion_handlers.pop_back();
-    }
-}
-
-
 void SessionWrapper::on_download_completion()
 {
+    // Ensure that progress handlers get called before completion handlers. The
+    // download completing performed a commit and will trigger progress
+    // notifications asynchronously, but they would arrive after the download
+    // completion without this.
+    check_progress();
+
     while (!m_download_completion_handlers.empty()) {
         auto handler = std::move(m_download_completion_handlers.back());
         m_download_completion_handlers.pop_back();
@@ -1642,25 +1618,51 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state,
 
 void SessionWrapper::init_progress_handler()
 {
-    ClientHistory::get_upload_download_bytes(m_db.get(), m_final_downloaded, m_final_uploaded);
+    ClientHistory::get_upload_download_state(m_db.get(), m_final_downloaded, m_final_uploaded);
 }
 
-void SessionWrapper::report_progress()
+void SessionWrapper::check_progress()
 {
     REALM_ASSERT(!m_finalized);
     REALM_ASSERT(m_sess);
 
+    if (!m_progress_handler && m_upload_completion_handlers.empty() && m_sync_completion_handlers.empty())
+        return;
+
+    version_type uploaded_version;
+    ReportedProgress p;
+    DownloadableProgress downloadable;
+    ClientHistory::get_upload_download_state(*m_db, p.downloaded, downloadable, p.uploaded, p.uploadable, p.snapshot,
+                                             uploaded_version);
+
+    report_progress(p, downloadable);
+    report_upload_completion(uploaded_version);
+}
+
+void SessionWrapper::report_upload_completion(version_type uploaded_version)
+{
+    if (uploaded_version < m_upload_completion_requested_version)
+        return;
+
+    std::move(m_sync_completion_handlers.begin(), m_sync_completion_handlers.end(),
+              std::back_inserter(m_download_completion_handlers));
+    m_sync_completion_handlers.clear();
+
+    while (!m_upload_completion_handlers.empty()) {
+        auto handler = std::move(m_upload_completion_handlers.back());
+        m_upload_completion_handlers.pop_back();
+        handler(Status::OK()); // Throws
+    }
+}
+
+void SessionWrapper::report_progress(ReportedProgress& p, DownloadableProgress downloadable)
+{
     if (!m_progress_handler)
         return;
 
     // Ignore progress messages from before we first receive a DOWNLOAD message
     if (!m_reliable_download_progress)
         return;
-
-    ReportedProgress p;
-    DownloadableProgress downloadable;
-    ClientHistory::get_upload_download_bytes(m_db.get(), p.downloaded, downloadable, p.uploaded, p.uploadable,
-                                             p.snapshot);
 
     auto calculate_progress = [](uint64_t transferred, uint64_t transferable, uint64_t final_transferred) {
         REALM_ASSERT_DEBUG_EX(final_transferred <= transferred, final_transferred, transferred, transferable);
