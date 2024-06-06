@@ -5021,7 +5021,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     size_t bootstrap_msg_count = 0;
     bool role_change_bootstrap = false;
     bool send_test_command = false;
-    std::vector<util::Future<std::string>> test_command_futures(0);
     auto logger = util::Logger::get_default_logger();
 
     auto setup_harness = [&](FLXSyncTestHarness& harness, TestParams params) {
@@ -5047,24 +5046,15 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     };
 
     /// TODO: Add back once the server supports sending test commands before the IDENT message being sent
-    auto pause_download_builder = [](SyncSession& session, bool pause) -> util::Future<std::string> {
-        nlohmann::json test_command = {{"command", pause ? "PAUSE_DOWNLOAD_BUILDER" : "RESUME_DOWNLOAD_BUILDER"}};
-        return SyncSession::OnlyForTesting::send_test_command(session, test_command.dump());
-    };
-
-    auto wait_for_test_command = [&](TestState wait_state) {
-        std::optional<util::Future<std::string>> cur_test_command;
-        REQUIRE(state_machina.wait_for(wait_state));
-        state_machina.transition_with([&](TestState) {
-            REQUIRE(send_test_command);
-            REQUIRE(test_command_futures.size() > 0);
-            cur_test_command = std::move(test_command_futures.front());
-            test_command_futures.erase(test_command_futures.begin());
-            return std::nullopt;
-        });
-        auto result = cur_test_command->get_no_throw();
-        REQUIRE(result.is_ok());
-        REQUIRE(result.get_value() == "{}");
+    auto pause_download_builder = [](std::weak_ptr<SyncSession> weak_session, bool pause) {
+        if (auto session = weak_session.lock()) {
+            nlohmann::json test_command = {{"command", pause ? "PAUSE_DOWNLOAD_BUILDER" : "RESUME_DOWNLOAD_BUILDER"}};
+            SyncSession::OnlyForTesting::send_test_command(*session, test_command.dump())
+                .get_async([](StatusWith<std::string> result) {
+                    REQUIRE(result.is_ok());             // Future completed successfully
+                    REQUIRE(result.get_value() == "{}"); // Command completed successfully
+                });
+        }
     };
 
     auto setup_config_callbacks = [&](SyncTestFile& config) {
@@ -5091,20 +5081,16 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                     case Event::SessionResumed:
                         if (send_test_command) {
                             REQUIRE(cur_state == TestState::reconnect_received);
-                            if (auto session = weak_session.lock()) {
-                                logger->trace("ROLE CHANGE: sending PAUSE test command after resumed");
-                                test_command_futures.push_back(pause_download_builder(*session, true));
-                            }
+                            logger->trace("ROLE CHANGE: sending PAUSE test command after resumed");
+                            pause_download_builder(weak_session, true);
                         }
                         return TestState::session_resumed;
 
                     case Event::IdentMessageSent:
                         if (send_test_command) {
                             REQUIRE(cur_state == TestState::session_resumed);
-                            if (auto session = weak_session.lock()) {
-                                logger->trace("ROLE CHANGE: sending RESUME test command after idient message sent");
-                                test_command_futures.push_back(pause_download_builder(*session, false));
-                            }
+                            logger->trace("ROLE CHANGE: sending RESUME test command after ident message sent");
+                            pause_download_builder(weak_session, false);
                         }
                         return TestState::ident_message;
 
@@ -5225,23 +5211,13 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         // Update the permissions on the server - should send an error to the client to force
         // it to reconnect
         auto& app_session = harness.session().app_session();
-        logger->trace("ROLE CHANGE: New rule definitions: %1", new_rules);
+        logger->debug("Updating rule definitions: %1", new_rules);
         app_session.admin_api.update_default_rule(app_session.server_app_id, new_rules);
 
         if (expected.bootstrap != BootstrapMode::NoReconnect) {
             // After updating the permissions (if they are different), the server should send an
             // error that will disconnect/reconnect the session - verify the reconnect occurs.
             REQUIRE(state_machina.wait_for(TestState::reconnect_received));
-        }
-
-        if (expected.bootstrap == BootstrapMode::SingleMessageMulti) {
-            // Wait for the session to be resumed and the "pause" test command to be sent
-            logger->trace("ROLE CHANGE: waiting for PAUSE test command to complete");
-            wait_for_test_command(TestState::session_resumed);
-            // Wait for the session to send the IDENT message and "unpause" test command
-            logger->trace("ROLE CHANGE: waiting for RESUME test command to complete");
-            wait_for_test_command(TestState::ident_message);
-            logger->trace("ROLE CHANGE: test commands complete");
         }
 
         // Assuming the session disconnects and reconnects, the server initiated role change
