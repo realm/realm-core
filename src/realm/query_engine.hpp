@@ -458,20 +458,6 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
         }
     }
     else {
-
-        if constexpr (std::is_same_v<LeafType, ArrayInteger>) {
-            if (leaf.is_compressed()) {
-                const auto& values = leaf.get_all(start, end);
-                size_t ndx = start;
-                for (const auto& v : values) {
-                    if (needles.count(v))
-                        return ndx;
-                    ndx += 1;
-                }
-                return realm::npos;
-            }
-        }
-
         for (size_t i = start; i < end; ++i) {
             auto element = leaf.get(i);
             if (needles.count(element))

@@ -89,8 +89,6 @@ public:
     }
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
-    bool _find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
-
     template <class cond>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
@@ -161,7 +159,6 @@ public:
 private:
     const Array& m_array;
 
-    template <size_t>
     bool find_all_will_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 };
 //*************************************************************************************
@@ -276,20 +273,6 @@ uint64_t ArrayWithFind::cascade(uint64_t a) const
     }
 }
 
-template <size_t bitwidth>
-REALM_NOINLINE bool ArrayWithFind::find_all_will_match(size_t start2, size_t end, size_t baseindex,
-                                                       QueryStateBase* state) const
-{
-    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
-    size_t process = state->limit() - state->match_count();
-    size_t end2 = end - start2 > process ? start2 + process : end;
-    for (; start2 < end2; start2++)
-        if (!state->match(start2 + baseindex))
-            return false;
-    return true;
-}
-
-
 // This is the main finding function for Array. Other finding functions are just
 // wrappers around this one. Search for 'value' using condition cond (Equal,
 // NotEqual, Less, etc) and call QueryStateBase::match() for each match. Break and
@@ -319,7 +302,7 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
 
     // optimization if all items are guaranteed to match (such as cond == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, lbound, ubound)) {
-        return find_all_will_match<bitwidth>(start2, end, baseindex, state);
+        return find_all_will_match(start2, end, baseindex, state);
     }
 
     // finder cannot handle this bitwidth

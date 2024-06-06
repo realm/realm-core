@@ -92,25 +92,23 @@ void ArrayUnsigned::update_from_parent() noexcept
 
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
-    auto width = get_width_from_header(get_header());
-
-    if (width == 8) {
+    if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (width == 16) {
+    else if (m_width == 16) {
         uint16_t* arr = reinterpret_cast<uint16_t*>(m_data);
         uint16_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (width == 32) {
+    else if (m_width == 32) {
         uint32_t* arr = reinterpret_cast<uint32_t*>(m_data);
         uint32_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (width < 8) {
-        switch (width) {
+    else if (m_width < 8) {
+        switch (m_width) {
             case 0:
                 return realm::lower_bound<0>(m_data, m_size, value);
             case 1:
@@ -132,25 +130,23 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
-    auto width = get_width_from_header(get_header());
-
-    if (width == 8) {
+    if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (width == 16) {
+    else if (m_width == 16) {
         uint16_t* arr = reinterpret_cast<uint16_t*>(m_data);
         uint16_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (width == 32) {
+    else if (m_width == 32) {
         uint32_t* arr = reinterpret_cast<uint32_t*>(m_data);
         uint32_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (width < 8) {
-        switch (width) {
+    else if (m_width < 8) {
+        switch (m_width) {
             case 0:
                 return realm::upper_bound<0>(m_data, m_size, value);
             case 1:

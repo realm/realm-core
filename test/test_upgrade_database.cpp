@@ -166,7 +166,6 @@ TEST(Upgrade_Disabled)
 
 TEST(Upgrade_DatabaseWithUnsupportedOldFileFormat)
 {
-    // Not core 6, thus kind is not set. And assetion is triggered.
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_1000_1.realm";
     CHECK_OR_RETURN(File::exists(path));
 
