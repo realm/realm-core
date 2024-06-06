@@ -30,7 +30,7 @@ jobs:
           branch: release/automated_v${{ inputs.version }}
           title: Prepare for ${{ inputs.version }}
           draft: false
-          body-path: changes-since-last-tag.txt
+          body-path: pr-body.txt
           labels: no-jira-ticket
           commit-message: Prepare for release ${{ inputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
