@@ -22,6 +22,7 @@
 #include <iostream>
 
 #include <realm.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
