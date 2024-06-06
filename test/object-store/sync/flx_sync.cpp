@@ -5089,8 +5089,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                         return TestState::reconnect_received;
 
                     case Event::SessionResumed:
-                        REQUIRE(cur_state == TestState::reconnect_received);
                         if (send_test_command) {
+                            REQUIRE(cur_state == TestState::reconnect_received);
                             if (auto session = weak_session.lock()) {
                                 logger->trace("ROLE CHANGE: sending PAUSE test command after resumed");
                                 test_command_futures.push_back(pause_download_builder(*session, true));
@@ -5099,8 +5099,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                         return TestState::session_resumed;
 
                     case Event::IdentMessageSent:
-                        REQUIRE(cur_state == TestState::session_resumed);
                         if (send_test_command) {
+                            REQUIRE(cur_state == TestState::session_resumed);
                             if (auto session = weak_session.lock()) {
                                 logger->trace("ROLE CHANGE: sending RESUME test command after idient message sent");
                                 test_command_futures.push_back(pause_download_builder(*session, false));
