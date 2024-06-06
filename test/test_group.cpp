@@ -184,7 +184,7 @@ TEST(Group_BadFile)
 
     {
         File file(path_1, File::mode_Append);
-        file.write("foo");
+        file.write(0, "foo");
     }
 
     {
@@ -214,7 +214,7 @@ TEST(Group_OpenBuffer)
             buffer_size = size_t(file.get_size());
             buffer.reset(new char[buffer_size]);
             CHECK(bool(buffer));
-            file.read(buffer.get(), buffer_size);
+            file.read(0, buffer.get(), buffer_size);
         }
     }
 

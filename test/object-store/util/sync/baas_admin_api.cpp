@@ -419,8 +419,8 @@ public:
                              baas_coid));
         }
         logger->info("Baasaas container started with id \"%1\"", m_container_id);
-        auto lock_file = util::File(std::string{s_baasaas_lock_file_name}, util::File::mode_Write);
-        lock_file.write(m_container_id);
+        util::File lock_file(s_baasaas_lock_file_name, util::File::mode_Write);
+        lock_file.write(0, m_container_id);
     }
 
     explicit Baasaas(std::string api_key, std::string baasaas_instance_id)

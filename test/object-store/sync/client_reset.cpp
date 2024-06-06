@@ -1099,10 +1099,10 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
-            util::File f(fresh_path, util::File::Mode::mode_Write);
-            f.write("a non empty file");
-            f.sync();
-            f.close();
+            {
+                util::File f(fresh_path, util::File::Mode::mode_Write);
+                f.write(0, "a non empty file");
+            }
 
             make_reset(local_config, remote_config)->run();
             REQUIRE(!err);

@@ -15,12 +15,15 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef FUZZ_CONFIG_HPP
 #define FUZZ_CONFIG_HPP
 
 #include "util.hpp"
 #include "fuzz_logger.hpp"
+
 #include <realm/object-store/shared_realm.hpp>
+
 #include <string>
 #include <vector>
 

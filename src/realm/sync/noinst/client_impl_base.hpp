@@ -26,6 +26,7 @@
 #include <map>
 #include <random>
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 namespace realm::sync {
