@@ -294,7 +294,7 @@ void Array::set_type(Type type)
     set_hasrefs_in_header(init_has_refs, header);
 }
 
-void Array::destroy_children(size_t offset) noexcept
+void Array::destroy_children(size_t offset, bool ro_only) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
@@ -310,7 +310,7 @@ void Array::destroy_children(size_t offset) noexcept
             continue;
 
         ref_type ref = to_ref(value);
-        destroy_deep(ref, m_alloc);
+        destroy_deep(ref, m_alloc, ro_only);
     }
 }
 
@@ -605,6 +605,14 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
         int64_t v = old_getter(*this, i);
         m_vtable->setter(*this, i, v);
     }
+}
+
+size_t Array::size() const noexcept
+{
+    // in case the array is in compressed format. Never read directly
+    // from the header the size, since it will result very likely in a cache miss.
+    // For compressed arrays m_size should always be kept updated, due to init_from_mem
+    return m_size;
 }
 
 bool Array::compress_array(Array& arr) const

@@ -66,6 +66,14 @@ public:
     {
         m_arr->set_parent(p, n);
     }
+    bool need_string_interner() const override
+    {
+        return true;
+    }
+    void set_string_interner(StringInterner* string_interner) const override
+    {
+        m_string_interner = string_interner;
+    }
     bool need_spec() const override
     {
         return true;
@@ -118,6 +126,10 @@ public:
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
     void verify() const;
+    // Write to 'out', if needed using 'interner' to intern any strings.
+    // An interner of 0 will disable interning. Interned values may be further
+    // compressed using leaf compression for integer arrays.
+    ref_type write(_impl::ArrayWriterBase& out, StringInterner* interner);
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
@@ -127,18 +139,18 @@ private:
     static constexpr size_t storage_size =
         std::max({sizeof(ArrayStringShort), sizeof(ArraySmallBlobs), sizeof(ArrayBigBlobs), sizeof(Array)});
 
-    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
+    enum class Type { small_strings, medium_strings, big_strings, enum_strings, interned_strings };
 
     Type m_type = Type::small_strings;
 
     Allocator& m_alloc;
     alignas(storage_alignment) std::byte m_storage[storage_size];
     Array* m_arr;
+    bool m_nullable = true;
     mutable Spec* m_spec = nullptr;
     mutable size_t m_col_ndx = realm::npos;
-    bool m_nullable = true;
-
     std::unique_ptr<ArrayString> m_string_enum_values;
+    mutable StringInterner* m_string_interner = nullptr;
 
     Type upgrade_leaf(size_t value_size);
 };

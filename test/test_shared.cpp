@@ -2289,6 +2289,89 @@ TEST(Shared_EncryptionPageReadFailure)
 
 #endif // REALM_ENABLE_ENCRYPTION
 
+TEST(Shared_MaxStrings)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    std::string str_a(16 * 1024 * 1024 - 257, 'a');
+    std::string str_b(16 * 1024 * 1024 - 257, 'b');
+    // make it harder to compress:
+    for (auto& e : str_a) {
+        e = std::rand() % 256;
+    }
+    for (auto& e : str_b) {
+        e = std::rand() % 256;
+    }
+    auto o = t->create_object();
+    o.set(ck, str_a);
+    trans->commit_and_continue_as_read();
+    auto v = o.get<StringData>(ck);
+    CHECK_EQUAL(str_a, v);
+    trans->promote_to_write();
+    auto o2 = t->create_object();
+    o2.set(ck, str_b);
+    trans->commit_and_continue_as_read();
+    v = o.get<StringData>(ck);
+    auto v2 = o2.get<StringData>(ck);
+    CHECK_EQUAL(v, str_a);
+    CHECK_EQUAL(v2, str_b);
+    trans->close();
+    sg.reset();
+}
+
+TEST(Shared_RandomMaxStrings)
+{
+
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    trans->commit_and_continue_as_read();
+    for (int run = 0; run < 10; ++run) {
+        trans->promote_to_write();
+        size_t str_length = std::rand() % (16 * 1024 * 1024 - 257);
+        std::string str(str_length, 'X');
+        for (auto& e : str) {
+            e = std::rand() % 256;
+        }
+        auto o = t->create_object();
+        o.set(ck, str);
+        trans->commit_and_continue_as_read();
+    }
+    trans->close();
+}
+
+TEST(Shared_RandomSmallStrings)
+{
+
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    // std::cout << "Writing " << path << std::endl;
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    trans->commit_and_continue_as_read();
+    std::string str(500, 'X');
+    // insert a million objects with at most 4000 different strings
+    for (int run = 0; run < 100; ++run) {
+        trans->promote_to_write();
+        for (int i = 0; i < 1000; ++i) {
+            // size_t str_length = std::rand() % (1 + 500);
+            // std::string str(str_length, 'X');
+            size_t offset = std::rand() % str.size();
+            str[offset] = 'a' + (std::rand() & 0x7);
+            auto o = t->create_object();
+            o.set(ck, str);
+        }
+        trans->commit_and_continue_as_read();
+    }
+    trans->close();
+}
+
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2469,6 +2552,7 @@ TEST(Shared_MovingSearchIndex)
     // Remove the padding column to shift the indexed columns
     {
         WriteTransaction wt(sg);
+        wt.get_group().verify();
         TableRef table = wt.get_table("foo");
 
         CHECK(table->has_search_index(int_col));

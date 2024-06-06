@@ -217,6 +217,7 @@ private:
 
     friend class DB;
     friend class DisableReplication;
+    friend class Table;
 };
 
 /*

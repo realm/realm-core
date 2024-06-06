@@ -515,6 +515,8 @@ private:
     std::shared_ptr<util::Logger> m_logger;
     std::mutex m_commit_listener_mutex;
     std::vector<CommitListener*> m_commit_listeners;
+    std::unordered_map<TableKey, std::vector<StringInterner*>*> m_string_interners;
+    std::mutex m_string_interners_mutex;
     bool m_is_sync_agent = false;
     // Id for this DB to be used in logging. We will just use some bits from the pointer.
     // The path cannot be used as this would not allow us to distinguish between two DBs opening

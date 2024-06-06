@@ -613,7 +613,11 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
         return values.get(m_row_ndx);
     }
     else {
-        return ArrayString::get(alloc.translate(ref), m_row_ndx, alloc);
+        ArrayString values(get_alloc());
+        auto col_key = m_table->leaf_ndx2colkey(col_ndx);
+        values.set_string_interner(m_table->get_string_interner(col_key));
+        values.init_from_ref(ref);
+        return values.get(m_row_ndx);
     }
 }
 
@@ -738,9 +742,12 @@ inline bool Obj::do_is_null(ColKey::Idx col_ndx) const
 template <>
 inline bool Obj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
 {
+    REALM_ASSERT(false); // Don't come here, you're falling from a cliff....
     ArrayString values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.set_spec(const_cast<Spec*>(&get_spec()), m_table->leaf_ndx2spec_ndx(col_ndx));
+    // TODO: Set string interner if needed
+    // values.set_string_interner(m_table->get_string_interner(col_key));
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
 }
@@ -765,8 +772,16 @@ bool Obj::is_null(ColKey col_key) const
                 return do_is_null<ArrayFloatNull>(col_ndx);
             case col_type_Double:
                 return do_is_null<ArrayDoubleNull>(col_ndx);
-            case col_type_String:
-                return do_is_null<ArrayString>(col_ndx);
+            case col_type_String: {
+                ArrayString values(get_alloc());
+                ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+                values.set_spec(const_cast<Spec*>(&get_spec()), m_table->leaf_ndx2spec_ndx(col_ndx));
+                // TODO: Set string interner if needed
+                values.set_string_interner(m_table->get_string_interner(col_key));
+                values.init_from_ref(ref);
+                return values.is_null(m_row_ndx);
+            }
+                // return do_is_null<ArrayString>(col_ndx);
             case col_type_Binary:
                 return do_is_null<ArrayBinary>(col_ndx);
             case col_type_Mixed:
@@ -1588,6 +1603,17 @@ inline void check_range(const BinaryData& val)
 }
 } // namespace
 
+// helper functions for filtering out calls to set_string_interner()
+template <class T>
+inline void Obj::set_string_interner(T&, ColKey)
+{
+}
+template <>
+inline void Obj::set_string_interner<ArrayString>(ArrayString& values, ColKey col_key)
+{
+    values.set_string_interner(m_table->get_string_interner(col_key));
+}
+
 // helper functions for filtering out calls to set_spec()
 template <class T>
 inline void Obj::set_spec(T&, ColKey)
@@ -1685,6 +1711,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     LeafType values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
     set_spec<LeafType>(values, col_key);
+    set_string_interner<LeafType>(values, col_key);
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
@@ -2296,6 +2323,7 @@ inline void Obj::do_set_null<ArrayString>(ColKey col_key)
     ArrayString values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
     values.set_spec(const_cast<Spec*>(&get_spec()), spec_ndx);
+    values.set_string_interner(m_table->get_string_interner(col_key));
     values.init_from_parent();
     values.set_null(m_row_ndx);
 

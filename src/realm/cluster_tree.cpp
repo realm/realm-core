@@ -1135,6 +1135,15 @@ void ClusterTree::update(UpdateFunction func)
     }
 }
 
+void ClusterTree::set_string_interner(ArrayPayload& arr, ColKey col_key) const
+{
+    // Check for owner. This function may be called in context of DictionaryClusterTree
+    // in which case m_owner is null (and spec never needed).
+    if (m_owner) {
+        arr.set_string_interner(_impl::TableFriend::get_string_interner(*m_owner, col_key));
+    }
+}
+
 void ClusterTree::set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const
 {
     // Check for owner. This function may be called in context of DictionaryClusterTree

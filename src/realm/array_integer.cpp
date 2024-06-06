@@ -22,6 +22,8 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column_integer.hpp>
 
+#include <iostream>
+
 using namespace realm;
 
 ArrayInteger::ArrayInteger(Allocator& allocator) noexcept

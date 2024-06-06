@@ -365,6 +365,8 @@ private:
     void do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_value, ObjKey origin_key);
     template <class T>
     void set_spec(T&, ColKey::Idx) const;
+    template <class T>
+    void set_string_interner(T&, ColKey) const;
     template <class ArrayType>
     void verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const;
 };
