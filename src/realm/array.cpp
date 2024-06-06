@@ -42,7 +42,6 @@
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
 
-
 // Header format (8 bytes):
 // ------------------------
 //
@@ -190,38 +189,79 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 
-size_t Array::bit_width(int64_t v)
+uint8_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
     // implemented as a table lookup on the result of the scan
-
     if ((uint64_t(v) >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[int8_t(v)];
     }
-
-    // First flip all bits if bit 63 is set (will now always be zero)
     if (v < 0)
         v = ~v;
-
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
+template <size_t width>
+struct Array::VTableForWidth {
+    struct PopulatedVTable : VTable {
+        PopulatedVTable()
+        {
+            getter = &Array::get<width>;
+            setter = &Array::set<width>;
+            chunk_getter = &Array::get_chunk<width>;
+            finder[cond_Equal] = &Array::find_vtable<Equal>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual>;
+            finder[cond_Greater] = &Array::find_vtable<Greater>;
+            finder[cond_Less] = &Array::find_vtable<Less>;
+        }
+    };
+    static const PopulatedVTable vtable;
+};
+
+template <size_t width>
+const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
+
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    char* header = Node::init_from_mem(mem);
-    // Parse header
+    // Header is the type of header that has been allocated, in case we are decompressing,
+    // the header is of kind A, which is kind of deceiving the purpose of these checks.
+    // Since we will try to fetch some data from the just initialised header, and never reset
+    // important fields used for type A arrays, like width, lower, upper_bound which are used
+    // for expanding the array, but also query the data.
+    const auto header = mem.get_addr();
+    const auto is_extended = m_integer_compressor.init(header);
+
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    update_width_cache_from_header();
+
+    if (is_extended) {
+        m_ref = mem.get_ref();
+        m_data = get_data_from_header(header);
+        m_size = m_integer_compressor.size();
+        m_width = m_integer_compressor.v_width();
+        m_lbound = -m_integer_compressor.v_mask();
+        m_ubound = m_integer_compressor.v_mask() - 1;
+        m_integer_compressor.set_vtable(*this);
+        m_getter = m_vtable->getter;
+    }
+    else {
+        // Old init phase.
+        Node::init_from_mem(mem);
+        update_width_cache_from_header();
+    }
+}
+
+MemRef Array::get_mem() const noexcept
+{
+    return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
 void Array::update_from_parent() noexcept
 {
-    REALM_ASSERT_DEBUG(is_attached());
     ArrayParent* parent = get_parent();
     REALM_ASSERT_DEBUG(parent);
     ref_type new_ref = get_ref_from_parent();
@@ -230,7 +270,7 @@ void Array::update_from_parent() noexcept
 
 void Array::set_type(Type type)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
 
     copy_on_write(); // Throws
 
@@ -254,7 +294,6 @@ void Array::set_type(Type type)
     set_hasrefs_in_header(init_has_refs, header);
 }
 
-
 void Array::destroy_children(size_t offset) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
@@ -275,15 +314,28 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
+// size_t Array::get_byte_size() const noexcept
+//{
+//     const auto header = get_header();
+//     auto num_bytes = get_byte_size_from_header(header);
+//     auto read_only = m_alloc.is_read_only(m_ref) == true;
+//     auto capacity = get_capacity_from_header(header);
+//     auto bytes_ok = num_bytes <= capacity;
+//     REALM_ASSERT(read_only || bytes_ok);
+//     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+//     return num_bytes;
+// }
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
-    // Write flat array
+    // here we might want to compress the array and write down.
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
-    uint32_t dummy_checksum = 0x41414141UL;                                // "AAAA" in ASCII
-    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
-    REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
+    const auto compressed = is_compressed();
+    uint32_t dummy_checksum = compressed ? 0x42424242UL : 0x41414141UL; //
+    uint32_t dummy_checksum_bytes = compressed ? 2 : 4; // AAAA / BB (only 2 bytes for extended arrays)
+    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum, dummy_checksum_bytes); // Throws
+    REALM_ASSERT_3(new_ref % 8, ==, 0);                                                          // 8-byte alignment
     return new_ref;
 }
 
@@ -308,7 +360,6 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         }
         new_array.add(value); // Throws
     }
-
     return new_array.do_write_shallow(out); // Throws
 }
 
@@ -333,8 +384,8 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     if (bits_per_elem < 8) {
         // FIXME: Should be optimized
         for (size_t i = begin; i != end; ++i) {
-            int_fast64_t v = (this->*m_getter)(i);
-            (this->*(m_vtable->setter))(dest_begin++, v);
+            int_fast64_t v = m_getter(*this, i);
+            m_vtable->setter(*this, dest_begin++, v);
         }
         return;
     }
@@ -360,8 +411,8 @@ void Array::move(Array& dst, size_t ndx)
     size_t sz = m_size;
 
     for (size_t i = ndx; i < sz; i++) {
-        auto v = (this->*getter)(i);
-        (dst.*setter)(dest_begin++, v);
+        auto v = getter(*this, i);
+        setter(dst, dest_begin++, v);
     }
 
     truncate(ndx);
@@ -370,17 +421,15 @@ void Array::move(Array& dst, size_t ndx)
 void Array::set(size_t ndx, int64_t value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
-    if ((this->*(m_vtable->getter))(ndx) == value)
+    if (m_vtable->getter(*this, ndx) == value)
         return;
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
-
     // Grow the array if needed to store this value
     ensure_minimum_width(value); // Throws
-
     // Set the value
-    (this->*(m_vtable->setter))(ndx, value);
+    m_vtable->setter(*this, ndx, value);
 }
 
 void Array::set_as_ref(size_t ndx, ref_type ref)
@@ -428,6 +477,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
+    decompress_array(*this);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -447,8 +497,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
         size_t i = old_size;
         while (i > ndx) {
             --i;
-            int64_t v = (this->*old_getter)(i);
-            (this->*(m_vtable->setter))(i + 1, v);
+            int64_t v = old_getter(*this, i);
+            m_vtable->setter(*this, i + 1, v);
         }
     }
     else if (ndx != old_size) {
@@ -462,19 +512,30 @@ void Array::insert(size_t ndx, int_fast64_t value)
     }
 
     // Insert the new value
-    (this->*(m_vtable->setter))(ndx, value);
+    m_vtable->setter(*this, ndx, value);
 
     // Expand values above insertion
     if (do_expand) {
         size_t i = ndx;
         while (i != 0) {
             --i;
-            int64_t v = (this->*old_getter)(i);
-            (this->*(m_vtable->setter))(i, v);
+            int64_t v = old_getter(*this, i);
+            m_vtable->setter(*this, i, v);
         }
     }
 }
 
+void Array::copy_on_write()
+{
+    if (is_read_only() && !decompress_array(*this))
+        Node::copy_on_write();
+}
+
+void Array::copy_on_write(size_t min_size)
+{
+    if (is_read_only() && !decompress_array(*this))
+        Node::copy_on_write(min_size);
+}
 
 void Array::truncate(size_t new_size)
 {
@@ -498,7 +559,6 @@ void Array::truncate(size_t new_size)
         update_width_cache_from_header();
     }
 }
-
 
 void Array::truncate_and_destroy_children(size_t new_size)
 {
@@ -528,10 +588,8 @@ void Array::truncate_and_destroy_children(size_t new_size)
     }
 }
 
-
 void Array::do_ensure_minimum_width(int_fast64_t value)
 {
-
     // Make room for the new value
     const size_t width = bit_width(value);
 
@@ -544,353 +602,32 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     size_t i = m_size;
     while (i != 0) {
         --i;
-        int64_t v = (this->*old_getter)(i);
-        (this->*(m_vtable->setter))(i, v);
+        int64_t v = old_getter(*this, i);
+        m_vtable->setter(*this, i, v);
     }
 }
 
-int64_t Array::sum(size_t start, size_t end) const
+bool Array::compress_array(Array& arr) const
 {
-    REALM_TEMPEX(return sum, m_width, (start, end));
+    if (m_integer_compressor.get_encoding() == NodeHeader::Encoding::WTypBits) {
+        return m_integer_compressor.compress(*this, arr);
+    }
+    return false;
 }
 
-template <size_t w>
-int64_t Array::sum(size_t start, size_t end) const
+bool Array::decompress_array(Array& arr) const
 {
-    if (end == size_t(-1))
-        end = m_size;
-    REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
-
-    if (w == 0 || start == end)
-        return 0;
-
-    int64_t s = 0;
-
-    // Sum manually until 128 bit aligned
-    for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % 128 != 0); start++) {
-        s += get<w>(start);
-    }
-
-    if (w == 1 || w == 2 || w == 4) {
-        // Sum of bitwidths less than a byte (which are always positive)
-        // uses a divide and conquer algorithm that is a variation of popolation count:
-        // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-
-        // static values needed for fast sums
-        const uint64_t m2 = 0x3333333333333333ULL;
-        const uint64_t m4 = 0x0f0f0f0f0f0f0f0fULL;
-        const uint64_t h01 = 0x0101010101010101ULL;
-
-        int64_t* data = reinterpret_cast<int64_t*>(m_data + start * w / 8);
-        size_t chunks = (end - start) * w / 8 / sizeof(int64_t);
-
-        for (size_t t = 0; t < chunks; t++) {
-            if (w == 1) {
-#if 0
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
-                s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
-                s += __builtin_popcountll(data[t]);
-#else
-                uint64_t a = data[t];
-                const uint64_t m1  = 0x5555555555555555ULL;
-                a -= (a >> 1) & m1;
-                a = (a & m2) + ((a >> 2) & m2);
-                a = (a + (a >> 4)) & m4;
-                a = (a * h01) >> 56;
-                s += a;
-#endif
-#endif
-                s += fast_popcount64(data[t]);
-            }
-            else if (w == 2) {
-                uint64_t a = data[t];
-                a = (a & m2) + ((a >> 2) & m2);
-                a = (a + (a >> 4)) & m4;
-                a = (a * h01) >> 56;
-
-                s += a;
-            }
-            else if (w == 4) {
-                uint64_t a = data[t];
-                a = (a & m4) + ((a >> 4) & m4);
-                a = (a * h01) >> 56;
-                s += a;
-            }
-        }
-        start += sizeof(int64_t) * 8 / no0(w) * chunks;
-    }
-
-#ifdef REALM_COMPILER_SSE
-    if (sseavx<42>()) {
-        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
-        // Naive, templated get<>: 391 371 374
-        // SSE:                     97 148 282
-
-        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
-            __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
-            __m128i sum_result = {0};
-            __m128i sum2;
-
-            size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
-
-            for (size_t t = 0; t < chunks; t++) {
-                if (w == 8) {
-                    /*
-                    // 469 ms AND disadvantage of handling max 64k elements before overflow
-                    __m128i vl = _mm_cvtepi8_epi16(data[t]);
-                    __m128i vh = data[t];
-                    vh.m128i_i64[0] = vh.m128i_i64[1];
-                    vh = _mm_cvtepi8_epi16(vh);
-                    sum_result = _mm_add_epi16(sum_result, vl);
-                    sum_result = _mm_add_epi16(sum_result, vh);
-                    */
-
-                    /*
-                    // 424 ms
-                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
-                    __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
-                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
-                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
-                    */
-
-                    __m128i vl = _mm_cvtepi8_epi16(data[t]); // sign extend lower words 8->16
-                    __m128i vh = data[t];
-                    vh = _mm_srli_si128(vh, 8); // v >>= 64
-                    vh = _mm_cvtepi8_epi16(vh); // sign extend lower words 8->16
-                    __m128i sum1 = _mm_add_epi16(vl, vh);
-                    __m128i sumH = _mm_cvtepi16_epi32(sum1);
-                    __m128i sumL = _mm_srli_si128(sum1, 8); // v >>= 64
-                    sumL = _mm_cvtepi16_epi32(sumL);
-                    sum_result = _mm_add_epi32(sum_result, sumL);
-                    sum_result = _mm_add_epi32(sum_result, sumH);
-                }
-                else if (w == 16) {
-                    // todo, can overflow for array size > 2^32
-                    __m128i vl = _mm_cvtepi16_epi32(data[t]); // sign extend lower words 16->32
-                    __m128i vh = data[t];
-                    vh = _mm_srli_si128(vh, 8);  // v >>= 64
-                    vh = _mm_cvtepi16_epi32(vh); // sign extend lower words 16->32
-                    sum_result = _mm_add_epi32(sum_result, vl);
-                    sum_result = _mm_add_epi32(sum_result, vh);
-                }
-                else if (w == 32) {
-                    __m128i v = data[t];
-                    __m128i v0 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
-                    v = _mm_srli_si128(v, 8);           // v >>= 64
-                    __m128i v1 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
-                    sum_result = _mm_add_epi64(sum_result, v0);
-                    sum_result = _mm_add_epi64(sum_result, v1);
-
-                    /*
-                    __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need
-                    underflow test).
-                    __m128i mm = _mm_and_si128(data[t], m);
-                    zz = _mm_or_si128(mm, zz);
-                    sum_result = _mm_add_epi32(sum_result, data[t]);
-                    */
-                }
-            }
-            start += sizeof(__m128i) * 8 / no0(w) * chunks;
-
-            // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop
-            // (vc2010/gcc4.6)
-            sum2 = sum_result;
-
-            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
-            char sum3[sizeof sum2];
-            memcpy(&sum3, &sum2, sizeof sum2);
-
-            // Sum elements of sum
-            for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-                int64_t v = get_universal < (w == 8 || w == 16) ? 32 : 64 > (reinterpret_cast<char*>(&sum3), t);
-                s += v;
-            }
-        }
-    }
-#endif
-
-    // Sum remaining elements
-    for (; start < end; ++start)
-        s += get<w>(start);
-
-    return s;
+    return arr.is_compressed() ? m_integer_compressor.decompress(arr) : false;
 }
 
-size_t Array::count(int64_t value) const noexcept
+bool Array::try_compress(Array& arr) const
 {
-    const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
-    size_t value_count = 0;
-    const size_t end = m_size;
-    size_t i = 0;
+    return compress_array(arr);
+}
 
-    // static values needed for fast population count
-    const uint64_t m1 = 0x5555555555555555ULL;
-    const uint64_t m2 = 0x3333333333333333ULL;
-    const uint64_t m4 = 0x0f0f0f0f0f0f0f0fULL;
-    const uint64_t h01 = 0x0101010101010101ULL;
-
-    if (m_width == 0) {
-        if (value == 0)
-            return m_size;
-        return 0;
-    }
-    if (m_width == 1) {
-        if (uint64_t(value) > 1)
-            return 0;
-
-        const size_t chunkvals = 64;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            if (value == 0)
-                a = ~a; // reverse
-
-            a -= (a >> 1) & m1;
-            a = (a & m2) + ((a >> 2) & m2);
-            a = (a + (a >> 4)) & m4;
-            a = (a * h01) >> 56;
-
-            // Could use intrinsic instead:
-            // a = __builtin_popcountll(a); // gcc intrinsic
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 2) {
-        if (uint64_t(value) > 3)
-            return 0;
-
-        const uint64_t v = ~0ULL / 0x3 * value;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0x3 * 0x1;
-
-        const size_t chunkvals = 32;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a &= m1;            // isolate single bit in each segment
-            a ^= m1;            // reverse isolated bits
-            // if (!a) continue;
-
-            // Population count
-            a = (a & m2) + ((a >> 2) & m2);
-            a = (a + (a >> 4)) & m4;
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 4) {
-        if (uint64_t(value) > 15)
-            return 0;
-
-        const uint64_t v = ~0ULL / 0xF * value;
-        const uint64_t m = ~0ULL / 0xF * 0x1;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0xF * 0x7;
-        const uint64_t c2 = ~0ULL / 0xF * 0x3;
-
-        const size_t chunkvals = 16;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a |= (a >> 2) & c2;
-            a &= m; // isolate single bit in each segment
-            a ^= m; // reverse isolated bits
-
-            // Population count
-            a = (a + (a >> 4)) & m4;
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 8) {
-        if (value > 0x7FLL || value < -0x80LL)
-            return 0; // by casting?
-
-        const uint64_t v = ~0ULL / 0xFF * value;
-        const uint64_t m = ~0ULL / 0xFF * 0x1;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0xFF * 0x7F;
-        const uint64_t c2 = ~0ULL / 0xFF * 0x3F;
-        const uint64_t c3 = ~0ULL / 0xFF * 0x0F;
-
-        const size_t chunkvals = 8;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a |= (a >> 2) & c2;
-            a |= (a >> 4) & c3;
-            a &= m; // isolate single bit in each segment
-            a ^= m; // reverse isolated bits
-
-            // Population count
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 16) {
-        if (value > 0x7FFFLL || value < -0x8000LL)
-            return 0; // by casting?
-
-        const uint64_t v = ~0ULL / 0xFFFF * value;
-        const uint64_t m = ~0ULL / 0xFFFF * 0x1;
-
-        // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL / 0xFFFF * 0x7FFF;
-        const uint64_t c2 = ~0ULL / 0xFFFF * 0x3FFF;
-        const uint64_t c3 = ~0ULL / 0xFFFF * 0x0FFF;
-        const uint64_t c4 = ~0ULL / 0xFFFF * 0x00FF;
-
-        const size_t chunkvals = 4;
-        for (; i + chunkvals <= end; i += chunkvals) {
-            uint64_t a = next[i / chunkvals];
-            a ^= v;             // zero matching bit segments
-            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
-            a |= (a >> 2) & c2;
-            a |= (a >> 4) & c3;
-            a |= (a >> 8) & c4;
-            a &= m; // isolate single bit in each segment
-            a ^= m; // reverse isolated bits
-
-            // Population count
-            a = (a * h01) >> 56;
-
-            value_count += to_size_t(a);
-        }
-    }
-    else if (m_width == 32) {
-        int32_t v = int32_t(value);
-        const int32_t* d = reinterpret_cast<int32_t*>(m_data);
-        for (; i < end; ++i) {
-            if (d[i] == v)
-                ++value_count;
-        }
-        return value_count;
-    }
-    else if (m_width == 64) {
-        const int64_t* d = reinterpret_cast<int64_t*>(m_data);
-        for (; i < end; ++i) {
-            if (d[i] == value)
-                ++value_count;
-        }
-        return value_count;
-    }
-
-    // Check remaining elements
-    for (; i < end; ++i)
-        if (value == get(i))
-            ++value_count;
-
-    return value_count;
+bool Array::try_decompress()
+{
+    return decompress_array(*this);
 }
 
 size_t Array::calc_aligned_byte_size(size_t size, int width)
@@ -990,9 +727,9 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 {
     REALM_ASSERT_DEBUG(value == 0 || width_type == wtype_Bits);
     REALM_ASSERT_DEBUG(size == 0 || width_type != wtype_Ignore);
-    int width = 0;
+    uint8_t width = 0;
     if (value != 0)
-        width = static_cast<int>(bit_width(value));
+        width = bit_width(value);
     auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
     if (value != 0) {
         const auto header = mem.get_addr();
@@ -1004,52 +741,32 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 }
 
 // This is the one installed into the m_vtable->finder slots.
-template <class cond, size_t bitwidth>
-bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+template <class cond>
+bool Array::find_vtable(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                        QueryStateBase* state)
 {
-    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
+    REALM_TEMPEX2(return ArrayWithFind(arr).find_optimized, cond, arr.m_width, (value, start, end, baseindex, state));
 }
-
-
-template <size_t width>
-struct Array::VTableForWidth {
-    struct PopulatedVTable : Array::VTable {
-        PopulatedVTable()
-        {
-            getter = &Array::get<width>;
-            setter = &Array::set<width>;
-            chunk_getter = &Array::get_chunk<width>;
-            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
-            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
-            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
-            finder[cond_Less] = &Array::find_vtable<Less, width>;
-        }
-    };
-    static const PopulatedVTable vtable;
-};
-
-template <size_t width>
-const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
 void Array::update_width_cache_from_header() noexcept
 {
-    auto width = get_width_from_header(get_header());
-    m_lbound = lbound_for_width(width);
-    m_ubound = ubound_for_width(width);
-
-    m_width = width;
-
-    REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
+    m_width = get_width_from_header(get_header());
+    m_lbound = lbound_for_width(m_width);
+    m_ubound = ubound_for_width(m_width);
+    REALM_ASSERT_DEBUG(m_lbound <= m_ubound);
+    REALM_ASSERT_DEBUG(m_width >= m_lbound);
+    REALM_ASSERT_DEBUG(m_width <= m_ubound);
+    REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
     m_getter = m_vtable->getter;
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be be set to 0.
 template <size_t w>
-void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
+void Array::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) noexcept
 {
-    REALM_ASSERT_3(ndx, <, m_size);
-
+    auto sz = arr.size();
+    REALM_ASSERT_3(ndx, <, sz);
     size_t i = 0;
 
     // if constexpr to avoid producing spurious warnings resulting from
@@ -1061,7 +778,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 
         // Round m_size down to byte granularity as the trailing bits in the last
         // byte are uninitialized
-        size_t bytes_available = m_size / elements_per_byte;
+        size_t bytes_available = sz / elements_per_byte;
 
         // Round start and end to be byte-aligned. Start is rounded down and
         // end is rounded up as we may read up to 7 unused bits at each end.
@@ -1073,7 +790,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
             uint64_t c = 0;
             for (size_t i = end; i > start; --i) {
                 c <<= 8;
-                c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
+                c += *reinterpret_cast<const uint8_t*>(arr.m_data + i - 1);
             }
             // Trim off leading bits which aren't part of the requested range
             c >>= (ndx - start * elements_per_byte) * w;
@@ -1093,31 +810,31 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
         }
     }
 
-    for (; i + ndx < m_size && i < 8; i++)
-        res[i] = get<w>(ndx + i);
+    for (; i + ndx < sz && i < 8; i++)
+        res[i] = get<w>(arr, ndx + i);
     for (; i < 8; i++)
         res[i] = 0;
 
 #ifdef REALM_DEBUG
-    for (int j = 0; j + ndx < m_size && j < 8; j++) {
-        int64_t expected = get<w>(ndx + j);
+    for (int j = 0; j + ndx < sz && j < 8; j++) {
+        int64_t expected = Array::get_universal<w>(arr.m_data, ndx + j);
         REALM_ASSERT(res[j] == expected);
     }
 #endif
 }
 
 template <>
-void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
+void Array::get_chunk<0>(const Array& arr, size_t ndx, int64_t res[8]) noexcept
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(ndx, <, arr.m_size);
     memset(res, 0, sizeof(int64_t) * 8);
 }
 
 
 template <size_t width>
-void Array::set(size_t ndx, int64_t value)
+void Array::set(Array& arr, size_t ndx, int64_t value)
 {
-    set_direct<width>(m_data, ndx, value);
+    realm::set_direct<width>(arr.m_data, ndx, value);
 }
 
 void Array::_mem_usage(size_t& mem) const noexcept
@@ -1222,10 +939,15 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
 void Array::verify() const
 {
 #ifdef REALM_DEBUG
-    REALM_ASSERT(is_attached());
 
-    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                 m_width == 32 || m_width == 64);
+    REALM_ASSERT(is_attached());
+    if (!wtype_is_extended(get_header())) {
+        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                     m_width == 32 || m_width == 64);
+    }
+    else {
+        REALM_ASSERT(m_width <= 64);
+    }
 
     if (!get_parent())
         return;
@@ -1238,35 +960,60 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
+    if (is_compressed())
+        return lower_bound_int_compressed(value);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
+    if (is_compressed())
+        return upper_bound_int_compressed(value);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
-
-size_t Array::find_first(int64_t value, size_t start, size_t end) const
+size_t Array::lower_bound_int_compressed(int64_t value) const noexcept
 {
-    return find_first<Equal>(value, start, end);
+    static impl::CompressedDataFetcher<IntegerCompressor> encoder;
+    encoder.ptr = &m_integer_compressor;
+    return lower_bound(m_data, m_size, value, encoder);
 }
 
+size_t Array::upper_bound_int_compressed(int64_t value) const noexcept
+{
+    static impl::CompressedDataFetcher<IntegerCompressor> encoder;
+    encoder.ptr = &m_integer_compressor;
+    return upper_bound(m_data, m_size, value, encoder);
+}
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    return get_direct(data, width, ndx);
+    // this is very important. Most of the times we end up here
+    // because we are traversing the cluster, the keys/refs in the cluster
+    // are not compressed (because there is almost no gain), so the intent
+    // is avoiding to pollute traversing the cluster as little as possible.
+    // We need to check the header wtype and only initialise the
+    // integer compressor, if needed. Otherwise we should just call
+    // get_direct. On average there should be one more access to the header
+    // while traversing the cluster tree.
+    if (REALM_LIKELY(!NodeHeader::wtype_is_extended(header))) {
+        const char* data = get_data_from_header(header);
+        uint_least8_t width = get_width_from_header(header);
+        return get_direct(data, width, ndx);
+    }
+    // Ideally, we would not want to construct a compressor every time we end up here.
+    // However the compressor initalization should be fast enough. Creating an array,
+    // which owns a compressor internally, is the better approach if we intend to access
+    // the same data over and over again. The compressor basically caches the most important
+    // information about the layuot of the data itself.
+    IntegerCompressor s_compressor;
+    s_compressor.init(header);
+    return s_compressor.get(ndx);
 }
-
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
-    return std::make_pair(p.first, p.second);
+    return std::make_pair(get(header, ndx), get(header, ndx + 1));
 }
 
 bool QueryStateCount::match(size_t, Mixed) noexcept
@@ -1312,7 +1059,6 @@ bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index) noexcept
     ++m_match_count;
     int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
     m_keys.push_back(ObjKey(key_value));
-
     return (m_limit > m_match_count);
 }
 

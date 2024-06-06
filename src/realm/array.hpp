@@ -21,8 +21,10 @@
 
 #include <realm/node.hpp>
 #include <realm/query_state.hpp>
+#include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/integer_compressor.hpp>
 
 namespace realm {
 
@@ -90,12 +92,8 @@ public:
 class Array : public Node, public ArrayParent {
 public:
     /// Create an array accessor in the unattached state.
-    explicit Array(Allocator& allocator) noexcept
-        : Node(allocator)
-    {
-    }
-
-    ~Array() noexcept override {}
+    explicit Array(Allocator& allocator) noexcept;
+    virtual ~Array() noexcept = default;
 
     /// Create a new integer array of the specified type and size, and filled
     /// with the specified value, and attach this accessor to it. This does not
@@ -125,6 +123,8 @@ public:
         ref_type ref = get_ref_from_parent();
         init_from_ref(ref);
     }
+
+    MemRef get_mem() const noexcept;
 
     /// Called in the context of Group::commit() to ensure that attached
     /// accessors stay valid across a commit. Please note that this works only
@@ -174,21 +174,23 @@ public:
     void set_as_ref(size_t ndx, ref_type ref);
 
     template <size_t w>
-    void set(size_t ndx, int64_t value);
+    static void set(Array&, size_t ndx, int64_t value);
 
     int64_t get(size_t ndx) const noexcept;
+
+    std::vector<int64_t> get_all(size_t b, size_t e) const;
 
     template <size_t w>
-    int64_t get(size_t ndx) const noexcept;
+    static int64_t get(const Array& arr, size_t ndx) noexcept;
 
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     template <size_t w>
-    void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
+    static void get_chunk(const Array&, size_t ndx, int64_t res[8]) noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
-
     RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
+
     void set(size_t ndx, RefOrTagged);
     void add(RefOrTagged);
     void ensure_minimum_width(RefOrTagged);
@@ -198,10 +200,19 @@ public:
 
     void alloc(size_t init_size, size_t new_width)
     {
-        REALM_ASSERT_3(m_width, ==, get_width_from_header(get_header()));
-        REALM_ASSERT_3(m_size, ==, get_size_from_header(get_header()));
+        // Node::alloc is the one that triggers copy on write. If we call alloc for a B
+        //       array we have a bug in our machinery, the array should have been decompressed
+        //       way before calling alloc.
+        const auto header = get_header();
+        REALM_ASSERT_3(m_width, ==, get_width_from_header(header));
+        REALM_ASSERT_3(m_size, ==, get_size_from_header(header));
         Node::alloc(init_size, new_width);
         update_width_cache_from_header();
+    }
+
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
     }
 
     /// Remove the element at the specified index, and move elements at higher
@@ -322,6 +333,8 @@ public:
     /// by doing a linear search for short sequences.
     size_t lower_bound_int(int64_t value) const noexcept;
     size_t upper_bound_int(int64_t value) const noexcept;
+    size_t lower_bound_int_compressed(int64_t value) const noexcept;
+    size_t upper_bound_int_compressed(int64_t value) const noexcept;
     //@}
 
     int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const
@@ -350,6 +363,18 @@ public:
     /// accessor is already in the detached state, this function has no effect
     /// (idempotency).
     void destroy_deep() noexcept;
+
+    /// check if the array is encoded (in B format)
+    inline bool is_compressed() const;
+
+    inline const IntegerCompressor& integer_compressor() const;
+
+    /// used only for testing, encode the array passed as argument
+    bool try_compress(Array&) const;
+
+    /// used only for testing, decode the array, on which this method is invoked. If the array is not encoded, this is
+    /// a NOP
+    bool try_decompress();
 
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
     static void destroy_deep(ref_type ref, Allocator& alloc) noexcept;
@@ -383,24 +408,34 @@ public:
 
     /// Same as non-static write() with `deep` set to true. This is for the
     /// cases where you do not already have an array accessor available.
+    /// Compression may be attempted if `compress_in_flight` is true.
+    /// This should be avoided if you rely on the size of the array beeing unchanged.
     static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified,
                           bool compress_in_flight);
 
-    size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const;
+    inline size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const
+    {
+        return find_first<Equal>(value, begin, end);
+    }
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
-        REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
-        // todo, would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
-        (this->*finder)(value, start, end, 0, &state);
-
-        return static_cast<size_t>(state.m_state);
+        finder(*this, value, start, end, 0, &state);
+        return state.m_state;
     }
+
+    template <class cond>
+    bool find(int64_t value, size_t start, size_t end, size_t baseIndex, QueryStateBase* state) const
+    {
+        Finder finder = m_vtable->finder[cond::condition];
+        return finder(*this, value, start, end, baseIndex, state);
+    }
+
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -463,11 +498,15 @@ public:
     /// Takes a 64-bit value and returns the minimum number of bits needed
     /// to fit the value. For alignment this is rounded up to nearest
     /// log2. Possible results {0, 1, 2, 4, 8, 16, 32, 64}
-    static size_t bit_width(int64_t value);
+    static uint8_t bit_width(int64_t value);
 
     void typed_print(std::string prefix) const;
 
 protected:
+    friend class NodeTree;
+    void copy_on_write();
+    void copy_on_write(size_t min_size);
+
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     static constexpr int_fast64_t lbound_for_width(size_t width) noexcept;
@@ -505,14 +544,17 @@ protected:
 
 protected:
     // Getters and Setters for adaptive-packed arrays
-    typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
-    typedef void (Array::*Setter)(size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
+    typedef int64_t (*Getter)(const Array&, size_t); // Note: getters must not throw
+    typedef void (*Setter)(Array&, size_t, int64_t);
+    typedef bool (*Finder)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
+    typedef void (*ChunkGetter)(const Array&, size_t, int64_t res[8]); // Note: getters must not throw
+
+    typedef std::vector<int64_t> (*GetterAll)(const Array&, size_t, size_t); // Note: getters must not throw
 
     struct VTable {
         Getter getter;
         ChunkGetter chunk_getter;
+        GetterAll getter_all;
         Setter setter;
         Finder finder[cond_VTABLE_FINDER_COUNT]; // one for each active function pointer
     };
@@ -520,11 +562,12 @@ protected:
     struct VTableForWidth;
 
     // This is the one installed into the m_vtable->finder slots.
-    template <class cond, size_t bitwidth>
-    bool find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    template <class cond>
+    static bool find_vtable(const Array&, int64_t value, size_t start, size_t end, size_t baseindex,
+                            QueryStateBase* state);
 
     template <size_t w>
-    int64_t get_universal(const char* const data, const size_t ndx) const;
+    static int64_t get_universal(const char* const data, const size_t ndx);
 
 protected:
     Getter m_getter = nullptr; // cached to avoid indirection
@@ -538,6 +581,11 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
+    IntegerCompressor m_integer_compressor;
+    // compress/decompress this array
+    bool compress_array(Array&) const;
+    bool decompress_array(Array& arr) const;
+
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified, bool compress) const;
@@ -548,10 +596,15 @@ private:
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
+
+private:
     friend class Allocator;
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class ArrayWithFind;
+    friend class IntegerCompressor;
+    friend class PackedCompressor;
+    friend class FlexCompressor;
 };
 
 class TempArray : public Array {
@@ -573,6 +626,57 @@ public:
 
 // Implementation:
 
+inline Array::Array(Allocator& allocator) noexcept
+    : Node(allocator)
+{
+}
+
+inline bool Array::is_compressed() const
+{
+    const auto enc = m_integer_compressor.get_encoding();
+    return enc == NodeHeader::Encoding::Flex || enc == NodeHeader::Encoding::Packed;
+}
+
+inline const IntegerCompressor& Array::integer_compressor() const
+{
+    return m_integer_compressor;
+}
+
+inline int64_t Array::get(size_t ndx) const noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
+    return m_getter(*this, ndx);
+
+    // Two ideas that are not efficient but may be worth looking into again:
+    /*
+        // Assume correct width is found early in REALM_TEMPEX, which is the case for B tree offsets that
+        // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
+        // if found later
+        REALM_TEMPEX(return get, (ndx));
+    */
+    /*
+        // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
+        // reading beyond array.
+        if (m_width >= 8 && m_size > ndx + 7)
+            return get<64>(ndx >> m_shift) & m_widthmask;
+        else
+            return (this->*(m_vtable->getter))(ndx);
+    */
+}
+
+inline std::vector<int64_t> Array::get_all(size_t b, size_t e) const
+{
+    REALM_ASSERT_DEBUG(is_compressed());
+    return m_vtable->getter_all(*this, b, e);
+}
+
+template <size_t w>
+inline int64_t Array::get(const Array& arr, size_t ndx) noexcept
+{
+    REALM_ASSERT_DEBUG(arr.is_attached());
+    return get_universal<w>(arr.m_data, ndx);
+}
 
 constexpr inline int_fast64_t Array::lbound_for_width(size_t width) noexcept
 {
@@ -673,7 +777,6 @@ inline void Array::create(Type type, bool context_flag, size_t length, int_fast6
     init_from_mem(mem);
 }
 
-
 inline Array::Type Array::get_type() const noexcept
 {
     if (m_is_inner_bptree_node) {
@@ -689,75 +792,49 @@ inline Array::Type Array::get_type() const noexcept
 inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_size);
-    (this->*(m_vtable->chunk_getter))(ndx, res);
+    m_vtable->chunk_getter(*this, ndx, res);
 }
 
 template <size_t w>
-int64_t Array::get_universal(const char* data, size_t ndx) const
+inline int64_t Array::get_universal(const char* data, size_t ndx)
 {
-    if (w == 0) {
-        return 0;
+    if (w == 64) {
+        size_t offset = ndx << 3;
+        return *reinterpret_cast<const int64_t*>(data + offset);
     }
-    else if (w == 1) {
-        size_t offset = ndx >> 3;
-        return (data[offset] >> (ndx & 7)) & 0x01;
+    else if (w == 32) {
+        size_t offset = ndx << 2;
+        return *reinterpret_cast<const int32_t*>(data + offset);
     }
-    else if (w == 2) {
-        size_t offset = ndx >> 2;
-        return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
-    }
-    else if (w == 4) {
-        size_t offset = ndx >> 1;
-        return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+    else if (w == 16) {
+        size_t offset = ndx << 1;
+        return *reinterpret_cast<const int16_t*>(data + offset);
     }
     else if (w == 8) {
         return *reinterpret_cast<const signed char*>(data + ndx);
     }
-    else if (w == 16) {
-        size_t offset = ndx * 2;
-        return *reinterpret_cast<const int16_t*>(data + offset);
+    else if (w == 4) {
+        size_t offset = ndx >> 1;
+        auto d = data[offset];
+        return (d >> ((ndx & 1) << 2)) & 0x0F;
     }
-    else if (w == 32) {
-        size_t offset = ndx * 4;
-        return *reinterpret_cast<const int32_t*>(data + offset);
+    else if (w == 2) {
+        size_t offset = ndx >> 2;
+        auto d = data[offset];
+        return (d >> ((ndx & 3) << 1)) & 0x03;
     }
-    else if (w == 64) {
-        size_t offset = ndx * 8;
-        return *reinterpret_cast<const int64_t*>(data + offset);
+    else if (w == 1) {
+        size_t offset = ndx >> 3;
+        auto d = data[offset];
+        return (d >> (ndx & 7)) & 0x01;
+    }
+    else if (w == 0) {
+        return 0;
     }
     else {
         REALM_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
-}
-
-template <size_t w>
-int64_t Array::get(size_t ndx) const noexcept
-{
-    return get_universal<w>(m_data, ndx);
-}
-
-inline int64_t Array::get(size_t ndx) const noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
-    return (this->*m_getter)(ndx);
-
-    // Two ideas that are not efficient but may be worth looking into again:
-    /*
-        // Assume correct width is found early in REALM_TEMPEX, which is the case for B tree offsets that
-        // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
-        // if found later
-        REALM_TEMPEX(return get, (ndx));
-    */
-    /*
-        // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
-        // reading beyond array.
-        if (m_width >= 8 && m_size > ndx + 7)
-            return get<64>(ndx >> m_shift) & m_widthmask;
-        else
-            return (this->*(m_vtable->getter))(ndx);
-    */
 }
 
 inline int64_t Array::front() const noexcept
@@ -846,34 +923,6 @@ inline void Array::destroy_deep() noexcept
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
     m_data = nullptr;
-}
-
-inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress) const
-{
-    REALM_ASSERT(is_attached());
-
-    if (only_if_modified && m_alloc.is_read_only(m_ref))
-        return m_ref;
-
-    if (!deep || !m_has_refs)
-        return do_write_shallow(out); // Throws
-
-    return do_write_deep(out, only_if_modified, compress); // Throws
-}
-
-inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
-                             bool compress)
-{
-    if (only_if_modified && alloc.is_read_only(ref))
-        return ref;
-
-    Array array(alloc);
-    array.init_from_ref(ref);
-
-    if (!array.m_has_refs)
-        return array.do_write_shallow(out); // Throws
-
-    return array.do_write_deep(out, only_if_modified, compress); // Throws
 }
 
 inline void Array::add(int_fast64_t value)
@@ -986,7 +1035,6 @@ inline size_t Array::get_max_byte_size(size_t num_elems) noexcept
     return header_size + num_elems * max_bytes_per_elem;
 }
 
-
 inline void Array::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
     set(child_ndx, new_ref);
@@ -1002,6 +1050,73 @@ inline void Array::ensure_minimum_width(int_fast64_t value)
     if (value >= m_lbound && value <= m_ubound)
         return;
     do_ensure_minimum_width(value);
+}
+
+inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified,
+                             bool compress_in_flight) const
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT_DEBUG(!only_if_modified || &m_alloc != &Allocator::get_default());
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs) {
+        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
+        // it only works by accident, because the whole slab area is reinitialized after commit.
+        // We should have: Array encoded_array{Allocator::get_default()};
+        Array compressed_array{Allocator::get_default()};
+        if (compress_in_flight && compress_array(compressed_array)) {
+#ifdef REALM_DEBUG
+            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
+            REALM_ASSERT_DEBUG(size() == compressed_array.size());
+            for (size_t i = 0; i < compressed_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(get(i) == compressed_array.get(i));
+            }
+#endif
+            auto ref = compressed_array.do_write_shallow(out);
+            compressed_array.destroy();
+            return ref;
+        }
+        return do_write_shallow(out); // Throws
+    }
+
+    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
+}
+
+inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
+                             bool compress_in_flight)
+{
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT_DEBUG(!only_if_modified || &alloc != &Allocator::get_default());
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc);
+    array.init_from_ref(ref);
+    REALM_ASSERT_DEBUG(array.is_attached());
+
+    if (!array.m_has_refs) {
+        Array compressed_array{Allocator::get_default()};
+        if (compress_in_flight && array.compress_array(compressed_array)) {
+#ifdef REALM_DEBUG
+            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
+            REALM_ASSERT_DEBUG(array.size() == compressed_array.size());
+            for (size_t i = 0; i < compressed_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(array.get(i) == compressed_array.get(i));
+            }
+#endif
+            auto ref = compressed_array.do_write_shallow(out);
+            compressed_array.destroy();
+            return ref;
+        }
+        else {
+            return array.do_write_shallow(out); // Throws
+        }
+    }
+    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
 }
 
 

@@ -34,32 +34,6 @@ void ArrayWithFind::find_all(IntegerColumn* result, int64_t value, size_t col_of
     return;
 }
 
-
-bool ArrayWithFind::find(int cond, int64_t value, size_t start, size_t end, size_t baseindex,
-                         QueryStateBase* state) const
-{
-    if (cond == cond_Equal) {
-        return find<Equal>(value, start, end, baseindex, state);
-    }
-    if (cond == cond_NotEqual) {
-        return find<NotEqual>(value, start, end, baseindex, state);
-    }
-    if (cond == cond_Greater) {
-        return find<Greater>(value, start, end, baseindex, state);
-    }
-    if (cond == cond_Less) {
-        return find<Less>(value, start, end, baseindex, state);
-    }
-    if (cond == cond_None) {
-        return find<None>(value, start, end, baseindex, state);
-    }
-    else if (cond == cond_LeftNotNull) {
-        return find<NotNull>(value, start, end, baseindex, state);
-    }
-    REALM_ASSERT_DEBUG(false);
-    return false;
-}
-
 size_t ArrayWithFind::first_set_bit(uint32_t v) const
 {
     // (v & -v) is UB when v is INT_MIN
@@ -79,5 +53,15 @@ size_t ArrayWithFind::first_set_bit64(int64_t v) const
     return first_set_bit(v1) + 32;
 }
 
+bool ArrayWithFind::find_all_will_match(size_t start2, size_t end, size_t baseindex, QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
+    size_t process = state->limit() - state->match_count();
+    size_t end2 = end - start2 > process ? start2 + process : end;
+    for (; start2 < end2; start2++)
+        if (!state->match(start2 + baseindex))
+            return false;
+    return true;
+}
 
 } // namespace realm

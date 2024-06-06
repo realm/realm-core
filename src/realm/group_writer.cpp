@@ -41,15 +41,16 @@ public:
         , m_alloc(owner.m_alloc)
     {
     }
-    ref_type write_array(const char* data, size_t size, uint32_t checksum) override
+    ref_type write_array(const char* data, size_t size, uint32_t checksum, uint32_t checksum_bytes) override
     {
+        REALM_ASSERT(checksum_bytes == 4 || checksum_bytes == 2);
         size_t pos = m_owner.get_free_space(size);
 
         // Write the block
         char* dest_addr = translate(pos);
         REALM_ASSERT_RELEASE(dest_addr && (reinterpret_cast<size_t>(dest_addr) & 7) == 0);
-        memcpy(dest_addr, &checksum, 4);
-        memcpy(dest_addr + 4, data + 4, size - 4);
+        memcpy(dest_addr, &checksum, checksum_bytes);
+        memcpy(dest_addr + checksum_bytes, data + checksum_bytes, size - checksum_bytes);
         // return ref of the written array
         ref_type ref = to_ref(pos);
         return ref;
@@ -1339,8 +1340,9 @@ bool inline is_aligned(char* addr)
     return (as_binary & 7) == 0;
 }
 
-ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checksum)
+ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checksum, uint32_t checksum_bytes)
 {
+    REALM_ASSERT(checksum_bytes == 4 || checksum_bytes == 2);
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
 
@@ -1349,8 +1351,8 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     char* dest_addr = window->translate(pos);
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
     window->encryption_read_barrier(dest_addr, size);
-    memcpy(dest_addr, &checksum, 4);
-    memcpy(dest_addr + 4, data + 4, size - 4);
+    memcpy(dest_addr, &checksum, checksum_bytes);
+    memcpy(dest_addr + checksum_bytes, data + checksum_bytes, size - checksum_bytes);
     window->encryption_write_barrier(dest_addr, size);
     // return ref of the written array
     ref_type ref = to_ref(pos);

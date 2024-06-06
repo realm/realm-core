@@ -96,6 +96,27 @@ void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 
 } // anonymous namespace
 
+TEST(Array_Bits)
+{
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(0), 0);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(1), 1);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(2), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(3), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(4), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(5), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(7), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(8), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(0), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(1), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-1), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-2), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-4), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(4), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(7), 4);
+}
+
 TEST(Array_General)
 {
     Array c(Allocator::get_default());
@@ -1560,25 +1581,56 @@ NONCONCURRENT_TEST(Array_count)
     c.destroy();
 }
 
-TEST(Array_Bits)
+TEST(DirectBitFields)
 {
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(0), 0);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(1), 1);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(2), 2);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(3), 2);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(4), 3);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(5), 3);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(7), 3);
-    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(8), 4);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(0), 1);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(1), 2);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-1), 1);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-2), 2);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-3), 3);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-4), 3);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(3), 3);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(4), 4);
-    CHECK_EQUAL(NodeHeader::signed_to_num_bits(7), 4);
+    uint64_t a[2];
+    a[0] = a[1] = 0;
+    {
+        BfIterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 0);
+        auto it2(it);
+        ++it2;
+        it2.set_value(127 + 128);
+        REALM_ASSERT(*it == 0);
+        ++it;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 0);
+    }
+    // reverse polarity
+    a[0] = a[1] = -1ULL;
+    {
+        BfIterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 127);
+        auto it2(it);
+        ++it2;
+        it2.set_value(42 + 128);
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 42);
+        ++it;
+        REALM_ASSERT(*it == 127);
+    }
+}
+
+TEST(Extended_Array_encoding)
+{
+    using Encoding = NodeHeader::Encoding;
+    Array array(Allocator::get_default());
+    auto mem = array.get_alloc().alloc(10);
+    init_header(mem.get_addr(), Encoding::Flex, 7, 1, 1, 1, 1);
+    array.init_from_mem(mem);
+    auto array_header = array.get_header();
+    auto encoding = array.get_encoding(array_header);
+    CHECK(encoding == Encoding::Flex);
+
+    Array another_array(Allocator::get_default());
+    another_array.init_from_ref(array.get_ref());
+    auto another_header = another_array.get_header();
+    auto another_encoding = another_array.get_encoding(another_header);
+    CHECK(encoding == another_encoding);
+
+    array.get_alloc().free_(mem);
 }
 
 TEST(Array_cares_about)
@@ -1710,9 +1762,8 @@ TEST(VerifyIterationAcrossWords)
         // unaligned iterator
         UnalignedWordIter u_it(a, 0);
         for (size_t i = 0; i < 51; ++i) {
-            const auto v = sign_extend_value(5, u_it.get(5) & 0x1F);
+            const auto v = sign_extend_value(5, u_it.consume(5) & 0x1F);
             CHECK_EQUAL(v, values[i]);
-            u_it.bump(5);
         }
     }
 }
@@ -1859,7 +1910,7 @@ TEST(ParallelSearchEqualMatch)
 
             // Now use the optimized version
             static auto vector_compare_eq = [](auto msb, auto a, auto b) {
-                return find_all_fields_EQ(msb, a, b);
+                return find_all_fields<Equal>(msb, a, b);
             };
 
             start = 0;
@@ -1901,7 +1952,7 @@ TEST(ParallelSearchEqualNoMatch)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_eq = [](auto msb, auto a, auto b) {
-        return find_all_fields_EQ(msb, a, b);
+        return find_all_fields<Equal>(msb, a, b);
     };
 
     size_t start = 0;
@@ -1951,7 +2002,7 @@ TEST(ParallelSearchNotEqual)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_neq = [](auto msb, auto a, auto b) {
-        return find_all_fields_NE(msb, a, b);
+        return find_all_fields<NotEqual>(msb, a, b);
     };
 
     size_t start = 0;
@@ -2002,7 +2053,7 @@ TEST(ParallelSearchLessThan)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_lt = [](auto msb, auto a, auto b) {
-        return find_all_fields_signed_LT(msb, a, b);
+        return find_all_fields<Less>(msb, a, b);
     };
 
     size_t start = 0;
@@ -2052,7 +2103,7 @@ TEST(ParallelSearchGreaterThan)
     const auto search_vector = populate(width, key);
 
     static auto vector_compare_gt = [](auto msb, auto a, auto b) {
-        return find_all_fields_signed_GT(msb, a, b);
+        return find_all_fields<Greater>(msb, a, b);
     };
 
     size_t start = 0;

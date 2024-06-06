@@ -544,6 +544,10 @@ public:
         return false;
     }
 
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
+                         bool compress) const;
+    void typed_print(std::string prefix, ref_type ref) const;
+
 private:
     template <class T>
     TableView find_all(ColKey col_key, T value);
@@ -689,7 +693,6 @@ public:
     };
 
     ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const;
-    void typed_print(std::string prefix, ref_type ref) const;
 
 private:
     enum LifeCycleCookie {

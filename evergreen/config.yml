@@ -137,6 +137,10 @@ functions:
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
 
+          if [[ -n "${compress|}" ]]; then
+              set_cmake_var realm_vars REALM_COMPRESS PATH "${cmake_toolchain_file}"
+          fi
+
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL "${build_command_line_tools|On}"
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL "${enable_realm_encryption|On}"
           if [[ -n "${compress|}" ]]; then

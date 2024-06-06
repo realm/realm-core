@@ -26,7 +26,8 @@
 
 using namespace realm;
 
-MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type, int width)
+MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type,
+                         uint8_t width)
 {
     size_t byte_size_0 = calc_byte_size(width_type, size, width);
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
@@ -81,9 +82,9 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 
 void Node::alloc(size_t init_size, size_t new_width)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
     char* header = get_header_from_data(m_data);
-    REALM_ASSERT(!wtype_is_extended(header));
+    REALM_ASSERT_DEBUG(!wtype_is_extended(header));
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
@@ -132,7 +133,7 @@ void Node::alloc(size_t init_size, size_t new_width)
     }
     // update width (important when we convert from normal uncompressed array into compressed format)
     if (new_width != orig_width) {
-        set_width_in_header(int(new_width), header);
+        set_width_in_header(new_width, header);
     }
     set_size_in_header(init_size, header);
     m_size = init_size;

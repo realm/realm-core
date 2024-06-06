@@ -89,8 +89,6 @@ public:
     }
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
-    bool find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
-
     template <class cond>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
@@ -161,7 +159,6 @@ public:
 private:
     const Array& m_array;
 
-    template <size_t bitwidth>
     bool find_all_will_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 };
 //*************************************************************************************
@@ -276,19 +273,6 @@ uint64_t ArrayWithFind::cascade(uint64_t a) const
     }
 }
 
-template <size_t bitwidth>
-REALM_NOINLINE bool ArrayWithFind::find_all_will_match(size_t start2, size_t end, size_t baseindex,
-                                                       QueryStateBase* state) const
-{
-    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
-    size_t process = state->limit() - state->match_count();
-    size_t end2 = end - start2 > process ? start2 + process : end;
-    for (; start2 < end2; start2++)
-        if (!state->match(start2 + baseindex))
-            return false;
-    return true;
-}
-
 // This is the main finding function for Array. Other finding functions are just
 // wrappers around this one. Search for 'value' using condition cond (Equal,
 // NotEqual, Less, etc) and call QueryStateBase::match() for each match. Break and
@@ -318,7 +302,7 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
 
     // optimization if all items are guaranteed to match (such as cond == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, lbound, ubound)) {
-        return find_all_will_match<bitwidth>(start2, end, baseindex, state);
+        return find_all_will_match(start2, end, baseindex, state);
     }
 
     // finder cannot handle this bitwidth
@@ -567,14 +551,18 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
                                             QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
+    REALM_ASSERT_DEBUG(width == m_array.m_width);
 
-    size_t ee = round_up(start, 64 / no0(width));
+    auto v = 64 / no0(width);
+    size_t ee = round_up(start, v);
     ee = ee > end ? end : ee;
-    for (; start < ee; ++start)
-        if (eq ? (m_array.get<width>(start) == value) : (m_array.get<width>(start) != value)) {
+    for (; start < ee; ++start) {
+        auto v = Array::get<width>(m_array, start);
+        if (eq ? (v == value) : (v != value)) {
             if (!state->match(start + baseindex))
                 return false;
         }
+    }
 
     if (start >= end)
         return true;
@@ -624,7 +612,7 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
     }
 
     while (start < end) {
-        if (eq ? m_array.get<width>(start) == value : m_array.get<width>(start) != value) {
+        if (eq ? Array::get<width>(m_array, start) == value : Array::get<width>(m_array, start) != value) {
             if (!state->match(start + baseindex)) {
                 return false;
             }
@@ -903,8 +891,8 @@ bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, si
     size_t ee = round_up(start, 64 / no0(bitwidth));
     ee = ee > end ? end : ee;
     for (; start < ee; start++) {
-        if (gt ? (m_array.get<bitwidth>(start) > value) : (m_array.get<bitwidth>(start) < value)) {
-            if (!state->match(start + baseindex, m_array.get<bitwidth>(start)))
+        if (gt ? (Array::get<bitwidth>(m_array, start) > value) : (Array::get<bitwidth>(m_array, start) < value)) {
+            if (!state->match(start + baseindex, Array::get<bitwidth>(m_array, start)))
                 return false;
         }
     }
@@ -969,7 +957,7 @@ bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, si
 
     // Test unaligned end and/or values of width > 16 manually
     while (start < end) {
-        if (gt ? m_array.get<bitwidth>(start) > value : m_array.get<bitwidth>(start) < value) {
+        if (gt ? Array::get<bitwidth>(m_array, start) > value : Array::get<bitwidth>(m_array, start) < value) {
             if (!state->match(start + baseindex))
                 return false;
         }

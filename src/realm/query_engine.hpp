@@ -449,6 +449,7 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
 {
     // for a small number of conditions, it is faster to do a linear search than to compute the hash
     // the exact thresholds were found experimentally
+
     if (needles.size() < linear_search_threshold) {
         for (size_t i = start; i < end; ++i) {
             auto element = leaf.get(i);

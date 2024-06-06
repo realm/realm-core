@@ -24,6 +24,12 @@
 
 using namespace realm;
 
+ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
+    : Array(allocator)
+{
+    m_is_inner_bptree_node = false;
+}
+
 Mixed ArrayInteger::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
@@ -111,7 +117,6 @@ void ArrayIntNull::replace_nulls_with(int64_t new_null)
         }
     }
 }
-
 
 void ArrayIntNull::avoid_null_collision(int64_t value)
 {
