@@ -392,7 +392,11 @@ public:
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
+        static cond c;
         REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
+        if (end - start == 1) {
+            return c(get(start), value) ? start : realm::not_found;
+        }
         // todo, would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
