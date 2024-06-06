@@ -3,6 +3,6 @@ VERSION: 14.9.0
 OPENSSL_VERSION: 3.2.0
 ZLIB_VERSION: 1.2.13
 # https://github.com/10gen/baas/commits
-# b36466c is 2024 June 5
-BAAS_VERSION: b36466c6ff24539cdbfa2b62f5df3016d19cddee
+# 010c03e is 2024 June 5
+BAAS_VERSION: 010c03e0c200c59d36df0b7925bfcb1a7df23721
 BAAS_VERSION_TYPE: githash

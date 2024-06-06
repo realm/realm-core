@@ -1536,6 +1536,10 @@ inline void ClientImpl::Session::initiate_rebind()
 
     reset_protocol_state();
 
+    // Call SessionResumed before sending the BIND Message to
+    // allow adding a test command between BIND and IDENT messages
+    call_debug_hook(SyncClientHookEvent::SessionResumed);
+
     // Ready to send BIND message
     enlist_to_send(); // Throws
 }

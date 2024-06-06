@@ -4994,7 +4994,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         size_t num_mgrs = 10;
         size_t num_dirs = 5;
         std::optional<size_t> num_objects = std::nullopt;
-        std::optional<size_t> sleep_millis = std::nullopt;
     };
 
     struct ExpectedResults {
@@ -5004,7 +5003,16 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         size_t dirs;
     };
 
-    enum TestState { not_ready, start, reconnect_received, downloading, downloaded, complete };
+    enum TestState {
+        not_ready,
+        start,
+        reconnect_received,
+        session_resumed,
+        ident_message,
+        downloading,
+        downloaded,
+        complete
+    };
     TestingStateMachine<TestState> state_machina(TestState::not_ready);
     int64_t query_version = 0;
     bool did_client_reset = false;
@@ -5012,6 +5020,8 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     size_t download_msg_count = 0;
     size_t bootstrap_msg_count = 0;
     bool role_change_bootstrap = false;
+    bool send_test_command = false;
+    std::vector<util::Future<std::string>> test_command_futures(0);
     auto logger = util::Logger::get_default_logger();
 
     auto setup_harness = [&](FLXSyncTestHarness& harness, TestParams params) {
@@ -5027,10 +5037,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                 app_session.server_app_id,
                 {{"sync", {{"num_objects_before_bootstrap_flush", *params.num_objects}}}}));
         }
-        if (params.sleep_millis) {
-            REQUIRE(app_session.admin_api.patch_app_settings(
-                app_session.server_app_id, {{"sync", {{"download_loop_sleep_millis", *params.sleep_millis}}}}));
-        }
 
         // Initialize the realm with some data
         harness.load_initial_data([&](SharedRealm realm) {
@@ -5040,19 +5046,32 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         });
     };
 
-#if 0
     /// TODO: Add back once the server supports sending test commands before the IDENT message being sent
     auto pause_download_builder = [](SyncSession& session, bool pause) -> util::Future<std::string> {
         nlohmann::json test_command = {{"command", pause ? "PAUSE_DOWNLOAD_BUILDER" :
         "RESUME_DOWNLOAD_BUILDER"}}; return SyncSession::OnlyForTesting::send_test_command(session,
         test_command.dump());
     };
-#endif
+
+    auto wait_for_test_command = [&](TestState wait_state) {
+        std::optional<util::Future<std::string>> cur_test_command;
+        REQUIRE(state_machina.wait_for(wait_state));
+        state_machina.transition_with([&](TestState) {
+            REQUIRE(send_test_command);
+            REQUIRE(test_command_futures.size() > 0);
+            cur_test_command = std::move(test_command_futures.front());
+            test_command_futures.erase(test_command_futures.begin());
+            return std::nullopt;
+        });
+        auto result = cur_test_command->get_no_throw();
+        REQUIRE(result.is_ok());
+        REQUIRE(result.get_value() == "{}");
+    };
 
     auto setup_config_callbacks = [&](SyncTestFile& config) {
         // Use the sync client event hook to check for the error received and for tracking
         // download messages and bootstraps
-        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
+        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_session,
                                                             const SyncClientHookData& data) {
             state_machina.transition_with([&](TestState cur_state) -> std::optional<TestState> {
                 if (cur_state == TestState::not_ready || cur_state == TestState::complete)
@@ -5070,12 +5089,33 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                         REQUIRE_FALSE(data.error_info->is_fatal);
                         return TestState::reconnect_received;
 
-                    case Event::DownloadMessageReceived: {
-                        // multi-message bootstrap in progress..
-                        ++download_msg_count;
-                        if (cur_state != TestState::reconnect_received && cur_state != TestState::downloading)
-                            return std::nullopt;
+                    case Event::SessionResumed:
+                        REQUIRE(cur_state == TestState::reconnect_received);
+                        if (send_test_command) {
+                            if (auto session = weak_session.lock()) {
+                                logger->trace("ROLE CHANGE: sending PAUSE test command after resumed");
+                                test_command_futures.push_back(pause_download_builder(*session, true));
+                            }
+                        }
+                        return TestState::session_resumed;
 
+                    case Event::IdentMessageSent:
+                        REQUIRE(cur_state == TestState::session_resumed);
+                        if (send_test_command) {
+                            if (auto session = weak_session.lock()) {
+                                logger->trace("ROLE CHANGE: sending RESUME test command after idient message sent");
+                                test_command_futures.push_back(pause_download_builder(*session, false));
+                            }
+                        }
+                        return TestState::ident_message;
+
+                    case Event::DownloadMessageReceived: {
+                        // Skip unexpected download messages
+                        if (cur_state != TestState::ident_message && cur_state != TestState::downloading) {
+                            return std::nullopt;
+                        }
+                        ++download_msg_count;
+                        // A multi-message bootstrap is in progress..
                         if (data.batch_state == BatchState::MoreToCome) {
                             // More than 1 bootstrap message, always a multi-message
                             bootstrap_mode = BootstrapMode::MultiMessage;
@@ -5177,6 +5217,9 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             download_msg_count = 0;
             role_change_bootstrap = false;
             query_version = check_realm->get_active_subscription_set().version();
+            if (expected.bootstrap == BootstrapMode::SingleMessageMulti) {
+                send_test_command = true;
+            }
             return TestState::start;
         });
 
@@ -5190,6 +5233,16 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             // After updating the permissions (if they are different), the server should send an
             // error that will disconnect/reconnect the session - verify the reconnect occurs.
             REQUIRE(state_machina.wait_for(TestState::reconnect_received));
+        }
+
+        if (expected.bootstrap == BootstrapMode::SingleMessageMulti) {
+            // Wait for the session to be resumed and the "pause" test command to be sent
+            logger->trace("ROLE CHANGE: waiting for PAUSE test command to complete");
+            wait_for_test_command(TestState::session_resumed);
+            // Wait for the session to send the IDENT message and "unpause" test command
+            logger->trace("ROLE CHANGE: waiting for RESUME test command to complete");
+            wait_for_test_command(TestState::ident_message);
+            logger->trace("ROLE CHANGE: test commands complete");
         }
 
         // Assuming the session disconnects and reconnects, the server initiated role change
@@ -5275,45 +5328,31 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         auto& app_session = harness.session().app_session();
         auto test_rules = app_session.admin_api.get_default_rule(app_session.server_app_id);
 
-        SECTION("Basic bootstraps") {
-            // Single message bootstrap - remove employees, keep mgrs/dirs
-            // 5000 emps, 100 mgrs, 25 dirs
-            // num_objects_before_bootstrap_flush: 10
-            TestParams params{5000, 100, 25, 10};
-            auto num_total = params.num_emps + params.num_mgrs + params.num_dirs;
-            auto realm = setup_test(harness, params, {}, num_total);
+        // 5000 emps, 100 mgrs, 25 dirs
+        // num_objects_before_bootstrap_flush: 10
+        TestParams params{5000, 100, 25, 10};
+        auto num_total = params.num_emps + params.num_mgrs + params.num_dirs;
+        auto realm = setup_test(harness, params, {}, num_total);
 
-            // Single message bootstrap - remove employees, keep mgrs/dirs
-            logger->trace("ROLE CHANGE: Updating rules to remove employees");
-            update_role(test_rules, {{"role", {{"$in", {"manager", "director"}}}}});
-            update_perms_and_verify(harness, realm, test_rules,
-                                    {BootstrapMode::SingleMessage, 0, params.num_mgrs, params.num_dirs});
-            // Write the same rules again - the client should not receive the reconnect (200) error
-            logger->trace("ROLE CHANGE: Updating same rules again and verify reconnect doesn't happen");
-            update_perms_and_verify(harness, realm, test_rules,
-                                    {BootstrapMode::NoReconnect, 0, params.num_mgrs, params.num_dirs});
-            // Multi-message bootstrap - add employeees, remove managers and directors
-            logger->trace("ROLE CHANGE: Updating rules to add back the employees and remove mgrs/dirs");
-            update_role(test_rules, {{"role", "employee"}});
-            update_perms_and_verify(harness, realm, test_rules, {BootstrapMode::MultiMessage, params.num_emps, 0, 0});
-        }
-        SECTION("Single-message/Multi-changeset bootstrap") {
-            /// TODO: Update this test to use the PAUSE_DOWNLOAD_BUILDER test command
-            ///       once it can be sent prior to the IDENT message
-            // 500 emps, 500 mgrs, 125 dirs
-            // num_objects_before_bootstrap_flush: 100
-            // download_loop_sleep_millis: 2000
-            TestParams params{500, 500, 125, 100, 2000};
-            update_role(test_rules, {{"role", "employee"}});
-            auto realm = setup_test(harness, params, test_rules, params.num_emps);
-
-            // Single message/multi-changeset bootstrap - add back managers and directors
-            logger->trace("ROLE CHANGE: Updating rules to all records");
-            update_role(test_rules, true);
-            update_perms_and_verify(
-                harness, realm, test_rules,
-                {BootstrapMode::SingleMessageMulti, params.num_emps, params.num_mgrs, params.num_dirs});
-        }
+        // Single message bootstrap - remove employees, keep mgrs/dirs
+        logger->trace("ROLE CHANGE: Updating rules to remove employees");
+        update_role(test_rules, {{"role", {{"$in", {"manager", "director"}}}}});
+        update_perms_and_verify(harness, realm, test_rules,
+                                {BootstrapMode::SingleMessage, 0, params.num_mgrs, params.num_dirs});
+        // Write the same rules again - the client should not receive the reconnect (200) error
+        logger->trace("ROLE CHANGE: Updating same rules again and verify reconnect doesn't happen");
+        update_perms_and_verify(harness, realm, test_rules,
+                                {BootstrapMode::NoReconnect, 0, params.num_mgrs, params.num_dirs});
+        // Multi-message bootstrap - add employeees, remove managers and directors
+        logger->trace("ROLE CHANGE: Updating rules to add back the employees and remove mgrs/dirs");
+        update_role(test_rules, {{"role", "employee"}});
+        update_perms_and_verify(harness, realm, test_rules, {BootstrapMode::MultiMessage, params.num_emps, 0, 0});
+        // Single message/multi-changeset bootstrap - add back the managers and directors
+        logger->trace("ROLE CHANGE: Updating rules to allow all records");
+        update_role(test_rules, true);
+        update_perms_and_verify(
+            harness, realm, test_rules,
+            {BootstrapMode::SingleMessageMulti, params.num_emps, params.num_mgrs, params.num_dirs});
     }
     SECTION("Role changes for one user do not change unaffected user") {
         FLXSyncTestHarness harness("flx_role_change_bootstrap", {g_person_schema, {"role", "firstName", "lastName"}});
