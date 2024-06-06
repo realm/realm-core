@@ -7,7 +7,6 @@
 #include <realm/util/cli_args.hpp>
 #include <realm/util/compression.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/util/load_file.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
 

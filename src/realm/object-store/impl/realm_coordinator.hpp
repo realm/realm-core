@@ -200,7 +200,7 @@ public:
 
     void close();
     bool compact();
-    void write_copy(StringData path, const char* key);
+    void write_copy(std::string_view path, const char* key);
 
     // Close the DB, delete the file, and then reopen it. This operation is *not*
     // implemented in a safe manner and will only work in fairly specific circumstances

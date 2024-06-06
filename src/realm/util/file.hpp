@@ -54,6 +54,7 @@
 
 namespace realm::util {
 
+class EncryptedFile;
 class EncryptedFileMapping;
 class WriteObserver;
 
@@ -114,11 +115,6 @@ std::string make_temp_file(const char* prefix);
 
 size_t page_size();
 
-struct OnlyForTestingPageSizeChange {
-    OnlyForTestingPageSizeChange(size_t new_page_size);
-    ~OnlyForTestingPageSizeChange();
-};
-
 /// This class provides a RAII abstraction over the concept of a file
 /// descriptor (or file handle).
 ///
@@ -149,13 +145,13 @@ public:
         mode_Append  ///< access_ReadWrite, create_Auto, flag_Append (fopen: ab+)
     };
 
-    /// Equivalent to calling open(const std::string&, Mode) on a
+    /// Equivalent to calling open(std::string_view, Mode) on a
     /// default constructed instance.
-    explicit File(const std::string& path, Mode = mode_Read);
+    explicit File(std::string_view path, Mode = mode_Read);
 
     /// Create an instance that is not initially attached to an open
     /// file.
-    File() = default;
+    File();
     ~File() noexcept;
 
     File(File&&) noexcept;
@@ -174,13 +170,12 @@ public:
     /// derived from AccessError, the derived exception type is thrown
     /// (as long as the underlying system provides the information to
     /// unambiguously distinguish that particular reason).
-    void open(const std::string& path, Mode = mode_Read);
+    void open(std::string_view path, Mode = mode_Read);
 
     /// This function is idempotent, that is, it is valid to call it
     /// regardless of whether this instance currently is attached to
     /// an open file.
     void close() noexcept;
-    static void close_static(FileDesc fd); // throws
 
     /// Check whether this File instance is currently attached to an
     /// open file.
@@ -202,18 +197,21 @@ public:
         flag_Append = 2 ///< Move to end of file before each write.
     };
 
-    /// See open(const std::string&, Mode).
+    /// See open(std::string_view, Mode).
     ///
     /// Specifying access_ReadOnly together with a create mode that is
     /// not create_Never, or together with a non-zero \a flags
     /// argument, results in undefined behavior. Specifying flag_Trunc
     /// together with create_Must results in undefined behavior.
-    void open(const std::string& path, AccessMode, CreateMode, int flags);
+    void open(std::string_view path, AccessMode, CreateMode, int flags);
 
     /// Same as open(path, access_ReadWrite, create_Auto, 0), except
     /// that this one returns an indication of whether a new file was
     /// created, or an existing file was opened.
-    void open(const std::string& path, bool& was_created);
+    void open(std::string_view path, bool& was_created);
+
+    /// Plays the same role as off_t in POSIX
+    typedef int_fast64_t SizeType;
 
     /// Read data into the specified buffer and return the number of
     /// bytes read. If the returned number of bytes is less than \a
@@ -221,8 +219,8 @@ public:
     ///
     /// Calling this function on an instance, that is not currently
     /// attached to an open file, has undefined behavior.
-    size_t read(char* data, size_t size);
-    static size_t read_static(FileDesc fd, char* data, size_t size);
+    size_t read(SizeType pos, char* data, size_t size);
+    static size_t read_static(FileDesc fd, SizeType pos, char* data, size_t size);
 
     /// Write the specified data to this file.
     ///
@@ -231,34 +229,31 @@ public:
     ///
     /// Calling this function on an instance, that was opened in
     /// read-only mode, has undefined behavior.
-    void write(const char* data, size_t size);
-    static void write_static(FileDesc fd, const char* data, size_t size);
+    void write(SizeType pos, const char* data, size_t size);
+    static void write_static(FileDesc fd, SizeType pos, const char* data, size_t size);
 
     // Tells current file pointer of fd
-    static uint64_t get_file_pos(FileDesc fd);
+    SizeType get_file_pos();
 
     /// Calls write(s.data(), s.size()).
-    void write(const std::string& s)
+    void write(SizeType pos, std::string_view s)
     {
-        write(s.data(), s.size());
+        write(pos, s.data(), s.size());
     }
 
     /// Calls read(data, N).
     template <size_t N>
-    size_t read(char (&data)[N])
+    size_t read(SizeType pos, char (&data)[N])
     {
-        return read(data, N);
+        return read(pos, data, N);
     }
 
     /// Calls write(data(), N).
     template <size_t N>
-    void write(const char (&data)[N])
+    void write(SizeType pos, const char (&data)[N])
     {
-        write(data, N);
+        write(pos, data, N);
     }
-
-    /// Plays the same role as off_t in POSIX
-    typedef int_fast64_t SizeType;
 
     /// Calling this function on an instance that is not attached to
     /// an open file has undefined behavior.
@@ -287,7 +282,7 @@ public:
     /// through distinct File instances.
     ///
     /// \sa prealloc_if_supported()
-    void prealloc(size_t new_size);
+    void prealloc(SizeType new_size);
 
     /// When supported by the system, allocate space on the target
     /// device for the specified region of the file. If the region
@@ -308,7 +303,7 @@ public:
     ///
     /// \sa prealloc()
     /// \sa is_prealloc_supported()
-    bool prealloc_if_supported(SizeType offset, size_t size);
+    bool prealloc_if_supported(SizeType offset, SizeType size);
 
     /// See prealloc_if_supported().
     static bool is_prealloc_supported();
@@ -394,22 +389,11 @@ public:
     /// \param key A 64-byte encryption key, or null to disable encryption.
     void set_encryption_key(const char* key);
 
-    /// Get the encryption key set by set_encryption_key(),
-    /// null_ptr if no key set.
-    const char* get_encryption_key() const;
+    EncryptedFile* get_encryption() const noexcept;
 
     /// Set the path used for emulating file locks. If not set explicitly,
     /// the emulation will use the path of the file itself suffixed by ".fifo"
     void set_fifo_path(const std::string& fifo_dir_path, const std::string& fifo_file_name);
-    enum {
-        /// If possible, disable opportunistic flushing of dirted
-        /// pages of a memory mapped file to physical medium. On some
-        /// systems this cannot be disabled. On other systems it is
-        /// the default behavior. An explicit call to sync_map() will
-        /// flush the buffers regardless of whether this flag is
-        /// specified or not.
-        map_NoSync = 1
-    };
 
     /// Map this file into memory. The file is mapped as shared
     /// memory. This allows two processes to interact under exatly the
@@ -431,39 +415,6 @@ public:
     ///
     /// Calling this function with a size that is greater than the
     /// size of the file has undefined behavior.
-    void* map(AccessMode, size_t size, int map_flags = 0, size_t offset = 0) const;
-    void* map_fixed(AccessMode, void* address, size_t size, int map_flags = 0, size_t offset = 0) const;
-    void* map_reserve(AccessMode, size_t size, size_t offset) const;
-    /// The same as unmap(old_addr, old_size) followed by map(a,
-    /// new_size, map_flags), but more efficient on some systems.
-    ///
-    /// The old address range must have been acquired by a call to
-    /// map() or remap() on this File instance, the specified access
-    /// mode and flags must be the same as the ones specified
-    /// previously, and this File instance must not have been reopend
-    /// in the meantime. Failing to adhere to these rules will result
-    /// in undefined behavior.
-    ///
-    /// If this function throws, the old address range will remain
-    /// mapped.
-    void* remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int map_flags = 0,
-                size_t file_offset = 0) const;
-
-#if REALM_ENABLE_ENCRYPTION
-    void* map(AccessMode, size_t size, EncryptedFileMapping*& mapping, int map_flags = 0, size_t offset = 0) const;
-    void* map_fixed(AccessMode, void* address, size_t size, EncryptedFileMapping* mapping, int map_flags = 0,
-                    size_t offset = 0) const;
-    void* map_reserve(AccessMode, size_t size, size_t offset, EncryptedFileMapping*& mapping) const;
-#endif
-    /// Unmap the specified address range which must have been
-    /// previously returned by map().
-    static void unmap(void* addr, size_t size) noexcept;
-
-    /// Flush in-kernel buffers to disk. This blocks the caller until
-    /// the synchronization operation is complete. The specified
-    /// address range must be (a subset of) one that was previously returned by
-    /// map().
-    static void sync_map(FileDesc fd, void* addr, size_t size);
 
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
@@ -521,10 +472,6 @@ public:
 
     /// Copy the file at the specified origin path to the specified target path.
     static bool copy(const std::string& origin_path, const std::string& target_path, bool overwrite_existing = true);
-
-    /// Compare the two files at the specified paths for equality. Returns true
-    /// if, and only if they are equal.
-    static bool compare(const std::string& path_1, const std::string& path_2);
 
     /// Check whether two open file descriptors refer to the same
     /// underlying file, that is, if writing via one of them, will
@@ -609,9 +556,6 @@ public:
         uint_fast64_t inode;
 #endif
     };
-    // Return the unique id for the current opened file descriptor.
-    // Same UniqueID means they are the same file.
-    UniqueID get_unique_id(); // Throws
     // Return the file descriptor for the file
     FileDesc get_descriptor() const;
     // Return the path of the open file, or an empty string if
@@ -636,25 +580,26 @@ public:
     class Streambuf;
 
 private:
-    bool m_have_lock = false; // Only valid when m_fd is not null
 #ifdef _WIN32
-    HANDLE m_fd = nullptr;
+    static inline const HANDLE invalid_fd = INVALID_HANDLE_VALUE;
 #else
-    int m_fd = -1;
+    static inline const int invalid_fd = -1;
+#endif
+
+    FileDesc m_fd = invalid_fd;
+    bool m_have_lock = false; // Only valid when m_fd is not null
 #ifdef REALM_FILELOCK_EMULATION
-    int m_pipe_fd = -1; // -1 if no pipe has been allocated for emulation
     bool m_has_exclusive_lock = false;
+    int m_pipe_fd = -1; // -1 if no pipe has been allocated for emulation
     std::string m_fifo_dir_path;
     std::string m_fifo_path;
 #endif
-#endif
-    std::unique_ptr<const char[]> m_encryption_key = nullptr;
+    std::unique_ptr<util::EncryptedFile> m_encryption;
     std::string m_path;
-    std::optional<UniqueID> m_cached_unique_id;
 
     bool lock(bool exclusive, bool non_blocking);
     bool rw_lock(bool exclusive, bool non_blocking);
-    void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
+    void open_internal(std::string_view path, AccessMode, CreateMode, int flags, bool* success);
 
 #ifdef REALM_FILELOCK_EMULATION
     bool has_shared_lock() const noexcept
@@ -667,11 +612,11 @@ private:
         void* m_addr = nullptr;
         mutable size_t m_size = 0;
         size_t m_reservation_size = 0;
-        size_t m_offset = 0;
-        FileDesc m_fd;
+        uint64_t m_offset = 0;
+        FileDesc m_fd = invalid_fd;
         AccessMode m_access_mode = access_ReadOnly;
 
-        MapBase() noexcept = default;
+        MapBase() noexcept;
         ~MapBase() noexcept;
 
         // Disable copying. Copying an opened MapBase will create a scenario
@@ -679,19 +624,19 @@ private:
         MapBase(const MapBase&) = delete;
         MapBase& operator=(const MapBase&) = delete;
 
-        // Use
-        void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0,
-                 util::WriteObserver* observer = nullptr);
+        MapBase(MapBase&& other) noexcept;
+        MapBase& operator=(MapBase&& other) noexcept;
+
+        void map(const File&, AccessMode, size_t size, SizeType offset = 0, util::WriteObserver* observer = nullptr);
         // reserve address space for later mapping operations.
         // returns false if reservation can't be done.
-        bool try_reserve(const File&, AccessMode, size_t size, size_t offset = 0,
+        bool try_reserve(const File&, AccessMode, size_t size, SizeType offset = 0,
                          util::WriteObserver* observer = nullptr);
-        void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         // fully update any process shared representation (e.g. buffer cache).
         // other processes will be able to see changes, but a full platform crash
         // may loose data
-        void flush();
+        void flush(bool skip_validate = false);
         // try to extend the mapping in-place. Virtual address space must have
         // been set aside earlier by a call to reserve()
         bool try_extend_to(size_t size) noexcept;
@@ -699,20 +644,19 @@ private:
         // crash will *not* have lost data.
         void sync();
 #if REALM_ENABLE_ENCRYPTION
-        mutable util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
-        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        mutable std::unique_ptr<util::EncryptedFileMapping> m_encrypted_mapping;
+        util::EncryptedFileMapping* get_encrypted_mapping() const
         {
-            return m_encrypted_mapping;
+            return m_encrypted_mapping.get();
         }
 #else
-        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        util::EncryptedFileMapping* get_encrypted_mapping() const
         {
             return nullptr;
         }
 #endif
     };
 };
-
 
 /// This class provides a RAII abstraction over the concept of a
 /// memory mapped file.
@@ -733,15 +677,15 @@ template <class T>
 class File::Map : private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
-    explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0,
+    explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T),
                  util::WriteObserver* observer = nullptr);
 
-    explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0,
+    explicit Map(const File&, SizeType offset, AccessMode = access_ReadOnly, size_t size = sizeof(T),
                  util::WriteObserver* observer = nullptr);
 
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
-    Map() noexcept;
+    Map() noexcept = default;
 
     // Disable copying. Copying an opened Map will create a scenario
     // where the same memory will be mapped once but unmapped twice.
@@ -749,30 +693,8 @@ public:
     Map& operator=(const Map&) = delete;
 
     /// Move the mapping from another Map object to this Map object
-    File::Map<T>& operator=(File::Map<T>&& other) noexcept
-    {
-        REALM_ASSERT(this != &other);
-        if (m_addr)
-            unmap();
-        m_addr = other.get_addr();
-        m_size = other.m_size;
-        m_access_mode = other.m_access_mode;
-        m_reservation_size = other.m_reservation_size;
-        m_offset = other.m_offset;
-        m_fd = other.m_fd;
-        other.m_offset = 0;
-        other.m_addr = nullptr;
-        other.m_size = other.m_reservation_size = 0;
-#if REALM_ENABLE_ENCRYPTION
-        m_encrypted_mapping = other.m_encrypted_mapping;
-        other.m_encrypted_mapping = nullptr;
-#endif
-        return *this;
-    }
-    Map(Map&& other) noexcept
-    {
-        *this = std::move(other);
-    }
+    File::Map<T>& operator=(File::Map<T>&& other) noexcept = default;
+    Map(Map&& other) noexcept = default;
 
     /// See File::map().
     ///
@@ -780,7 +702,7 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0, size_t offset = 0,
+    T* map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), SizeType offset = 0,
            util::WriteObserver* observer = nullptr);
 
     /// See File::unmap(). This function is idempotent, that is, it is
@@ -788,16 +710,21 @@ public:
     /// currently attached to a memory mapped file.
     void unmap() noexcept;
 
-    bool try_reserve(const File&, AccessMode a = access_ReadOnly, size_t size = sizeof(T), size_t offset = 0,
+    bool try_reserve(const File&, AccessMode a = access_ReadOnly, size_t size = sizeof(T), SizeType offset = 0,
                      util::WriteObserver* observer = nullptr);
 
-    /// See File::remap().
+    /// The same as unmap(old_addr, old_size) followed by map(a,
+    /// new_size, map_flags), but more efficient on some systems.
+    ///
     ///
     /// Calling this function on a Map instance that is not currently attached
     /// to a memory mapped file is equivalent to calling map(). The returned
     /// pointer is the same as what will subsequently be returned by
     /// get_addr().
-    T* remap(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
+    ///
+    /// If this function throws, the old address range will remain
+    /// mapped.
+    T* remap(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T));
 
     /// Try to extend the existing mapping to a given size
     bool try_extend_to(size_t size) noexcept;
@@ -806,9 +733,9 @@ public:
     ///
     /// Calling this function on an instance that is not currently
     /// attached to a memory mapped file, has undefined behavior.
-    void sync();
+    using MapBase::flush;
+    using MapBase::sync;
 
-    void flush();
     /// Check whether this Map instance is currently attached to a
     /// memory mapped file.
     bool is_attached() const noexcept;
@@ -834,18 +761,8 @@ public:
         return m_access_mode == access_ReadWrite;
     }
 
-#if REALM_ENABLE_ENCRYPTION
     /// Get the encrypted file mapping corresponding to this mapping
-    inline EncryptedFileMapping* get_encrypted_mapping() const
-    {
-        return m_encrypted_mapping;
-    }
-#else
-    inline EncryptedFileMapping* get_encrypted_mapping() const
-    {
-        return nullptr;
-    }
-#endif
+    using MapBase::get_encrypted_mapping;
 
     friend class UnmapGuard;
 };
@@ -967,16 +884,6 @@ private:
 
 // Implementation:
 
-inline File::File(const std::string& path, Mode m)
-{
-    open(path, m);
-}
-
-inline File::~File() noexcept
-{
-    close();
-}
-
 inline void File::set_fifo_path(const std::string& fifo_dir_path, const std::string& fifo_file_name)
 {
 #ifdef REALM_FILELOCK_EMULATION
@@ -988,49 +895,7 @@ inline void File::set_fifo_path(const std::string& fifo_dir_path, const std::str
 #endif
 }
 
-inline File::File(File&& f) noexcept
-{
-#ifdef _WIN32
-    m_fd = f.m_fd;
-    f.m_fd = nullptr;
-#else
-    m_fd = f.m_fd;
-#ifdef REALM_FILELOCK_EMULATION
-    m_pipe_fd = f.m_pipe_fd;
-    m_has_exclusive_lock = f.m_has_exclusive_lock;
-    f.m_has_exclusive_lock = false;
-    f.m_pipe_fd = -1;
-#endif
-    f.m_fd = -1;
-#endif
-    m_have_lock = f.m_have_lock;
-    f.m_have_lock = false;
-    m_encryption_key = std::move(f.m_encryption_key);
-}
-
-inline File& File::operator=(File&& f) noexcept
-{
-    close();
-#ifdef _WIN32
-    m_fd = f.m_fd;
-    f.m_fd = nullptr;
-#else
-    m_fd = f.m_fd;
-    f.m_fd = -1;
-#ifdef REALM_FILELOCK_EMULATION
-    m_pipe_fd = f.m_pipe_fd;
-    f.m_pipe_fd = -1;
-    m_has_exclusive_lock = f.m_has_exclusive_lock;
-    f.m_has_exclusive_lock = false;
-#endif
-#endif
-    m_have_lock = f.m_have_lock;
-    f.m_have_lock = false;
-    m_encryption_key = std::move(f.m_encryption_key);
-    return *this;
-}
-
-inline void File::open(const std::string& path, Mode m)
+inline void File::open(std::string_view path, Mode m)
 {
     AccessMode a = access_ReadWrite;
     CreateMode c = create_Auto;
@@ -1053,13 +918,13 @@ inline void File::open(const std::string& path, Mode m)
     open(path, a, c, flags);
 }
 
-inline void File::open(const std::string& path, AccessMode am, CreateMode cm, int flags)
+inline void File::open(std::string_view path, AccessMode am, CreateMode cm, int flags)
 {
     open_internal(path, am, cm, flags, nullptr);
 }
 
 
-inline void File::open(const std::string& path, bool& was_created)
+inline void File::open(std::string_view path, bool& was_created)
 {
     while (1) {
         bool success;
@@ -1078,11 +943,7 @@ inline void File::open(const std::string& path, bool& was_created)
 
 inline bool File::is_attached() const noexcept
 {
-#ifdef _WIN32
-    return (m_fd != nullptr);
-#else
-    return 0 <= m_fd;
-#endif
+    return m_fd != invalid_fd;
 }
 
 inline void File::rw_lock_shared()
@@ -1110,40 +971,28 @@ inline bool File::try_lock()
     return lock(true, true);
 }
 
-inline File::MapBase::~MapBase() noexcept
-{
-    unmap();
-}
-
 
 template <class T>
-inline File::Map<T>::Map(const File& f, AccessMode a, size_t size, int map_flags, util::WriteObserver* observer)
+inline File::Map<T>::Map(const File& f, AccessMode a, size_t size, util::WriteObserver* observer)
 {
-    map(f, a, size, map_flags, 0, observer);
+    map(f, a, size, 0, observer);
 }
 
 template <class T>
-inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size, int map_flags,
-                         util::WriteObserver* observer)
+inline File::Map<T>::Map(const File& f, SizeType offset, AccessMode a, size_t size, util::WriteObserver* observer)
 {
-    map(f, a, size, map_flags, offset, observer);
+    map(f, a, size, offset, observer);
 }
 
 template <class T>
-inline File::Map<T>::Map() noexcept
+inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, SizeType offset, util::WriteObserver* observer)
 {
-}
-
-template <class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
-                            util::WriteObserver* observer)
-{
-    MapBase::map(f, a, size, map_flags, offset, observer);
+    MapBase::map(f, a, size, offset, observer);
     return static_cast<T*>(m_addr);
 }
 
 template <class T>
-inline bool File::Map<T>::try_reserve(const File& f, AccessMode a, size_t size, size_t offset,
+inline bool File::Map<T>::try_reserve(const File& f, AccessMode a, size_t size, SizeType offset,
                                       util::WriteObserver* observer)
 {
     return MapBase::try_reserve(f, a, size, offset, observer);
@@ -1156,13 +1005,11 @@ inline void File::Map<T>::unmap() noexcept
 }
 
 template <class T>
-inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_flags)
+inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size)
 {
-    // MapBase::remap(f, a, size, map_flags);
     // missing sync() here?
     unmap();
-    map(f, a, size, map_flags);
-
+    map(f, a, size);
     return static_cast<T*>(m_addr);
 }
 
@@ -1170,18 +1017,6 @@ template <class T>
 inline bool File::Map<T>::try_extend_to(size_t size) noexcept
 {
     return MapBase::try_extend_to(sizeof(T) * size);
-}
-
-template <class T>
-inline void File::Map<T>::sync()
-{
-    MapBase::sync();
-}
-
-template <class T>
-inline void File::Map<T>::flush()
-{
-    MapBase::flush();
 }
 
 template <class T>
@@ -1207,7 +1042,7 @@ inline T* File::Map<T>::release() noexcept
 {
     T* addr = static_cast<T*>(m_addr);
     m_addr = nullptr;
-    m_fd = 0;
+    m_fd = invalid_fd;
     return addr;
 }
 
@@ -1261,8 +1096,10 @@ inline void File::Streambuf::flush()
 {
     size_t n = pptr() - pbase();
     if (n > 0) {
-        m_file.write(pbase(), n);
+        SizeType pos = m_file.get_file_pos();
+        m_file.write(pos, pbase(), n);
         setp(m_buffer.get(), epptr());
+        m_file.seek(pos + n);
     }
 }
 
@@ -1312,7 +1149,6 @@ inline bool operator>=(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
     return !(lhs < rhs);
 }
-
 } // namespace realm::util
 
 #endif // REALM_UTIL_FILE_HPP

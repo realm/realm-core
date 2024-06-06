@@ -19,6 +19,7 @@
 #include "spawned_process.hpp"
 
 #include <realm/util/assert.hpp>
+#include <realm/util/backtrace.hpp>
 #include <realm/util/file_mapper.hpp>
 
 #include "test_path.hpp"

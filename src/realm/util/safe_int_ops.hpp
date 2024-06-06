@@ -25,10 +25,10 @@
 #include <safeint.h>
 #endif
 
-#include <limits>
-
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+
+#include <limits>
 
 namespace realm {
 namespace util {
@@ -55,17 +55,17 @@ namespace util {
 /// integers.
 
 template <class A, class B>
-inline bool int_equal_to(A, B) noexcept;
+constexpr bool int_equal_to(A, B) noexcept;
 template <class A, class B>
-inline bool int_not_equal_to(A, B) noexcept;
+constexpr bool int_not_equal_to(A, B) noexcept;
 template <class A, class B>
-inline bool int_less_than(A, B) noexcept;
+constexpr bool int_less_than(A, B) noexcept;
 template <class A, class B>
-inline bool int_less_than_or_equal(A, B) noexcept;
+constexpr bool int_less_than_or_equal(A, B) noexcept;
 template <class A, class B>
-inline bool int_greater_than(A, B) noexcept;
+constexpr bool int_greater_than(A, B) noexcept;
 template <class A, class B>
-inline bool int_greater_than_or_equal(A, B) noexcept;
+constexpr bool int_greater_than_or_equal(A, B) noexcept;
 
 //@}
 
@@ -89,10 +89,10 @@ inline bool int_greater_than_or_equal(A, B) noexcept;
 /// integers.
 
 template <class L, class R>
-inline bool int_add_with_overflow_detect(L& lval, R rval) noexcept;
+constexpr bool int_add_with_overflow_detect(L& lval, R rval) noexcept;
 
 template <class L, class R>
-inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept;
+constexpr bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept;
 
 //@}
 
@@ -113,7 +113,7 @@ inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept;
 /// specializations of std::numeric_limits<> and that both are indeed
 /// integers.
 template <class L, class R>
-inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept;
+constexpr bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept;
 
 
 /// Checks for positive overflow when performing a bitwise shift to
@@ -128,7 +128,7 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept;
 /// value of i must not exceed the number of bits of storage type T as
 /// shifting by this amount is not defined by the standard.
 template <class T>
-inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
+constexpr bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
 
 
 //@{
@@ -146,10 +146,10 @@ inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
 /// except that it complies with at least C++03.
 
 template <class To, class From>
-bool int_cast_has_overflow(From from) noexcept;
+constexpr bool int_cast_has_overflow(From from) noexcept;
 
 template <class To, class From>
-bool int_cast_with_overflow_detect(From from, To& to) noexcept;
+constexpr bool int_cast_with_overflow_detect(From from, To& to) noexcept;
 
 //@}
 
@@ -164,11 +164,11 @@ struct SafeIntBinopsImpl;
 template <class L, class R>
 struct SafeIntBinopsImpl<L, R, std::enable_if_t<std::is_signed_v<L> == std::is_signed_v<R>>> {
     using common = std::common_type_t<L, R>;
-    static bool equal(L l, R r) noexcept
+    constexpr static bool equal(L l, R r) noexcept
     {
         return common(l) == common(r);
     }
-    static bool less(L l, R r) noexcept
+    constexpr static bool less(L l, R r) noexcept
     {
         return common(l) < common(r);
     }
@@ -179,11 +179,11 @@ template <class L, class R>
 struct SafeIntBinopsImpl<L, R, std::enable_if_t<!std::is_signed_v<L> && std::is_signed_v<R>>> {
     using lim_l = std::numeric_limits<L>;
     using lim_r = std::numeric_limits<R>;
-    static bool equal(L l, R r) noexcept
+    constexpr static bool equal(L l, R r) noexcept
     {
         return (lim_l::digits > lim_r::digits) ? r >= 0 && l == L(r) : R(l) == r;
     }
-    static bool less(L l, R r) noexcept
+    constexpr static bool less(L l, R r) noexcept
     {
         return (lim_l::digits > lim_r::digits) ? r >= 0 && l < L(r) : R(l) < r;
     }
@@ -192,12 +192,12 @@ struct SafeIntBinopsImpl<L, R, std::enable_if_t<!std::is_signed_v<L> && std::is_
 // (signed, unsigned) (all size combinations)
 template <class L, class R>
 struct SafeIntBinopsImpl<L, R, std::enable_if_t<std::is_signed_v<L> && !std::is_signed_v<R>>> {
-    static bool equal(L l, R r) noexcept
+    constexpr static bool equal(L l, R r) noexcept
     {
         // r == l
         return SafeIntBinopsImpl<R, L>::equal(r, l);
     }
-    static bool less(L l, R r) noexcept
+    constexpr static bool less(L l, R r) noexcept
     {
         // !(r == l || r < l)
         return !(SafeIntBinopsImpl<R, L>::equal(r, l) || SafeIntBinopsImpl<R, L>::less(r, l));
@@ -218,43 +218,43 @@ struct SafeIntBinops : SafeIntBinopsImpl<L, R> {
 namespace util {
 
 template <class A, class B>
-inline bool int_equal_to(A a, B b) noexcept
+constexpr bool int_equal_to(A a, B b) noexcept
 {
     return realm::_impl::SafeIntBinops<A, B>::equal(a, b);
 }
 
 template <class A, class B>
-inline bool int_not_equal_to(A a, B b) noexcept
+constexpr bool int_not_equal_to(A a, B b) noexcept
 {
     return !realm::_impl::SafeIntBinops<A, B>::equal(a, b);
 }
 
 template <class A, class B>
-inline bool int_less_than(A a, B b) noexcept
+constexpr bool int_less_than(A a, B b) noexcept
 {
     return realm::_impl::SafeIntBinops<A, B>::less(a, b);
 }
 
 template <class A, class B>
-inline bool int_less_than_or_equal(A a, B b) noexcept
+constexpr bool int_less_than_or_equal(A a, B b) noexcept
 {
     return !realm::_impl::SafeIntBinops<B, A>::less(b, a); // Not greater than
 }
 
 template <class A, class B>
-inline bool int_greater_than(A a, B b) noexcept
+constexpr bool int_greater_than(A a, B b) noexcept
 {
     return realm::_impl::SafeIntBinops<B, A>::less(b, a);
 }
 
 template <class A, class B>
-inline bool int_greater_than_or_equal(A a, B b) noexcept
+constexpr bool int_greater_than_or_equal(A a, B b) noexcept
 {
     return !realm::_impl::SafeIntBinops<A, B>::less(a, b); // Not less than
 }
 
 template <class L, class R>
-inline bool int_add_with_overflow_detect(L& lval, R rval) noexcept
+constexpr bool int_add_with_overflow_detect(L& lval, R rval) noexcept
 {
     // Note: MSVC returns true on success, while gcc/clang return true on overflow.
     // Note: Both may write to destination on overflow, but our tests check that this doesn't happen.
@@ -270,7 +270,7 @@ inline bool int_add_with_overflow_detect(L& lval, R rval) noexcept
 }
 
 template <class L, class R>
-inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept
+constexpr bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept
 {
     auto old = lval;
 #ifdef _MSC_VER
@@ -284,7 +284,7 @@ inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept
 }
 
 template <class L, class R>
-inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
+constexpr bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
 {
     auto old = lval;
 #ifdef _MSC_VER
@@ -298,7 +298,7 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
 }
 
 template <class T>
-inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
+constexpr bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
 {
     typedef std::numeric_limits<T> lim;
     static_assert(lim::is_specialized, "std::numeric_limits<> must be specialized for T");
@@ -311,14 +311,14 @@ inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
 }
 
 template <class To, class From>
-inline bool int_cast_has_overflow(From from) noexcept
+constexpr bool int_cast_has_overflow(From from) noexcept
 {
     typedef std::numeric_limits<To> lim_to;
     return int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from);
 }
 
 template <class To, class From>
-inline bool int_cast_with_overflow_detect(From from, To& to) noexcept
+constexpr bool int_cast_with_overflow_detect(From from, To& to) noexcept
 {
     if (REALM_LIKELY(!int_cast_has_overflow<To>(from))) {
         to = To(from);
