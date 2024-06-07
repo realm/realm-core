@@ -1467,6 +1467,10 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
         ++m_target_download_mark;
     }
 
+    // Call SessionResumed before sending the BIND Message to
+    // allow adding a test command between BIND and IDENT messages
+    call_debug_hook(SyncClientHookEvent::SessionConnected);
+
     if (!m_suspended) {
         // Ready to send BIND message
         enlist_to_send(); // Throws

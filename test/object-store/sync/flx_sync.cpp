@@ -5078,6 +5078,9 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                         REQUIRE_FALSE(data.error_info->is_fatal);
                         return TestState::reconnect_received;
 
+                    case Event::SessionConnected:
+                        // Handle the reconnect if session multiplexing is disabled
+                        [[fallthrough]];
                     case Event::SessionResumed:
                         if (send_test_command) {
                             REQUIRE(cur_state == TestState::reconnect_received);
