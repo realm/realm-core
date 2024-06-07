@@ -5045,7 +5045,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         });
     };
 
-    /// TODO: Add back once the server supports sending test commands before the IDENT message being sent
     auto pause_download_builder = [](std::weak_ptr<SyncSession> weak_session, bool pause) {
         if (auto session = weak_session.lock()) {
             nlohmann::json test_command = {{"command", pause ? "PAUSE_DOWNLOAD_BUILDER" : "RESUME_DOWNLOAD_BUILDER"}};
