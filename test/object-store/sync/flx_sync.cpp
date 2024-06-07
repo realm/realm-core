@@ -5219,7 +5219,11 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         if (expected.bootstrap != BootstrapMode::NoReconnect) {
             // After updating the permissions (if they are different), the server should send an
             // error that will disconnect/reconnect the session - verify the reconnect occurs.
-            REQUIRE(state_machina.wait_for(TestState::reconnect_received));
+            // Make sure at least the reconnect state (or later) has been reached
+            auto state_reached = state_machina.wait_until([](TestState cur_state) {
+                return static_cast<int>(cur_state) >= static_cast<int>(TestState::reconnect_received);
+            });
+            REQUIRE(state_reached);
         }
 
         // Assuming the session disconnects and reconnects, the server initiated role change
