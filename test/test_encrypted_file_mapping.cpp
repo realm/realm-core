@@ -63,7 +63,7 @@ using namespace realm::util;
 using realm::FileDesc;
 
 namespace {
-const uint8_t test_key[] = "1234567890123456789012345678901123456789012345678901234567890123";
+const char test_key[] = "1234567890123456789012345678901123456789012345678901234567890123";
 }
 
 TEST(EncryptedFile_CryptorBasic)
@@ -71,13 +71,13 @@ TEST(EncryptedFile_CryptorBasic)
     TEST_PATH(path);
 
     AESCryptor cryptor(test_key);
-    cryptor.set_file_size(16);
+    cryptor.set_data_size(16);
     const char data[4096] = "test data";
     char buffer[4096];
 
     File file(path, realm::util::File::mode_Write);
-    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
-    cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
+    cryptor.write(file.get_descriptor(), 0, data);
+    cryptor.read(file.get_descriptor(), 0, buffer);
     CHECK(memcmp(buffer, data, strlen(data)) == 0);
 }
 
@@ -85,20 +85,18 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
 {
     TEST_PATH(path);
     AESCryptor cryptor(test_key);
-    cryptor.set_file_size(16);
+    cryptor.set_data_size(16);
 
     const char data[4096] = "test data";
     char raw_buffer_1[8192] = {0}, raw_buffer_2[8192] = {0};
     File file(path, realm::util::File::mode_Write);
 
-    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
-    file.seek(0);
-    ssize_t actual_read_1 = file.read(raw_buffer_1, sizeof(raw_buffer_1));
+    cryptor.write(file.get_descriptor(), 0, data);
+    ssize_t actual_read_1 = file.read(0, raw_buffer_1, sizeof(raw_buffer_1));
     CHECK_EQUAL(actual_read_1, sizeof(raw_buffer_1));
 
-    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
-    file.seek(0);
-    ssize_t actual_read_2 = file.read(raw_buffer_2, sizeof(raw_buffer_2));
+    cryptor.write(file.get_descriptor(), 0, data);
+    ssize_t actual_read_2 = file.read(0, raw_buffer_2, sizeof(raw_buffer_2));
     CHECK_EQUAL(actual_read_2, sizeof(raw_buffer_2));
 
     CHECK(memcmp(raw_buffer_1, raw_buffer_2, sizeof(raw_buffer_1)) != 0);
@@ -114,13 +112,13 @@ TEST(EncryptedFile_SeparateCryptors)
     File file(path, realm::util::File::mode_Write);
     {
         AESCryptor cryptor(test_key);
-        cryptor.set_file_size(16);
-        cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
+        cryptor.set_data_size(16);
+        cryptor.write(file.get_descriptor(), 0, data);
     }
     {
         AESCryptor cryptor(test_key);
-        cryptor.set_file_size(16);
-        cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
+        cryptor.set_data_size(16);
+        cryptor.read(file.get_descriptor(), 0, buffer);
     }
 
     CHECK(memcmp(buffer, data, strlen(data)) == 0);
@@ -135,265 +133,501 @@ TEST(EncryptedFile_InterruptedWrite)
     File file(path, realm::util::File::mode_Write);
     {
         AESCryptor cryptor(test_key);
-        cryptor.set_file_size(16);
-        cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
+        cryptor.set_data_size(16);
+        cryptor.write(file.get_descriptor(), 0, data);
     }
 
     // Fake an interrupted write which updates the IV table but not the data
     char buffer[4096];
-    file.seek(0);
-    size_t actual_pread = file.read(buffer, 64);
+    size_t actual_pread = file.read(0, buffer, 64);
     CHECK_EQUAL(actual_pread, 64);
 
     memcpy(buffer + 32, buffer, 32);
     buffer[5]++; // first byte of "hmac1" field in iv table
-    file.seek(0);
-    file.write(buffer, 64);
+    file.write(0, buffer, 64);
 
     {
         AESCryptor cryptor(test_key);
-        cryptor.set_file_size(16);
-        cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
+        cryptor.set_data_size(16);
+        cryptor.read(file.get_descriptor(), 0, buffer);
         CHECK(memcmp(buffer, data, strlen(data)) == 0);
     }
 }
 
-TEST(EncryptedFile_LargePages)
-{
-    TEST_PATH(path);
-
-    char data[4096 * 4];
-    for (size_t i = 0; i < sizeof(data); ++i)
-        data[i] = static_cast<char>(i);
-
-    AESCryptor cryptor(test_key);
-    cryptor.set_file_size(sizeof(data));
-    char buffer[sizeof(data)];
-
-    File file(path, realm::util::File::mode_Write);
-    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
-    cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
-    CHECK(memcmp(buffer, data, sizeof(data)) == 0);
-}
-
 TEST(EncryptedFile_IVRefreshing)
 {
-    using IVPageStates = realm::util::FlatMap<size_t, IVRefreshState>;
-    constexpr size_t block_size = 4096;
-    constexpr size_t blocks_per_metadata_block = 64;
-    const size_t pages_per_metadata_block = block_size * blocks_per_metadata_block / page_size();
+    constexpr size_t page_size = 4096;
+    constexpr size_t pages_per_metadata_block = 64;
 
-    auto verify_page_states = [&](const IVPageStates& states, off_t data_pos,
-                                  std::vector<size_t> expected_pages_refreshed) {
-        size_t start_page_ndx = ((data_pos / block_size) / blocks_per_metadata_block) * blocks_per_metadata_block *
-                                block_size / page_size();
-        size_t end_page_ndx = (((data_pos / block_size) + blocks_per_metadata_block) / blocks_per_metadata_block) *
-                              blocks_per_metadata_block * block_size / page_size();
-
-        CHECK_EQUAL(states.size(), end_page_ndx - start_page_ndx);
-        for (size_t ndx = start_page_ndx; ndx < end_page_ndx; ++ndx) {
-            CHECK_EQUAL(states.count(ndx), 1);
-            bool expected_refresh = std::find(expected_pages_refreshed.begin(), expected_pages_refreshed.end(),
-                                              ndx) != expected_pages_refreshed.end();
-            CHECK(states.at(ndx) == (expected_refresh ? IVRefreshState::RequiresRefresh : IVRefreshState::UpToDate));
-        }
-    };
+    // enough data to span two metadata blocks
+    constexpr size_t page_count = pages_per_metadata_block * 2;
+    constexpr File::SizeType data_size = page_size * page_count;
+    char data[page_size];
+    std::iota(std::begin(data), std::end(data), 0);
 
     TEST_PATH(path);
-    // enough data to span two metadata blocks
-    constexpr size_t data_size = block_size * blocks_per_metadata_block * 2;
-    const size_t num_pages = data_size / page_size();
-    char data[block_size];
-    for (size_t i = 0; i < sizeof(data); ++i)
-        data[i] = static_cast<char>(i);
-
-    AESCryptor cryptor(test_key);
-    cryptor.set_file_size(off_t(data_size));
     File file(path, realm::util::File::mode_Write);
     const FileDesc fd = file.get_descriptor();
 
-    auto make_external_write_at_pos = [&](off_t data_pos) -> size_t {
-        const size_t begin_write_block = data_pos / block_size * block_size;
-        const size_t ndx_in_block = data_pos % block_size;
-        AESCryptor cryptor2(test_key);
-        cryptor2.set_file_size(off_t(data_size));
-        cryptor2.read(fd, off_t(begin_write_block), data, block_size);
-        ++data[ndx_in_block];
-        cryptor2.write(fd, off_t(begin_write_block), data, block_size);
-        return data_pos / page_size();
-    };
-
-    for (size_t i = 0; i < data_size; i += block_size) {
-        cryptor.write(fd, off_t(i), data, block_size);
+    AESCryptor cryptor(test_key);
+    cryptor.set_data_size(data_size);
+    for (File::SizeType i = 0; i < data_size; i += page_size) {
+        cryptor.write(fd, i, data);
+    }
+    // The IVs for the pages we just wrote should obviously be up to date
+    for (size_t i = 0; i < page_count; ++i) {
+        CHECK_NOT(cryptor.refresh_iv(fd, i));
+    }
+    // and we should see the same ones after rereading them
+    cryptor.invalidate_ivs();
+    for (size_t i = 0; i < page_count; ++i) {
+        CHECK_NOT(cryptor.refresh_iv(fd, i));
     }
 
-    IVPageStates states = cryptor.refresh_ivs(fd, 0, 0, num_pages);
-    std::vector<size_t> pages_needing_refresh = {};
-    for (size_t i = 0; i < pages_per_metadata_block; ++i) {
-        pages_needing_refresh.push_back(i);
+    AESCryptor cryptor2(test_key);
+    cryptor2.set_data_size(data_size);
+    for (size_t i = 0; i < page_count; ++i) {
+        // Each IV should be up to date immediately after reading the page
+        cryptor2.read(fd, File::SizeType(i) * page_size, data);
+        CHECK_NOT(cryptor2.refresh_iv(fd, i));
     }
-    // initial call requires refreshing all pages in range
-    verify_page_states(states, 0, pages_needing_refresh);
-    states = cryptor.refresh_ivs(fd, 0, 0, num_pages);
-    // subsequent call does not require refreshing anything
-    verify_page_states(states, 0, {});
 
-    pages_needing_refresh = {};
-    for (size_t i = 0; i < pages_per_metadata_block; ++i) {
-        pages_needing_refresh.push_back(i + pages_per_metadata_block);
+    // Nothing's changed so rereading them should report no refresh needed
+    cryptor2.invalidate_ivs();
+    for (size_t i = 0; i < page_count; ++i) {
+        CHECK_NOT(cryptor2.refresh_iv(fd, i));
     }
-    off_t read_data_pos = off_t(pages_per_metadata_block * page_size());
-    states = cryptor.refresh_ivs(fd, read_data_pos, pages_per_metadata_block, num_pages);
-    verify_page_states(states, read_data_pos, pages_needing_refresh);
-    states = cryptor.refresh_ivs(fd, read_data_pos, pages_per_metadata_block, num_pages);
-    verify_page_states(states, read_data_pos, {});
 
-    read_data_pos = off_t(data_size / 2);
-    size_t read_page_ndx = read_data_pos / page_size();
-    states = cryptor.refresh_ivs(fd, read_data_pos, read_page_ndx, num_pages);
-    verify_page_states(states, read_data_pos, {});
-
-    read_data_pos = off_t(data_size - 1);
-    read_page_ndx = read_data_pos / page_size();
-    states = cryptor.refresh_ivs(fd, read_data_pos, read_page_ndx, num_pages);
-    verify_page_states(states, read_data_pos, {});
-
-    // write at pos 0, read half way through the first page
-    make_external_write_at_pos(0);
-    read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
-    verify_page_states(states, read_data_pos, {0});
-
-    // write at end of first page, read half way through first page
-    make_external_write_at_pos(off_t(page_size() - 1));
-    read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
-    verify_page_states(states, read_data_pos, {0});
-
-    // write at beginning of second page, read in first page
-    make_external_write_at_pos(off_t(page_size()));
-    read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
-    verify_page_states(states, read_data_pos, {1});
-
-    // write at last page of first metadata block, read in first page
-    size_t page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size - 1);
-    read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
-    verify_page_states(states, read_data_pos, {page_needing_refresh});
-
-    // test truncation of end_page: write to first page, and last page of first metadata block, read in first page,
-    // but set the end page index lower than the last write
-    make_external_write_at_pos(0);
-    page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size - 1);
-    REALM_ASSERT(page_needing_refresh >= 1); // this test assumes page_size is < 64 * block_size
-    read_data_pos = off_t(0);
-    constexpr size_t end_page_index = 1;
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, end_page_index);
-    CHECK_EQUAL(states.size(), 1);
-    CHECK_EQUAL(states.count(size_t(0)), 1);
-    CHECK(states[0] == IVRefreshState::RequiresRefresh);
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
-    verify_page_states(states, 0, {page_needing_refresh});
-
-    // write to a block indexed to the second metadata block
-    page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size);
-    // a read anywhere in the first metadata block domain does not require refresh
-    read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
-    verify_page_states(states, read_data_pos, {});
-    // but a read in a page controlled by the second metadata block does require a refresh
-    read_data_pos = off_t(blocks_per_metadata_block * block_size);
-    states = cryptor.refresh_ivs(fd, read_data_pos, page_needing_refresh, num_pages);
-    verify_page_states(states, read_data_pos, {page_needing_refresh});
-
-    // write to the last byte of data
-    page_needing_refresh = make_external_write_at_pos(data_size - 1);
-    // a read anywhere in the first metadata block domain does not require refresh
-    read_data_pos = 0;
-    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
-    verify_page_states(states, read_data_pos, {});
-    // but a read in a page controlled by the second metadata block does require a refresh
-    read_data_pos = off_t(data_size - 1);
-    states = cryptor.refresh_ivs(fd, read_data_pos, page_needing_refresh, num_pages);
-    verify_page_states(states, read_data_pos, {page_needing_refresh});
-}
-
-static void check_attach_and_read(const char* key, const std::string& path, size_t num_entries)
-{
-    try {
-        auto hist = make_in_realm_history();
-        DBOptions options(key);
-        auto sg = DB::create(*hist, path, options);
-        auto rt = sg->start_read();
-        auto foo = rt->get_table("foo");
-        auto pk_col = foo->get_primary_key_column();
-        REALM_ASSERT_3(foo->size(), ==, num_entries);
-        REALM_ASSERT_3(foo->where().equal(pk_col, util::format("name %1", num_entries - 1).c_str()).count(), ==, 1);
+    // Modify all pages, invalidate, verify each page needs to be refreshed
+    // Note that even though this isn't changing the plaintext it does update
+    // the ciphertext each time
+    for (File::SizeType i = 0; i < data_size; i += page_size) {
+        cryptor.write(fd, i, data);
     }
-    catch (const std::exception& e) {
-        auto fs = File::get_size_static(path);
-        util::format(std::cout, "Error for num_entries %1 with page_size of %2 on file of size %3\n%4", num_entries,
-                     page_size(), fs, e.what());
-        throw;
+    cryptor2.invalidate_ivs();
+    for (size_t i = 0; i < page_count; ++i) {
+        CHECK(cryptor2.refresh_iv(fd, i));
+        // refresh_iv only returns true once per page per write
+        CHECK_NOT(cryptor2.refresh_iv(fd, i));
+    }
+
+    // Modify all pages, verifying that a refresh is needed after each one
+    for (size_t i = 0; i < page_count; ++i) {
+        cryptor.write(fd, File::SizeType(i) * page_size, data);
+        cryptor2.invalidate_ivs();
+        CHECK(cryptor2.refresh_iv(fd, i));
+        CHECK_NOT(cryptor2.refresh_iv(fd, i));
+    }
+
+    // Same thing but in reverse. This verifies that initialization of data
+    // before the earliest populated point is tracked correctly
+    for (size_t i = page_count; i > 0; --i) {
+        cryptor.write(fd, File::SizeType(i - 1) * page_size, data);
+        cryptor2.invalidate_ivs();
+        CHECK(cryptor2.refresh_iv(fd, i - 1));
+        CHECK_NOT(cryptor2.refresh_iv(fd, i - 1));
     }
 }
 
-// This test changes the global page_size() and should not run with other tests.
-// It checks that an encrypted Realm is portable between systems with a different page size
-NONCONCURRENT_TEST(EncryptedFile_Portablility)
+TEST(EncryptedFile_NonPageAlignedMapping)
 {
-    const char* key = test_util::crypt_key(true);
-    // The idea here is to incrementally increase the allocations in the Realm
-    // such that the top ref written eventually crosses over the block_size and
-    // page_size() thresholds. This has caught faulty top_ref + size calculations.
-    std::vector<size_t> test_sizes;
-#if TEST_DURATION == 0
-    test_sizes.resize(100);
-    std::iota(test_sizes.begin(), test_sizes.end(), 500);
-    // The allocations are not controlled, but at the time of writing this test
-    // 539 objects produced a file of size 16384 while 540 objects produced a file of size 20480
-    // so at least one threshold is crossed here, though this may change if the allocator changes
-    // or if compression is implemented
-#else
-    test_sizes.resize(5000);
-    std::iota(test_sizes.begin(), test_sizes.end(), 500);
-#endif
+    TEST_PATH(path);
+    {
+        File f(path, File::mode_Write);
+        f.set_encryption_key(test_util::crypt_key(true));
+        f.resize(page_size() * 2);
+        // Since no power-of-two page size is a multiple of 11, one of these
+        // mapping will straddle a page
+        for (size_t pos = 0; pos + 10 <= page_size() * 2; pos += 11) {
+            File::Map<char> map(f, pos, File::access_ReadWrite, 10);
+            util::encryption_read_barrier(map, 0, 10);
+            for (int i = 0; i < 10; ++i)
+                map.get_addr()[i] = char(i + 1);
+            util::encryption_write_barrier(map, 0, 10);
+        }
+    }
+    {
+        File f(path, File::mode_Read);
+        f.set_encryption_key(test_util::crypt_key(true));
+        for (size_t pos = 0; pos + 17 <= page_size() * 2; pos += 7) {
+            File::Map<char> map(f, pos, File::access_ReadOnly, 6);
+            util::encryption_read_barrier(map, 0, 6);
+            for (int i = 0; i < 6; ++i)
+                CHECK_EQUAL(int(map.get_addr()[i]), (pos + i + 1) % 11);
+        }
+    }
+}
 
-    test_sizes.push_back(1); // check the lower limit
-    for (auto num_entries : test_sizes) {
-        TEST_PATH(path);
-        {
-            // create the Realm with the smallest supported page_size() of 4096
-            OnlyForTestingPageSizeChange change_page_size(4096);
-            Group g;
-            TableRef foo = g.add_table_with_primary_key("foo", type_String, "name", false);
-            for (size_t i = 0; i < num_entries; ++i) {
-                foo->create_object_with_primary_key(util::format("name %1", i));
+TEST(EncryptedFile_GapsOfNeverWrittenPages)
+{
+    constexpr size_t page_count = 128;
+    TEST_PATH(path);
+
+    // Write to every other page. Note that on 16k systems this is actually
+    // writing to 4 pages and then skipping 4 pages, which achieves the same
+    // goal.
+    {
+        File f(path, File::mode_Write);
+        f.set_encryption_key(test_util::crypt_key(true));
+        f.resize(page_size() * page_count);
+        for (size_t i = 0; i < page_count; i += 2) {
+            File::Map<char> map(f, i * page_size(), File::access_ReadWrite, page_size());
+            util::encryption_read_barrier(map, 0, page_size());
+            std::fill(map.get_addr(), map.get_addr() + map.get_size(), 1);
+            util::encryption_write_barrier(map, 0, page_size());
+        }
+    }
+
+    // Trying to read via a single large read barrier should fail since it
+    // includes never-written pages
+    {
+        File f(path, File::mode_Read);
+        f.set_encryption_key(test_util::crypt_key(true));
+        File::Map<char> map(f, 0, File::access_ReadOnly, page_count * page_size());
+        CHECK_THROW(util::encryption_read_barrier(map, 0, map.get_size()), DecryptionFailed);
+    }
+
+    // A single large read mapping that only has barriers for the written pages
+    // should work
+    {
+        File f(path, File::mode_Read);
+        f.set_encryption_key(test_util::crypt_key(true));
+        File::Map<char> map(f, 0, File::access_ReadOnly, page_count * page_size());
+        for (size_t i = 0; i < page_count; i += 2) {
+            util::encryption_read_barrier(map, i * page_size(), page_size());
+            for (size_t j = 0; j < page_size(); ++j) {
+                CHECK_EQUAL(int(map.get_addr()[i * page_size() + j]), 1);
             }
-            g.write(path, key);
-            // size_t fs = File::get_size_static(path);
-            // util::format(std::cout, "write of %1 objects produced a file of size %2\n", num_entries, fs);
-        }
-        {
-            OnlyForTestingPageSizeChange change_page_size(8192);
-            check_attach_and_read(key, path, num_entries);
-        }
-        {
-            OnlyForTestingPageSizeChange change_page_size(16384);
-            check_attach_and_read(key, path, num_entries);
         }
 
-        // check with the native page_size (which is probably redundant with one of the above)
-        // and check that a write works correctly
-        auto history = make_in_realm_history();
-        DBOptions options(key);
-        DBRef db = DB::create(*history, path, options);
-        auto wt = db->start_write();
-        TableRef bar = wt->get_or_add_table_with_primary_key("bar", type_String, "pk");
-        bar->create_object_with_primary_key("test");
-        wt->commit();
-        check_attach_and_read(key, path, num_entries);
+        // And reading the unwritten pages should throw
+        for (size_t i = 1; i < page_count; i += 2) {
+            CHECK_THROW(util::encryption_read_barrier(map, 0, map.get_size()), DecryptionFailed);
+        }
+    }
+
+    // Reading the whole thing via a write mapping should work, as those are
+    // allowed to see uninitialized data
+    {
+        File f(path, File::mode_Update);
+        f.set_encryption_key(test_util::crypt_key(true));
+        File::Map<char> map(f, 0, File::access_ReadWrite, page_count * page_size());
+        util::encryption_read_barrier(map, 0, map.get_size());
+
+        for (size_t i = 0; i < page_count; ++i) {
+            const int expected = (i + 1) % 2;
+            for (size_t j = 0; j < page_size(); ++j) {
+                CHECK_EQUAL(int(map.get_addr()[i * page_size() + j]), expected);
+            }
+        }
+        util::encryption_write_barrier(map, 0, map.get_size());
+    }
+}
+
+TEST(EncryptedFile_MultipleWriterMappings)
+{
+    const size_t count = 4096 * 64 * 2; // i.e. two metablocks of data
+    const size_t increments = 100;
+    TEST_PATH(path);
+
+    {
+        File w(path, File::mode_Write);
+        w.set_encryption_key(test_util::crypt_key(true));
+        w.resize(count);
+        File::Map<char> map1(w, File::access_ReadWrite, count);
+        File::Map<char> map2(w, File::access_ReadWrite, count);
+
+        for (size_t i = 0; i < count; i += increments) {
+            util::encryption_read_barrier(map1, i);
+            map1.get_addr()[i] = 1;
+            realm::util::encryption_write_barrier(map1, i);
+        }
+
+        // Since these are multiple mappings from one File, they should see
+        // each other's writes without flushing in between
+        for (size_t i = 0; i < count; i += increments) {
+            util::encryption_read_barrier(map1, i, 1);
+            ++map1.get_addr()[i];
+            realm::util::encryption_write_barrier(map1, i);
+            util::encryption_read_barrier(map2, i, 1);
+            ++map2.get_addr()[i];
+            realm::util::encryption_write_barrier(map2, i);
+        }
+    }
+
+    File reader(path, File::mode_Read);
+    reader.set_encryption_key(test_util::crypt_key(true));
+
+    File::Map<char> read(reader, File::access_ReadOnly, count);
+    util::encryption_read_barrier(read, 0, count);
+    for (size_t i = 0; i < count; i += increments) {
+        if (!CHECK_EQUAL(int(read.get_addr()[i]), 3))
+            return;
+    }
+}
+
+TEST(EncryptedFile_MultipleWriterFiles)
+{
+    const size_t count = 4096 * 64 * 2; // i.e. two metablocks of data
+    const size_t increments = 100;
+    TEST_PATH(path);
+
+    {
+        File w1(path, File::mode_Write);
+        w1.set_encryption_key(test_util::crypt_key(true));
+        w1.resize(count);
+        File::Map<char> map1(w1, File::access_ReadWrite, count);
+
+        File w2(path, File::mode_Update);
+        w2.set_encryption_key(test_util::crypt_key(true));
+        File::Map<char> map2(w2, File::access_ReadWrite, count);
+
+        for (size_t i = 0; i < count; i += increments) {
+            util::encryption_read_barrier(map1, i);
+            map1.get_addr()[i] = 1;
+            realm::util::encryption_write_barrier(map1, i);
+        }
+        map1.flush();
+
+        for (size_t i = 0; i < count; i += increments) {
+            util::encryption_read_barrier(map1, i, 1);
+            ++map1.get_addr()[i];
+            realm::util::encryption_write_barrier(map1, i);
+            map1.flush();
+            w2.get_encryption()->mark_data_as_possibly_stale();
+
+            util::encryption_read_barrier(map2, i, 1);
+            ++map2.get_addr()[i];
+            realm::util::encryption_write_barrier(map2, i);
+            map2.flush();
+            w1.get_encryption()->mark_data_as_possibly_stale();
+        }
+    }
+
+    File reader(path, File::mode_Read);
+    reader.set_encryption_key(test_util::crypt_key(true));
+
+    File::Map<char> read(reader, File::access_ReadOnly, count);
+    util::encryption_read_barrier(read, 0, count);
+    for (size_t i = 0; i < count; i += increments) {
+        if (!CHECK_EQUAL(int(read.get_addr()[i]), 3))
+            return;
+    }
+}
+
+TEST(EncryptedFile_MultipleReaders)
+{
+    const size_t count = 4096 * 64 * 2; // i.e. two metablocks of data
+    const size_t increments = 100;
+    TEST_PATH(path);
+
+    File w1(path, File::mode_Write);
+    w1.set_encryption_key(test_util::crypt_key(true));
+    w1.resize(count);
+    File::Map<char> map1(w1, File::access_ReadWrite, count);
+    File::Map<char> map2(w1, File::access_ReadOnly, count);
+
+    File w2(path, File::mode_Read);
+    w2.set_encryption_key(test_util::crypt_key(true));
+    File::Map<char> map3(w2, File::access_ReadOnly, count);
+
+    for (size_t i = 0; i < count; i += increments) {
+        util::encryption_read_barrier(map1, i);
+        map1.get_addr()[i] = 1;
+        realm::util::encryption_write_barrier(map1, i);
+    }
+    map1.flush();
+
+    // Bring both readers fully up to date
+    util::encryption_read_barrier(map2, 0, count);
+    util::encryption_read_barrier(map3, 0, count);
+
+    for (size_t i = 0; i < count; i += increments) {
+        util::encryption_read_barrier(map1, i, 1);
+        ++map1.get_addr()[i];
+        realm::util::encryption_write_barrier(map1, i);
+
+        // map1 sees the new value because the write was performed via it
+        // map2 was updated in the write barrier since it's the same File
+        // map3 is viewing stale data but hasn't been told to refresh
+        CHECK_EQUAL(map1.get_addr()[i], 2);
+        CHECK_EQUAL(map2.get_addr()[i], 2);
+        CHECK_EQUAL(map3.get_addr()[i], 1);
+
+        // Read barrier is a no-op because of no call to mark_data_as_possibly_stale()
+        util::encryption_read_barrier(map3, i, 1);
+        CHECK_EQUAL(map3.get_addr()[i], 1);
+
+        map1.flush(true);
+        w2.get_encryption()->mark_data_as_possibly_stale();
+
+        // Still see the old value since no read barrier
+        CHECK_EQUAL(map3.get_addr()[i], 1);
+
+        // Now finally brought up to date
+        util::encryption_read_barrier(map3, i, 1);
+        CHECK_EQUAL(map3.get_addr()[i], 2);
+    }
+}
+
+TEST(EncryptedFile_IVsAreRereadOnlyWhenObserverIsPresent)
+{
+    TEST_PATH(path);
+    const size_t page_size = 4096;
+    const size_t size = page_size * 64;
+    File w(path, File::mode_Write);
+    w.set_encryption_key(test_util::crypt_key(true));
+    w.resize(size);
+
+    // Initialize all of the pages so iv1 is non-zero
+    File::Map<char> map_w(w, File::access_ReadWrite, size);
+    encryption_read_barrier(map_w, 0, size);
+    encryption_write_barrier(map_w, 0, size);
+    map_w.flush();
+
+    File r(path, File::mode_Read);
+    r.set_encryption_key(test_util::crypt_key(true));
+    File::Map<char> map_r1(r, File::access_ReadOnly, size);
+    File::Map<char> map_r2(r, File::access_ReadOnly, size);
+    File::Map<char> map_r3(r, File::access_ReadOnly, size);
+
+    struct : WriteObserver {
+        bool no_concurrent_writer_seen() override
+        {
+            return true;
+        }
+    } r2_observer;
+    map_r2.get_encrypted_mapping()->set_observer(&r2_observer);
+
+    struct : WriteObserver {
+        bool no_concurrent_writer_seen() override
+        {
+            return false;
+        }
+    } r3_observer;
+    map_r3.get_encrypted_mapping()->set_observer(&r3_observer);
+
+    // Reads the entire IV block and first page of data
+    encryption_read_barrier(map_r1, 0, page_size);
+    encryption_read_barrier(map_r2, 0, page_size);
+    encryption_read_barrier(map_r3, 0, page_size);
+
+    encryption_read_barrier(map_w, page_size, size - page_size);
+    encryption_write_barrier(map_w, page_size, size - page_size);
+    map_w.flush();
+
+    // No observer, so it uses the cached IV/hmac
+    CHECK_THROW(encryption_read_barrier(map_r1, page_size, 1), DecryptionFailed);
+    // Observer says no concurrent writers, so it uses the cached IV/hmac
+    CHECK_THROW(encryption_read_barrier(map_r2, page_size, 1), DecryptionFailed);
+    // Observer says there are concurrent writers, so it rereads the IV after
+    // decryption fails the first time
+    encryption_read_barrier(map_r3, page_size, 1);
+}
+
+TEST(EncryptedFile_Truncation)
+{
+    TEST_PATH(path);
+    const size_t page_size = 4096;
+    const size_t size = page_size * 64;
+    File w(path, File::mode_Write);
+    w.set_encryption_key(test_util::crypt_key(true));
+    w.resize(size);
+
+    {
+        // Initialize all of the pages so iv1 is non-zero
+        File::Map<char> map(w, File::access_ReadWrite, size);
+        encryption_read_barrier(map, 0, size);
+        encryption_write_barrier(map, 0, size);
+    }
+
+    // Truncate and then re-expand the file
+    w.resize(size / 2);
+    w.resize(size);
+
+    {
+        File::Map<char> map(w, File::access_ReadOnly, size);
+        // Trying to read the entire file fails because it's trying to read
+        // uninitialized data
+        CHECK_THROW(encryption_read_barrier(map, 0, size), DecryptionFailed);
+        // Reading just the valid part works
+        CHECK_NOTHROW(encryption_read_barrier(map, 0, size / 2));
+    }
+
+    {
+        // Write mapping can read the entire file
+        File::Map<char> map(w, File::access_ReadWrite, size);
+        encryption_read_barrier(map, 0, size);
+        encryption_write_barrier(map, 0, size);
+    }
+}
+
+TEST(EncryptedFile_RacingReadAndWrite)
+{
+    TEST_PATH(path);
+    static constexpr size_t page_size = 4096;
+    static constexpr size_t page_count = 64;
+    static constexpr size_t size = page_size * page_count;
+
+    {
+        // Initialize the file
+        File w(path, File::mode_Write);
+        w.set_encryption_key(test_util::crypt_key(true));
+        w.resize(size);
+        File::Map<char> map(w, File::access_ReadWrite, size);
+        encryption_read_barrier(map, 0, size);
+        encryption_write_barrier(map, 0, size);
+        map.flush();
+    }
+
+    File w(path, File::mode_Update);
+    // note: not setting encryption key
+    // Flip some bits in the encrypted file to make it invalid
+    for (File::SizeType pos = int(page_size); pos < w.get_size(); pos += page_size) {
+        char c;
+        w.read(pos, &c, 1);
+        c = ~c;
+        w.write(pos, &c, 1);
+    }
+
+    struct : WriteObserver {
+        size_t page = 0;
+        size_t count = 0;
+        AESCryptor cryptor{test_util::crypt_key(true)};
+        util::File* file;
+
+        bool no_concurrent_writer_seen() override
+        {
+            // The first 15 read attempts we modify the page so that it
+            // continues trying to reread past the normal limit of 5 attempts,
+            // but we continue to leave the page in an invalid state
+            if (++count < 15) {
+                auto pos = (page + 1) * page_size + 1;
+                char c;
+                file->read(pos, &c, 1);
+                ++c;
+                file->write(pos, &c, 1);
+                return false;
+            }
+
+            // Now we write valid encrypted data which will result in the
+            // decryption succeeding
+            count = 0;
+            char buffer[page_size] = {0};
+            cryptor.write(file->get_descriptor(), page * page_size, buffer);
+            return false;
+        }
+    } observer;
+    observer.file = &w;
+    observer.cryptor.set_data_size(File::SizeType(size));
+
+    File r(path, File::mode_Read);
+    r.set_encryption_key(test_util::crypt_key(true));
+    for (size_t i = 0; i < page_count; ++i) {
+        observer.page = i;
+        File::Map<char> map(r, i * page_size);
+        map.get_encrypted_mapping()->set_observer(&observer);
+        util::encryption_read_barrier(map, 0);
     }
 }
 

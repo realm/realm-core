@@ -1,14 +1,5 @@
 # ThreadSanitizer suppressions file for realm-core
 
-# `AESCryptor::read()` and`copy_up_to_date_page()` copy entire pages.
-# They may overwrite something which
-# is being read concurrently. The reason it is benign, is that whenever there is a
-# race, it overwrites with the same value as is already there, so the reader sees
-# the correct value. This is all by design.
-
-race:realm::util::AESCryptor::read
-race:realm::util::EncryptedFileMapping::copy_up_to_date_page
-
 # Avoid a false positive instance of lock-order-inversion.
 # SyncManager::m_sessions_mutex and SyncSession::m_state_mutex are locked
 # in this order when a SyncSession is created, and in reverse order when

@@ -1577,16 +1577,6 @@ uint64_t Table::allocate_sequence_number()
     return sn;
 }
 
-void Table::set_sequence_number(uint64_t seq)
-{
-    m_top.set(top_position_for_sequence_number, RefOrTagged::make_tagged(seq));
-}
-
-void Table::set_collision_map(ref_type ref)
-{
-    m_top.set(top_position_for_collision_map, RefOrTagged::make_ref(ref));
-}
-
 void Table::set_col_key_sequence_number(uint64_t seq)
 {
     m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(seq));
@@ -2253,8 +2243,10 @@ Obj Table::create_linked_object()
 
     GlobalKey object_id = allocate_object_id_squeezed();
     ObjKey key = object_id.get_local_key(get_sync_file_id());
-
     REALM_ASSERT(key.value >= 0);
+
+    if (auto repl = get_repl())
+        repl->create_linked_object(this, key);
 
     Obj obj = m_clusters.insert(key, {});
 

@@ -201,7 +201,7 @@ bool json_test(std::string json, std::string expected_file, bool generate)
             std::string path = file_name + "bad_" + expected_file + ".json";
             std::string pathOld = "bad_" + file_name;
             File out(path, File::mode_Write);
-            out.write(json);
+            out.write(0, json);
             std::cerr << "\n error result in '" << std::string(path) << "'\n";
             return false;
         }

@@ -171,7 +171,7 @@ protected:
     // into equal chunks.
     struct RefTranslation {
         char* mapping_addr;
-        uint64_t cookie;
+        uint64_t cookie = 0x1234567890;
         std::atomic<size_t> lowest_possible_xover_offset = 0;
 
         // member 'xover_mapping_addr' is used for memory synchronization of the fields
@@ -183,14 +183,12 @@ protected:
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* encrypted_mapping = nullptr;
         util::EncryptedFileMapping* xover_encrypted_mapping = nullptr;
+#else
+        static inline util::EncryptedFileMapping* const encrypted_mapping = nullptr;
+        static inline util::EncryptedFileMapping* const xover_encrypted_mapping = nullptr;
 #endif
-        explicit RefTranslation(char* addr)
+        explicit RefTranslation(char* addr = nullptr)
             : mapping_addr(addr)
-            , cookie(0x1234567890)
-        {
-        }
-        RefTranslation()
-            : RefTranslation(nullptr)
         {
         }
         ~RefTranslation()
@@ -222,7 +220,7 @@ protected:
     };
     // This pointer may be changed concurrently with access, so make sure it is
     // atomic!
-    std::atomic<RefTranslation*> m_ref_translation_ptr;
+    std::atomic<RefTranslation*> m_ref_translation_ptr{nullptr};
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -252,7 +250,7 @@ protected:
     char* translate_critical(RefTranslation*, ref_type ref) const noexcept;
     char* translate_less_critical(RefTranslation*, ref_type ref) const noexcept;
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) = 0;
-    Allocator() noexcept;
+    Allocator() noexcept = default;
     size_t get_section_index(size_t pos) const noexcept;
     inline size_t get_section_base(size_t index) const noexcept;
 
@@ -271,11 +269,9 @@ protected:
     //   used to detect if the allocator (and owning structure, e.g. Table)
     //   is recycled. Mismatch on this counter will cause accesors
     //   lower in the hierarchy to throw if access is attempted.
-    std::atomic<uint_fast64_t> m_content_versioning_counter;
-
-    std::atomic<uint_fast64_t> m_storage_versioning_counter;
-
-    std::atomic<uint_fast64_t> m_instance_versioning_counter;
+    std::atomic<uint_fast64_t> m_content_versioning_counter{0};
+    std::atomic<uint_fast64_t> m_storage_versioning_counter{0};
+    std::atomic<uint_fast64_t> m_instance_versioning_counter{0};
 
     inline uint_fast64_t get_storage_version(uint64_t instance_version)
     {
@@ -547,14 +543,6 @@ inline bool Allocator::is_read_only(ref_type ref) const noexcept
     return ref < m_baseline.load(std::memory_order_relaxed);
 }
 
-inline Allocator::Allocator() noexcept
-{
-    m_content_versioning_counter = 0;
-    m_storage_versioning_counter = 0;
-    m_instance_versioning_counter = 0;
-    m_ref_translation_ptr = nullptr;
-}
-
 // performance critical part of the translation process. Less critical code is in translate_less_critical.
 inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
 {
@@ -566,30 +554,23 @@ inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, 
         if (REALM_LIKELY(offset < lowest_possible_xover_offset)) {
             // the lowest possible xover offset may grow concurrently, but that will not affect this code path
             char* addr = txl.mapping_addr + offset;
-#if REALM_ENABLE_ENCRYPTION
-            realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
-                                                 NodeHeader::get_byte_size_from_header);
-#endif
+            util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping);
+            size_t size = NodeHeader::get_byte_size_from_header(addr);
+            util::encryption_read_barrier(addr, size, txl.encrypted_mapping);
             return addr;
         }
-        else {
-            // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
-            return translate_less_critical(ref_translation_ptr, ref);
-        }
+        // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
+        return translate_less_critical(ref_translation_ptr, ref);
     }
     realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890, ref, idx);
-    return nullptr;
 }
 
 inline char* Allocator::translate(ref_type ref) const noexcept
 {
-    auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire);
-    if (REALM_LIKELY(ref_translation_ptr)) {
-        return translate_critical(ref_translation_ptr, ref);
+    if (auto ptr = m_ref_translation_ptr.load(std::memory_order_acquire); REALM_LIKELY(ptr)) {
+        return translate_critical(ptr, ref);
     }
-    else {
-        return do_translate(ref);
-    }
+    return do_translate(ref);
 }
 
 
