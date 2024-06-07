@@ -1,13 +1,11 @@
-# NEXT RELEASE
+# 14.10.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Include the originating client reset error in AutoClientResetFailure errors. ([#7761](https://github.com/realm/realm-core/pull/7761))
 * Reduce the size of the local transaction log produced by creating objects, improving the performance of insertion-heavy transactions ([PR #7734](https://github.com/realm/realm-core/pull/7734)).
 * Add support for server initiated bootstraps. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix some client resets (such as migrating to flexible sync) potentially failing with AutoClientResetFailed if a new client reset condition (such as rolling back a flexible sync migration) occurred before the first one completed. ([PR #7542](https://github.com/realm/realm-core/pull/7542), since v13.11.0)
 * Encrypted files on Windows had a maximum size of 2GB even on x64 due to internal usage of `off_t`, which is a 32-bit type on 64-bit Windows ([PR #7698](https://github.com/realm/realm-core/pull/7698), since the introduction of encryption support on Windows in v3.0.0).
 * The encryption code no longer behaves differently depending on the system page size, which should entirely eliminate a recurring source of bugs related to copying encrypted Realm files between platforms with different page sizes. One known outstanding bug was ([RNET-1141](https://github.com/realm/realm-dotnet/issues/3592)), where opening files on a system with a larger page size than the writing system would attempt to read sections of the file which had never been written to ([PR #7698](https://github.com/realm/realm-core/pull/7698)).
