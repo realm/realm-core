@@ -3907,6 +3907,7 @@ TEST(Query_DateRange)
         for (int nano = 0; nano < 5; nano++) {
             table.create_object().set(col_date, Timestamp(sec, nano));
         }
+        table.create_object();
     }
 
     CHECK_EQUAL(table.where().between(col_date, Timestamp(100, 1), Timestamp(100, 1)).count(), 1);

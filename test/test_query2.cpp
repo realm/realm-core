@@ -208,6 +208,10 @@ TEST_TYPES(Query_FindAllBetween, std::true_type, std::false_type)
     ttt.create_object().set_all(5, 11, "X");
     ttt.create_object().set_all(6, 3, "X");
 
+    Query q1 = ttt.where().between(col_int, 100, 200);
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(tv1.size(), 0);
+
     Query q2 = ttt.where().between(col_int, 3, 5);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(tv2.size(), 4);

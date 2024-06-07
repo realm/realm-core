@@ -31,11 +31,13 @@ Mixed ArrayInteger::get_any(size_t ndx) const
 
 size_t ArrayInteger::find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const
 {
-    while (start < end) {
-        auto val = get(start);
-        if (from <= val && val <= to)
-            return start;
-        start++;
+    if (m_ubound >= from && m_lbound <= to) {
+        while (start < end) {
+            auto val = get(start);
+            if (from <= val && val <= to)
+                return start;
+            start++;
+        }
     }
     return realm::not_found;
 }
@@ -190,10 +192,12 @@ size_t ArrayIntNull::find_first(value_type value, size_t begin, size_t end) cons
 
 size_t ArrayIntNull::find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const
 {
-    for (size_t i = start; i < end; i++) {
-        auto val = get(i);
-        if (val && *val >= from && *val <= to)
-            return i;
+    if (m_ubound >= from && m_lbound <= to) {
+        for (size_t i = start; i < end; i++) {
+            auto val = get(i);
+            if (val && *val >= from && *val <= to)
+                return i;
+        }
     }
     return realm::not_found;
 }

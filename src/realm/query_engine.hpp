@@ -416,6 +416,8 @@ public:
         , m_from(std::move(from))
         , m_to(std::move(to))
     {
+        if (is_null(from) || is_null(to))
+            throw InvalidArgument("'from' or 'to' must not be null");
     }
 
     BetweenNode(const BetweenNode& from)
@@ -440,7 +442,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        return m_leaf->template find_first_in_range(m_from, m_to, start, end);
+        return m_leaf->find_first_in_range(m_from, m_to, start, end);
     }
 
     std::string describe(util::serializer::SerialisationState& state) const override
