@@ -5015,7 +5015,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     };
     TestingStateMachine<TestState> state_machina(TestState::not_ready);
     int64_t query_version = 0;
-    bool did_client_reset = false;
     BootstrapMode bootstrap_mode = BootstrapMode::None;
     size_t download_msg_count = 0;
     size_t bootstrap_msg_count = 0;
@@ -5025,7 +5024,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
     auto setup_harness = [&](FLXSyncTestHarness& harness, TestParams params) {
         auto& app_session = harness.session().app_session();
-        /** TODO: Remove when switching to use Protocol version in RCORE-1972 */
+        /** TODO: Remove once the server has been updated to use the protocol version */
         // Enable the role change bootstraps
         REQUIRE(
             app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
@@ -5150,7 +5149,9 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
 
         // Add client reset callback to verify a client reset doesn't happen
         config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
-            did_client_reset = true;
+            // Make sure a client reset did not occur while waiting for the role change to
+            // be applied
+            FAIL("Client reset is not expected when the role/rules/permissions are changed");
         };
     };
 
@@ -5199,7 +5200,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         // Reset the state machine
         state_machina.transition_with([&](TestState cur_state) {
             REQUIRE(cur_state == TestState::not_ready);
-            did_client_reset = false;
             bootstrap_msg_count = 0;
             download_msg_count = 0;
             role_change_bootstrap = false;
@@ -5240,19 +5240,16 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                     // Confirm that the session did receive an error and a bootstrap did not occur
                     REQUIRE(cur_state == TestState::start);
                     REQUIRE_FALSE(role_change_bootstrap);
-                    REQUIRE_FALSE(did_client_reset);
                     break;
                 case BootstrapMode::None:
                     // Confirm that a bootstrap nor a client reset did not occur
                     REQUIRE(cur_state == TestState::reconnect_received);
                     REQUIRE_FALSE(role_change_bootstrap);
-                    REQUIRE_FALSE(did_client_reset);
                     break;
                 case BootstrapMode::Any:
                     // Doesn't matter which one, just that a bootstrap occurred and not a client reset
                     REQUIRE(cur_state == TestState::complete);
                     REQUIRE(role_change_bootstrap);
-                    REQUIRE_FALSE(did_client_reset);
                     break;
                 default:
                     // By the time the MARK response is received and wait_for_download()
@@ -5267,9 +5264,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                     else if (expected.bootstrap == BootstrapMode::MultiMessage) {
                         REQUIRE(bootstrap_msg_count > 1);
                     }
-                    // Make sure a client reset did not occur while waiting for the role change to
-                    // be applied
-                    REQUIRE_FALSE(did_client_reset);
                     break;
             }
             return std::nullopt; // Don't transition
