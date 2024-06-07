@@ -706,17 +706,18 @@ TEST(Query_NextGenSyntaxMonkey0)
     }
 }
 
-TEST(Query_NextGenSyntaxMonkey)
+TEST_TYPES(Query_NextGenSyntaxMonkey, std::true_type, std::false_type)
 {
+    static const bool nullable = TEST_TYPE::value;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows = 1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
                                                             (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
-        auto col_int0 = table.add_column(type_Int, "first");
-        auto col_int1 = table.add_column(type_Int, "second");
-        auto col_int2 = table.add_column(type_Int, "third");
+        auto col_int0 = table.add_column(type_Int, "first", nullable);
+        auto col_int1 = table.add_column(type_Int, "second", nullable);
+        auto col_int2 = table.add_column(type_Int, "third", nullable);
 
         for (size_t r = 0; r < rows; r++) {
             Obj obj = table.create_object();

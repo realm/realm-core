@@ -577,11 +577,6 @@ public:
             else if (m_index_evaluator) {
                 return m_index_evaluator->do_search_index(BaseType::m_cluster, start, end);
             }
-            else if (end - start == 1) {
-                if (this->m_leaf->get(start) == this->m_value) {
-                    s = start;
-                }
-            }
             else {
                 s = this->m_leaf->template find_first<Equal>(this->m_value, start, end);
             }
