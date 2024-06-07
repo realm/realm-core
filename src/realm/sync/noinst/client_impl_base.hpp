@@ -1467,8 +1467,8 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
         ++m_target_download_mark;
     }
 
-    // Call SessionResumed before sending the BIND Message to
-    // allow adding a test command between BIND and IDENT messages
+    // Notify the debug hook of the SessionConnected event before sending
+    // the bind messsage
     call_debug_hook(SyncClientHookEvent::SessionConnected);
 
     if (!m_suspended) {
@@ -1541,8 +1541,8 @@ inline void ClientImpl::Session::initiate_rebind()
 
     reset_protocol_state();
 
-    // Call SessionResumed before sending the BIND Message to
-    // allow adding a test command between BIND and IDENT messages
+    // Notify the debug hook of the SessionResumed event before sending
+    // the bind messsage
     call_debug_hook(SyncClientHookEvent::SessionResumed);
 
     // Ready to send BIND message
