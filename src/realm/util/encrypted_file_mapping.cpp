@@ -377,7 +377,7 @@ bool AESCryptor::constant_time_equals(const Hmac& a, const Hmac& b) const
 {
     // Constant-time memcmp to avoid timing attacks
     uint8_t result = 0;
-    for (size_t i = 0; i < 224 / 8; ++i)
+    for (size_t i = 0; i < a.size(); ++i)
         result |= a[i] ^ b[i];
     return result == 0;
 }
@@ -404,7 +404,7 @@ void AESCryptor::invalidate_ivs() noexcept
 AESCryptor::ReadResult AESCryptor::read(FileDesc fd, SizeType pos, char* dst, WriteObserver* observer)
 {
     uint32_t iv = 0;
-    Hmac hmac{};
+    Hmac hmac;
     // We're in a single-process scenario (or other processes are only reading),
     // so we can trust our in-memory caches and never need to retry
     if (!observer || observer->no_concurrent_writer_seen()) {
@@ -475,12 +475,12 @@ AESCryptor::ReadResult AESCryptor::attempt_read(FileDesc fd, SizeType pos, char*
     IVTable& iv = get_iv_table(fd, pos, iv_mode);
     iv_out = iv.iv1;
     if (iv.iv1 == 0) {
-        std::fill(hmac.begin(), hmac.end(), 0);
+        hmac.fill(0);
         return ReadResult::Uninitialized;
     }
 
     size_t actual = check_read(fd, data_pos_to_file_pos(pos), m_rw_buffer.get());
-    if (actual == 0) {
+    if (actual < encryption_page_size) {
         return ReadResult::Eof;
     }
 
