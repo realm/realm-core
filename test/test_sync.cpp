@@ -2927,65 +2927,80 @@ TEST(Sync_UploadDownloadProgress_1)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    std::atomic<uint_fast64_t> downloaded_bytes;
-    std::atomic<uint_fast64_t> downloadable_bytes;
-    std::atomic<uint_fast64_t> uploaded_bytes;
-    std::atomic<uint_fast64_t> uploadable_bytes;
-    std::atomic<uint_fast64_t> snapshot_version;
-    {
-        int handler_entry = 0;
+    struct ProgressInfo {
+        uint64_t downloaded_bytes = 0;
+        uint64_t downloadable_bytes = 0;
+        uint64_t uploaded_bytes = 0;
+        uint64_t uploadable_bytes = 0;
+        uint64_t snapshot_version = 0;
+    };
 
+    ProgressInfo first_run_progress;
+
+    {
         ClientServerFixture fixture(server_dir, test_context);
         fixture.start();
 
         Session::Config config;
+        std::mutex progress_mutex;
+        std::condition_variable progress_cv;
+        std::optional<ProgressInfo> observed_progress;
+        auto wait_for_progress_info = [&] {
+            std::unique_lock lk(progress_mutex);
+            progress_cv.wait(lk, [&] {
+                return observed_progress;
+            });
+            auto ret = std::exchange(observed_progress, std::optional<ProgressInfo>{});
+            return *ret;
+        };
         config.progress_handler = [&](uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
                                       uint64_t uploadable, uint64_t snapshot, double, double, int64_t) {
-            downloaded_bytes = downloaded;
-            downloadable_bytes = downloadable;
-            uploaded_bytes = uploaded;
-            uploadable_bytes = uploadable;
-            snapshot_version = snapshot;
-            ++handler_entry;
+            std::lock_guard lk(progress_mutex);
+            observed_progress = ProgressInfo{downloaded, downloadable, uploaded, uploadable, snapshot};
+            progress_cv.notify_one();
         };
 
-        auto pf = util::make_promise_future();
-        config.connection_state_change_listener = [&](ConnectionState state, util::Optional<ErrorInfo>) {
-            if (state == ConnectionState::connected) {
-                pf.promise.emplace_value();
-            }
-        };
 
         Session session = fixture.make_session(db, "/test", std::move(config));
-        pf.future.get();
-        CHECK_EQUAL(handler_entry, 0);
+        auto progress_info = wait_for_progress_info();
+
+        CHECK_EQUAL(progress_info.downloaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.downloadable_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.uploaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.uploadable_bytes, uint_fast64_t(0));
+        CHECK_GREATER_EQUAL(progress_info.snapshot_version, 1);
 
         auto commit_version = write_transaction(db, [](WriteTransaction& wt) {
-            wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
+            auto tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
+            tr->add_column(type_Int, "integer column");
         });
 
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
 
-        CHECK_EQUAL(downloaded_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(downloadable_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploaded_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
-        CHECK_GREATER_EQUAL(snapshot_version, commit_version);
-
+        auto old_progress_info = progress_info;
+        progress_info = wait_for_progress_info();
+        CHECK_EQUAL(progress_info.downloaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.downloadable_bytes, uint_fast64_t(0));
+        CHECK_GREATER(progress_info.uploaded_bytes, old_progress_info.uploaded_bytes);
+        CHECK_GREATER(progress_info.uploadable_bytes, old_progress_info.uploadable_bytes);
+        CHECK_GREATER_EQUAL(progress_info.snapshot_version, commit_version);
 
         commit_version = write_transaction(db, [](WriteTransaction& wt) {
-            wt.get_table("class_table")->create_object_with_primary_key(1);
+            wt.get_table("class_table")->create_object_with_primary_key(1).set("integer column", 42);
         });
 
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
 
-        CHECK_EQUAL(downloaded_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(downloadable_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploaded_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
-        CHECK_GREATER_EQUAL(snapshot_version, commit_version);
+        old_progress_info = progress_info;
+        progress_info = wait_for_progress_info();
+        CHECK_EQUAL(progress_info.downloaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.downloadable_bytes, uint_fast64_t(0));
+        CHECK_GREATER(progress_info.uploaded_bytes, old_progress_info.uploaded_bytes);
+        CHECK_GREATER(progress_info.uploadable_bytes, old_progress_info.uploadable_bytes);
+        CHECK_GREATER_EQUAL(progress_info.snapshot_version, commit_version);
+        first_run_progress = progress_info;
     }
 
     {
@@ -2998,24 +3013,20 @@ TEST(Sync_UploadDownloadProgress_1)
         fixture.start();
 
         int number_of_handler_calls = 0;
-
         auto pf = util::make_promise_future<int>();
         Session::Config config;
         config.progress_handler = [&](uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
                                       uint64_t uploadable, uint64_t snapshot, double, double, int64_t) {
-            CHECK_EQUAL(downloaded, downloaded_bytes);
-            CHECK_EQUAL(downloadable, downloaded_bytes);
-            CHECK_EQUAL(uploaded, uploaded_bytes);
-            CHECK_GREATER(uploadable, uploaded_bytes);
-            CHECK_GREATER(snapshot, snapshot_version);
+            CHECK_EQUAL(downloaded, first_run_progress.downloaded_bytes);
+            CHECK_EQUAL(downloadable, first_run_progress.downloadable_bytes);
+            CHECK_EQUAL(uploaded, first_run_progress.uploaded_bytes);
+            CHECK_EQUAL(uploadable, first_run_progress.uploadable_bytes);
+            CHECK_GREATER(snapshot, first_run_progress.snapshot_version);
             number_of_handler_calls++;
             pf.promise.emplace_value(number_of_handler_calls);
         };
 
         Session session = fixture.make_session(db, "/test", std::move(config));
-        write_transaction(db, [](WriteTransaction& wt) {
-            wt.get_table("class_table")->create_object_with_primary_key(2);
-        });
         CHECK_EQUAL(pf.future.get(), 1);
     }
 }
