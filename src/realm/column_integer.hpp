@@ -149,7 +149,7 @@ public:
             init_from_ref(ref);
     }
 
-    int64_t back()
+    int64_t back() const
     {
         return get(size() - 1);
     }

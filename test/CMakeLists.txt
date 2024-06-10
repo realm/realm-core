@@ -69,6 +69,7 @@ set(CORE_TEST_SOURCES
     test_mixed_null_assertions.cpp
     test_object_id.cpp
     test_priority_queue.cpp
+    test_radix_tree.cpp
     test_replication.cpp
     test_safe_int_ops.cpp
     test_self.cpp
