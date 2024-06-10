@@ -23,6 +23,8 @@ jobs:
       - name: Change Version
         run: tools/release-init.sh ${{ inputs.version }}
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # the gh command in the release script requires this token
       - name: Create Release PR
         id: prepare-pr
         uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e #! 6.0.5
@@ -30,7 +32,7 @@ jobs:
           branch: release/automated_v${{ inputs.version }}
           title: Prepare for ${{ inputs.version }}
           draft: false
-          body-path: changes-since-last-tag.txt
+          body-path: pr-body.txt
           labels: no-jira-ticket
           commit-message: Prepare for release ${{ inputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}

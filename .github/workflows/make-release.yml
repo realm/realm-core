@@ -12,6 +12,9 @@ jobs:
   finish_release:
     if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/automated_v')
     runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: ${{ steps.publish-github-release.outputs.html_url }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -29,6 +32,7 @@ jobs:
       shell: bash
     - name: Make Tag and Publish Github Release
       uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5 #! 1.14.0
+      id: publish-github-release
       with:
         bodyFile: extracted_changelog.md
         name: Realm Core v${{ steps.get-version.outputs.version }}

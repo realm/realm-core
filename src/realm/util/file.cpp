@@ -20,6 +20,7 @@
 
 #include <realm/unicode.hpp>
 #include <realm/util/errno.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/file_mapper.hpp>
 
 #include <algorithm>
@@ -49,27 +50,13 @@
 
 using namespace realm::util;
 
-namespace {
-constexpr size_t c_min_supported_page_size = 4096;
-size_t get_page_size()
-{
-#ifdef _WIN32
-    SYSTEM_INFO sysinfo;
-    GetNativeSystemInfo(&sysinfo);
-    // DWORD size = sysinfo.dwPageSize;
-    // On windows we use the allocation granularity instead
-    DWORD size = sysinfo.dwAllocationGranularity;
-#else
-    long size = sysconf(_SC_PAGESIZE);
+#ifndef _WIN32
+// All mainstream platforms other than Windows migrated to 64-bit off_t many
+// years ago. Supporting 32-bit off_t is possible, but not currently implemented.
+static_assert(sizeof(off_t) == 8 || sizeof(size_t) == 4);
 #endif
-    REALM_ASSERT(size > 0 && size % c_min_supported_page_size == 0);
-    return static_cast<size_t>(size);
-}
 
-// This variable exists such that page_size() can return the page size without having to make any system calls.
-// It could also have been a static local variable, but Valgrind/Helgrind gives a false error on that.
-std::atomic<size_t> cached_page_size = get_page_size();
-
+namespace {
 bool for_each_helper(const std::string& path, const std::string& dir, realm::util::File::ForEachHandler& handler)
 {
     using File = realm::util::File;
@@ -412,25 +399,64 @@ std::string make_temp_file(const char* prefix)
 
 size_t page_size()
 {
-    return cached_page_size.load(std::memory_order::memory_order_relaxed);
+    static constexpr size_t c_min_supported_page_size = 4096;
+    static size_t page_size = [] {
+#ifdef _WIN32
+        SYSTEM_INFO sysinfo;
+        GetNativeSystemInfo(&sysinfo);
+        // DWORD size = sysinfo.dwPageSize;
+        // On windows we use the allocation granularity instead
+        DWORD size = sysinfo.dwAllocationGranularity;
+#else
+        long size = sysconf(_SC_PAGESIZE);
+#endif
+        REALM_ASSERT(size > 0 && size % c_min_supported_page_size == 0);
+        return static_cast<size_t>(size);
+    }();
+    return page_size;
 }
 
-OnlyForTestingPageSizeChange::OnlyForTestingPageSizeChange(size_t new_page_size)
+File::File() = default;
+File::File(std::string_view path, Mode m)
 {
-    REALM_ASSERT(new_page_size % c_min_supported_page_size == 0);
-    cached_page_size = new_page_size;
+    open(path, m);
 }
 
-OnlyForTestingPageSizeChange::~OnlyForTestingPageSizeChange()
+File::~File() noexcept
 {
-    cached_page_size = get_page_size();
+    close();
 }
 
-void File::open_internal(const std::string& path, AccessMode a, CreateMode c, int flags, bool* success)
+File::File(File&& f) noexcept
+{
+    m_fd = std::exchange(f.m_fd, invalid_fd);
+#ifdef REALM_FILELOCK_EMULATION
+    m_pipe_fd = std::exchange(f.m_pipe_fd, invalid_fd);
+    m_has_exclusive_lock = std::exchange(f.m_has_exclusive_lock, false);
+#endif
+    m_have_lock = std::exchange(f.m_have_lock, false);
+    m_encryption = std::move(f.m_encryption);
+}
+
+File& File::operator=(File&& f) noexcept
+{
+    close();
+
+    m_fd = std::exchange(f.m_fd, invalid_fd);
+#ifdef REALM_FILELOCK_EMULATION
+    m_pipe_fd = std::exchange(f.m_pipe_fd, invalid_fd);
+    m_has_exclusive_lock = std::exchange(f.m_has_exclusive_lock, false);
+#endif
+    m_have_lock = std::exchange(f.m_have_lock, false);
+    m_encryption = std::move(f.m_encryption);
+    return *this;
+}
+
+
+void File::open_internal(std::string_view path, AccessMode a, CreateMode c, int flags, bool* success)
 {
     REALM_ASSERT_RELEASE(!is_attached());
     m_path = path; // for error reporting and debugging
-    m_cached_unique_id = {};
 
 #ifdef _WIN32 // Windows version
 
@@ -464,9 +490,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
     }
     DWORD flags_and_attributes = 0;
-    HANDLE handle = CreateFile2(u8path(path).c_str(), desired_access, share_mode, creation_disposition, nullptr);
-    if (handle != INVALID_HANDLE_VALUE) {
-        m_fd = handle;
+    m_fd = CreateFile2(u8path(m_path).c_str(), desired_access, share_mode, creation_disposition, nullptr);
+    if (m_fd != INVALID_HANDLE_VALUE) {
         m_have_lock = false;
         if (success)
             *success = true;
@@ -486,14 +511,14 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
-            throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, int(err));
+            throw FileAccessError(ErrorCodes::PermissionDenied, msg, m_path, int(err));
         case ERROR_FILE_NOT_FOUND:
         case ERROR_PATH_NOT_FOUND:
-            throw FileAccessError(ErrorCodes::FileNotFound, msg, path, int(err));
+            throw FileAccessError(ErrorCodes::FileNotFound, msg, m_path, int(err));
         case ERROR_FILE_EXISTS:
-            throw Exists(msg, path);
+            throw Exists(msg, m_path);
         default:
-            throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, int(err));
+            throw FileAccessError(ErrorCodes::FileOperationFailed, msg, m_path, int(err));
     }
 
 #else // POSIX version
@@ -521,7 +546,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         flags2 |= O_TRUNC;
     if (flags & flag_Append)
         flags2 |= O_APPEND;
-    int fd = ::open(path.c_str(), flags2, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    int fd = ::open(m_path.c_str(), flags2, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
         m_have_lock = false;
@@ -551,7 +576,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
                 msg = util::format("Failed to open file at path '%1': parent directory does not exist", path);
             throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
         case EEXIST:
-            throw Exists(msg, path);
+            throw Exists(msg, m_path);
         case ENOTDIR:
             msg = format("Failed to open file at path '%1': parent path is not a directory", path);
             [[fallthrough]];
@@ -565,57 +590,23 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
 
 void File::close() noexcept
 {
-#ifdef _WIN32 // Windows version
-
-    if (!m_fd)
+    m_encryption.reset();
+    if (m_fd == invalid_fd)
         return;
     if (m_have_lock)
         unlock();
-
+#ifdef _WIN32 // Windows version
     BOOL r = CloseHandle(m_fd);
     REALM_ASSERT_RELEASE(r);
-    m_fd = nullptr;
-
 #else // POSIX version
-
-    if (m_fd < 0)
-        return;
-    if (m_have_lock)
-        unlock();
     int r = ::close(m_fd);
     REALM_ASSERT_RELEASE(r == 0);
-    m_fd = -1;
-
 #endif
+
+    m_fd = invalid_fd;
 }
 
-void File::close_static(FileDesc fd)
-{
-#ifdef _WIN32
-    if (!fd)
-        return;
-
-    if (!CloseHandle(fd))
-        throw std::system_error(GetLastError(), std::system_category(),
-                                "CloseHandle() failed from File::close_static()");
-#else
-    if (fd < 0)
-        return;
-
-    int ret = -1;
-    do {
-        ret = ::close(fd);
-    } while (ret == -1 && errno == EINTR);
-
-    if (ret != 0) {
-        int err = errno; // Eliminate any risk of clobbering
-        if (err == EBADF || err == EIO)
-            throw SystemError(err, "File::close_static() failed");
-    }
-#endif
-}
-
-size_t File::read_static(FileDesc fd, char* data, size_t size)
+size_t File::read_static(FileDesc fd, SizeType pos, char* data, size_t size)
 {
 #ifdef _WIN32 // Windows version
     char* const data_0 = data;
@@ -624,19 +615,21 @@ size_t File::read_static(FileDesc fd, char* data, size_t size)
         if (int_less_than(size, n))
             n = static_cast<DWORD>(size);
         DWORD r = 0;
-        if (!ReadFile(fd, data, n, &r, 0))
-            goto error;
-        if (r == 0)
-            break;
-        REALM_ASSERT_RELEASE(r <= n);
+        OVERLAPPED o{};
+        o.Offset = static_cast<DWORD>(pos);
+        o.OffsetHigh = static_cast<DWORD>(pos >> 32);
+        if (!ReadFile(fd, data, n, &r, &o)) {
+            DWORD err = GetLastError();
+            if (err == ERROR_HANDLE_EOF)
+                break;
+            throw SystemError(int(err), "ReadFile() failed");
+        }
+        REALM_ASSERT_RELEASE(r > 0 && r <= n);
         size -= size_t(r);
         data += size_t(r);
+        pos += r;
     }
     return data - data_0;
-
-error:
-    DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    throw SystemError(int(err), "ReadFile() failed");
 
 #else // POSIX version
 
@@ -644,7 +637,7 @@ error:
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
         size_t n = std::min(size, size_t(SSIZE_MAX));
-        ssize_t r = ::read(fd, data, n);
+        ssize_t r = pread(fd, data, n, pos);
         if (r == 0)
             break;
         if (r < 0)
@@ -652,6 +645,7 @@ error:
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
+        pos += r;
     }
     return data - data_0;
 
@@ -663,26 +657,21 @@ error:
 }
 
 
-size_t File::read(char* data, size_t size)
+size_t File::read(SizeType pos, char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-    if (m_encryption_key) {
-        uint64_t pos_original = File::get_file_pos(m_fd);
-        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
-        size_t pos = size_t(pos_original);
-        Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(read_map, pos, size);
-        memcpy(data, read_map.get_addr() + pos, size);
-        uint64_t cur = File::get_file_pos(m_fd);
-        seek_static(m_fd, cur + size);
-        return read_map.get_size() - pos;
+    if (m_encryption) {
+        Map<char> read_map(*this, pos, access_ReadOnly, size);
+        util::encryption_read_barrier(read_map, 0, size);
+        memcpy(data, read_map.get_addr(), size);
+        return size;
     }
 
-    return read_static(m_fd, data, size);
+    return read_static(m_fd, pos, data, size);
 }
 
-void File::write_static(FileDesc fd, const char* data, size_t size)
+void File::write_static(FileDesc fd, SizeType pos, const char* data, size_t size)
 {
 #ifdef _WIN32
     while (0 < size) {
@@ -690,11 +679,15 @@ void File::write_static(FileDesc fd, const char* data, size_t size)
         if (int_less_than(size, n))
             n = static_cast<DWORD>(size);
         DWORD r = 0;
-        if (!WriteFile(fd, data, n, &r, 0))
+        OVERLAPPED o{};
+        o.Offset = static_cast<DWORD>(pos);
+        o.OffsetHigh = static_cast<DWORD>(pos >> 32);
+        if (!WriteFile(fd, data, n, &r, &o))
             goto error;
         REALM_ASSERT_RELEASE(r == n); // Partial writes are not possible.
         size -= size_t(r);
         data += size_t(r);
+        pos += r;
     }
     return;
 
@@ -709,13 +702,14 @@ error:
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
         size_t n = std::min(size, size_t(SSIZE_MAX));
-        ssize_t r = ::write(fd, data, n);
+        ssize_t r = pwrite(fd, data, n, pos);
         if (r < 0)
             goto error; // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(r != 0);
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
+        pos += off_t(r);
     }
     return;
 
@@ -732,44 +726,39 @@ error:
 #endif
 }
 
-void File::write(const char* data, size_t size)
+void File::write(SizeType pos, const char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-    if (m_encryption_key) {
-        uint64_t pos_original = get_file_pos(m_fd);
-        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
-        size_t pos = size_t(pos_original);
-        Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(write_map, pos, size);
-        memcpy(write_map.get_addr() + pos, data, size);
-        realm::util::encryption_write_barrier(write_map, pos, size);
-        uint64_t cur = get_file_pos(m_fd);
-        seek(cur + size);
+    if (m_encryption) {
+        Map<char> write_map(*this, pos, access_ReadWrite, size);
+        util::encryption_read_barrier(write_map, 0, size);
+        memcpy(write_map.get_addr(), data, size);
+        realm::util::encryption_write_barrier(write_map, 0, size);
         return;
     }
 
-    write_static(m_fd, data, size);
+    write_static(m_fd, pos, data, size);
 }
 
-uint64_t File::get_file_pos(FileDesc fd)
+File::SizeType File::get_file_pos()
 {
 #ifdef _WIN32
     LONG high_dword = 0;
     LARGE_INTEGER li;
     LARGE_INTEGER res;
     li.QuadPart = 0;
-    bool ok = SetFilePointerEx(fd, li, &res, FILE_CURRENT);
+    bool ok = SetFilePointerEx(m_fd, li, &res, FILE_CURRENT);
     if (!ok)
         throw SystemError(GetLastError(), "SetFilePointer() failed");
 
-    return uint64_t(res.QuadPart);
+    return SizeType(res.QuadPart);
 #else
-    auto pos = lseek(fd, 0, SEEK_CUR);
+    auto pos = lseek(m_fd, 0, SEEK_CUR);
     if (pos < 0) {
         throw SystemError(errno, "lseek() failed");
     }
-    return uint64_t(pos);
+    return SizeType(pos);
 #endif
 }
 
@@ -812,12 +801,10 @@ File::SizeType File::get_size() const
     REALM_ASSERT_RELEASE(is_attached());
     File::SizeType size = get_size_static(m_fd);
 
-    if (m_encryption_key) {
-        File::SizeType ret_size = encrypted_size_to_data_size(size);
-        return ret_size;
+    if (m_encryption) {
+        return encrypted_size_to_data_size(size);
     }
-    else
-        return size;
+    return size;
 }
 
 
@@ -825,35 +812,20 @@ void File::resize(SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
-
-    // Save file position
-    SizeType p = get_file_pos(m_fd);
-
-    if (m_encryption_key)
+    if (m_encryption)
         size = data_size_to_encrypted_size(size);
 
-    // Windows docs say "it is not an error to set the file pointer to a position beyond the end of the file."
-    // so seeking with SetFilePointerEx() will not error out even if there is no disk space left.
-    // In this scenario though, the following call to SedEndOfFile() will fail if there is no disk space left.
-    seek(size);
-
-    if (!SetEndOfFile(m_fd)) {
+#ifdef _WIN32 // Windows version
+    FILE_END_OF_FILE_INFO info;
+    info.EndOfFile.QuadPart = size;
+    if (!SetFileInformationByHandle(m_fd, FileEndOfFileInfo, &info, sizeof(info))) {
         DWORD err = GetLastError(); // Eliminate any risk of clobbering
         if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
-            std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
-            throw OutOfDiskSpace(msg);
+            throw OutOfDiskSpace(get_last_error_msg("SetFileInformationByHandle() failed: ", err));
         }
-        throw SystemError(int(err), "SetEndOfFile() failed");
+        throw SystemError(int(err), "SetFileInformationByHandle() failed");
     }
-
-    // Restore file position
-    seek(p);
-
 #else // POSIX version
-
-    if (m_encryption_key)
-        size = data_size_to_encrypted_size(size);
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
@@ -874,62 +846,39 @@ void File::resize(SizeType size)
 }
 
 
-void File::prealloc(size_t size)
+void File::prealloc(SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
-
-    if (size <= to_size_t(get_size())) {
+    if (size <= get_size()) {
         return;
     }
 
-    size_t new_size = size;
-    if (m_encryption_key) {
-        new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
-        REALM_ASSERT(size == static_cast<size_t>(encrypted_size_to_data_size(new_size)));
-        if (new_size < size) {
-            throw RuntimeError(ErrorCodes::RangeError, "File size overflow: data_size_to_encrypted_size(" +
-                                                           realm::util::to_string(size) +
-                                                           ") == " + realm::util::to_string(new_size));
-        }
+    SizeType new_size = size;
+    if (m_encryption) {
+        new_size = data_size_to_encrypted_size(size);
+        REALM_ASSERT(new_size > size);
+        REALM_ASSERT(size == encrypted_size_to_data_size(new_size));
     }
 
     auto manually_consume_space = [&]() {
-        constexpr size_t chunk_size = 4096;
-        int64_t original_size = get_size_static(m_fd); // raw size
-        seek(original_size);
-        size_t num_bytes = size_t(new_size - original_size);
+        constexpr uint16_t chunk_size = 4096;
+        SizeType write_pos = get_size_static(m_fd); // raw size
+        SizeType num_bytes = new_size - write_pos;
         std::string zeros(chunk_size, '\0');
         while (num_bytes > 0) {
-            size_t t = num_bytes > chunk_size ? chunk_size : num_bytes;
-            write_static(m_fd, zeros.c_str(), t);
+            uint16_t t = uint16_t(std::min<SizeType>(num_bytes, chunk_size));
+            write_static(m_fd, write_pos, zeros.c_str(), t);
             num_bytes -= t;
+            write_pos += t;
         }
-    };
-
-    auto consume_space_interlocked = [&] {
-#if REALM_ENABLE_ENCRYPTION
-        if (m_encryption_key) {
-            // We need to prevent concurrent calls to lseek from the encryption layer
-            // while we're writing to the file to extend it. Otherwise an intervening
-            // lseek may redirect the writing process, causing file corruption.
-            UniqueLock lck(util::mapping_mutex);
-            manually_consume_space();
-        }
-        else {
-            manually_consume_space();
-        }
-#else
-        manually_consume_space();
-#endif
     };
 
 #if REALM_HAVE_POSIX_FALLOCATE
     // Mostly Linux only
     if (!prealloc_if_supported(0, new_size)) {
-        consume_space_interlocked();
+        manually_consume_space();
     }
-#else // Non-atomic fallback
-#if REALM_PLATFORM_APPLE
+#elif REALM_PLATFORM_APPLE // Non-atomic fallback
     // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and
     // ftruncate().
 
@@ -939,22 +888,21 @@ void File::prealloc(size_t size)
         throw SystemError(err, "fstat() inside prealloc() failed");
     }
 
-    size_t allocated_size;
+    SizeType allocated_size;
     if (int_cast_with_overflow_detect(statbuf.st_blocks, allocated_size)) {
         throw RuntimeError(ErrorCodes::RangeError,
-                           "Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
+                           util::format("Overflow on block conversion to SizeType %1", statbuf.st_blocks));
     }
     if (int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE)) {
-        throw RuntimeError(ErrorCodes::RangeError, "Overflow computing existing file space allocation blocks: " +
-                                                       realm::util::to_string(allocated_size) +
-                                                       " block size: " + realm::util::to_string(S_BLKSIZE));
+        throw RuntimeError(ErrorCodes::RangeError,
+                           util::format("Overflow computing existing file space allocation blocks: %1 block size %2",
+                                        allocated_size, S_BLKSIZE));
     }
 
     // Only attempt to preallocate space if there's not already sufficient free space in the file.
     // APFS would fail with EINVAL if we attempted it, and HFS+ would preallocate extra space unnecessarily.
     // See <https://github.com/realm/realm-core/issues/3005> for details.
     if (new_size > allocated_size) {
-
         off_t to_allocate = static_cast<off_t>(new_size - statbuf.st_size);
         fstore_t store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, to_allocate, 0};
         int ret = 0;
@@ -973,7 +921,7 @@ void File::prealloc(size_t size)
             // 2) fcntl will fail with ENOTSUP on non-supported file systems such as ExFAT. In this case
             // the fallback should succeed.
             // 3) if there is some other error such as no space left (ENOSPC) we will expect to fail again later
-            consume_space_interlocked();
+            manually_consume_space();
         }
     }
 
@@ -990,18 +938,14 @@ void File::prealloc(size_t size)
         throw SystemError(err, "ftruncate() inside prealloc() failed");
     }
 #elif REALM_ANDROID || defined(_WIN32) || defined(__EMSCRIPTEN__)
-
-    consume_space_interlocked();
-
+    manually_consume_space();
 #else
 #error Please check if/how your OS supports file preallocation
-#endif
-
 #endif // REALM_HAVE_POSIX_FALLOCATE
 }
 
 
-bool File::prealloc_if_supported(SizeType offset, size_t size)
+bool File::prealloc_if_supported(SizeType offset, SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
@@ -1356,93 +1300,6 @@ void File::rw_unlock() noexcept
 #endif // REALM_FILELOCK_EMULATION
 }
 
-void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) const
-{
-    return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset);
-}
-
-void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags */, size_t offset) const
-{
-    if (m_encryption_key.get()) {
-        // encryption enabled - this is not supported - see explanation in alloc_slab.cpp
-        REALM_ASSERT(false);
-    }
-#ifdef _WIN32
-    // windows, no encryption - this is not supported, see explanation in alloc_slab.cpp,
-    // above the method 'update_reader_view()'
-    REALM_ASSERT(false);
-    return nullptr;
-#else
-    // unencrypted - mmap part of already reserved space
-    return realm::util::mmap_fixed(m_fd, address, size, a, offset, m_encryption_key.get());
-#endif
-}
-
-void* File::map_reserve(AccessMode a, size_t size, size_t offset) const
-{
-    static_cast<void>(a); // FIXME: Consider removing this argument
-    return realm::util::mmap_reserve(m_fd, size, offset);
-}
-
-#if REALM_ENABLE_ENCRYPTION
-void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/, size_t offset) const
-{
-    return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset, mapping);
-}
-
-void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
-                      size_t offset) const
-{
-    if (m_encryption_key.get()) {
-        // encryption enabled - we shouldn't be here, all memory was allocated by reserve
-        REALM_ASSERT_RELEASE(false);
-    }
-#ifndef _WIN32
-    // no encryption. On Unixes, map relevant part of reserved virtual address range
-    return realm::util::mmap_fixed(m_fd, address, size, a, offset, nullptr, mapping);
-#else
-    // no encryption - unsupported on windows
-    REALM_ASSERT(false);
-    return nullptr;
-#endif
-}
-
-void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileMapping*& mapping) const
-{
-    if (m_encryption_key.get()) {
-        // encrypted file - just mmap it, the encryption layer handles if the mapping extends beyond eof
-        return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset, mapping);
-    }
-#ifndef _WIN32
-    // not encrypted, do a proper reservation on Unixes'
-    return realm::util::mmap_reserve({m_fd, m_path, a, nullptr}, size, offset, mapping);
-#else
-    // on windows, this is a no-op
-    return nullptr;
-#endif
-}
-
-#endif // REALM_ENABLE_ENCRYPTION
-
-void File::unmap(void* addr, size_t size) noexcept
-{
-    realm::util::munmap(addr, size);
-}
-
-
-void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int /*map_flags*/,
-                  size_t file_offset) const
-{
-    return realm::util::mremap({m_fd, m_path, a, m_encryption_key.get()}, file_offset, old_addr, old_size, new_size);
-}
-
-
-void File::sync_map(FileDesc fd, void* addr, size_t size)
-{
-    realm::util::msync(fd, addr, size);
-}
-
-
 bool File::exists(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
@@ -1587,10 +1444,12 @@ bool File::copy(const std::string& origin_path, const std::string& target_path, 
     }
 
     size_t buffer_size = 4096;
+    off_t pos = 0;
     auto buffer = std::make_unique<char[]>(buffer_size); // Throws
     for (;;) {
-        size_t n = origin_file.read(buffer.get(), buffer_size); // Throws
-        target_file.write(buffer.get(), n);                     // Throws
+        size_t n = origin_file.read(pos, buffer.get(), buffer_size); // Throws
+        target_file.write(pos, buffer.get(), n);                     // Throws
+        pos += n;
         if (n < buffer_size)
             break;
     }
@@ -1599,26 +1458,6 @@ bool File::copy(const std::string& origin_path, const std::string& target_path, 
 #endif
 }
 
-
-bool File::compare(const std::string& path_1, const std::string& path_2)
-{
-    File file_1{path_1}; // Throws
-    File file_2{path_2}; // Throws
-    size_t buffer_size = 4096;
-    std::unique_ptr<char[]> buffer_1 = std::make_unique<char[]>(buffer_size); // Throws
-    std::unique_ptr<char[]> buffer_2 = std::make_unique<char[]>(buffer_size); // Throws
-    for (;;) {
-        size_t n_1 = file_1.read(buffer_1.get(), buffer_size); // Throws
-        size_t n_2 = file_2.read(buffer_2.get(), buffer_size); // Throws
-        if (n_1 != n_2)
-            return false;
-        if (!std::equal(buffer_1.get(), buffer_1.get() + n_1, buffer_2.get()))
-            return false;
-        if (n_1 < buffer_size)
-            break;
-    }
-    return true;
-}
 
 bool File::is_same_file_static(FileDesc f1, FileDesc f2, const std::string& path1, const std::string& path2)
 {
@@ -1647,23 +1486,6 @@ FileDesc File::dup_file_desc(FileDesc fd)
     }
 #endif // conditonal on _WIN32
     return fd_duped;
-}
-
-File::UniqueID File::get_unique_id()
-{
-    REALM_ASSERT_RELEASE(is_attached());
-    File::UniqueID uid = File::get_unique_id(m_fd, m_path);
-    if (!m_cached_unique_id) {
-        m_cached_unique_id = std::make_optional(uid);
-    }
-    if (m_cached_unique_id != uid) {
-        throw FileAccessError(ErrorCodes::FileOperationFailed,
-                              util::format("The unique id of this Realm file has changed unexpectedly, this could be "
-                                           "due to modifications by an external process '%1'",
-                                           m_path),
-                              m_path);
-    }
-    return uid;
 }
 
 FileDesc File::get_descriptor() const
@@ -1815,12 +1637,10 @@ void File::set_encryption_key(const char* key)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (key) {
-        auto buffer = std::make_unique<char[]>(64);
-        memcpy(buffer.get(), key, 64);
-        m_encryption_key = std::move(buffer);
+        m_encryption = std::make_unique<util::EncryptedFile>(key, m_fd);
     }
     else {
-        m_encryption_key.reset();
+        m_encryption.reset();
     }
 #else
     if (key) {
@@ -1829,22 +1649,54 @@ void File::set_encryption_key(const char* key)
 #endif
 }
 
-const char* File::get_encryption_key() const
+EncryptedFile* File::get_encryption() const noexcept
 {
-    return m_encryption_key.get();
+#if REALM_ENABLE_ENCRYPTION
+    return m_encryption.get();
+#else
+    return nullptr;
+#endif
 }
 
-void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
-                        util::WriteObserver* observer)
+File::MapBase::MapBase() noexcept = default;
+File::MapBase::~MapBase() noexcept
+{
+    unmap();
+}
+
+File::MapBase::MapBase(MapBase&& other) noexcept
+{
+    *this = std::move(other);
+}
+
+File::MapBase& File::MapBase::operator=(MapBase&& other) noexcept
+{
+    REALM_ASSERT(this != &other);
+    if (m_addr)
+        unmap();
+    m_addr = std::exchange(other.m_addr, nullptr);
+    m_size = std::exchange(other.m_size, 0);
+    m_access_mode = other.m_access_mode;
+    m_reservation_size = std::exchange(other.m_reservation_size, 0);
+    m_offset = std::exchange(other.m_offset, 0);
+    m_fd = std::exchange(other.m_fd, invalid_fd);
+#if REALM_ENABLE_ENCRYPTION
+    m_encrypted_mapping = std::move(other.m_encrypted_mapping);
+#endif
+    return *this;
+}
+
+void File::MapBase::map(const File& f, AccessMode a, size_t size, SizeType offset, util::WriteObserver* observer)
 {
     REALM_ASSERT(!m_addr);
 #if REALM_ENABLE_ENCRYPTION
-    m_addr = f.map(a, size, m_encrypted_mapping, map_flags, offset);
+    m_addr = mmap({f.m_fd, a, f.m_encryption.get()}, size, offset, m_encrypted_mapping);
     if (observer && m_encrypted_mapping) {
         m_encrypted_mapping->set_observer(observer);
     }
 #else
-    m_addr = f.map(a, size, map_flags, offset);
+    std::unique_ptr<util::EncryptedFileMapping> dummy_encrypted_mapping;
+    m_addr = mmap({f.m_fd, a, nullptr}, size, offset, dummy_encrypted_mapping);
     static_cast<void>(observer);
 #endif
     m_size = m_reservation_size = size;
@@ -1860,25 +1712,15 @@ void File::MapBase::unmap() noexcept
         return;
     REALM_ASSERT(m_reservation_size);
 #if REALM_ENABLE_ENCRYPTION
-    if (m_encrypted_mapping) {
-        m_encrypted_mapping = nullptr;
-        util::remove_encrypted_mapping(m_addr, m_size);
-    }
+    m_encrypted_mapping = nullptr;
 #endif
-    ::munmap(m_addr, m_reservation_size);
+    munmap(m_addr, m_reservation_size);
     m_addr = nullptr;
     m_size = 0;
     m_reservation_size = 0;
 }
 
-void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
-{
-    REALM_ASSERT(m_addr);
-    m_addr = f.remap(m_addr, m_size, a, size, map_flags);
-    m_size = m_reservation_size = size;
-}
-
-bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, size_t offset,
+bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, SizeType offset,
                                 util::WriteObserver* observer)
 {
 #ifdef _WIN32
@@ -1896,9 +1738,8 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
     m_fd = file.get_descriptor();
     m_offset = offset;
 #if REALM_ENABLE_ENCRYPTION
-    if (file.m_encryption_key) {
-        m_encrypted_mapping =
-            util::reserve_mapping(addr, {m_fd, file.get_path(), a, file.m_encryption_key.get()}, offset);
+    if (file.m_encryption) {
+        m_encrypted_mapping = util::reserve_mapping(addr, {m_fd, a, file.m_encryption.get()}, offset);
         if (observer) {
             m_encrypted_mapping->set_observer(observer);
         }
@@ -1915,7 +1756,6 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     if (size > m_reservation_size) {
         return false;
     }
-    // return false;
 #ifndef _WIN32
     char* extension_start_addr = (char*)m_addr + m_size;
     size_t extension_size = size - m_size;
@@ -1927,14 +1767,14 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
         if (got_addr == MAP_FAILED)
             return false;
         REALM_ASSERT(got_addr == extension_start_addr);
-        util::extend_encrypted_mapping(m_encrypted_mapping, m_addr, m_offset, m_size, size);
         m_size = size;
+        m_encrypted_mapping->extend_to(m_offset, size);
         return true;
     }
 #endif
     try {
-        void* got_addr = util::mmap_fixed(m_fd, extension_start_addr, extension_size, m_access_mode,
-                                          extension_start_offset, nullptr);
+        void* got_addr =
+            util::mmap_fixed(m_fd, extension_start_addr, extension_size, m_access_mode, extension_start_offset);
         if (got_addr == extension_start_addr) {
             m_size = size;
             return true;
@@ -1950,17 +1790,25 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
 void File::MapBase::sync()
 {
     REALM_ASSERT(m_addr);
+#if REALM_ENABLE_ENCRYPTION
+    if (m_encrypted_mapping) {
+        m_encrypted_mapping->sync();
+        return;
+    }
+#endif
 
-    File::sync_map(m_fd, m_addr, m_size);
+    realm::util::msync(m_fd, m_addr, m_size);
 }
 
-void File::MapBase::flush()
+void File::MapBase::flush(bool skip_validate)
 {
     REALM_ASSERT(m_addr);
 #if REALM_ENABLE_ENCRYPTION
     if (m_encrypted_mapping) {
-        realm::util::encryption_flush(m_encrypted_mapping);
+        m_encrypted_mapping->flush(skip_validate);
     }
+#else
+    static_cast<void>(skip_validate);
 #endif
 }
 
@@ -2003,13 +1851,10 @@ File::SizeType File::get_free_space(const std::string& path)
 
 DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
-    try {
-        m_iterator = std::filesystem::directory_iterator(u8path(path));
-    }
-    catch (const std::filesystem::filesystem_error& e) {
-        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
-            throw;
-    }
+    std::error_code ec;
+    m_iterator = std::filesystem::directory_iterator(u8path(path), ec);
+    if (ec && (ec != std::errc::no_such_file_or_directory || !allow_missing))
+        throw std::filesystem::filesystem_error("directory_iterator::directory_iterator", u8path(path), ec);
 }
 
 DirScanner::~DirScanner() = default;

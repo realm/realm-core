@@ -110,4 +110,4 @@ ssh_agent_commands.sh
 
 # release script artifacts
 extracted_changelog.md
-changes-since-last-tag.txt
+pr-body.txt

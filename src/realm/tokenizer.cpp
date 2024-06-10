@@ -61,7 +61,7 @@ std::pair<std::set<std::string>, std::set<std::string>> Tokenizer::get_search_to
         }
     };
     for (; m_cur_pos != m_end_pos; m_cur_pos++) {
-        if (isspace(*m_cur_pos)) {
+        if (isspace(static_cast<unsigned char>(*m_cur_pos))) {
             add_token();
         }
         else {

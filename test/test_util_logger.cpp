@@ -280,7 +280,7 @@ TEST(Util_Logger_File_1)
     std::unique_ptr<char[]> buffer(new char[size]);
     util::File file(path);
     if (CHECK_EQUAL(size, file.get_size())) {
-        file.read(buffer.get(), size);
+        file.read(0, buffer.get(), size);
         CHECK(str == std::string(buffer.get(), size));
     }
 }
@@ -304,7 +304,7 @@ TEST(Util_Logger_File_2)
     std::unique_ptr<char[]> buffer(new char[size]);
     util::File file(path);
     if (CHECK_EQUAL(size, file.get_size())) {
-        file.read(buffer.get(), size);
+        file.read(0, buffer.get(), size);
         CHECK(str == std::string(buffer.get(), size));
     }
 }

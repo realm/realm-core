@@ -91,6 +91,7 @@ TConditionValue:    Type of values in condition column. That is, int64_t, float,
 #include <realm/query_expression.hpp>
 #include <realm/table.hpp>
 #include <realm/unicode.hpp>
+#include <realm/util/flat_map.hpp>
 #include <realm/util/serializer.hpp>
 #include <realm/utilities.hpp>
 
@@ -576,11 +577,6 @@ public:
             }
             else if (m_index_evaluator) {
                 return m_index_evaluator->do_search_index(BaseType::m_cluster, start, end);
-            }
-            else if (end - start == 1) {
-                if (this->m_leaf->get(start) == this->m_value) {
-                    s = start;
-                }
             }
             else {
                 s = this->m_leaf->template find_first<Equal>(this->m_value, start, end);
