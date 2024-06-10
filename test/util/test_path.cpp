@@ -148,7 +148,7 @@ bool initialize_test_path(int argc, const char* argv[])
         return false;
     }
     g_resource_path = File::resolve("resources", directory) + "/";
-    g_path_prefix = directory;
+    g_path_prefix = std::string(directory) + "/";
 #endif
 
     if (argc > 0) {

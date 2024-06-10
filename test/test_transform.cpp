@@ -1,24 +1,3 @@
-#include <stddef.h>
-#include <stdint.h>
-#include <algorithm>
-#include <utility>
-#include <memory>
-#include <initializer_list>
-#include <string>
-#include <vector>
-#include <map>
-#include <sstream>
-#include <iostream>
-#include <fstream>
-
-#include <realm/util/features.h>
-#include <realm/binary_data.hpp>
-#include <realm/db.hpp>
-#include <realm/replication.hpp>
-#include <realm/list.hpp>
-#include <realm/set.hpp>
-#include <realm/sync/transform.hpp>
-
 #include "test.hpp"
 #include "testsettings.hpp"
 #include "util/quote.hpp"
@@ -27,6 +6,28 @@
 #include "fuzz_tester.hpp" // Transform_Randomized
 #include "util/compare_groups.hpp"
 #include "util/dump_changesets.hpp"
+
+#include <realm/binary_data.hpp>
+#include <realm/db.hpp>
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/list.hpp>
+#include <realm/replication.hpp>
+#include <realm/set.hpp>
+#include <realm/sync/transform.hpp>
+#include <realm/util/features.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <fstream>
+#include <initializer_list>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
 extern unsigned int unit_test_random_seed;
 
