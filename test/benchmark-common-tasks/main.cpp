@@ -2741,6 +2741,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkParsedIn<Prop<ObjectId>, 5>);
 
     BENCH(BenchmarkRangeForType<Prop<Int>>);
+    BENCH(BenchmarkRangeForType<Prop<Timestamp>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<String>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<Int>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<Timestamp>>);
