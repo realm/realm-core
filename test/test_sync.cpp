@@ -2988,7 +2988,6 @@ TEST(Sync_UploadDownloadProgress_1)
 
         commit_version = write_transaction(db, [](WriteTransaction& wt) {
             wt.get_table("class_table")->create_object_with_primary_key(1).set("integer column", 42);
-            ;
         });
 
         session.wait_for_upload_complete_or_client_stopped();
