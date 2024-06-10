@@ -272,6 +272,11 @@ RLM_API void realm_app_config_set_security_access_group(realm_app_config_t* conf
     config->security_access_group = group;
 }
 
+RLM_API void realm_app_config_set_sync_client_config(realm_app_config_t* config, realm_sync_client_config_t* sync_client_config) noexcept
+{
+    config->sync_client_config = *sync_client_config;
+}
+
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t* app_credentials) noexcept
 {
     return wrap_err([&] {
