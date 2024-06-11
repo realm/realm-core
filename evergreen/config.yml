@@ -234,8 +234,9 @@ functions:
         shell: bash
         env:
           BAASAAS_API_KEY: "${baasaas_api_key}"
+          # BAAS_VERSION and VERSION_TYPE are set by realm-core/dependencies.yml
           BAASAAS_REF_SPEC: "${BAAS_VERSION}"
-          BAASAAS_START_MODE: "githash"
+          BAASAAS_START_MODE: "${BAAS_VERSION_TYPE|githash}"
         script: |-
           set -o errexit
           set -o verbose

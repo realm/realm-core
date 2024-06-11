@@ -715,8 +715,8 @@ app::Response AdminAPIEndpoint::del() const
 nlohmann::json AdminAPIEndpoint::get_json(const std::vector<std::pair<std::string, std::string>>& params) const
 {
     auto resp = get(params);
-    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
-                    util::format("url: %1, reply: %2", m_url, resp.body));
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, resp.http_status_code,
+                    resp.body);
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -732,7 +732,8 @@ app::Response AdminAPIEndpoint::post(std::string body) const
 nlohmann::json AdminAPIEndpoint::post_json(nlohmann::json body) const
 {
     auto resp = post(body.dump());
-    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(), resp.body);
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(),
+                    resp.http_status_code, resp.body);
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -748,8 +749,8 @@ app::Response AdminAPIEndpoint::put(std::string body) const
 nlohmann::json AdminAPIEndpoint::put_json(nlohmann::json body) const
 {
     auto resp = put(body.dump());
-    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
-                    util::format("url: %1 request: %2, reply: %3", m_url, body.dump(), resp.body));
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(),
+                    resp.http_status_code, resp.body);
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -765,8 +766,8 @@ app::Response AdminAPIEndpoint::patch(std::string body) const
 nlohmann::json AdminAPIEndpoint::patch_json(nlohmann::json body) const
 {
     auto resp = patch(body.dump());
-    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
-                    util::format("url: %1 request: %2, reply: %3", m_url, body.dump(), resp.body));
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(),
+                    resp.http_status_code, resp.body);
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -983,6 +984,60 @@ void AdminAPISession::create_schema(const std::string& app_id, const AppCreateCo
     if (use_draft) {
         drafts[draft_id]["deployment"].post_json({});
     }
+}
+
+bool AdminAPISession::set_feature_flag(const std::string& app_id, const std::string& flag_name, bool enable) const
+{
+    auto features = apps(APIFamily::Private)[app_id]["features"];
+    auto flag_response =
+        features.post_json(nlohmann::json{{"action", enable ? "enable" : "disable"}, {"feature_flags", {flag_name}}});
+    return flag_response.empty();
+}
+
+bool AdminAPISession::get_feature_flag(const std::string& app_id, const std::string& flag_name) const
+{
+    auto features = apps(APIFamily::Private)[app_id]["features"];
+    auto response = features.get_json();
+    if (auto feature_list = response["enabled"]; !feature_list.empty()) {
+        return std::find_if(feature_list.begin(), feature_list.end(), [&flag_name](const auto& feature) {
+                   return feature == flag_name;
+               }) != feature_list.end();
+    }
+    return false;
+}
+
+nlohmann::json AdminAPISession::get_default_rule(const std::string& app_id) const
+{
+    auto baas_sync_service = get_sync_service(app_id);
+    auto rule_endpoint = apps()[app_id]["services"][baas_sync_service.id]["default_rule"];
+    auto rule = rule_endpoint.get_json();
+    return rule;
+}
+
+bool AdminAPISession::update_default_rule(const std::string& app_id, nlohmann::json rule_json) const
+{
+    if (auto id = rule_json.find("_id");
+        id == rule_json.end() || !id->is_string() || id->get<std::string>().empty()) {
+        return false;
+    }
+
+    auto baas_sync_service = get_sync_service(app_id);
+    auto rule_endpoint = apps()[app_id]["services"][baas_sync_service.id]["default_rule"];
+    auto response = rule_endpoint.put_json(rule_json);
+    return response.empty();
+}
+
+nlohmann::json AdminAPISession::get_app_settings(const std::string& app_id) const
+{
+    auto settings_endpoint = apps(APIFamily::Private)[app_id]["settings"];
+    return settings_endpoint.get_json();
+}
+
+bool AdminAPISession::patch_app_settings(const std::string& app_id, nlohmann::json&& json) const
+{
+    auto settings_endpoint = apps(APIFamily::Private)[app_id]["settings"];
+    auto response = settings_endpoint.patch_json(std::move(json));
+    return response.empty();
 }
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
@@ -1371,6 +1426,23 @@ AppCreateConfig minimal_app_config(const std::string& name, const Schema& schema
     };
 }
 
+nlohmann::json transform_service_role(const AppCreateConfig::ServiceRole& role_def)
+{
+    return {
+        {"name", role_def.name},
+        {"apply_when", role_def.apply_when},
+        {"document_filters",
+         {
+             {"read", role_def.document_filters.read},
+             {"write", role_def.document_filters.write},
+         }},
+        {"insert", role_def.insert_filter},
+        {"delete", role_def.delete_filter},
+        {"read", role_def.read},
+        {"write", role_def.write},
+    };
+}
+
 AppSession create_app(const AppCreateConfig& config)
 {
     auto session = AdminAPISession::login(config);
@@ -1509,36 +1581,11 @@ AppSession create_app(const AppCreateConfig& config)
     auto default_rule = services[mongo_service_id]["default_rule"];
     auto service_roles = nlohmann::json::array();
     if (config.service_roles.empty()) {
-        service_roles = nlohmann::json::array({{{"name", "default"},
-                                                {"apply_when", nlohmann::json::object()},
-                                                {"document_filters",
-                                                 {
-                                                     {"read", true},
-                                                     {"write", true},
-                                                 }},
-                                                {"read", true},
-                                                {"write", true},
-                                                {"insert", true},
-                                                {"delete", true}}});
+        service_roles.push_back(transform_service_role({"default"}));
     }
     else {
         std::transform(config.service_roles.begin(), config.service_roles.end(), std::back_inserter(service_roles),
-                       [](const AppCreateConfig::ServiceRole& role_def) {
-                           nlohmann::json ret{
-                               {"name", role_def.name},
-                               {"apply_when", role_def.apply_when},
-                               {"document_filters",
-                                {
-                                    {"read", role_def.document_filters.read},
-                                    {"write", role_def.document_filters.write},
-                                }},
-                               {"insert", role_def.insert_filter},
-                               {"delete", role_def.delete_filter},
-                               {"read", role_def.read},
-                               {"write", role_def.write},
-                           };
-                           return ret;
-                       });
+                       transform_service_role);
     }
 
     default_rule.post_json({{"roles", service_roles}});
@@ -1609,11 +1656,12 @@ AppSession create_app(const AppCreateConfig& config)
         return object_schema.table_type == ObjectSchema::ObjectType::TopLevel;
     });
     if (any_sync_types) {
+        // Increasing timeout due to occasional slow startup of the translator on baasaas
         timed_sleeping_wait_for(
             [&] {
                 return session.is_initial_sync_complete(app_id);
             },
-            std::chrono::seconds(30), std::chrono::seconds(1));
+            std::chrono::seconds(60), std::chrono::seconds(1));
     }
 
     return {client_app_id, app_id, session, config};

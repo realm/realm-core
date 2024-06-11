@@ -827,7 +827,7 @@ public:
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
     void integrate_changesets(const SyncProgress&, std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
-                              VersionInfo&, DownloadBatchState last_in_batch);
+                              VersionInfo&, DownloadBatchState batch_state);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -1179,11 +1179,8 @@ private:
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
-    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* = nullptr);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
-    SyncClientHookAction call_debug_hook(SyncClientHookEvent event);
-
-    bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
     void init_progress_handler();
     void enable_progress_notifications();
@@ -1470,6 +1467,10 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
         ++m_target_download_mark;
     }
 
+    // Notify the debug hook of the SessionConnected event before sending
+    // the bind messsage
+    call_debug_hook(SyncClientHookEvent::SessionConnected);
+
     if (!m_suspended) {
         // Ready to send BIND message
         enlist_to_send(); // Throws
@@ -1539,6 +1540,10 @@ inline void ClientImpl::Session::initiate_rebind()
     REALM_ASSERT(!m_enlisted_to_send);
 
     reset_protocol_state();
+
+    // Notify the debug hook of the SessionResumed event before sending
+    // the bind messsage
+    call_debug_hook(SyncClientHookEvent::SessionResumed);
 
     // Ready to send BIND message
     enlist_to_send(); // Throws

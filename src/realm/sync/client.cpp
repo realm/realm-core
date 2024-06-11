@@ -803,12 +803,8 @@ void SessionImpl::update_subscription_version_info()
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
 {
-    // Ignore the call if the session is not active
-    if (m_state != State::Active) {
-        return false;
-    }
-
-    if (is_steady_state_download_message(batch_state, query_version)) {
+    // Ignore the message if the session is not active or a steady state message
+    if (m_state != State::Active || batch_state == DownloadBatchState::SteadyState) {
         return false;
     }
 
@@ -904,7 +900,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
-            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
+            // Close the write transaction before clearing the bootstrap store to avoid a deadlock because the
             // bootstrap store requires a write transaction itself.
             transact->close();
             bootstrap_store->clear();
@@ -1047,7 +1043,7 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     return call_debug_hook(data);
 }
 
-SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo& error_info)
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* error_info)
 {
     if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
         return SyncClientHookAction::NoAction;
@@ -1061,35 +1057,10 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     data.batch_state = DownloadBatchState::SteadyState;
     data.progress = m_progress;
     data.num_changesets = 0;
-    data.query_version = 0;
-    data.error_info = &error_info;
+    data.query_version = m_last_sent_flx_query_version;
+    data.error_info = error_info;
 
     return call_debug_hook(data);
-}
-
-SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event)
-{
-    return call_debug_hook(event, m_progress, m_last_sent_flx_query_version, DownloadBatchState::SteadyState, 0);
-}
-
-bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
-{
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == State::Active, m_state);
-    if (batch_state == DownloadBatchState::SteadyState) {
-        return true;
-    }
-
-    if (!m_is_flx_sync_session) {
-        return true;
-    }
-
-    // If this is a steady state DOWNLOAD, no need for special handling.
-    if (batch_state == DownloadBatchState::LastInBatch && query_version == m_wrapper.m_flx_active_version) {
-        return true;
-    }
-
-    return false;
 }
 
 void SessionImpl::init_progress_handler()
