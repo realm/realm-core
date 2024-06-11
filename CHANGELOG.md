@@ -20,7 +20,7 @@
 -----------
 
 ### Internals
-* None.
+* Switch to building the Swift package and Cocoa binaries as C++20 ([PR #7802](https://github.com/realm/realm-core/pull/7802)).
 
 ----------------------------------------------
 
