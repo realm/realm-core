@@ -718,7 +718,7 @@ TEST(Shared_InitialMem_StaleFile)
     // delete it
     {
         File f(path, File::mode_Write);
-        f.write("text");
+        f.write(0, "text");
     }
     CHECK(File::exists(path));
     CHECK(File::exists(path.get_lock_path()));
@@ -2265,9 +2265,8 @@ TEST(Shared_EncryptionPageReadFailure)
         // make a corruption in the first data page
         util::File f(path, File::Mode::mode_Update);
         CHECK_GREATER(f.get_size(), 12288); // 4k iv page, then at least 2 pages
-        f.seek(5000);                       // somewhere on the first data page
         constexpr std::string_view data = "an external corruption in the encrypted page";
-        f.write(data.data(), data.size());
+        f.write(5000, data.data(), data.size()); // somewhere on the first data page
         f.sync();
         f.close();
     }
@@ -3227,10 +3226,10 @@ TEST(Shared_LockFileOfWrongSizeThrows)
         // On Windows, we implement a shared lock on a file by locking the first byte of the file. Since
         // you cannot write to a locked region using WriteFile(), we use memory mapping which works fine, and
         // which is also the same method used by the .lock file initialization in SharedGroup::do_open()
-        char* mem = static_cast<char*>(f.map(realm::util::File::access_ReadWrite, 1));
+        File::Map<char> mem(f, realm::util::File::access_ReadWrite, 1);
 
         // set init_complete flag to 1 and sync
-        mem[0] = 1;
+        mem.get_addr()[0] = 1;
         f.sync();
 
         CHECK_EQUAL(f.get_size(), wrong_size);
@@ -3282,9 +3281,8 @@ TEST(Shared_LockFileOfWrongVersionThrows)
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
-        f.seek(6);
         char bad_version = 0;
-        f.write(&bad_version, 1);
+        f.write(6, &bad_version, 1);
         f.sync();
 
         mutex.lock();
@@ -3333,8 +3331,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
         CHECK(f.is_attached());
 
         char bad_mutex_size = sizeof(InterprocessMutex::SharedPart) + 1;
-        f.seek(1);
-        f.write(&bad_mutex_size, 1);
+        f.write(1, &bad_mutex_size, 1);
         f.sync();
 
         mutex.lock();
@@ -3384,8 +3381,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
         CHECK(f.is_attached());
 
         char bad_condvar_size = sizeof(InterprocessCondVar::SharedPart) + 1;
-        f.seek(2);
-        f.write(&bad_condvar_size, 1);
+        f.write(2, &bad_condvar_size, 1);
         f.sync();
 
         mutex.lock();
@@ -4572,8 +4568,7 @@ TEST(Shared_ClearOnError_ResetInvalidFile)
     {
         // Overwrite the first byte of the mnemonic so that this isn't a valid file
         util::File file(path, File::mode_Update);
-        file.seek(8);
-        file.write("\0", 1);
+        file.write(8, "\0", 1);
     }
 
     {

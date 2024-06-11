@@ -25,7 +25,6 @@
 #include <realm/util/compression.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/json_parser.hpp>
-#include <realm/util/load_file.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/platform_info.hpp>

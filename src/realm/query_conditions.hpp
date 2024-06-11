@@ -302,6 +302,10 @@ struct Equal {
     {
         return (v == 0 && ubound == 0 && lbound == 0);
     }
+    bool operator()(int64_t v1, int64_t v2) const
+    {
+        return v1 == v2;
+    }
 
     static std::string description()
     {
@@ -343,6 +347,10 @@ struct NotEqual {
     bool will_match(int64_t v, int64_t lbound, int64_t ubound)
     {
         return (v > ubound || v < lbound);
+    }
+    bool operator()(int64_t v1, int64_t v2) const
+    {
+        return v1 != v2;
     }
 
     template <class A, class B, class C, class D>
@@ -816,6 +824,10 @@ struct Greater {
         static_cast<void>(ubound);
         return lbound > v;
     }
+    bool operator()(int64_t v1, int64_t v2) const
+    {
+        return v1 > v2;
+    }
 
     static std::string description()
     {
@@ -890,7 +902,6 @@ struct NotNull {
     }
 };
 
-
 struct Less {
     static const int avx = 0x11; // _CMP_LT_OQ
     template <class T>
@@ -907,6 +918,11 @@ struct Less {
         return Mixed::types_are_comparable(m1, m2) && (m1 < m2);
     }
 
+    bool operator()(int64_t v1, int64_t v2) const
+    {
+        return v1 < v2;
+    }
+
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
     {
@@ -914,14 +930,12 @@ struct Less {
         return false;
     }
     static const int condition = cond_Less;
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    bool can_match(int64_t v, int64_t lbound, int64_t)
     {
-        static_cast<void>(ubound);
         return lbound < v;
     }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    bool will_match(int64_t v, int64_t, int64_t ubound)
     {
-        static_cast<void>(lbound);
         return ubound < v;
     }
     static std::string description()
@@ -951,6 +965,10 @@ struct LessEqual : public HackClass {
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 <= m2));
+    }
+    bool operator()(int64_t v1, int64_t v2) const
+    {
+        return v1 <= v2;
     }
 
     template <class A, class B, class C, class D>
@@ -987,6 +1005,10 @@ struct GreaterEqual : public HackClass {
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 >= m2));
+    }
+    bool operator()(int64_t v1, int64_t v2) const
+    {
+        return v1 >= v2;
     }
 
     template <class A, class B, class C, class D>

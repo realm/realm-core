@@ -70,10 +70,18 @@ void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& val
 bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
-    const auto process = state->limit() - state->match_count();
-    const auto end2 = end - start > process ? start + process : end;
-    for (; start < end2; start++)
+    while (start < end) {
         if (!state->match(start + baseindex))
             return false;
+        start++;
+    }
     return true;
+}
+
+size_t FlexCompressor::lower_bound(size_t size, int64_t value, uint64_t mask, BfIterator& data_iterator) noexcept
+{
+    return impl::lower_bound(nullptr, 0, size, value, [&](auto, size_t ndx) {
+        data_iterator.move(ndx);
+        return sign_extend_field_by_mask(mask, *data_iterator);
+    });
 }

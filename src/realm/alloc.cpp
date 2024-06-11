@@ -120,9 +120,7 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
     RefTranslation& txl = ref_translation_ptr[idx];
     size_t offset = ref - get_section_base(idx);
     char* addr = txl.mapping_addr + offset;
-#if REALM_ENABLE_ENCRYPTION
-    realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping, nullptr);
-#endif
+    util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping);
     // if we know the translation is inside the slab area, we don't need to check
     // for anything beyond the header, and we don't need to check if decryption is needed
     auto size = known_in_slab ? 8 : NodeHeader::get_byte_size_from_header(addr);
@@ -138,27 +136,21 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
     }
     if (REALM_LIKELY(!crosses_mapping)) {
         // Array fits inside primary mapping, no new mapping needed.
-#if REALM_ENABLE_ENCRYPTION
-        realm::util::encryption_read_barrier(addr, size, txl.encrypted_mapping, nullptr);
-#endif
+        util::encryption_read_barrier(addr, size, txl.encrypted_mapping);
         return addr;
     }
-    else {
-        // we need a cross-over mapping. If one is already established, use that.
-        auto xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_acquire);
-        if (!xover_mapping_addr) {
-            // we need to establish a xover mapping - or wait for another thread to finish
-            // establishing one:
-            const_cast<Allocator*>(this)->get_or_add_xover_mapping(txl, idx, offset, size);
-            // reload (can be relaxed since the call above synchronizes on a mutex)
-            xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_relaxed);
-        }
-        // array is now known to be inside the established xover mapping:
-        addr = xover_mapping_addr + (offset - txl.xover_mapping_base);
-#if REALM_ENABLE_ENCRYPTION
-        realm::util::encryption_read_barrier(addr, size, txl.xover_encrypted_mapping, nullptr);
-#endif
-        return addr;
+    // we need a cross-over mapping. If one is already established, use that.
+    auto xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_acquire);
+    if (!xover_mapping_addr) {
+        // we need to establish a xover mapping - or wait for another thread to finish
+        // establishing one:
+        const_cast<Allocator*>(this)->get_or_add_xover_mapping(txl, idx, offset, size);
+        // reload (can be relaxed since the call above synchronizes on a mutex)
+        xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_relaxed);
     }
+    // array is now known to be inside the established xover mapping:
+    addr = xover_mapping_addr + (offset - txl.xover_mapping_base);
+    util::encryption_read_barrier(addr, size, txl.xover_encrypted_mapping);
+    return addr;
 }
 } // namespace realm
