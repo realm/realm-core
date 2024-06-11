@@ -28,7 +28,9 @@
 #include <realm/query_expression.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/object.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
