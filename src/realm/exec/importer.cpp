@@ -118,8 +118,11 @@ void print_row(Table& table, size_t r)
     std::cout << "\n";
 }
 
+} // anonymous namespace
 
-bool is_null(const char* v)
+namespace realm {
+template <>
+bool is_null(const char* const& v)
 {
     if (v[0] == 0)
         return true;
@@ -132,9 +135,7 @@ bool is_null(const char* v)
 
     return false;
 }
-
-} // anonymous namespace
-
+} // namespace realm
 
 Importer::Importer()
     : Quiet(false)

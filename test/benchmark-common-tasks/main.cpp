@@ -634,8 +634,8 @@ struct BenchmarkRangeForType : public BenchmarkWithType<Type> {
             }
             else {
                 TableView results = Base::m_table->where()
-                                        .greater(Base::m_col, Base::needles[i - 1].template get<underlying_type>())
-                                        .less(Base::m_col, Base::needles[i].template get<underlying_type>())
+                                        .between(Base::m_col, Base::needles[i - 1].template get<underlying_type>(),
+                                                 Base::needles[i].template get<underlying_type>())
                                         .find_all();
                 static_cast<void>(results);
             }
@@ -2741,6 +2741,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkParsedIn<Prop<ObjectId>, 5>);
 
     BENCH(BenchmarkRangeForType<Prop<Int>>);
+    BENCH(BenchmarkRangeForType<Prop<Timestamp>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<String>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<Int>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<Timestamp>>);

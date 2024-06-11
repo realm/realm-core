@@ -640,10 +640,29 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     auto& min(limits->elements.at(0));
     auto& max(limits->elements.at(1));
+    Query q(drv->m_base_table);
+
+    auto tmp = prop->visit(drv);
+    const ObjPropertyBase* obj_prop = dynamic_cast<const ObjPropertyBase*>(tmp.get());
+    if (obj_prop) {
+        if (tmp->get_type() == type_Int) {
+            auto min_val = min->visit(drv, type_Int);
+            auto max_val = max->visit(drv, type_Int);
+            q.between(obj_prop->column_key(), min_val->get_mixed().get_int(), max_val->get_mixed().get_int());
+            return q;
+        }
+        if (tmp->get_type() == type_Timestamp) {
+            auto min_val = min->visit(drv, type_Timestamp);
+            auto max_val = max->visit(drv, type_Timestamp);
+            q.between(obj_prop->column_key(), min_val->get_mixed().get_timestamp(),
+                      max_val->get_mixed().get_timestamp());
+            return q;
+        }
+    }
+
     RelationalNode cmp1(prop, CompareType::GREATER_EQUAL, min);
     RelationalNode cmp2(prop, CompareType::LESS_EQUAL, max);
 
-    Query q(drv->m_base_table);
     q.and_query(cmp1.visit(drv));
     q.and_query(cmp2.visit(drv));
 
