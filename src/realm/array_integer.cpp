@@ -29,6 +29,19 @@ Mixed ArrayInteger::get_any(size_t ndx) const
     return Mixed(get(ndx));
 }
 
+size_t ArrayInteger::find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const
+{
+    if (m_ubound >= from && m_lbound <= to) {
+        while (start < end) {
+            auto val = get(start);
+            if (from <= val && val <= to)
+                return start;
+            start++;
+        }
+    }
+    return realm::not_found;
+}
+
 Mixed ArrayIntNull::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
@@ -175,6 +188,18 @@ bool ArrayIntNull::find(int cond, value_type value, size_t start, size_t end, Qu
 size_t ArrayIntNull::find_first(value_type value, size_t begin, size_t end) const
 {
     return find_first<Equal>(value, begin, end);
+}
+
+size_t ArrayIntNull::find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const
+{
+    if (m_ubound >= from && m_lbound <= to) {
+        for (size_t i = start; i < end; i++) {
+            auto val = get(i);
+            if (val && *val >= from && *val <= to)
+                return i;
+        }
+    }
+    return realm::not_found;
 }
 
 void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
