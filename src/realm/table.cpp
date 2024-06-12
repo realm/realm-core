@@ -36,6 +36,7 @@
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
 #include <realm/util/serializer.hpp>
+#include <realm/string_interner.hpp>
 
 #include <stdexcept>
 
@@ -1070,19 +1071,19 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     if (m_tombstones) {
         m_tombstones->insert_column(col_key);
     }
-    // create string interners internal rep as well as data area
-    REALM_ASSERT_DEBUG(m_interner_data.is_attached());
-    while (col_ndx >= m_string_interners.size()) {
-        m_string_interners.push_back({});
+    if (col_key.get_type() == col_type_String || col_key.get_type() == col_type_Mixed) {
+        // create string interners internal rep as well as data area
+        REALM_ASSERT_DEBUG(m_interner_data.is_attached());
+        while (col_ndx >= m_string_interners.size()) {
+            m_string_interners.push_back({});
+        }
+        while (col_ndx >= m_interner_data.size()) {
+            m_interner_data.add(0);
+        }
+        REALM_ASSERT(!m_string_interners[col_ndx]);
+        m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, true);
     }
-    while (col_ndx >= m_interner_data.size()) {
-        m_interner_data.add(0);
-    }
-    REALM_ASSERT(!m_string_interners[col_ndx]);
-    // FIXME: Limit creation of interners to EXACTLY the columns, where they can be
-    // relevant.
-    // if (col_key.get_type() == col_type_String)
-    m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, true);
+
     bump_storage_version();
 
     return col_key;
@@ -1114,8 +1115,7 @@ void Table::do_erase_root_column(ColKey col_key)
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.pop_back();
     }
-    REALM_ASSERT_DEBUG(col_ndx < m_string_interners.size());
-    if (m_string_interners[col_ndx]) {
+    if (col_ndx < m_string_interners.size() && m_string_interners[col_ndx]) {
         REALM_ASSERT_DEBUG(m_interner_data.is_attached());
         REALM_ASSERT_DEBUG(col_ndx < m_interner_data.size());
         auto data_ref = m_interner_data.get_as_ref(col_ndx);
@@ -2231,6 +2231,10 @@ void Table::refresh_string_interners(bool writable)
                 m_string_interners[idx].reset();
             continue;
         }
+
+        if (col_key.get_type() != col_type_String && col_key.get_type() != col_type_Mixed)
+            continue;
+
         REALM_ASSERT_DEBUG(col_key.get_index().val == idx);
         // maintain sufficient size of interner arrays to cover all columns
         while (idx >= m_string_interners.size()) {

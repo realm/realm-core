@@ -210,8 +210,6 @@ public:
         update_width_cache_from_header();
     }
 
-    size_t size() const noexcept;
-
     bool is_empty() const noexcept
     {
         return size() == 0;

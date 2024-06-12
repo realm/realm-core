@@ -16,8 +16,9 @@
  *
  **************************************************************************/
 
-#include <realm/array_string.hpp>
 #include <realm/impl/array_writer.hpp>
+#include <realm/array_string.hpp>
+#include <realm/string_interner.hpp>
 #include <realm/spec.hpp>
 #include <realm/mixed.hpp>
 

@@ -21,7 +21,6 @@
 
 #include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
-#include <realm/string_interner.hpp>
 
 #include <iostream>
 
@@ -352,6 +351,7 @@ class ArrayWriterBase;
 }
 
 /// Base class for all nodes holding user data
+class StringInterner;
 class ArrayPayload {
 public:
     virtual ~ArrayPayload();
