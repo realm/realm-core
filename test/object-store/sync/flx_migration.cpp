@@ -908,21 +908,16 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
         shared_object.persisted_properties.push_back({"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
         config->schema = {shared_object, locally_added};
 
-        async_open_realm(*config, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(ref);
-            REQUIRE_FALSE(error);
+        auto realm = successfully_async_open_realm(*config);
 
-            auto realm = Realm::get_shared_realm(std::move(ref));
+        auto table = realm->read_group().get_table("class_Object");
+        REQUIRE(table->size() == 0);
+        REQUIRE(num_before_reset_notifications == 1);
+        REQUIRE(num_after_reset_notifications == 1);
 
-            auto table = realm->read_group().get_table("class_Object");
-            REQUIRE(table->size() == 0);
-            REQUIRE(num_before_reset_notifications == 1);
-            REQUIRE(num_after_reset_notifications == 1);
-
-            auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
-            REQUIRE(locally_added_table);
-            REQUIRE(locally_added_table->size() == 0);
-        });
+        auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
+        REQUIRE(locally_added_table);
+        REQUIRE(locally_added_table->size() == 0);
     }
 
     SECTION("initial state") {
@@ -941,21 +936,16 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
                 {"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
             config->schema = {shared_object, locally_added};
 
-            async_open_realm(*config, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
-                REQUIRE(ref);
-                REQUIRE_FALSE(error);
+            auto realm = successfully_async_open_realm(*config);
 
-                auto realm = Realm::get_shared_realm(std::move(ref));
+            auto table = realm->read_group().get_table("class_Object");
+            REQUIRE(table->size() == 1);
+            REQUIRE(num_before_reset_notifications == 1);
+            REQUIRE(num_after_reset_notifications == 1);
 
-                auto table = realm->read_group().get_table("class_Object");
-                REQUIRE(table->size() == 1);
-                REQUIRE(num_before_reset_notifications == 1);
-                REQUIRE(num_after_reset_notifications == 1);
-
-                auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
-                REQUIRE(locally_added_table);
-                REQUIRE(locally_added_table->size() == 0);
-            });
+            auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
+            REQUIRE(locally_added_table);
+            REQUIRE(locally_added_table->size() == 0);
         }
     }
 }
