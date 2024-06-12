@@ -360,9 +360,8 @@ ref_type ArrayMixed::typed_write(ref_type top_ref, _impl::ArrayWriterBase& out, 
      2. int and pair int arrays, they are used for storing integers, timestamps, floats, doubles,
      decimals, links. In general we can compress them, but we need to be careful, controlling the col_type
      should prevent compressing data that we want to leave in the current format.
-     3. string array is for strings and binary data (no compression for now)
-     4. ref array is actually storing refs to collections. they can only be BPlusTree<int, Mixed> or
-     BPlusTree<string, Mixed>.
+     3. string array is for strings and binary data
+     4. ref array is actually storing refs to collections. They can only be Lst<Mixed> or Dictionary.
      5. key array stores unique identifiers for collections in mixed (integers that can be compressed)
      */
     Array composite(alloc);
@@ -372,41 +371,48 @@ ref_type ArrayMixed::typed_write(ref_type top_ref, _impl::ArrayWriterBase& out, 
         auto ref = top.get(i);
         ref_type new_ref = ref;
         if (ref && !(out.only_modified && alloc.is_read_only(ref))) {
-            if (i < 3) { // int, and pair_int
-                // integer arrays
-                new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
-            }
-            else if (i == 4) { // collection in mixed
-                ArrayRef arr_ref(alloc);
-                arr_ref.init_from_ref(ref);
-                auto ref_sz = arr_ref.size();
-                TempArray written_ref_leaf(ref_sz);
+            switch (i) {
+                case payload_idx_int:
+                    // integer array
+                    new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
+                    break;
+                case payload_idx_pair:
+                    // integer array
+                    new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
+                    break;
+                case payload_idx_str:
+                    new_ref = ArrayString::typed_write(ref, out, alloc);
+                    break;
+                case payload_idx_ref: {
+                    // collection in mixed
+                    ArrayRef arr_ref(alloc);
+                    arr_ref.init_from_ref(ref);
+                    auto ref_sz = arr_ref.size();
+                    TempArray written_ref_leaf(ref_sz);
 
-                for (size_t k = 0; k < ref_sz; k++) {
-                    ref_type new_sub_ref = 0;
-                    if (auto sub_ref = arr_ref.get(k)) {
-                        auto header = alloc.translate(sub_ref);
-                        // Now we have to find out if the nested collection is a
-                        // dictionary or a list. If the top array has a size of 2
-                        // and it is not a BplusTree inner node, then it is a dictionary
-                        if (NodeHeader::get_size_from_header(header) == 2 &&
-                            !NodeHeader::get_is_inner_bptree_node_from_header(header)) {
-                            new_sub_ref = Dictionary::typed_write(sub_ref, out, alloc);
+                    for (size_t k = 0; k < ref_sz; k++) {
+                        ref_type new_sub_ref = 0;
+                        if (auto sub_ref = arr_ref.get(k)) {
+                            auto header = alloc.translate(sub_ref);
+                            // Now we have to find out if the nested collection is a
+                            // dictionary or a list. If the top array has a size of 2
+                            // and it is not a BplusTree inner node, then it is a dictionary
+                            if (NodeHeader::get_size_from_header(header) == 2 &&
+                                !NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+                                new_sub_ref = Dictionary::typed_write(sub_ref, out, alloc);
+                            }
+                            else {
+                                new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, alloc);
+                            }
                         }
-                        else {
-                            new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, alloc);
-                        }
+                        written_ref_leaf.set_as_ref(k, new_sub_ref);
                     }
-                    written_ref_leaf.set_as_ref(k, new_sub_ref);
+                    new_ref = written_ref_leaf.write(out);
+                    break;
                 }
-                new_ref = written_ref_leaf.write(out);
-            }
-            else if (i == 5) { // unique keys associated to collections in mixed
-                new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
-            }
-            else {
-                // all the rest we don't want to compress it, at least for now (strings will be needed)
-                new_ref = Array::write(ref, alloc, out, out.only_modified, false);
+                case payload_idx_key:
+                    new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
+                    break;
             }
         }
         written_leaf.set(i, new_ref);
@@ -451,6 +457,7 @@ void ArrayMixed::ensure_string_array() const
             m_strings.create();
             m_strings.update_parent();
         }
+        m_strings.set_string_interner(m_string_interner);
     }
 }
 

@@ -5541,6 +5541,7 @@ TEST(Query_LinkToDictionary)
 {
     Group g;
     auto target = g.add_table("target");
+    target->add_column(type_Int, "dummy"); // Ensure that dict_col get index 1
     auto dict_col = target->add_column_dictionary(type_String, "string", true);
     auto source = g.add_table("source");
     auto link_col = source->add_column(*target, "link");

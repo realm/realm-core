@@ -18,7 +18,7 @@
 
 #include <realm/array_string.hpp>
 #include <realm/impl/array_writer.hpp>
-#include <realm/spec.hpp>
+#include <realm/table.hpp>
 #include <realm/mixed.hpp>
 
 using namespace realm;
@@ -536,18 +536,39 @@ void ArrayString::verify() const
 #endif
 }
 
-ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interner)
+template <>
+ref_type ArrayString::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
 {
-    REALM_ASSERT(interner);
-    // we have to write out all, modified or not, to match the total cleanup
-    Array interned(Allocator::get_default());
-    auto sz = size();
-    interned.create(NodeHeader::type_Normal, true, sz);
-    for (size_t i = 0; i < sz; ++i) {
-        interned.set(i, interner->intern(get(i)));
+    Array leaf(alloc);
+    leaf.init_from_ref(ref);
+    ref_type ret_val;
+    auto header = leaf.get_header();
+    if (NodeHeader::get_hasrefs_from_header(header) ||
+        NodeHeader::get_wtype_from_header(header) == NodeHeader::wtype_Multiply) {
+        // We're interning these strings
+        ArrayString as(alloc);
+        as.init_from_ref(ref);
+        StringInterner* interner = out.table->get_string_interner(out.col_key);
+        auto sz = as.size();
+        Array interned(Allocator::get_default());
+        interned.create(NodeHeader::type_Normal, true, sz);
+        for (size_t i = 0; i < sz; ++i) {
+            interned.set(i, interner->intern(as.get(i)));
+        }
+        ret_val = interned.write(out, false, false, out.compress);
+        interned.destroy();
+        // in a transactional setting:
+        // Destroy all sub-arrays if present, in order to release memory in file
+        // This is contrary to the rest of the handling in this function, but needed
+        // here since sub-arrays may not have been COW'ed and therefore not freed in file.
+        // We rely on 'only_modified' to indicate that we're in a transactional setting.
+        if (out.only_modified)
+            leaf.destroy_deep(true);
     }
-    auto retval = interned.write(out, false, false, out.compress);
-    interned.destroy();
-    return retval;
-    // return m_arr->write(out, true, false, false);
+    else {
+        // whether it's the old enum strings or the new interned strings,
+        // just write out the array using integer leaf compression
+        ret_val = leaf.write(out, false, out.only_modified, out.compress);
+    }
+    return ret_val;
 }

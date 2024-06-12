@@ -20,6 +20,7 @@
 #define REALM_ARRAY_WRITER_HPP
 
 #include <realm/alloc.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 class Table;
@@ -30,6 +31,7 @@ public:
     bool only_modified = true;
     bool compress = true;
     const Table* table;
+    ColKey col_key;
     virtual ~ArrayWriterBase()
     {
     }
