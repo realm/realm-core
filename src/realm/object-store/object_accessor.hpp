@@ -176,6 +176,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
             ContextType child_ctx(ctx, m_obj, property);
             m_obj.set_collection(col, CollectionType::Dictionary);
             object_store::Dictionary dict(m_realm, m_obj, col);
+            dict.remove_all();
             dict.assign(child_ctx, value, policy);
             ctx.did_change();
             return;
@@ -184,6 +185,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
             ContextType child_ctx(ctx, m_obj, property);
             m_obj.set_collection(col, CollectionType::List);
             List list(m_realm, m_obj, col);
+            list.remove_all();
             list.assign(child_ctx, value, policy);
             ctx.did_change();
             return;

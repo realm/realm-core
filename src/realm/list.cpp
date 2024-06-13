@@ -503,10 +503,10 @@ void Lst<Mixed>::remove(size_t from, size_t to)
 
 void Lst<Mixed>::clear()
 {
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_clear(*this);
+    }
     if (size() > 0) {
-        if (Replication* repl = Base::get_replication()) {
-            repl->list_clear(*this);
-        }
         CascadeState state;
         bool recurse = remove_backlinks(state);
 

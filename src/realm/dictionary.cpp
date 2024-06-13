@@ -823,10 +823,10 @@ size_t Dictionary::find_first(Mixed value) const
 
 void Dictionary::clear()
 {
+    if (Replication* repl = get_replication()) {
+        repl->dictionary_clear(*this);
+    }
     if (size() > 0) {
-        if (Replication* repl = get_replication()) {
-            repl->dictionary_clear(*this);
-        }
         CascadeState cascade_state(CascadeState::Mode::Strong);
         bool recurse = remove_backlinks(cascade_state);
 
