@@ -106,6 +106,7 @@ public:
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
 
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
+    size_t find_first_in_range(Timestamp from, Timestamp to, size_t start, size_t end) const;
 
     void verify() const;
 

@@ -192,20 +192,25 @@ TEST(Query_FindAll2)
     CHECK_EQUAL(6, tv2[0].get<Int>(col_id));
 }
 
-TEST(Query_FindAllBetween)
+TEST_TYPES(Query_FindAllBetween, std::true_type, std::false_type)
 {
     Table ttt;
     auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_int = ttt.add_column(type_Int, "1", TEST_TYPE::value);
     ttt.add_column(type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
     ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set(col_id, 7); // null or 0
     ttt.create_object().set_all(3, 4, "a");
     ttt.create_object().set_all(4, 5, "a");
     ttt.create_object().set_all(5, 11, "X");
     ttt.create_object().set_all(6, 3, "X");
+
+    Query q1 = ttt.where().between(col_int, 100, 200);
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(tv1.size(), 0);
 
     Query q2 = ttt.where().between(col_int, 3, 5);
     TableView tv2 = q2.find_all();
