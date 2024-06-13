@@ -9,6 +9,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Valgrind could report a branch on an uninitialized read when opening something that is not an encrypted Realm file as an encrypted Realm file ([PR #7789](https://github.com/realm/realm-core/pull/7789), since v14.10.0).
 * Opening an FLX realm asynchronously may not wait to download all data ([#7720](https://github.com/realm/realm-core/issues/7720), since FLX sync was introduced).
+* Clearing a List of Mixed in an upgraded file would lead to an assertion failing ([#7771](https://github.com/realm/realm-core/issues/7771), since 14.0.0)
 * Fix compilation with Xcode 16 ([PR #7802](https://github.com/realm/realm-core/pull/7802))
 
 ### Breaking changes
