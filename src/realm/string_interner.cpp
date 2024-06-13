@@ -399,11 +399,9 @@ void StringInterner::rebuild_internal()
     for (size_t idx = 0; idx < m_compressed_leafs.size(); ++idx) {
         auto ref = m_data.get_as_ref(idx);
         auto& leaf_meta = m_compressed_leafs[idx];
-        // if (ref != leaf_meta.m_leaf_ref) {
         leaf_meta.m_is_loaded = false;
         leaf_meta.m_compressed.clear();
         leaf_meta.m_leaf_ref = ref;
-        //}
     }
 }
 

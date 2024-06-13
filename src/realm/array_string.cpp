@@ -550,5 +550,4 @@ ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interne
     auto retval = interned.write(out, false, false, out.compress);
     interned.destroy();
     return retval;
-    // return m_arr->write(out, true, false, false);
 }

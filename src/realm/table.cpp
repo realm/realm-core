@@ -542,6 +542,7 @@ void Table::remove_column(ColKey col_key)
     erase_root_column(col_key); // Throws
     m_has_any_embedded_objects.reset();
     auto i = col_key.get_index().val;
+
     if (i < m_string_interners.size() && m_string_interners[i])
         m_string_interners[i].reset();
 }
@@ -1122,7 +1123,6 @@ void Table::do_erase_root_column(ColKey col_key)
         if (data_ref)
             Array::destroy_deep(data_ref, m_alloc);
         m_interner_data.set(col_ndx, 0);
-        // m_string_interners[col_ndx]->update_from_parent(true);
         m_string_interners[col_ndx].reset();
     }
     bump_content_version();
