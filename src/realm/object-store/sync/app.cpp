@@ -159,7 +159,7 @@ HttpHeaders get_request_headers(const std::shared_ptr<User>& user, RequestTokenT
 
 std::string trim_base_url(std::string base_url)
 {
-    while (base_url.back() == '/') {
+    while (!base_url.empty() && base_url.back() == '/') {
         base_url.pop_back();
     }
 
