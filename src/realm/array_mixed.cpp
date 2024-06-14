@@ -215,7 +215,9 @@ void ArrayMixed::clear()
     Array::set(payload_idx_int, 0);
     Array::set(payload_idx_pair, 0);
     Array::set(payload_idx_str, 0);
-    Array::set(payload_idx_ref, 0);
+    if (Array::size() > payload_idx_ref) {
+        Array::set(payload_idx_ref, 0);
+    }
     if (Array::size() > payload_idx_key) {
         if (auto ref = Array::get_as_ref(payload_idx_key)) {
             Array::destroy(ref, m_composite.get_alloc());
