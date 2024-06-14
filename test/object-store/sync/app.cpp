@@ -3282,6 +3282,48 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
+
+TEST_CASE("app: trailing slash in base url", "[sync][app]") {
+    auto logger = util::Logger::get_default_logger();
+
+    const auto schema = get_default_schema();
+
+    SyncServer server({});
+    auto transport = std::make_shared<HookedTransport<UnitTestTransport>>();
+    auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "");
+    OfflineAppSession::Config oas_config(transport);
+    oas_config.base_url = util::format("http://localhost:%1/", server.port());
+    oas_config.socket_provider = socket_provider;
+    OfflineAppSession oas(oas_config);
+    AutoVerifiedEmailCredentials creds;
+    auto app = oas.app();
+    const auto partition = random_string(100);
+
+    transport->request_hook = [&](const Request& req) -> std::optional<Response> {
+        if (req.url.find("/location") == std::string::npos) {
+            return std::nullopt;
+        }
+
+        REQUIRE(req.url == util::format("http://localhost:%1/api/client/v2.0/app/app_id/location", server.port()));
+        return Response{
+            200,
+            0,
+            {},
+            nlohmann::json(nlohmann::json::object({
+                               {"hostname", util::format("http://localhost:%1", server.port())},
+                               {"ws_hostname", util::format("ws://localhost:%1", server.port())},
+                               {"sync_route", util::format("ws://localhost:%1/realm-sync", server.port())},
+                           }))
+                .dump(),
+        };
+    };
+
+    SyncTestFile realm_config(oas, "test");
+
+    auto r = Realm::get_shared_realm(realm_config);
+    REQUIRE(!wait_for_download(*r));
+}
+
 TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
     auto logger = util::Logger::get_default_logger();
 

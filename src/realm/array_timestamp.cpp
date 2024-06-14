@@ -236,6 +236,23 @@ size_t ArrayTimestamp::find_first<NotEqual>(Timestamp value, size_t begin, size_
     return not_found;
 }
 
+size_t ArrayTimestamp::find_first_in_range(Timestamp from, Timestamp to, size_t start, size_t end) const
+{
+    while (start < end) {
+        start = m_seconds.find_first_in_range(from.get_seconds(), to.get_seconds(), start, end);
+        if (start != realm::not_found) {
+            util::Optional<int64_t> seconds = m_seconds.get(start);
+            int32_t nanos = int32_t(m_nanoseconds.get(start));
+            if ((from.get_seconds() < *seconds || from.get_nanoseconds() <= nanos) &&
+                (to.get_seconds() > *seconds || nanos <= to.get_nanoseconds()))
+                return start;
+            start++;
+        }
+    }
+    return not_found;
+}
+
+
 void ArrayTimestamp::verify() const
 {
 #ifdef REALM_DEBUG

@@ -68,10 +68,7 @@ private:
 
     void async_open_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
         REQUIRES(!m_mutex);
-    void attach_to_subscription_initializer(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, bool)
-        REQUIRES(!m_mutex);
-    void migrate_schema_or_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
-        REQUIRES(!m_mutex);
+    void migrate_schema_or_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>) REQUIRES(!m_mutex);
     void wait_for_bootstrap_or_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
         REQUIRES(!m_mutex);
 
