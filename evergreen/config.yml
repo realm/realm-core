@@ -1380,7 +1380,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    enable_bass_redirector: On
+    enable_baas_redirector: On
   tasks:
   - name: only_baas_integration_tests
 
@@ -1792,6 +1792,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     enable_llvm_coverage: On
     coveralls_flag_name: "ubuntu-x86_64"
+    enable_baas_redirector: On
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-x86_64-unknown-linux-gnu.tar.bz2"
   tasks:
   - name: compile_test_coverage
