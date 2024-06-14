@@ -40,7 +40,7 @@ class StringCompressor;
 
 struct CachedString {
     uint8_t m_weight = 0;
-    std::string m_decompressed;
+    std::unique_ptr<std::string> m_decompressed;
 };
 
 class StringInterner {

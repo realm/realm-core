@@ -1116,14 +1116,16 @@ void Table::do_erase_root_column(ColKey col_key)
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.pop_back();
     }
-    if (col_ndx < m_string_interners.size() && m_string_interners[col_ndx]) {
-        REALM_ASSERT_DEBUG(m_interner_data.is_attached());
-        REALM_ASSERT_DEBUG(col_ndx < m_interner_data.size());
-        auto data_ref = m_interner_data.get_as_ref(col_ndx);
-        if (data_ref)
-            Array::destroy_deep(data_ref, m_alloc);
-        m_interner_data.set(col_ndx, 0);
-        m_string_interners[col_ndx].reset();
+    if (col_key.get_type() == col_type_String || col_key.get_type() == col_type_Mixed) {
+        if (col_ndx < m_string_interners.size() && m_string_interners[col_ndx]) {
+            REALM_ASSERT_DEBUG(m_interner_data.is_attached());
+            REALM_ASSERT_DEBUG(col_ndx < m_interner_data.size());
+            auto data_ref = m_interner_data.get_as_ref(col_ndx);
+            if (data_ref)
+                Array::destroy_deep(data_ref, m_alloc);
+            m_interner_data.set(col_ndx, 0);
+            m_string_interners[col_ndx].reset();
+        }
     }
     bump_content_version();
     bump_storage_version();
