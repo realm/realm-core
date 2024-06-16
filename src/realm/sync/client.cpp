@@ -1216,6 +1216,10 @@ bool SessionWrapper::has_flx_subscription_store() const
 void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
 {
     REALM_ASSERT(!m_finalized);
+    // Don't report errors on server initiated bootstraps to the subscription store
+    if (m_flx_active_version == version) {
+        return;
+    }
     get_flx_subscription_store()->update_state(version, SubscriptionSet::State::Error, err_msg);
 }
 
@@ -1243,6 +1247,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             // Cannot be called with this value.
             REALM_UNREACHABLE();
         case DownloadBatchState::LastInBatch:
+            // Server initiated bootstraps don't go through the subscription store
             if (m_flx_active_version == new_version) {
                 return;
             }
@@ -1256,7 +1261,9 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             }
             break;
         case DownloadBatchState::MoreToCome:
-            if (m_flx_last_seen_version == new_version) {
+            // Skip if this bootstrap version has already been seen or is a server
+            // initiated bootstrap.
+            if (m_flx_last_seen_version == new_version || m_flx_active_version == new_version) {
                 return;
             }
 
@@ -1666,6 +1673,7 @@ void SessionWrapper::on_download_completion()
         m_sync_completion_handlers.pop_back();
     }
 
+    // If there is a query bootstrap in progress, then complete it now
     if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
         m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
                              m_flx_pending_mark_version);
