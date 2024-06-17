@@ -59,7 +59,48 @@ TEST(StringInterner_Basic_Creation)
     CHECK(string_interner.compare(*stored_id, id) == 0); // compare agaist self.
 }
 
-TEST(StringInterner_Creation_Multiple_Strings)
+ONLY(StringInterner_Creation_Multiple_String_One_ColKey)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    const auto colkey = table->add_column(type_String, "string");
+    auto obj = table->create_object();
+
+    Allocator& alloc = obj.get_alloc();
+    Array dummy_parent{alloc};
+    dummy_parent.create(realm::NodeHeader::type_HasRefs);
+    dummy_parent.add(0);
+    StringID prev_string_id{0};
+
+    // every leaf can contain max 15 entries, after thant it
+    // a new leaf is added. So this loop should hit this limit
+
+    for (size_t i = 0; i < 20; ++i) {
+        std::string my_string = "aaaaaaaaaaaaaaa" + std::to_string(i);
+        obj.set(colkey, StringData(my_string));
+
+
+        auto string_interner = std::make_unique<StringInterner>(alloc, dummy_parent, colkey, true);
+
+        const auto& db_string = obj.get_any(colkey).get_string();
+        auto id = string_interner->intern(db_string);
+
+        CHECK(prev_string_id == id - 1);
+        // id 16, one full leaf with values, searching for the 16th string  is failing.
+        const auto stored_id = string_interner->lookup(StringData(db_string));
+        CHECK(stored_id);
+        CHECK(*stored_id == id);
+
+        CHECK(string_interner->compare(StringData(my_string), *stored_id) == 0); // should be equal
+        const auto origin_string = string_interner->get(id);
+        CHECK(obj.get_any(colkey).get_string() == origin_string);
+
+        CHECK(string_interner->compare(*stored_id, id) == 0); // compare agaist self.
+        prev_string_id = id;
+    }
+}
+
+TEST(StringInterner_Creation_Multiple_String_ColKey)
 {
     Group group;
     TableRef table = group.add_table("test");
