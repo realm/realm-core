@@ -175,11 +175,11 @@ private:
 
     void send_simple_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, std::string body)
     {
+        m_logger->debug("Redirector sending http response %1: %2 \"%3\"", status, reason, body);
         HTTPResponse resp;
         resp.status = status;
         resp.reason = std::move(reason);
         resp.body = std::move(body);
-        m_logger->debug("Redirector sending http response %1: %2 \"%3\"", status, reason, body);
         conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
             if (ec && ec != util::error::operation_aborted) {
                 m_logger->warn("Error sending redirector response: %1", ec);
