@@ -210,6 +210,7 @@ private:
                 if (ec != util::error::operation_aborted) {
                     m_logger->warn("Error sending websocket HTTP upgrade response: %1", ec);
                 }
+                return;
             }
 
             conn->websocket.emplace(*conn);
