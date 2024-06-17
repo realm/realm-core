@@ -1046,7 +1046,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         realm->cancel_transaction();
                         return value == 6;
                     },
-                    std::chrono::seconds(20));
+                    std::chrono::seconds(20), std::chrono::milliseconds(500));
             }
             // We can't be sure that the 'after' callback has been called yet
             timed_sleeping_wait_for(

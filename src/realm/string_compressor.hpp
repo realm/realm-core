@@ -19,11 +19,13 @@
 #ifndef REALM_STRING_COMPRESSOR_HPP
 #define REALM_STRING_COMPRESSOR_HPP
 
+#include <realm/array_unsigned.hpp>
 #include <realm/utilities.hpp>
 #include <vector>
 
 using CompressionSymbol = uint16_t;
 using CompressedString = std::vector<CompressionSymbol>;
+
 struct CompressedStringView {
     CompressionSymbol* data = 0;
     uint32_t size = 0;
@@ -51,11 +53,6 @@ struct CompressedStringView {
 };
 
 namespace realm {
-
-class ArrayUnsigned;
-class Array;
-class Allocator;
-
 class StringCompressor {
 public:
     StringCompressor(Allocator& alloc, Array& parent, size_t index, bool writable);
@@ -90,7 +87,7 @@ private:
     std::vector<ExpandedSymbolDef> m_symbols; // map from symbol -> symbolpair, 2 elements pr entry
     std::vector<SymbolDef> m_compression_map; // perfect hash from symbolpair to its symbol
 
-    std::unique_ptr<ArrayUnsigned> m_data;
+    ArrayUnsigned m_data;
     constexpr static size_t storage_chunk_size = 4096;
     std::vector<std::string> m_expansion_storage;
 };

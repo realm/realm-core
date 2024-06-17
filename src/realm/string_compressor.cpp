@@ -17,19 +17,18 @@
  **************************************************************************/
 
 #include <realm/string_compressor.hpp>
+#include <realm/string_interner.hpp>
 #include <realm/string_data.hpp>
-
-#include <realm/array_unsigned.hpp>
 
 #include <iostream>
 namespace realm {
 
 StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index, bool writable)
+    : m_data(alloc)
 {
     m_compression_map.resize(16); // start with a very small compression map
     m_symbols.reserve(65536);
-    m_data = std::make_unique<ArrayUnsigned>(alloc);
-    m_data->set_parent(&parent, index);
+    m_data.set_parent(&parent, index);
     refresh(writable);
 }
 
@@ -37,16 +36,16 @@ void StringCompressor::refresh(bool writable)
 {
     // we assume that compressors are only created from a valid parent.
     // String interners in 'dead' mode should never instantiate a string compressor.
-    if (m_data->get_ref_from_parent() == 0) {
+    if (m_data.get_ref_from_parent() == 0) {
         REALM_ASSERT(writable);
-        m_data->create(0, 65535);
-        m_data->update_parent();
+        m_data.create(0, 65535);
+        m_data.update_parent();
     }
     else {
-        if (m_data->is_attached())
-            m_data->update_from_parent();
+        if (m_data.is_attached())
+            m_data.update_from_parent();
         else
-            m_data->init_from_ref(m_data->get_ref_from_parent());
+            m_data.init_from_ref(m_data.get_ref_from_parent());
     }
     rebuild_internal();
 }
@@ -111,7 +110,7 @@ void StringCompressor::expand_compression_map()
 
 void StringCompressor::rebuild_internal()
 {
-    auto num_symbols = m_data->size();
+    auto num_symbols = m_data.size();
     if (num_symbols == m_symbols.size())
         return;
     if (num_symbols < m_symbols.size()) {
@@ -132,7 +131,7 @@ void StringCompressor::rebuild_internal()
     }
     // we have new symbols to add
     for (size_t i = m_symbols.size(); i < num_symbols; ++i) {
-        auto pair = m_data->get(i);
+        auto pair = m_data.get(i);
         SymbolDef def;
         def.id = (CompressionSymbol)(i + 256);
         def.expansion_a = 0xFFFF & (pair >> 16);
@@ -198,13 +197,13 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
                 if (m_symbols.size() < (65536 - 256) && learn) {
                     // define a new symbol for this entry and use it.
                     REALM_ASSERT_DEBUG(m_compression_map[hash].id == 0);
-                    REALM_ASSERT_DEBUG(m_symbols.size() == m_data->size());
-                    REALM_ASSERT_DEBUG(m_data->is_attached());
+                    REALM_ASSERT_DEBUG(m_symbols.size() == m_data.size());
+                    REALM_ASSERT_DEBUG(m_data.is_attached());
                     CompressionSymbol id = (CompressionSymbol)(256 + m_symbols.size());
                     SymbolDef def{id, from[0], from[1]};
                     m_compression_map[hash] = def;
                     add_expansion(def);
-                    m_data->add(((uint64_t)from[0]) << 16 | from[1]);
+                    m_data.add(((uint64_t)from[0]) << 16 | from[1]);
                     // std::cerr << id << " = {" << from[0] << ", " << from[1] << "}" << std::endl;
                     *to++ = id;
                     from += 2;

@@ -314,18 +314,6 @@ void Array::destroy_children(size_t offset, bool ro_only) noexcept
     }
 }
 
-// size_t Array::get_byte_size() const noexcept
-//{
-//     const auto header = get_header();
-//     auto num_bytes = get_byte_size_from_header(header);
-//     auto read_only = m_alloc.is_read_only(m_ref) == true;
-//     auto capacity = get_capacity_from_header(header);
-//     auto bytes_ok = num_bytes <= capacity;
-//     REALM_ASSERT(read_only || bytes_ok);
-//     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-//     return num_bytes;
-// }
-
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
     // here we might want to compress the array and write down.
@@ -605,14 +593,6 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
         int64_t v = old_getter(*this, i);
         m_vtable->setter(*this, i, v);
     }
-}
-
-size_t Array::size() const noexcept
-{
-    // in case the array is in compressed format. Never read directly
-    // from the header the size, since it will result very likely in a cache miss.
-    // For compressed arrays m_size should always be kept updated, due to init_from_mem
-    return m_size;
 }
 
 bool Array::compress_array(Array& arr) const

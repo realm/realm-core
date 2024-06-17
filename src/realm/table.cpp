@@ -36,6 +36,7 @@
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
 #include <realm/util/serializer.hpp>
+#include <realm/string_interner.hpp>
 
 #include <stdexcept>
 
