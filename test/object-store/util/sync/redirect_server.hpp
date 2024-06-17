@@ -175,14 +175,14 @@ private:
 
     void send_simple_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, std::string body)
     {
-        m_logger->debug("Redirector sending http response %1: %2 \"%3\"", status, reason, body);
+        m_logger->debug("sending http response %1: %2 \"%3\"", status, reason, body);
         HTTPResponse resp;
         resp.status = status;
         resp.reason = std::move(reason);
         resp.body = std::move(body);
         conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
             if (ec && ec != util::error::operation_aborted) {
-                m_logger->warn("Error sending redirector response: %1", ec);
+                m_logger->warn("Error sending response: %1", ec);
             }
         });
     }
@@ -208,7 +208,7 @@ private:
         conn->http_server.async_send_response(*maybe_resp, [this, conn](std::error_code ec) {
             if (ec) {
                 if (ec != util::error::operation_aborted) {
-                    m_logger->warn("Error sending redirector websocket HTTP upgrade response: %1", ec);
+                    m_logger->warn("Error sending websocket HTTP upgrade response: %1", ec);
                 }
                 return;
             }
@@ -233,7 +233,7 @@ private:
             }
             do_accept();
             if (ec) {
-                m_logger->error("Error accepting new connection in redirector: %1", ec);
+                m_logger->error("Error accepting new connection in: %1", ec);
                 return;
             }
 
