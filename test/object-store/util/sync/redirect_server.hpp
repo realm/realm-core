@@ -27,6 +27,8 @@
 #include <realm/util/uri.hpp>
 #include <external/json/json.hpp>
 
+#include <catch2/catch_all.hpp>
+
 #include <thread>
 
 namespace realm::sync {
@@ -53,6 +55,7 @@ public:
 
     ~RedirectingHttpServer()
     {
+        m_acceptor.cancel();
         m_service.stop();
         m_server_thread.join();
     }
@@ -94,12 +97,14 @@ private:
 
     struct Conn : public util::RefCountBase, websocket::Config {
         Conn(network::Service& service, const std::shared_ptr<util::Logger>& logger)
-            : logger(logger)
+            : random(Catch::getSeed())
+            , logger(logger)
             , socket(service)
             , http_server(socket, logger)
         {
         }
 
+        // Implement the websocket::Config interface
         const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept override
         {
             return logger;
@@ -168,10 +173,63 @@ private:
         std::optional<websocket::Socket> websocket;
     };
 
+    void send_simple_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, std::string body)
+    {
+        HTTPResponse resp;
+        resp.status = status;
+        resp.reason = std::move(reason);
+        resp.body = std::move(body);
+        m_logger->debug("Sending http response %1: %2", status, reason);
+        conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
+            if (ec && ec != util::error::operation_aborted) {
+                m_logger->warn("Error sending response: %1", ec);
+            }
+        });
+    }
+
+    void do_websocket_redirect(util::bind_ptr<Conn> conn, const HTTPRequest& req)
+    {
+        auto protocol_it = req.headers.find("Sec-WebSocket-Protocol");
+        REALM_ASSERT(protocol_it != req.headers.end());
+        auto protocols = protocol_it->second;
+
+        auto first_comma = protocols.find(',');
+        std::string protocol;
+        if (first_comma == std::string::npos) {
+            protocol = protocols;
+        }
+        else {
+            protocol = protocols.substr(0, first_comma);
+        }
+        std::error_code ec;
+        auto maybe_resp = websocket::make_http_response(req, protocol, ec);
+        REALM_ASSERT(maybe_resp);
+        REALM_ASSERT(!ec);
+        conn->http_server.async_send_response(*maybe_resp, [this, conn](std::error_code ec) {
+            if (ec) {
+                if (ec != util::error::operation_aborted) {
+                    m_logger->warn("Error sending websocket HTTP upgrade response: %1", ec);
+                }
+            }
+
+            conn->websocket.emplace(*conn);
+            conn->websocket->initiate_server_websocket_after_handshake();
+
+            static const std::string_view msg("\x0f\xa3Permanently moved");
+            conn->websocket->async_write_close(msg.data(), msg.size(), [conn](std::error_code, size_t) {
+                conn->logger->debug("Sent close frame with move code");
+                conn->websocket.reset();
+            });
+        });
+    }
+
     void do_accept()
     {
         auto conn = util::make_bind<Conn>(m_service, m_logger);
         m_acceptor.async_accept(conn->socket, [this, conn](std::error_code ec) {
+            if (ec == util::error::operation_aborted) {
+                return;
+            }
             do_accept();
             if (ec) {
                 m_logger->error("Error accepting new connection: %1", ec);
@@ -180,25 +238,13 @@ private:
 
             conn->http_server.async_receive_request([this, conn](HTTPRequest req, std::error_code ec) {
                 if (ec) {
-                    m_logger->error("Error receiving HTTP request to redirect: %1", ec);
+                    if (ec != util::error::operation_aborted) {
+                        m_logger->error("Error receiving HTTP request to redirect: %1", ec);
+                    }
                     return;
                 }
 
-                auto send_simple_response = [&](HTTPStatus status, std::string reason) {
-                    HTTPResponse resp;
-                    resp.status = status;
-                    resp.reason = reason;
-                    m_logger->error("Sending http response %1: %2", status, reason);
-                    conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
-                        if (ec) {
-                            m_logger->warn("Error sending response: %1", ec);
-                        }
-                    });
-                };
                 if (req.path.find("/location") != std::string::npos) {
-                    HTTPResponse resp;
-                    resp.status = HTTPStatus::Ok;
-                    resp.reason = "Ok";
                     std::string_view base_url(m_redirect_to_base_url);
                     auto scheme = base_url.find("://");
                     auto ws_url = util::format("ws%1", base_url.substr(scheme));
@@ -206,59 +252,19 @@ private:
                                         {"location", "US-VA"},
                                         {"hostname", m_redirect_to_base_url},
                                         {"ws_hostname", ws_url}};
-                    resp.body = body.dump();
-                    m_logger->debug("sending fake location update: %1", resp.body);
-                    conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
-                        if (ec) {
-                            m_logger->warn("Error sending redirect response: %1", ec);
-                        }
-                    });
+                    auto body_str = body.dump();
+
+                    m_logger->debug("sending fake location update: %1", body_str);
+                    send_simple_response(conn, HTTPStatus::Ok, "Okay", std::move(body_str));
                     return;
                 }
 
                 if (req.path.find("/realm-sync") != std::string::npos) {
-                    auto protocol_it = req.headers.find("Sec-WebSocket-Protocol");
-                    if (protocol_it == req.headers.end()) {
-                        send_simple_response(HTTPStatus::InternalServerError,
-                                             "Could not find websocket protocol in request");
-                        return;
-                    }
-                    auto protocols = protocol_it->second;
-
-                    auto first_comma = protocols.find(',');
-                    std::string protocol;
-                    if (first_comma == std::string::npos) {
-                        protocol = protocols;
-                    }
-                    else {
-                        protocol = protocols.substr(0, first_comma);
-                    }
-                    std::error_code ec;
-                    auto maybe_resp = websocket::make_http_response(req, protocol, ec);
-                    if (!maybe_resp) {
-                        send_simple_response(HTTPStatus::InternalServerError,
-                                             "Could not generate HTTP response for websocket request");
-                        return;
-                    }
-                    m_logger->error("Sending websocket response");
-                    conn->http_server.async_send_response(*maybe_resp, [this, conn](std::error_code ec) {
-                        if (ec) {
-                            m_logger->warn("Error sending response: %1", ec);
-                        }
-
-                        conn->websocket.emplace(*conn);
-                        conn->websocket->initiate_server_websocket_after_handshake();
-
-                        static const std::string_view msg("\x0f\xa3Permanently moved");
-                        conn->websocket->async_write_close(msg.data(), msg.size(), [conn](std::error_code, size_t) {
-                            conn->logger->debug("Sent close frame with move code");
-                            conn->websocket.reset();
-                        });
-                    });
+                    do_websocket_redirect(conn, req);
                     return;
                 }
 
-                send_simple_response(HTTPStatus::NotFound, "Not found");
+                send_simple_response(conn, HTTPStatus::NotFound, "Not found", {});
             });
         });
     }

@@ -591,6 +591,24 @@ private:
     std::string m_mongo_endpoint;
 };
 
+static std::optional<sync::RedirectingHttpServer>& get_redirector(const std::string& base_url)
+{
+    static std::optional<sync::RedirectingHttpServer> redirector;
+    auto redirector_enabled = [&] {
+        const static auto enabled_values = {"On", "on", "1"};
+        auto enable_redirector = getenv_sv("ENABLE_BAAS_REDIRECTOR");
+        return std::any_of(enabled_values.begin(), enabled_values.end(), [&](const auto val) {
+            return val == enable_redirector;
+        });
+    };
+
+    if (redirector_enabled() && !redirector && !base_url.empty()) {
+        redirector.emplace(base_url, util::Logger::get_default_logger());
+    }
+
+    return redirector;
+}
+
 class BaasaasLauncher : public Catch::EventListenerBase {
 public:
     static std::optional<Baasaas>& get_baasaas_holder()
@@ -660,6 +678,10 @@ public:
 
     void testRunEnded(Catch::TestRunStats const&) override
     {
+        if (auto& redirector = get_redirector({})) {
+            redirector = std::nullopt;
+        }
+
         if (auto& baasaas_holder = get_baasaas_holder()) {
             baasaas_holder->stop();
         }
@@ -1204,17 +1226,8 @@ realm::Schema get_default_schema()
 std::string get_base_url()
 {
     auto base_url = get_real_base_url();
-    static std::optional<sync::RedirectingHttpServer> redirector;
-    auto redirector_enabled = [&] {
-        const static auto enabled_values = {"On", "on", "1"};
-        auto enable_redirector = getenv_sv("ENABLE_BAAS_REDIRECTOR");
-        return std::any_of(enabled_values.begin(), enabled_values.end(), [&](const auto val) {
-            return val == enable_redirector;
-        });
-    };
-    if (redirector_enabled() && !redirector) {
-        redirector.emplace(base_url, util::Logger::get_default_logger());
-    }
+
+    auto& redirector = get_redirector(base_url);
     if (redirector) {
         return redirector->base_url();
     }
