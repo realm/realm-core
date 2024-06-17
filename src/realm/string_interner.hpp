@@ -19,24 +19,25 @@
 #ifndef REALM_STRING_INTERNER_HPP
 #define REALM_STRING_INTERNER_HPP
 
+#include <realm/array_unsigned.hpp>
 #include <realm/utilities.hpp>
-#include <realm/string_compressor.hpp>
+#include <realm/array.hpp>
 #include <realm/keys.hpp>
 #include <realm/alloc.hpp>
 
 #include <unordered_map>
 #include <vector>
 #include <mutex>
+#include <string>
 
+struct CompressedStringView;
 
 namespace realm {
 
-
 using StringID = size_t;
 
-class Array;
-class ArrayUnsigned;
-class Allocator;
+class StringCompressor;
+
 struct CachedString {
     uint8_t m_weight = 0;
     std::unique_ptr<std::string> m_decompressed;
@@ -58,22 +59,22 @@ public:
 
 private:
     Array& m_parent; // need to be able to check if this is attached or not
-    std::unique_ptr<Array> m_top;
+    Array m_top;
     // Compressed strings are stored in blocks of 256.
     // One array holds refs to all blocks:
-    std::unique_ptr<Array> m_data;
+    Array m_data;
     // In-memory representation of a block. Either only the ref to it,
     // or a full vector of views into the block.
     struct DataLeaf;
     // in-memory metadata for faster access to compressed strings. Mirrors m_data.
     std::vector<DataLeaf> m_compressed_leafs;
     // 'm_hash_map' is used for mapping hash of uncompressed string to string id.
-    std::unique_ptr<Array> m_hash_map;
+    Array m_hash_map;
     // the block of compressed strings we're currently appending to:
-    std::unique_ptr<ArrayUnsigned> m_current_string_leaf;
+    ArrayUnsigned m_current_string_leaf;
     // an array of strings we're currently appending to. This is used instead
     // when ever we meet a string too large to be placed inline.
-    std::unique_ptr<Array> m_current_long_string_node;
+    Array m_current_long_string_node;
     void rebuild_internal();
     CompressedStringView& get_compressed(StringID id);
     // return true if the leaf was reloaded
