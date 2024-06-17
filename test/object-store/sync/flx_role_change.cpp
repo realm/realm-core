@@ -70,9 +70,9 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
     auto logger = util::Logger::get_default_logger();
 
     struct TestParams {
-        size_t num_emps = 100;
-        size_t num_mgrs = 10;
-        size_t num_dirs = 5;
+        size_t num_emps = 150;
+        size_t num_mgrs = 25;
+        size_t num_dirs = 10;
         std::optional<size_t> num_objects = std::nullopt;
         std::optional<size_t> max_download_bytes = std::nullopt;
         std::optional<size_t> sleep_millis = std::nullopt;
@@ -398,10 +398,12 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
             return setup_realm;
         };
 
-        // 500 emps, 10 mgrs, 5 dirs
+        // 150 emps, 25 mgrs, 10 dirs
         // 10 objects before flush
-        // 1000 download soft max bytes
-        TestParams params{100, 10, 5, 10, 3096};
+        // 3096 download soft max bytes
+        TestParams params{};
+        params.num_objects = 10;
+        params.max_download_bytes = 3096;
         if (!harness) {
             harness = std::make_unique<FLXSyncTestHarness>(
                 "flx_role_change_bootstraps", FLXSyncTestHarness::ServerSchema{g_person_schema, {"role", "name"}});
@@ -511,8 +513,10 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
             }
         }
 
+        // Add new sections before this
         SECTION("Pending changes are lost if not allowed after role change") {
-            std::vector<ObjectId> obj_ids;
+            std::vector<ObjectId> emp_ids;
+            std::vector<ObjectId> mgr_ids;
             auto config = harness->make_test_file();
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 REQUIRE(!error.is_fatal); // No fatal errors please
@@ -522,31 +526,33 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
             auto test_realm = Realm::get_shared_realm(config);
             set_up_realm(test_realm, num_total);
             test_realm->sync_session()->pause(); // Perform the local updates offline
-            {
-                // Modify 10 records with new names - pause the sync session so
-                // the changes aren't sync'ed prematurely
-                test_realm->begin_transaction();
-                auto table = test_realm->read_group().get_table("class_Person");
+            // Modify 10 records with new names - pause the sync session so
+            // the changes aren't sync'ed prematurely
+            auto update_records = [](SharedRealm update_realm, std::string_view role_to_change,
+                                     std::vector<ObjectId>& saved_ids, size_t num_records) {
+                update_realm->begin_transaction();
+                auto table = update_realm->read_group().get_table("class_Person");
                 auto id_col = table->get_column_key("_id");
                 auto role_col = table->get_column_key("role");
-                auto table_query = Query(table).equal(role_col, "employee");
-                auto results = Results(test_realm, table_query);
+                auto table_query = Query(table).equal(role_col, role_to_change.data());
+                auto results = Results(update_realm, table_query);
                 REQUIRE(results.size() > 0);
-                for (size_t i = 0; i < 10; i++) {
+                for (size_t i = 0; i < num_records; i++) {
                     auto obj = results.get(i);
-                    obj_ids.push_back(obj.get<ObjectId>(id_col));
+                    saved_ids.push_back(obj.get<ObjectId>(id_col));
                     obj.set(role_col, "worker-bee");
                 }
-                test_realm->commit_transaction();
-            }
+                update_realm->commit_transaction();
+            };
             // Update the rules so employees are not allowed and removed from view
             // This will also remove the existing changes to the 10 employee records
-            auto do_set_rules = [&](nlohmann::json new_rules) {
+            auto do_update_rules = [&](nlohmann::json new_rules) {
                 update_role(test_rules, new_rules);
                 logger->debug("Updating rule definitions: %1", test_rules);
                 app_session.admin_api.update_default_rule(app_session.server_app_id, test_rules);
             };
-            auto do_verify = [&obj_ids](SharedRealm realm, size_t cnt, bool present) {
+            auto do_verify = [](SharedRealm realm, size_t cnt, std::vector<ObjectId>& saved_ids,
+                                std::optional<std::string_view> expected = std::nullopt) {
                 REQUIRE(!wait_for_download(*realm));
                 REQUIRE(!wait_for_upload(*realm));
                 wait_for_advance(*realm);
@@ -555,32 +561,35 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                 REQUIRE(table->size() == cnt);
                 auto id_col = table->get_column_key("_id");
                 auto role_col = table->get_column_key("role");
-                for (auto& id : obj_ids) {
+                for (auto& id : saved_ids) {
                     auto objkey = table->find_first(id_col, id);
-                    if (present) {
+                    if (expected) {
                         REQUIRE(objkey);
                         auto obj = table->get_object(objkey);
-                        REQUIRE(obj.get<String>(role_col) == "employee");
+                        REQUIRE(obj.get<String>(role_col) == *expected);
                     }
                     else {
                         REQUIRE(!objkey);
                     }
                 }
             };
+            update_records(test_realm, "employee", emp_ids, 10); // Update 10 employees to worker-bee
+            update_records(test_realm, "manager", mgr_ids, 5);   // Update 5 managers to worker-bee
             // Update the allowed roles to "manager" and "worker-bee"
-            do_set_rules({{"role", {{"$in", {"manager", "worker-bee"}}}}});
+            do_update_rules({{"role", {{"$in", {"manager", "worker-bee"}}}}});
             // Resume the session and verify none of the records are present
             test_realm->sync_session()->resume();
-            // Verify none of the object IDs are present in the local data
-            do_verify(test_realm, params.num_mgrs, false);
+            // Verify none of the employee object IDs are present in the local data
+            do_verify(test_realm, params.num_mgrs, emp_ids, std::nullopt);
+            // Verify all of the manager object IDs are present in the local data
+            do_verify(test_realm, params.num_mgrs, mgr_ids, "worker-bee");
 
             // Update the allowed roles to "employee"
-            do_set_rules({{"role", "employee"}});
+            do_update_rules({{"role", "employee"}});
             // Verify the items with the object IDs are still listed as employees
-            do_verify(test_realm, params.num_emps, true);
+            do_verify(test_realm, params.num_emps, emp_ids, "employee");
         }
 
-        // Add new sections before this
         SECTION("teardown") {
             harness->app()->sync_manager()->wait_for_sessions_to_terminate();
             harness.reset();
