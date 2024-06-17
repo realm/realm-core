@@ -32,7 +32,7 @@
 using namespace realm;
 
 
-ONLY(StringInterner_Basic_Creation)
+TEST(StringInterner_Basic_Creation)
 {
     Group group;
     TableRef table = group.add_table("test");
@@ -44,6 +44,7 @@ ONLY(StringInterner_Basic_Creation)
     Array dummy_parent{obj.get_alloc()};
     dummy_parent.create(realm::NodeHeader::type_HasRefs);
     dummy_parent.add(0);
+
     StringInterner string_interner(obj.get_alloc(), dummy_parent, string_col_key, true);
     auto id = string_interner.intern(obj.get_any(string_col_key).get_string());
 
@@ -51,11 +52,60 @@ ONLY(StringInterner_Basic_Creation)
     CHECK(stored_id);
     CHECK(*stored_id == id);
 
-    // this fails ... the id retured is 1 but the size of the compressed strings is 1.
-    // either the stored id should be 0 or we should start indexing from 1.
     CHECK(string_interner.compare(StringData(my_string), *stored_id) == 0); // should be equal
     const auto origin_string = string_interner.get(id);
     CHECK(obj.get_any(string_col_key).get_string() == origin_string);
 
     CHECK(string_interner.compare(*stored_id, id) == 0); // compare agaist self.
+}
+
+TEST(StringInterner_Creation_Multiple_Strings)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+
+    std::vector<std::string> string_col_names;
+    std::vector<ColKey> col_keys;
+
+    for (size_t i = 0; i < 10; ++i)
+        string_col_names.push_back("string_" + std::to_string(i));
+
+    for (const auto& col_name : string_col_names)
+        col_keys.push_back(table->add_column(type_String, col_name));
+
+    auto obj = table->create_object();
+
+    std::vector<std::string> strings;
+    std::string my_string = "aaaaaaaaaaaaaaa";
+    for (size_t i = 0; i < col_keys.size(); ++i) {
+        strings.push_back(my_string + std::to_string(i));
+        obj.set(col_keys[i], StringData(strings[i]));
+    }
+
+    Allocator& alloc = obj.get_alloc();
+
+    Array dummy_parent{alloc};
+    dummy_parent.create(realm::NodeHeader::type_HasRefs);
+    std::vector<std::unique_ptr<StringInterner>> interners;
+    for (size_t i = 0; i < col_keys.size(); ++i) {
+        dummy_parent.add(0);
+        auto interner = std::make_unique<StringInterner>(alloc, dummy_parent, col_keys[i], true);
+        interners.push_back(std::move(interner));
+        interners.back()->update_from_parent(false);
+    }
+
+    for (size_t i = 0; i < interners.size(); ++i) {
+        auto& string_interner = *interners[i];
+        const auto& db_string = obj.get_any(col_keys[i]).get_string();
+        auto id = string_interner.intern(db_string);
+        const auto stored_id = string_interner.lookup(StringData(strings[i]));
+        CHECK(stored_id);
+        CHECK(*stored_id == id);
+
+        CHECK(string_interner.compare(StringData(strings[i]), *stored_id) == 0); // should be equal
+        const auto origin_string = string_interner.get(id);
+        CHECK(obj.get_any(col_keys[i]).get_string() == origin_string);
+
+        CHECK(string_interner.compare(*stored_id, id) == 0); // compare agaist self.
+    }
 }
