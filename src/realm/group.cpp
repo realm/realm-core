@@ -685,10 +685,6 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 
     auto table = do_add_table(name, table_type, false);
 
-    if (m_allow_additional_properties && name.begins_with(g_class_name_prefix)) {
-        table->do_add_additional_prop_column();
-    }
-
     // Add pk column - without replication
     ColumnAttrMask attr;
     if (nullable)
@@ -751,6 +747,10 @@ Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl
 
     Table* table = create_table_accessor(j);
     table->do_set_table_type(table_type);
+
+    if (m_allow_additional_properties && name.begins_with(g_class_name_prefix)) {
+        table->do_add_additional_prop_column();
+    }
 
     return table;
 }

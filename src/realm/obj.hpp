@@ -128,6 +128,7 @@ public:
         return get_additional_prop(col_name);
     }
     Mixed get_additional_prop(StringData col_name) const;
+
     Mixed get_primary_key() const;
 
     template <typename U>
@@ -215,6 +216,7 @@ public:
         }
         return set_additional_prop(col_name, Mixed(value));
     }
+    Obj& set_additional_prop(StringData prop_name, const Mixed& value);
 
     Obj& set_null(ColKey col_key, bool is_default = false);
     Obj& set_null(StringData col_name, bool is_default = false)
@@ -404,7 +406,6 @@ private:
         return _get_linked_object(get_column_key(link_col_name), link);
     }
 
-    Obj& set_additional_prop(StringData prop_name, const Mixed& value);
     void set_int(ColKey::Idx col_ndx, int64_t value);
     void set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
