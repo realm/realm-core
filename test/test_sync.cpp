@@ -6222,12 +6222,16 @@ TEST(Sync_CollectionClear)
         auto& g = tr.get_group();
         auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");
         auto col_list = table->add_column_list(type_Int, "ints");
+        auto col_list_mixed = table->add_column_list(type_Mixed, "any");
         auto col_dict = table->add_column_dictionary(type_String, "features");
 
         auto foo = table->create_object_with_primary_key(123);
         auto list = foo.get_list<Int>(col_list);
         list.clear();
         list.add(1);
+        auto list_mixed = foo.get_list<Mixed>(col_list_mixed);
+        list_mixed.clear();
+        list_mixed.add("Hello");
         auto dict = foo.get_dictionary(col_dict);
         dict.clear();
         dict.insert("address", "Any Road 3");
@@ -6237,12 +6241,16 @@ TEST(Sync_CollectionClear)
         auto& g = tr.get_group();
         auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");
         auto col_list = table->add_column_list(type_Int, "ints");
+        auto col_list_mixed = table->add_column_list(type_Mixed, "any");
         auto col_dict = table->add_column_dictionary(type_String, "features");
 
         auto foo = table->create_object_with_primary_key(123);
         auto list = foo.get_list<Int>(col_list);
         list.clear();
         list.add(2);
+        auto list_mixed = foo.get_list<Mixed>(col_list_mixed);
+        list_mixed.clear();
+        list_mixed.add("Godbye");
         auto dict = foo.get_dictionary(col_dict);
         dict.clear();
         dict.insert("city", "Andeby");
@@ -6258,8 +6266,10 @@ TEST(Sync_CollectionClear)
         auto table = read_1.get_table("class_Table");
         auto obj = table->get_object_with_primary_key(123);
         auto list = obj.get_list<Int>("ints");
+        auto list_mixed = obj.get_list<Mixed>("any");
         auto dict = obj.get_dictionary("features");
         CHECK_EQUAL(list.size(), 1);
+        CHECK_EQUAL(list_mixed.size(), 1);
         CHECK_EQUAL(dict.size(), 1);
 
         ReadTransaction read_2{db_2};
