@@ -41,52 +41,40 @@ TEST(StringInterner_Basic_Creation)
     std::string my_string = "aaaaaaaaaaaaaaa";
     obj.set(string_col_key, StringData(my_string));
 
-    Array dummy_parent{obj.get_alloc()};
-    dummy_parent.create(realm::NodeHeader::type_HasRefs);
-    dummy_parent.add(0);
+    auto* string_interner = table->get_string_interner(string_col_key);
+    auto id = string_interner->intern(obj.get_any(string_col_key).get_string());
 
-    StringInterner string_interner(obj.get_alloc(), dummy_parent, string_col_key, true);
-    auto id = string_interner.intern(obj.get_any(string_col_key).get_string());
-
-    const auto stored_id = string_interner.lookup(StringData(my_string));
+    const auto stored_id = string_interner->lookup(StringData(my_string));
     CHECK(stored_id);
     CHECK(*stored_id == id);
 
-    CHECK(string_interner.compare(StringData(my_string), *stored_id) == 0); // should be equal
-    const auto origin_string = string_interner.get(id);
+    CHECK(string_interner->compare(StringData(my_string), *stored_id) == 0); // should be equal
+    const auto origin_string = string_interner->get(id);
     CHECK(obj.get_any(string_col_key).get_string() == origin_string);
 
-    CHECK(string_interner.compare(*stored_id, id) == 0); // compare agaist self.
+    CHECK(string_interner->compare(*stored_id, id) == 0); // compare agaist self.
 }
 
-ONLY(StringInterner_Creation_Multiple_String_One_ColKey)
+TEST(StringInterner_Creation_Multiple_String_One_ColKey)
 {
     Group group;
     TableRef table = group.add_table("test");
     const auto colkey = table->add_column(type_String, "string");
     auto obj = table->create_object();
 
-    Allocator& alloc = obj.get_alloc();
-    Array dummy_parent{alloc};
-    dummy_parent.create(realm::NodeHeader::type_HasRefs);
-    dummy_parent.add(0);
-    StringID prev_string_id{0};
-
-    // every leaf can contain max 15 entries, after thant it
-    // a new leaf is added. So this loop should hit this limit
-
+    // every leaf contains by default 16  entries, after this the strings are "rehashed", meaning
+    // that the leaf capacity is extended (next power of 2)
+    StringID prev_string_id = 0;
     for (size_t i = 0; i < 20; ++i) {
         std::string my_string = "aaaaaaaaaaaaaaa" + std::to_string(i);
         obj.set(colkey, StringData(my_string));
 
-
-        auto string_interner = std::make_unique<StringInterner>(alloc, dummy_parent, colkey, true);
+        auto string_interner = table->get_string_interner(colkey);
 
         const auto& db_string = obj.get_any(colkey).get_string();
         auto id = string_interner->intern(db_string);
 
         CHECK(prev_string_id == id - 1);
-        // id 16, one full leaf with values, searching for the 16th string  is failing.
         const auto stored_id = string_interner->lookup(StringData(db_string));
         CHECK(stored_id);
         CHECK(*stored_id == id);
@@ -99,6 +87,44 @@ ONLY(StringInterner_Creation_Multiple_String_One_ColKey)
         prev_string_id = id;
     }
 }
+
+TEST(StringInterner_Verify_Lookup)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    const auto colkey1 = table->add_column(type_String, "string1");
+    const auto colkey2 = table->add_column(type_String, "string2");
+    auto obj = table->create_object();
+
+    auto string_interner1 = table->get_string_interner(colkey1);
+    auto string_interner2 = table->get_string_interner(colkey2);
+
+    std::vector<std::string> strings;
+    for (size_t i = 0; i < 500; ++i) {
+        std::string my_string = "aaaaaaaaaaaaaaa" + std::to_string(i);
+        strings.push_back(my_string);
+    }
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(strings.begin(), strings.end(), g);
+
+    for (const auto& s : strings) {
+        obj.set(colkey1, StringData(s));
+        string_interner1->intern(obj.get_any(colkey1).get_string());
+        auto interner1_id = string_interner1->lookup(StringData(s));
+        CHECK(string_interner1->compare(StringData(s), *interner1_id) == 0);
+    }
+
+    std::shuffle(strings.begin(), strings.end(), g);
+
+    for (const auto& s : strings) {
+        obj.set(colkey2, StringData(s));
+        string_interner2->intern(obj.get_any(colkey2).get_string());
+        auto interner2_id = string_interner2->lookup(StringData(s));
+        CHECK(string_interner2->compare(StringData(s), *interner2_id) == 0);
+    }
+}
+
 
 TEST(StringInterner_Creation_Multiple_String_ColKey)
 {
@@ -123,30 +149,23 @@ TEST(StringInterner_Creation_Multiple_String_ColKey)
         obj.set(col_keys[i], StringData(strings[i]));
     }
 
-    Allocator& alloc = obj.get_alloc();
-
-    Array dummy_parent{alloc};
-    dummy_parent.create(realm::NodeHeader::type_HasRefs);
-    std::vector<std::unique_ptr<StringInterner>> interners;
+    std::vector<StringInterner*> interners;
     for (size_t i = 0; i < col_keys.size(); ++i) {
-        dummy_parent.add(0);
-        auto interner = std::make_unique<StringInterner>(alloc, dummy_parent, col_keys[i], true);
-        interners.push_back(std::move(interner));
-        interners.back()->update_from_parent(false);
+        interners.push_back(table->get_string_interner(col_keys[i]));
+        // interners.back()->update_from_parent(false);
     }
 
     for (size_t i = 0; i < interners.size(); ++i) {
-        auto& string_interner = *interners[i];
         const auto& db_string = obj.get_any(col_keys[i]).get_string();
-        auto id = string_interner.intern(db_string);
-        const auto stored_id = string_interner.lookup(StringData(strings[i]));
+        auto id = interners[i]->intern(db_string);
+        const auto stored_id = interners[i]->lookup(StringData(strings[i]));
         CHECK(stored_id);
         CHECK(*stored_id == id);
 
-        CHECK(string_interner.compare(StringData(strings[i]), *stored_id) == 0); // should be equal
-        const auto origin_string = string_interner.get(id);
+        CHECK(interners[i]->compare(StringData(strings[i]), *stored_id) == 0); // should be equal
+        const auto origin_string = interners[i]->get(id);
         CHECK(obj.get_any(col_keys[i]).get_string() == origin_string);
 
-        CHECK(string_interner.compare(*stored_id, id) == 0); // compare agaist self.
+        CHECK(interners[i]->compare(*stored_id, id) == 0); // compare agaist self.
     }
 }

@@ -223,7 +223,7 @@ static std::vector<uint32_t> hash_to_id(Array& node, uint32_t hash, uint8_t hash
     if (!node.has_refs()) {
         // it's a leaf - default is a list, search starts from index 0.
         HashMapIter it(node, hash, hash_size);
-        if (node.size() > hash_node_min_size) {
+        if (node.size() >= hash_node_min_size) {
             // it is a hash table, so use hash to select index to start searching
             // table size must be power of two!
             size_t index = hash & (node.size() - 1);
