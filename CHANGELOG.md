@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Added tests to verify role change during sync session bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
 
 ----------------------------------------------
 
