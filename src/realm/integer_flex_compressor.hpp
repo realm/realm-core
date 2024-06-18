@@ -25,11 +25,7 @@
 #include <stddef.h>
 #include <vector>
 
-
 namespace realm {
-
-struct WordTypeValue {};
-struct WordTypeIndex {};
 
 //
 // Compress array in Flex format
@@ -38,42 +34,100 @@ struct WordTypeIndex {};
 class FlexCompressor {
 public:
     // encoding/decoding
-    void init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size, size_t ndx_size) const;
-    void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
+    static void init_header(char*, uint8_t, uint8_t, uint8_t, size_t, size_t);
+    static void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<unsigned>&);
     // getters/setters
-    inline int64_t get(bf_iterator&, bf_iterator&, size_t, uint64_t) const;
-    inline void get_chunk(bf_iterator&, bf_iterator&, size_t, uint64_t, int64_t[8]) const;
-    inline void set_direct(bf_iterator&, bf_iterator&, size_t, int64_t) const;
+    static int64_t get(const IntegerCompressor&, size_t);
+    static std::vector<int64_t> get_all(const IntegerCompressor&, size_t, size_t);
+    static void get_chunk(const IntegerCompressor&, size_t, int64_t[8]);
+    static void set_direct(const IntegerCompressor&, size_t, int64_t);
 
     template <typename Cond>
-    inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    static bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
+
+    static int64_t min(const IntegerCompressor&);
+    static int64_t max(const IntegerCompressor&);
 
 private:
-    bool find_all_match(size_t, size_t, size_t, QueryStateBase*) const;
-
-    template <typename Cond>
-    inline bool find_linear(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-
-    template <typename CondVal, typename CondIndex>
-    inline bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-
-    template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
-    inline bool do_find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-
-    template <typename Cond>
-    inline bool run_parallel_subscan(size_t, size_t, size_t) const;
+    static bool find_all_match(size_t, size_t, size_t, QueryStateBase*);
+    static size_t lower_bound(size_t, int64_t, uint64_t, BfIterator&) noexcept;
 };
 
-inline int64_t FlexCompressor::get(bf_iterator& data_iterator, bf_iterator& ndx_iterator, size_t ndx,
-                                   uint64_t mask) const
+inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx)
 {
-    ndx_iterator.move(ndx);
-    data_iterator.move(*ndx_iterator);
-    return sign_extend_field_by_mask(mask, *data_iterator);
+    const auto offset = c.v_width() * c.v_size();
+    const auto ndx_w = c.ndx_width();
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    BfIterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
+    BfIterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
+    return sign_extend_field_by_mask(c.v_mask(), *data_iterator);
 }
 
-inline void FlexCompressor::get_chunk(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, uint64_t mask,
-                                      int64_t res[8]) const
+inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e)
+{
+    const auto offset = c.v_width() * c.v_size();
+    const auto ndx_w = c.ndx_width();
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    const auto range = (e - b);
+    const auto starting_bit = offset + b * ndx_w;
+    const auto bit_per_it = num_bits_for_width(ndx_w);
+    const auto ndx_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - ndx_w);
+    const auto values_per_word = num_fields_for_width(ndx_w);
+
+    // this is very important, x4 faster pre-allocating the array
+    std::vector<int64_t> res;
+    res.reserve(range);
+
+    UnalignedWordIter unaligned_ndx_iterator(data, starting_bit);
+    BfIterator data_iterator{data, 0, v_w, v_w, 0};
+    auto remaining_bits = ndx_w * range;
+    while (remaining_bits >= bit_per_it) {
+        auto word = unaligned_ndx_iterator.consume(bit_per_it);
+        for (int i = 0; i < values_per_word; ++i) {
+            const auto index = word & ndx_mask;
+            data_iterator.move(static_cast<size_t>(index));
+            const auto sv = sign_extend_field_by_mask(sign_mask, *data_iterator);
+            res.push_back(sv);
+            word >>= ndx_w;
+        }
+        remaining_bits -= bit_per_it;
+    }
+    if (remaining_bits) {
+        auto last_word = unaligned_ndx_iterator.consume(remaining_bits);
+        while (remaining_bits) {
+            const auto index = last_word & ndx_mask;
+            data_iterator.move(static_cast<size_t>(index));
+            const auto sv = sign_extend_field_by_mask(sign_mask, *data_iterator);
+            res.push_back(sv);
+            remaining_bits -= ndx_w;
+            last_word >>= ndx_w;
+        }
+    }
+    return res;
+}
+
+inline int64_t FlexCompressor::min(const IntegerCompressor& c)
+{
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    BfIterator data_iterator{data, 0, v_w, v_w, 0};
+    return sign_extend_field_by_mask(sign_mask, *data_iterator);
+}
+
+inline int64_t FlexCompressor::max(const IntegerCompressor& c)
+{
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    const auto sign_mask = c.v_mask();
+    BfIterator data_iterator{data, 0, v_w, v_w, c.v_size() - 1};
+    return sign_extend_field_by_mask(sign_mask, *data_iterator);
+}
+
+inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8])
 {
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
@@ -81,31 +135,50 @@ inline void FlexCompressor::get_chunk(bf_iterator& data_it, bf_iterator& ndx_it,
     size_t i = ndx;
     size_t index = 0;
     for (; i < supposed_end; ++i) {
-        res[index++] = get(data_it, ndx_it, i, mask);
+        res[index++] = get(c, i);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(data_it, ndx_it, i++, mask);
+        res[index++] = get(c, i++);
     }
 }
 
-void FlexCompressor::set_direct(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, int64_t value) const
+inline void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value)
 {
-    ndx_it.move(ndx);
-    data_it.move(*ndx_it);
-    data_it.set_value(value);
+    const auto offset = c.v_width() * c.v_size();
+    const auto ndx_w = c.ndx_width();
+    const auto v_w = c.v_width();
+    const auto data = c.data();
+    BfIterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
+    BfIterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
+    data_iterator.set_value(value);
 }
+
+template <typename T>
+class IndexCond {
+public:
+    using type = T;
+};
+
+template <>
+class IndexCond<Greater> {
+public:
+    using type = GreaterEqual;
+};
 
 template <typename Cond>
 inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                     QueryStateBase* state) const
+                                     QueryStateBase* state)
 {
+    static constexpr size_t RANGE_LIMIT = 20;
+    static constexpr size_t WIDTH_LIMIT = 16;
+
     REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
     Cond c;
 
     if (end == npos)
         end = arr.m_size;
 
-    if (!(arr.m_size > start && start < end))
+    if (start >= arr.m_size || start >= end)
         return true;
 
     const auto lbound = arr.m_lbound;
@@ -120,147 +193,105 @@ inline bool FlexCompressor::find_all(const Array& arr, int64_t value, size_t sta
 
     REALM_ASSERT_DEBUG(arr.m_width != 0);
 
-    if constexpr (std::is_same_v<Equal, Cond>) {
-        return do_find_all<Equal, Equal, Equal>(arr, value, start, end, baseindex, state);
-    }
-    else if constexpr (std::is_same_v<NotEqual, Cond>) {
-        return do_find_all<NotEqual, NotEqual, LessEqual>(arr, value, start, end, baseindex, state);
-    }
-    else if constexpr (std::is_same_v<Less, Cond>) {
-        return do_find_all<Less, GreaterEqual, Less>(arr, value, start, end, baseindex, state);
-    }
-    else if constexpr (std::is_same_v<Greater, Cond>) {
-        return do_find_all<Greater, Greater, GreaterEqual>(arr, value, start, end, baseindex, state);
-    }
-    return true;
-}
-
-template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
-inline bool FlexCompressor::do_find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                        QueryStateBase* state) const
-{
+    const auto& compressor = arr.integer_compressor();
     const auto v_width = arr.m_width;
-    const auto v_range = arr.integer_compressor().v_size();
-    const auto ndx_range = end - start;
-    if (!run_parallel_subscan<LinearCond>(v_width, v_range, ndx_range))
-        return find_linear<LinearCond>(arr, value, start, end, baseindex, state);
-    return find_parallel<ParallelCond1, ParallelCond2>(arr, value, start, end, baseindex, state);
-}
+    const auto v_size = compressor.v_size();
+    const auto mask = compressor.v_mask();
+    uint64_t* data = (uint64_t*)arr.m_data;
+    size_t v_start = realm::not_found;
 
-template <typename Cond>
-inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                        QueryStateBase* state) const
-{
-    const auto cmp = [](int64_t item, int64_t key) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return item == key;
-        if constexpr (std::is_same_v<Cond, NotEqual>) {
-            return item != key;
+    /**************** Search the values ****************/
+
+    int64_t modified_value = value;
+    if constexpr (std::is_same_v<Cond, Greater>) {
+        modified_value++; // We use GreaterEqual below, so this will effectively be Greater
+    }
+
+    if (v_size >= RANGE_LIMIT) {
+        if (v_width <= WIDTH_LIMIT) {
+            auto search_vector = populate(v_width, modified_value);
+            v_start = parallel_subword_find(find_all_fields<GreaterEqual>, data, 0, v_width, compressor.msb(),
+                                            search_vector, 0, v_size);
         }
+        else {
+            BfIterator data_iterator{data, 0, v_width, v_width, 0};
+            v_start = lower_bound(v_size, modified_value, mask, data_iterator);
+        }
+    }
+    else {
+        BfIterator data_iterator{data, 0, v_width, v_width, 0};
+        size_t idx = 0;
+        while (idx < v_size) {
+            if (sign_extend_field_by_mask(mask, *data_iterator) >= modified_value) {
+                break;
+            }
+            data_iterator.move(++idx);
+        }
+        v_start = idx;
+    }
+
+    if constexpr (realm::is_any_v<Cond, Equal, NotEqual>) {
+        // Check for equality.
+        if (v_start < v_size) {
+            BfIterator it{data, 0, v_width, v_width, v_start};
+            if (sign_extend_field_by_mask(mask, *it) > value) {
+                v_start = v_size; // Mark as not found
+            }
+        }
+    }
+
+    /***************** Some early outs *****************/
+
+    if (v_start == v_size) {
+        if constexpr (realm::is_any_v<Cond, Equal, Greater>) {
+            return true; // No Matches
+        }
+        if constexpr (realm::is_any_v<Cond, NotEqual, Less>) {
+            return find_all_match(start, end, baseindex, state); // All matches
+        }
+    }
+    else if (v_start == 0) {
         if constexpr (std::is_same_v<Cond, Less>) {
-            return item < key;
+            // No index is less than 0
+            return true; // No Matches
         }
         if constexpr (std::is_same_v<Cond, Greater>) {
-            return item > key;
+            // All index is greater than or equal to 0
+            return find_all_match(start, end, baseindex, state);
         }
-        REALM_UNREACHABLE();
-    };
+    }
 
-    const auto& compressor = arr.integer_compressor();
-    auto& ndx_it = compressor.ndx_iterator();
-    auto& data_it = compressor.data_iterator();
-    ndx_it.move(start);
-    while (start < end) {
-        data_it.move(*ndx_it);
-        const auto sv = sign_extend_field_by_mask(compressor.width_mask(), *data_it);
-        if (cmp(sv, value) && !state->match(start + baseindex))
-            return false;
-        ++start;
-        ++ndx_it;
-    }
-    return true;
-}
+    /*************** Search the indexes ****************/
 
-template <typename Cond, typename Type = WordTypeValue>
-inline uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
-{
-    if constexpr (std::is_same_v<Cond, Equal>)
-        return find_all_fields_EQ(MSBs, a, b);
-    if constexpr (std::is_same_v<Cond, NotEqual>)
-        return find_all_fields_NE(MSBs, a, b);
-
-    if constexpr (std::is_same_v<Cond, Greater>) {
-        if (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        if (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_GT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, GreaterEqual>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_GE(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_GE(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, Less>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_LT(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-    if constexpr (std::is_same_v<Cond, LessEqual>) {
-        if constexpr (std::is_same_v<Type, WordTypeValue>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-        if constexpr (std::is_same_v<Type, WordTypeIndex>)
-            return find_all_fields_unsigned_LE(MSBs, a, b);
-        REALM_UNREACHABLE();
-    }
-}
-
-template <typename CondVal, typename CondIndex>
-inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                          QueryStateBase* state) const
-{
-    const auto& compressor = arr.integer_compressor();
-    const auto v_width = compressor.width();
-    const auto v_size = compressor.v_size();
+    using U = typename IndexCond<Cond>::type;
+    const auto ndx_range = end - start;
     const auto ndx_width = compressor.ndx_width();
-    const auto offset = v_size * v_width;
-    uint64_t* data = (uint64_t*)arr.m_data;
-
-    auto MSBs = compressor.msb();
-    auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(vector_compare<CondVal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
-    if (v_start == v_size)
-        return true;
-
-    MSBs = compressor.ndx_msb();
-    search_vector = populate(ndx_width, v_start);
-    while (start < end) {
-        start = parallel_subword_find(vector_compare<CondIndex, WordTypeIndex>, data, offset, ndx_width, MSBs,
-                                      search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
-                return false;
-
-        ++start;
+    const auto v_offset = v_size * v_width;
+    if (ndx_range >= RANGE_LIMIT) {
+        auto search_vector = populate(ndx_width, v_start);
+        while (start < end) {
+            start = parallel_subword_find(find_all_fields_unsigned<U>, data, v_offset, ndx_width,
+                                          compressor.ndx_msb(), search_vector, start, end);
+            if (start < end) {
+                if (!state->match(start + baseindex))
+                    return false;
+            }
+            ++start;
+        }
     }
-    return true;
-}
+    else {
+        U index_c;
+        BfIterator ndx_iterator{data, v_offset, ndx_width, ndx_width, start};
+        while (start < end) {
+            if (index_c(int64_t(*ndx_iterator), int64_t(v_start))) {
+                if (!state->match(start + baseindex))
+                    return false;
+            }
+            ndx_iterator.move(++start);
+        }
+    }
 
-template <typename Cond>
-inline bool FlexCompressor::run_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_range) const
-{
-    if (ndx_range <= 32)
-        return false;
-    // the threshold for v_width is empirical, some intuition for this is probably that we need to consider 2 parallel
-    // scans, one for finding the matching value and one for the indices (max bit-width 8, becasue max array size is
-    // 256). When we scan the values in parallel, we go through them all, we can't follow the hint given [start, end],
-    // thus a full scan of values makes sense only for certain widths that are not too big, in order to compare in
-    // parallel as many values as we can in one go.
-    return v_width <= 20 && v_range >= 20;
+    return true;
 }
 
 } // namespace realm

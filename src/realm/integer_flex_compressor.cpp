@@ -30,27 +30,27 @@
 
 using namespace realm;
 
-void FlexCompressor::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
-                                size_t ndx_size) const
+void FlexCompressor::init_header(char* h, uint8_t flags, uint8_t v_width, uint8_t ndx_width, size_t v_size,
+                                 size_t ndx_size)
 {
     using Encoding = NodeHeader::Encoding;
-    init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
+    ::init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
 }
 
 void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& values,
-                               const std::vector<size_t>& indices) const
+                               const std::vector<unsigned>& indices)
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
     const auto& compressor = arr.integer_compressor();
     REALM_ASSERT_DEBUG(compressor.get_encoding() == Encoding::Flex);
-    const auto v_width = compressor.width();
+    const auto v_width = compressor.v_width();
     const auto ndx_width = compressor.ndx_width();
     const auto v_size = values.size();
     const auto data = (uint64_t*)arr.m_data;
     const auto offset = static_cast<size_t>(v_size * v_width);
-    bf_iterator it_value{data, 0, v_width, v_width, 0};
-    bf_iterator it_index{data, offset, ndx_width, ndx_width, 0};
+    BfIterator it_value{data, 0, v_width, v_width, 0};
+    BfIterator it_index{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < v_size; ++i) {
         it_value.set_value(values[i]);
         REALM_ASSERT_DEBUG(sign_extend_value(v_width, it_value.get_value()) == values[i]);
@@ -67,13 +67,21 @@ void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& val
     }
 }
 
-bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state)
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
-    const auto process = state->limit() - state->match_count();
-    const auto end2 = end - start > process ? start + process : end;
-    for (; start < end2; start++)
+    while (start < end) {
         if (!state->match(start + baseindex))
             return false;
+        start++;
+    }
     return true;
+}
+
+size_t FlexCompressor::lower_bound(size_t size, int64_t value, uint64_t mask, BfIterator& data_iterator) noexcept
+{
+    return impl::lower_bound(nullptr, 0, size, value, [&](auto, size_t ndx) {
+        data_iterator.move(ndx);
+        return sign_extend_field_by_mask(mask, *data_iterator);
+    });
 }

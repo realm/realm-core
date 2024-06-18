@@ -1133,6 +1133,7 @@ public:
     {
         m_group->typed_print(prefix);
     }
+
     virtual ~TableWriter() noexcept {}
 
     void set_group(const Group* g)

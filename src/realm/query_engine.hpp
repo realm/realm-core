@@ -91,6 +91,7 @@ TConditionValue:    Type of values in condition column. That is, int64_t, float,
 #include <realm/query_expression.hpp>
 #include <realm/table.hpp>
 #include <realm/unicode.hpp>
+#include <realm/util/flat_map.hpp>
 #include <realm/util/serializer.hpp>
 #include <realm/utilities.hpp>
 
@@ -449,6 +450,7 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
 {
     // for a small number of conditions, it is faster to do a linear search than to compute the hash
     // the exact thresholds were found experimentally
+
     if (needles.size() < linear_search_threshold) {
         for (size_t i = start; i < end; ++i) {
             auto element = leaf.get(i);
@@ -512,6 +514,13 @@ public:
             if (const int64_t* val = it->get_if<int64_t>()) {
                 m_needles.insert(*val);
             }
+            else if (const double* val = it->get_if<double>()) {
+                // JS encodes numbers as double
+                // only add this value if it represents an integer
+                if (*val == double(int64_t(*val))) {
+                    m_needles.insert(int64_t(*val));
+                }
+            }
         }
     }
 
@@ -568,11 +577,6 @@ public:
             }
             else if (m_index_evaluator) {
                 return m_index_evaluator->do_search_index(BaseType::m_cluster, start, end);
-            }
-            else if (end - start == 1) {
-                if (this->m_leaf->get(start) == this->m_value) {
-                    s = start;
-                }
             }
             else {
                 s = this->m_leaf->template find_first<Equal>(this->m_value, start, end);
@@ -1246,18 +1250,12 @@ public:
         if (!this->m_value_is_null) {
             m_optional_value = this->m_value;
         }
-        if (m_index_evaluator && m_nb_needles == 0) {
+        if (m_nb_needles == 0 && has_search_index()) {
+            m_index_evaluator = std::make_optional(IndexEvaluator{});
             SearchIndex* index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
             m_index_evaluator->init(index, m_optional_value);
             this->m_dT = 0;
         }
-    }
-
-    void table_changed() override
-    {
-        const bool has_index =
-            this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
     }
 
     const IndexEvaluator* index_based_keys() override
@@ -1267,7 +1265,7 @@ public:
 
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1887,17 +1885,9 @@ public:
 
     void init(bool) override;
 
-    void table_changed() override
-    {
-        StringNodeBase::table_changed();
-        const bool has_index =
-            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
-    }
-
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return bool(m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General);
     }
 
     void cluster_changed() override

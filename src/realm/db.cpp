@@ -776,7 +776,7 @@ public:
             auto new_size = static_cast<size_t>(m_file.get_size());
             REALM_ASSERT(new_size > size);
             size = new_size;
-            m_reader_map.remap(m_file, File::access_ReadWrite, size, File::map_NoSync);
+            m_reader_map.remap(m_file, File::access_ReadWrite, size);
             m_info = m_reader_map.get_addr();
 
             std::lock_guard lock(m_mutex);
@@ -820,7 +820,7 @@ private:
 };
 
 // adapter class for marking/observing encrypted writes
-class DB::EncryptionMarkerObserver : public util::WriteMarker, public util::WriteObserver {
+class DB::EncryptionMarkerObserver final : public util::WriteMarker, public util::WriteObserver {
 public:
     EncryptionMarkerObserver(DB::VersionManager& vm)
         : vm(vm)
@@ -840,7 +840,7 @@ public:
         }
         ++calls_since_last_writer_observed;
         constexpr size_t max_calls = 5; // an arbitrary handful, > 1
-        return (calls_since_last_writer_observed >= max_calls);
+        return calls_since_last_writer_observed >= max_calls;
     }
     void mark(uint64_t pos) override
     {
@@ -985,7 +985,7 @@ void DB::open(const std::string& path, const DBOptions& options)
             // get the exclusive lock because we hold it, and hence were
             // waiting for the shared lock instead, to observe and use an
             // old lock file.
-            m_file_map.map(m_file, File::access_ReadWrite, sizeof(SharedInfo), File::map_NoSync); // Throws
+            m_file_map.map(m_file, File::access_ReadWrite, sizeof(SharedInfo)); // Throws
             File::UnmapGuard fug(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
 
@@ -1050,7 +1050,7 @@ void DB::open(const std::string& path, const DBOptions& options)
         // the SharedInfo struct, or less if the file is smaller. We know that
         // we have at least one byte, and that is enough to read the
         // `init_complete` flag.
-        m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
+        m_file_map.map(m_file, File::access_ReadWrite, info_size);
         File::UnmapGuard fug_1(m_file_map);
         SharedInfo* info = m_file_map.get_addr();
 
@@ -1187,21 +1187,11 @@ void DB::open(const std::string& path, const DBOptions& options)
             // From here on, if we fail in any way, we must detach the
             // allocator.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
-            alloc.note_reader_start(this);
-            // must come after the alloc detach guard
-            auto handler = [this, &alloc]() noexcept {
-                alloc.note_reader_end(this);
-            };
-            auto reader_end_guard = make_scope_exit(handler);
 
             // Check validity of top array (to give more meaningful errors
             // early)
             if (top_ref) {
                 try {
-                    alloc.note_reader_start(this);
-                    auto reader_end_guard = make_scope_exit([&]() noexcept {
-                        alloc.note_reader_end(this);
-                    });
                     Array top{alloc};
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);
@@ -1619,7 +1609,7 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
 // Unmapping (during close()) while transactions are live, is not considered an error. There
 // is a potential race between unmapping during close() and any operation carried out by a live
 // transaction. The user must ensure that this race never happens if she uses DB::close().
-bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
+bool DB::compact(bool bump_version_number, std::optional<const char*> output_encryption_key)
     NO_THREAD_SAFETY_ANALYSIS // this would work except for a known limitation: "No alias analysis" where clang cannot
                               // tell that tr->db->m_mutex is the same thing as m_mutex
 {
@@ -1636,7 +1626,19 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     }
     auto info = m_info;
     Durability dura = Durability(info->durability);
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
+    std::string key_buffer;
+    const char* write_key = nullptr;
+    if (output_encryption_key) {
+        if (*output_encryption_key) {
+            write_key = *output_encryption_key;
+        }
+    }
+#if REALM_ENABLE_ENCRYPTION
+    else if (auto encryption = m_alloc.get_file().get_encryption()) {
+        key_buffer = encryption->get_key();
+        write_key = key_buffer.data();
+    }
+#endif
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         auto t1 = std::chrono::steady_clock::now();
@@ -1681,9 +1683,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         catch (...) {
             // If writing the compact version failed in any way, delete the partially written file to clean up disk
             // space. This is so that we don't fail with 100% disk space used when compacting on a mostly full disk.
-            if (File::exists(tmp_path)) {
-                File::remove(tmp_path);
-            }
+            File::try_remove(tmp_path);
             throw;
         }
         // if we've written a file with a bumped version number, we need to update the lock file to match.
@@ -1727,7 +1727,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     return true;
 }
 
-void DB::write_copy(StringData path, const char* output_encryption_key)
+void DB::write_copy(std::string_view path, const char* output_encryption_key)
 {
     auto tr = start_read();
     if (auto hist = tr->get_history()) {

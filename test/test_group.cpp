@@ -184,7 +184,7 @@ TEST(Group_BadFile)
 
     {
         File file(path_1, File::mode_Append);
-        file.write("foo");
+        file.write(0, "foo");
     }
 
     {
@@ -214,7 +214,7 @@ TEST(Group_OpenBuffer)
             buffer_size = size_t(file.get_size());
             buffer.reset(new char[buffer_size]);
             CHECK(bool(buffer));
-            file.read(buffer.get(), buffer_size);
+            file.read(0, buffer.get(), buffer_size);
         }
     }
 
@@ -2362,5 +2362,151 @@ TEST(Group_ArrayCompression_Correctness)
     from_disk.verify();
 #endif
 }
+
+TEST(Group_ArrayCompression_Correctness_Negative)
+{
+    GROUP_TEST_PATH(path);
+
+    // Create group with one list<int> which maps to array_integer
+    Group to_disk;
+    TableRef table = to_disk.add_table("test");
+    auto col_key = table->add_column_list(type_Int, "lint");
+    auto obj = table->create_object();
+    auto array = obj.get_list<int64_t>(col_key);
+
+    array.add(-1);
+    array.add(-1);
+    array.add(-1);
+    array.add(-1);
+    array.add(std::numeric_limits<int64_t>::max());
+    array.add(std::numeric_limits<int64_t>::max());
+
+    CHECK_EQUAL(array.size(), 6);
+    CHECK_EQUAL(array.get_any(0).get_int(), -1);
+    CHECK_EQUAL(array.get_any(1).get_int(), -1);
+    CHECK_EQUAL(array.get_any(2).get_int(), -1);
+    CHECK_EQUAL(array.get_any(3).get_int(), -1);
+    CHECK_EQUAL(array.get_any(4).get_int(), std::numeric_limits<int64_t>::max());
+    CHECK_EQUAL(array.get_any(5).get_int(), std::numeric_limits<int64_t>::max());
+
+    // Serialize to disk (compression should happen when the proper leaf array is serialized to disk)
+    to_disk.write(path, crypt_key());
+
+#ifdef REALM_DEBUG
+    to_disk.verify();
+#endif
+
+    // Load the tables
+    Group from_disk(path, crypt_key());
+    TableRef read_table = from_disk.get_table("test");
+    auto col_key1 = read_table->get_column_key("lint");
+    auto obj1 = read_table->get_object(0);
+    auto l1 = obj1.get_list<int64_t>(col_key1);
+    CHECK(l1.size() == array.size());
+    CHECK(*read_table == *table);
+    for (size_t i = 0; i < l1.size(); ++i) {
+        CHECK_EQUAL(l1.get_any(i), array.get_any(i));
+    }
+
+#ifdef REALM_DEBUG
+    from_disk.verify();
+#endif
+}
+
+TEST(Group_ArrayCompression_Correctness_Funny_Values)
+{
+    GROUP_TEST_PATH(path);
+
+    // Create group with one list<int> which maps to array_integer
+    Group to_disk;
+    TableRef table = to_disk.add_table("test");
+    auto col_key = table->add_column_list(type_Int, "lint");
+    auto obj = table->create_object();
+    auto array = obj.get_list<int64_t>(col_key);
+
+    std::vector<int64_t> vs = {3656152302, 2814021986, 4195757081, 3272933168, 3466127978, 2777289082,
+                               4247467684, 3825361855, 2496524560, 4052938301, 3765455798, 2527633011,
+                               3448934593, 3699340964, 4057735040, 3294068800};
+
+    size_t ndx = 0;
+    for (const auto v : vs) {
+        array.add(v);
+        CHECK_EQUAL(v, array.get(ndx++));
+    }
+    CHECK_EQUAL(array.size(), vs.size());
+
+    // Serialize to disk (compression should happen when the proper leaf array is serialized to disk)
+    to_disk.write(path, crypt_key());
+
+#ifdef REALM_DEBUG
+    to_disk.verify();
+#endif
+
+    // Load the tables
+    Group from_disk(path, crypt_key());
+    TableRef read_table = from_disk.get_table("test");
+    auto col_key1 = read_table->get_column_key("lint");
+    auto obj1 = read_table->get_object(0);
+    auto l1 = obj1.get_list<int64_t>(col_key1);
+    CHECK(l1.size() == array.size());
+    CHECK(*read_table == *table);
+    for (size_t i = 0; i < l1.size(); ++i) {
+        CHECK_EQUAL(l1.get_any(i), array.get_any(i));
+    }
+
+#ifdef REALM_DEBUG
+    from_disk.verify();
+#endif
+}
+
+
+TEST(Group_ArrayCompression_Correctness_Random_Input)
+{
+    GROUP_TEST_PATH(path);
+
+    // Create group with one list<int> which maps to array_integer
+    Group to_disk;
+    TableRef table = to_disk.add_table("test");
+    auto col_key = table->add_column_list(type_Int, "lint");
+    auto obj = table->create_object();
+    auto array = obj.get_list<int64_t>(col_key);
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    constexpr auto min = std::numeric_limits<int64_t>::min();
+    constexpr auto max = std::numeric_limits<int64_t>::max();
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(static_cast<unsigned int>(min),
+                                                                   static_cast<unsigned int>(max));
+    for (size_t i = 0; i < 1000; ++i) {
+        const auto v = dist6(rng);
+        array.add(v);
+        const auto stored_v = array.get_any(i).get_int();
+        CHECK_EQUAL(stored_v, v);
+    }
+
+    // Serialize to disk (compression should happen when the proper leaf array is serialized to disk)
+    to_disk.write(path, crypt_key());
+
+#ifdef REALM_DEBUG
+    to_disk.verify();
+#endif
+
+    // Load the tables
+    Group from_disk(path, crypt_key());
+    TableRef read_table = from_disk.get_table("test");
+    auto col_key1 = read_table->get_column_key("lint");
+    auto obj1 = read_table->get_object(0);
+    auto l1 = obj1.get_list<int64_t>(col_key1);
+    CHECK(l1.size() == array.size());
+    CHECK(*read_table == *table);
+    for (size_t i = 0; i < l1.size(); ++i) {
+        CHECK_EQUAL(l1.get_any(i), array.get_any(i));
+    }
+
+#ifdef REALM_DEBUG
+    from_disk.verify();
+#endif
+}
+
 
 #endif // TEST_GROUP

@@ -1,0 +1,48 @@
+name: Prepare Release
+
+# This action is triggered manually and starts the release process.
+# See github.com/realm/realm-core/doc/development/how-to-release.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Use this to provide a version. For example "10.123.1" or "4.5.0-CustDemo".
+        required: true
+        type: string
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0 # include history and tags
+      - name: Change Version
+        run: tools/release-init.sh ${{ inputs.version }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # the gh command in the release script requires this token
+      - name: Create Release PR
+        id: prepare-pr
+        uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e #! 6.0.5
+        with:
+          branch: release/automated_v${{ inputs.version }}
+          title: Prepare for ${{ inputs.version }}
+          draft: false
+          body-path: pr-body.txt
+          labels: no-jira-ticket
+          commit-message: Prepare for release ${{ inputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          add-paths: |
+            dependencies.yml
+            Package.swift
+            CHANGELOG.md
+      - name: Output PR URL
+        run: |
+          echo "Prepare release PR created: $PREPARE_PR_URL" >> $GITHUB_STEP_SUMMARY
+        shell: bash
+        env:
+          PREPARE_PR_URL: ${{ steps.prepare-pr.outputs.pull-request-url }}

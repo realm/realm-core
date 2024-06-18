@@ -55,9 +55,6 @@ struct AccessTokenParser {
                 else if (escaped_key == "path") {
                     state_stack.push(await_path);
                 }
-                else if (escaped_key == "stitch_data") {
-                    state_stack.push(await_stitchdata);
-                }
                 else if (escaped_key == "sync_label" || escaped_key == "syncLabel") {
                     state_stack.push(await_sync_label);
                 }
@@ -78,34 +75,6 @@ struct AccessTokenParser {
                 }
                 if (m_skip_depth == 0) {
                     state_stack.pop();
-                }
-                break;
-            }
-            case await_stitchdata: {
-                if (event.type != JSONEvent::object_begin) {
-                    return JSONError::unexpected_token;
-                }
-                state_stack.pop();
-                state_stack.push(await_stitchdata_object);
-                break;
-            }
-            case await_stitchdata_object: {
-                if (event.type == JSONEvent::object_end) {
-                    state_stack.pop();
-                    break; // End of object
-                }
-                StringData escaped_key = event.escaped_string_value();
-                if (escaped_key == "realm_sync_label") {
-                    state_stack.push(await_sync_label);
-                }
-                else if (escaped_key == "realm_path") {
-                    state_stack.push(await_path);
-                }
-                else if (escaped_key == "realm_access") {
-                    state_stack.push(await_access);
-                }
-                else {
-                    state_stack.push(skip_value);
                 }
                 break;
             }
@@ -202,8 +171,6 @@ struct AccessTokenParser {
 private:
     enum parser_state {
         toplevel,
-        await_stitchdata,
-        await_stitchdata_object,
         await_identity,
         await_admin,
         await_timestamp,

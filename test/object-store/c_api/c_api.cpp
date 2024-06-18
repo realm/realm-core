@@ -4914,7 +4914,7 @@ TEST_CASE("C API - queries", "[c_api]") {
             realm_value_t object_id_arg = rlm_object_id_val("abc123abc123");
             realm_value_t uuid_arg = rlm_uuid_val("01234567-9abc-4def-9012-3456789abcde");
             realm_value_t link_arg = rlm_link_val(class_bar.key, realm_object_get_key(obj2.get()));
-            realm_value_t list_arg[3] = {rlm_int_val(456), rlm_str_val("lol"), rlm_double_val(3.14)};
+            realm_value_t list_arg[3] = {rlm_int_val(456), rlm_str_val("110"), rlm_double_val(3.14)};
 
             static const size_t num_args = 13;
             realm_query_arg_t args[num_args] = {

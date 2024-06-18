@@ -5958,9 +5958,8 @@ TEST(Query_links_to_with_bpnode_split)
 TEST_TYPES(Query_ManyIn, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<UUID>,
            Prop<ObjectId>, Prop<Decimal128>, Prop<BinaryData>, Prop<Mixed>, Nullable<Int>, Nullable<String>,
            Nullable<Float>, Nullable<Double>, Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>,
-           Nullable<Decimal128>, Nullable<BinaryData>, Indexed<Int>, Indexed<String>, Indexed<Float>, Indexed<Double>,
-           Indexed<Timestamp>, Indexed<UUID>, Indexed<ObjectId>, Indexed<Decimal128>, Indexed<BinaryData>,
-           Indexed<Mixed>)
+           Nullable<Decimal128>, Nullable<BinaryData>, Indexed<Int>, Indexed<String>, Indexed<Timestamp>,
+           Indexed<UUID>, Indexed<ObjectId>, Indexed<Mixed>)
 {
     using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
@@ -5968,6 +5967,9 @@ TEST_TYPES(Query_ManyIn, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Pro
 
     auto t = g.add_table("foo");
     auto col = t->add_column(TEST_TYPE::data_type, "value", TEST_TYPE::is_nullable);
+    if (TEST_TYPE::is_indexed) {
+        t->add_search_index(col);
+    }
     constexpr size_t num_values = 200;
     std::vector<int64_t> seed_values;
     seed_values.resize(num_values);

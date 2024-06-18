@@ -26,8 +26,6 @@
 
 using namespace realm;
 
-// this is a bad idea. Since Accessors are constructed everywhere, we need to store the information that array
-// integers can be compressed in the header
 ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
     : Array(allocator)
 {

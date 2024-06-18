@@ -609,6 +609,8 @@ private:
 
     bool verify_user_present(const std::shared_ptr<User>& user) const REQUIRES(m_user_mutex);
 
+    void emit_change_to_subscribers() REQUIRES(!m_user_mutex);
+
     // UserProvider implementation
     friend class User;
 

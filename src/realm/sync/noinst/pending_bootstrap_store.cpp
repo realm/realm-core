@@ -97,8 +97,10 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
          }}};
 
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_pending_bootstraps)) {
+    // Start with a reader so it doesn't try to write until we are ready
+    SyncMetadataSchemaVersionsReader schema_versions_reader(tr);
+    if (auto schema_version =
+            schema_versions_reader.get_version_for(tr, internal_schema_groups::c_pending_bootstraps)) {
         if (*schema_version != c_schema_version) {
             throw RuntimeError(ErrorCodes::SchemaVersionMismatch,
                                "Invalid schema version for FLX sync pending bootstrap table group");
@@ -107,10 +109,14 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
     }
     else {
         tr->promote_to_write();
-        create_sync_metadata_schema(tr, &internal_tables);
+        // Ensure the schema versions table is initialized (may add its own commit)
+        SyncMetadataSchemaVersions schema_versions(tr);
+        // Create the metadata schema and set the version (in the same commit)
         schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, c_schema_version);
+        create_sync_metadata_schema(tr, &internal_tables);
         tr->commit_and_continue_as_read();
     }
+    REALM_ASSERT(m_table);
 
     if (auto bootstrap_table = tr->get_table(m_table); !bootstrap_table->is_empty()) {
         m_has_pending = true;
@@ -330,7 +336,7 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
                        bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
     }
 
-    m_has_pending = (bootstrap_table->is_empty() == false);
+    m_has_pending = !bootstrap_table->is_empty();
 }
 
 } // namespace realm::sync

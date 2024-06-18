@@ -107,3 +107,7 @@ tsconfig.tsbuildinfo
 # Baas remote host artifacts
 baas-work-dir/
 ssh_agent_commands.sh
+
+# release script artifacts
+extracted_changelog.md
+pr-body.txt

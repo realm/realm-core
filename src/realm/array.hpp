@@ -174,17 +174,19 @@ public:
     void set_as_ref(size_t ndx, ref_type ref);
 
     template <size_t w>
-    void set(size_t ndx, int64_t value);
+    static void set(Array&, size_t ndx, int64_t value);
 
-    inline int64_t get(size_t ndx) const noexcept;
+    int64_t get(size_t ndx) const noexcept;
+
+    std::vector<int64_t> get_all(size_t b, size_t e) const;
 
     template <size_t w>
-    inline int64_t get(size_t ndx) const noexcept;
+    static int64_t get(const Array& arr, size_t ndx) noexcept;
 
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     template <size_t w>
-    void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
+    static void get_chunk(const Array&, size_t ndx, int64_t res[8]) noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
     RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
@@ -207,8 +209,6 @@ public:
         Node::alloc(init_size, new_width);
         update_width_cache_from_header();
     }
-
-    size_t size() const noexcept;
 
     bool is_empty() const noexcept
     {
@@ -424,9 +424,15 @@ public:
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
+        static cond c;
+        REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
+        if (end - start == 1) {
+            return c(get(start), value) ? start : realm::not_found;
+        }
+        // todo, would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
-        (this->*finder)(value, start, end, 0, &state);
+        finder(*this, value, start, end, 0, &state);
         return state.m_state;
     }
 
@@ -434,7 +440,7 @@ public:
     bool find(int64_t value, size_t start, size_t end, size_t baseIndex, QueryStateBase* state) const
     {
         Finder finder = m_vtable->finder[cond::condition];
-        return (this->*finder)(value, start, end, baseIndex, state);
+        return finder(*this, value, start, end, baseIndex, state);
     }
 
 
@@ -499,7 +505,7 @@ public:
     /// Takes a 64-bit value and returns the minimum number of bits needed
     /// to fit the value. For alignment this is rounded up to nearest
     /// log2. Possible results {0, 1, 2, 4, 8, 16, 32, 64}
-    static size_t bit_width(int64_t value);
+    static uint8_t bit_width(int64_t value);
 
     void typed_print(std::string prefix) const;
 
@@ -545,27 +551,30 @@ protected:
 
 protected:
     // Getters and Setters for adaptive-packed arrays
-    typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
-    typedef void (Array::*Setter)(size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
+    typedef int64_t (*Getter)(const Array&, size_t); // Note: getters must not throw
+    typedef void (*Setter)(Array&, size_t, int64_t);
+    typedef bool (*Finder)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
+    typedef void (*ChunkGetter)(const Array&, size_t, int64_t res[8]); // Note: getters must not throw
+
+    typedef std::vector<int64_t> (*GetterAll)(const Array&, size_t, size_t); // Note: getters must not throw
 
     struct VTable {
         Getter getter;
         ChunkGetter chunk_getter;
+        GetterAll getter_all;
         Setter setter;
         Finder finder[cond_VTABLE_FINDER_COUNT]; // one for each active function pointer
     };
     template <size_t w>
     struct VTableForWidth;
-    struct VTableForEncodedArray;
 
     // This is the one installed into the m_vtable->finder slots.
     template <class cond>
-    bool find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    static bool find_vtable(const Array&, int64_t value, size_t start, size_t end, size_t baseindex,
+                            QueryStateBase* state);
 
     template <size_t w>
-    int64_t get_universal(const char* const data, const size_t ndx) const;
+    static int64_t get_universal(const char* const data, const size_t ndx);
 
 protected:
     Getter m_getter = nullptr; // cached to avoid indirection
@@ -583,16 +592,6 @@ protected:
     // compress/decompress this array
     bool compress_array(Array&) const;
     bool decompress_array(Array& arr) const;
-    int64_t get_from_compressed_array(size_t ndx) const noexcept;
-    void set_compressed_array(size_t ndx, int64_t);
-    void get_chunk_compressed_array(size_t, int64_t[8]) const noexcept;
-
-#ifdef REALM_DEBUG
-public: // make it public for testing
-#endif
-    template <class cond>
-    bool find_compressed_array(int64_t value, size_t start, size_t end, size_t baseindex,
-                               QueryStateBase* state) const;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -617,10 +616,10 @@ private:
 
 class TempArray : public Array {
 public:
-    TempArray(size_t sz, Type type = Type::type_HasRefs)
+    TempArray(size_t sz, Type type = Type::type_HasRefs, bool cf = false)
         : Array(Allocator::get_default())
     {
-        create(type, false, sz);
+        create(type, cf, sz);
     }
     ~TempArray()
     {
@@ -633,6 +632,11 @@ public:
 };
 
 // Implementation:
+
+inline Array::Array(Allocator& allocator) noexcept
+    : Node(allocator)
+{
+}
 
 inline bool Array::is_compressed() const
 {
@@ -649,7 +653,7 @@ inline int64_t Array::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
-    return (this->*m_getter)(ndx);
+    return m_getter(*this, ndx);
 
     // Two ideas that are not efficient but may be worth looking into again:
     /*
@@ -668,12 +672,17 @@ inline int64_t Array::get(size_t ndx) const noexcept
     */
 }
 
+inline std::vector<int64_t> Array::get_all(size_t b, size_t e) const
+{
+    REALM_ASSERT_DEBUG(is_compressed());
+    return m_vtable->getter_all(*this, b, e);
+}
 
 template <size_t w>
-inline int64_t Array::get(size_t ndx) const noexcept
+inline int64_t Array::get(const Array& arr, size_t ndx) noexcept
 {
-    REALM_ASSERT_DEBUG(is_attached());
-    return get_universal<w>(m_data, ndx);
+    REALM_ASSERT_DEBUG(arr.is_attached());
+    return get_universal<w>(arr.m_data, ndx);
 }
 
 constexpr inline int_fast64_t Array::lbound_for_width(size_t width) noexcept
@@ -790,11 +799,11 @@ inline Array::Type Array::get_type() const noexcept
 inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_size);
-    (this->*(m_vtable->chunk_getter))(ndx, res);
+    m_vtable->chunk_getter(*this, ndx, res);
 }
 
 template <size_t w>
-inline int64_t Array::get_universal(const char* data, size_t ndx) const
+inline int64_t Array::get_universal(const char* data, size_t ndx)
 {
     if (w == 64) {
         size_t offset = ndx << 3;
@@ -1066,7 +1075,7 @@ inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_i
         // it only works by accident, because the whole slab area is reinitialized after commit.
         // We should have: Array encoded_array{Allocator::get_default()};
         Array compressed_array{Allocator::get_default()};
-        if (compress_in_flight && size() != 0 && compress_array(compressed_array)) {
+        if (compress_in_flight && compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
             const auto encoding = compressed_array.m_integer_compressor.get_encoding();
             REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
@@ -1099,7 +1108,7 @@ inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterB
 
     if (!array.m_has_refs) {
         Array compressed_array{Allocator::get_default()};
-        if (compress_in_flight && array.size() != 0 && array.compress_array(compressed_array)) {
+        if (compress_in_flight && array.compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
             const auto encoding = compressed_array.m_integer_compressor.get_encoding();
             REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);

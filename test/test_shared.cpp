@@ -421,7 +421,7 @@ ONLY(Shared_DiskSpace)
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
-    Thread writer_thread;
+    std::thread writer_thread;
     {
         DBRef sg = get_test_db(path, crypt_key());
         // Create table entries
@@ -439,7 +439,7 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            writer_thread.start(std::bind(&writer, sg, 41));
+            writer_thread = std::thread(&writer, sg, 41);
 
             // make sure writer has started:
             bool waiting = true;
@@ -493,25 +493,48 @@ TEST(Shared_CompactingOnTheFly)
 TEST(Shared_ReadAfterCompact)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = get_test_db(path);
     {
+        DBRef sg = DB::create(make_in_realm_history(), path);
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
         table->add_column(type_Int, "col");
         table->create_object().set_all(1);
         wt.commit();
+        sg->compact();
     }
-    sg->compact();
-    auto rt = sg->start_read();
-    auto table = rt->get_table("table");
-    for (int i = 2; i < 4; ++i) {
-        WriteTransaction wt(sg);
-        wt.get_table("table")->create_object().set_all(i);
-        wt.commit();
-    }
+    {
+        DBOptions options;
+        options.allow_file_format_upgrade = false;
+        DBRef sg = DB::create(make_in_realm_history(), path, options);
+        auto rt = sg->start_read();
+        auto table = rt->get_table("table");
+        for (int i = 2; i < 4; ++i) {
+            WriteTransaction wt(sg);
+            wt.get_table("table")->create_object().set_all(i);
+            wt.commit();
+        }
 
-    CHECK_EQUAL(table->size(), 1);
-    CHECK_EQUAL(table->get_object(0).get<int64_t>("col"), 1);
+        CHECK_EQUAL(table->size(), 1);
+        auto obj = table->get_object(0);
+        CHECK_EQUAL(obj.get<int64_t>("col"), 1);
+
+        struct Parser : _impl::NoOpTransactionLogParser {
+            bool create_object(ObjKey)
+            {
+                nb_objects++;
+                return true;
+            }
+            bool modify_object(ColKey, ObjKey)
+            {
+                return true;
+            }
+            void parse_complete() {}
+            int nb_objects = 0;
+        } parser;
+
+        rt->advance_read(&parser);
+        CHECK_EQUAL(parser.nb_objects, 2);
+    }
 }
 
 TEST(Shared_ReadOverRead)
@@ -695,7 +718,7 @@ TEST(Shared_InitialMem_StaleFile)
     // delete it
     {
         File f(path, File::mode_Write);
-        f.write("text");
+        f.write(0, "text");
     }
     CHECK(File::exists(path));
     CHECK(File::exists(path.get_lock_path()));
@@ -931,8 +954,7 @@ TEST(Shared_try_begin_write)
     };
 
     thread_obtains_write_lock.lock();
-    Thread async_writer;
-    async_writer.start(do_async);
+    std::thread async_writer(do_async);
 
     // wait for the thread to start a write transaction
     std::unique_lock<std::mutex> lock(cv_lock);
@@ -1424,9 +1446,9 @@ TEST(Many_ConcurrentReaders)
     };
 
     constexpr int num_threads = 4;
-    Thread threads[num_threads];
+    std::thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        threads[i].start(reader);
+        threads[i] = std::thread(reader);
     }
     for (int i = 0; i < num_threads; ++i) {
         threads[i].join();
@@ -1538,13 +1560,11 @@ TEST(Shared_WriterThreads)
             wt.commit();
         }
 
-        Thread threads[thread_count];
+        std::thread threads[thread_count];
 
         // Create all threads
         for (int i = 0; i < thread_count; ++i)
-            threads[i].start([this, &sg, i] {
-                writer_threads_thread(test_context, sg, ObjKey(i));
-            });
+            threads[i] = std::thread(writer_threads_thread, std::ref(test_context), sg, ObjKey(i));
 
         // Wait for all threads to complete
         for (int i = 0; i < thread_count; ++i)
@@ -2245,9 +2265,8 @@ TEST(Shared_EncryptionPageReadFailure)
         // make a corruption in the first data page
         util::File f(path, File::Mode::mode_Update);
         CHECK_GREATER(f.get_size(), 12288); // 4k iv page, then at least 2 pages
-        f.seek(5000);                       // somewhere on the first data page
         constexpr std::string_view data = "an external corruption in the encrypted page";
-        f.write(data.data(), data.size());
+        f.write(5000, data.data(), data.size()); // somewhere on the first data page
         f.sync();
         f.close();
     }
@@ -2268,6 +2287,89 @@ TEST(Shared_EncryptionPageReadFailure)
 }
 
 #endif // REALM_ENABLE_ENCRYPTION
+
+TEST(Shared_MaxStrings)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    std::string str_a(16 * 1024 * 1024 - 257, 'a');
+    std::string str_b(16 * 1024 * 1024 - 257, 'b');
+    // make it harder to compress:
+    for (auto& e : str_a) {
+        e = std::rand() % 256;
+    }
+    for (auto& e : str_b) {
+        e = std::rand() % 256;
+    }
+    auto o = t->create_object();
+    o.set(ck, str_a);
+    trans->commit_and_continue_as_read();
+    auto v = o.get<StringData>(ck);
+    CHECK_EQUAL(str_a, v);
+    trans->promote_to_write();
+    auto o2 = t->create_object();
+    o2.set(ck, str_b);
+    trans->commit_and_continue_as_read();
+    v = o.get<StringData>(ck);
+    auto v2 = o2.get<StringData>(ck);
+    CHECK_EQUAL(v, str_a);
+    CHECK_EQUAL(v2, str_b);
+    trans->close();
+    sg.reset();
+}
+
+TEST(Shared_RandomMaxStrings)
+{
+
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    trans->commit_and_continue_as_read();
+    for (int run = 0; run < 10; ++run) {
+        trans->promote_to_write();
+        size_t str_length = std::rand() % (16 * 1024 * 1024 - 257);
+        std::string str(str_length, 'X');
+        for (auto& e : str) {
+            e = std::rand() % 256;
+        }
+        auto o = t->create_object();
+        o.set(ck, str);
+        trans->commit_and_continue_as_read();
+    }
+    trans->close();
+}
+
+TEST(Shared_RandomSmallStrings)
+{
+
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = get_test_db(path);
+    // std::cout << "Writing " << path << std::endl;
+    auto trans = sg->start_write();
+    auto t = trans->add_table("MyTable");
+    ColKey ck = t->add_column(type_String, "MyStrings");
+    trans->commit_and_continue_as_read();
+    std::string str(500, 'X');
+    // insert a million objects with at most 4000 different strings
+    for (int run = 0; run < 100; ++run) {
+        trans->promote_to_write();
+        for (int i = 0; i < 1000; ++i) {
+            // size_t str_length = std::rand() % (1 + 500);
+            // std::string str(str_length, 'X');
+            size_t offset = std::rand() % str.size();
+            str[offset] = 'a' + (std::rand() & 0x7);
+            auto o = t->create_object();
+            o.set(ck, str);
+        }
+        trans->commit_and_continue_as_read();
+    }
+    trans->close();
+}
 
 TEST(Shared_VersionCount)
 {
@@ -3017,8 +3119,7 @@ TEST(Shared_LockFileInitSpinsOnZeroSize)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.rw_lock_shared();
         File::UnlockGuard ug(f);
@@ -3034,8 +3135,7 @@ TEST(Shared_LockFileInitSpinsOnZeroSize)
 
         millisleep(100);
         // the lock is then released and the other thread will be able to initialise properly
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3063,8 +3163,7 @@ TEST(Shared_LockFileSpinsOnInitComplete)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.rw_lock_shared();
         File::UnlockGuard ug(f);
@@ -3080,8 +3179,7 @@ TEST(Shared_LockFileSpinsOnInitComplete)
 
         millisleep(100);
         // the lock is then released and the other thread will be able to initialise properly
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3113,8 +3211,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.rw_lock_shared();
@@ -3129,10 +3226,10 @@ TEST(Shared_LockFileOfWrongSizeThrows)
         // On Windows, we implement a shared lock on a file by locking the first byte of the file. Since
         // you cannot write to a locked region using WriteFile(), we use memory mapping which works fine, and
         // which is also the same method used by the .lock file initialization in SharedGroup::do_open()
-        char* mem = static_cast<char*>(f.map(realm::util::File::access_ReadWrite, 1));
+        File::Map<char> mem(f, realm::util::File::access_ReadWrite, 1);
 
         // set init_complete flag to 1 and sync
-        mem[0] = 1;
+        mem.get_addr()[0] = 1;
         f.sync();
 
         CHECK_EQUAL(f.get_size(), wrong_size);
@@ -3142,8 +3239,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3174,8 +3270,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         CHECK(File::exists(path.get_lock_path()));
 
         File f;
@@ -3186,9 +3281,8 @@ TEST(Shared_LockFileOfWrongVersionThrows)
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
-        f.seek(6);
         char bad_version = 0;
-        f.write(&bad_version, 1);
+        f.write(6, &bad_version, 1);
         f.sync();
 
         mutex.lock();
@@ -3196,8 +3290,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
     sg->close();
@@ -3228,8 +3321,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
@@ -3239,8 +3331,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
         CHECK(f.is_attached());
 
         char bad_mutex_size = sizeof(InterprocessMutex::SharedPart) + 1;
-        f.seek(1);
-        f.write(&bad_mutex_size, 1);
+        f.write(1, &bad_mutex_size, 1);
         f.sync();
 
         mutex.lock();
@@ -3248,8 +3339,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
 
@@ -3281,8 +3371,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
     std::mutex mutex;
     size_t test_stage = 0;
 
-    Thread t;
-    auto do_async = [&]() {
+    std::thread t([&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
@@ -3292,8 +3381,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
         CHECK(f.is_attached());
 
         char bad_condvar_size = sizeof(InterprocessCondVar::SharedPart) + 1;
-        f.seek(2);
-        f.write(&bad_condvar_size, 1);
+        f.write(2, &bad_condvar_size, 1);
         f.sync();
 
         mutex.lock();
@@ -3301,8 +3389,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
         mutex.unlock();
 
         wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
-    };
-    t.start(do_async);
+    });
 
     wait_for(1, mutex, test_stage);
     sg->close();
@@ -4481,8 +4568,7 @@ TEST(Shared_ClearOnError_ResetInvalidFile)
     {
         // Overwrite the first byte of the mnemonic so that this isn't a valid file
         util::File file(path, File::mode_Update);
-        file.seek(8);
-        file.write("\0", 1);
+        file.write(8, "\0", 1);
     }
 
     {

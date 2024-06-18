@@ -15,9 +15,13 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #include "fuzz_configurator.hpp"
+
 #include "fuzz_object.hpp"
 #include "../util/test_path.hpp"
+
+#include <realm/disable_sync_to_disk.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 
 FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::string& input, bool use_input_file,
@@ -38,10 +42,12 @@ void FuzzConfigurator::setup_realm_config()
     m_config.scheduler = realm::util::Scheduler::make_dummy();
     if (m_use_encryption) {
         const char* key = m_fuzzer.get_encryption_key();
-        const char* i = key;
-        while (*i != '\0') {
-            m_config.encryption_key.push_back(*i);
-            i++;
+        if (key) {
+            const char* i = key;
+            while (*i != '\0') {
+                m_config.encryption_key.push_back(*i);
+                i++;
+            }
         }
     }
 }

@@ -18,6 +18,7 @@
 
 #include <realm/array_string.hpp>
 #include <realm/impl/array_writer.hpp>
+#include <realm/string_interner.hpp>
 #include <realm/spec.hpp>
 #include <realm/mixed.hpp>
 
@@ -315,8 +316,7 @@ void ArrayString::move(ArrayString& dst, size_t ndx)
             REALM_UNREACHABLE();
             break;
         case Type::interned_strings:
-            // unimplemented
-            REALM_ASSERT(false);
+            m_arr->truncate(ndx);
             break;
     }
 }
@@ -340,7 +340,7 @@ void ArrayString::clear()
     }
 }
 
-size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::optional<StringID> id) const noexcept
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const noexcept
 {
     switch (m_type) {
         case Type::small_strings:
@@ -364,6 +364,9 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::
             break;
         }
         case Type::interned_strings: {
+            // we need a way to avoid this lookup for each leaf array. The lookup must appear
+            // higher up the call stack and passed down.
+            auto id = m_string_interner->lookup(value);
             if (id) {
                 return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
             }
@@ -547,5 +550,4 @@ ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interne
     auto retval = interned.write(out, false, false, out.compress);
     interned.destroy();
     return retval;
-    // return m_arr->write(out, true, false, false);
 }

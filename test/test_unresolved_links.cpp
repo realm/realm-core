@@ -869,7 +869,6 @@ TEST(Unresolved_PerformanceLinkList)
     auto t2 = steady_clock::now();
     tr->commit_and_continue_as_read();
     CHECK(t2 > t1);
-    // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
     tr->promote_to_write();
     // fails in compressed format because of unsigned/signed interpretation.
     tr->verify();

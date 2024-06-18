@@ -7,6 +7,13 @@
 namespace realm::sync {
 namespace {
 
+constexpr static std::string_view
+    s_dict_key_wrong_type_err("%1: Dictionary key is not a string on field '%2' in class '%3'");
+constexpr static std::string_view
+    s_list_index_wrong_type_err("%1: List index is not an integer on field '%2' in class '%3'");
+constexpr static std::string_view
+    s_wrong_collection_type_err("%1: Not a list or dictionary on field '%2' in class '%3'");
+
 REALM_NORETURN void throw_bad_transaction_log(std::string msg)
 {
     throw BadChangesetError{std::move(msg)};
@@ -317,7 +324,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             , m_instr(instr)
         {
         }
-        void on_property(Obj& obj, ColKey col) override
+        Status on_property(Obj& obj, ColKey col) override
         {
             // Update of object field.
 
@@ -386,6 +393,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
+            return Status::Pending;
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
@@ -524,7 +532,7 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
             , m_instr(instr)
         {
         }
-        void on_property(Obj& obj, ColKey col)
+        Status on_property(Obj& obj, ColKey col)
         {
             // Increment of object field.
             if (!obj.is_null(col)) {
@@ -537,6 +545,7 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
                                                    table->get_column_name(col), table->get_name());
                 }
             }
+            return Status::Pending;
         }
 
     private:
@@ -940,21 +949,24 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         Status on_dictionary_key(Dictionary& dict, Mixed key) override
         {
             REALM_ASSERT(m_collection_type);
-            auto val = dict.get(key);
-            if (val.is_type(type_Dictionary)) {
-                Dictionary d(dict, dict.build_index(key));
-                d.clear();
+            if (auto val = dict.try_get(key)) {
+                if (val->is_type(type_Dictionary)) {
+                    Dictionary d(dict, dict.build_index(key));
+                    d.clear();
+                }
+                else if (val->is_type(type_List)) {
+                    Lst<Mixed> l(dict, dict.build_index(key));
+                    l.clear();
+                }
+                else if (val->is_type(type_Set)) {
+                    m_applier->bad_transaction_log("Clear: Item at key '%1' is a Set",
+                                                   key); // Throws
+                }
+                dict.insert_collection(key.get_string(), *m_collection_type);
+                return Status::Pending;
             }
-            else if (val.is_type(type_List)) {
-                Lst<Mixed> l(dict, dict.build_index(key));
-                l.clear();
-            }
-            else if (val.is_type(type_Set)) {
-                m_applier->bad_transaction_log("Clear: Item at key '%1' is a Set",
-                                               key); // Throws
-            }
-            dict.insert_collection(key.get_string(), *m_collection_type);
-            return Status::Pending;
+            m_applier->bad_transaction_log("Clear: Key '%1' not found", key);
+            return Status::DidNotResolve;
         }
         void on_set(SetBase& set) override
         {
@@ -964,7 +976,7 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
             }
             set.clear();
         }
-        void on_property(Obj& obj, ColKey col_key) override
+        Status on_property(Obj& obj, ColKey col_key) override
         {
             if (col_key.get_type() == col_type_Mixed) {
                 REALM_ASSERT(m_collection_type);
@@ -981,10 +993,10 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                     m_applier->bad_transaction_log("Clear: Mixed property is a Set"); // Throws
                 }
                 obj.set_collection(col_key, *m_collection_type);
-                return;
+                return Status::Pending;
             }
 
-            PathResolver::on_property(obj, col_key);
+            return PathResolver::on_property(obj, col_key);
         }
 
     private:
@@ -1020,9 +1032,10 @@ bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& i
             m_allows_nulls = true;
             return Status::Pending;
         }
-        void on_property(Obj&, ColKey) override
+        Status on_property(Obj&, ColKey) override
         {
             m_allows_nulls = true;
+            return Status::Pending;
         }
         bool allows_nulls()
         {
@@ -1096,12 +1109,13 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
             , m_instr(instr)
         {
         }
-        void on_property(Obj& obj, ColKey col) override
+        Status on_property(Obj& obj, ColKey col) override
         {
             // This better be a mixed column
             REALM_ASSERT(col.get_type() == col_type_Mixed);
             auto set = obj.get_set<Mixed>(col);
             on_set(set);
+            return Status::Pending;
         }
         void on_set(SetBase& set) override
         {
@@ -1190,12 +1204,13 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
             , m_instr(instr)
         {
         }
-        void on_property(Obj& obj, ColKey col) override
+        Status on_property(Obj& obj, ColKey col) override
         {
             // This better be a mixed column
             REALM_ASSERT(col.get_type() == col_type_Mixed);
             auto set = obj.get_set<Mixed>(col);
             on_set(set);
+            return Status::Pending;
         }
         void on_set(SetBase& set) override
         {
@@ -1370,9 +1385,10 @@ InstructionApplier::PathResolver::~PathResolver()
     on_finish();
 }
 
-void InstructionApplier::PathResolver::on_property(Obj&, ColKey)
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_property(Obj&, ColKey)
 {
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (object, column)", m_instr_name));
+    return Status::DidNotResolve;
 }
 
 void InstructionApplier::PathResolver::on_list(LstBase&)
@@ -1407,6 +1423,13 @@ void InstructionApplier::PathResolver::on_error(const std::string& err_msg)
     m_applier->bad_transaction_log(err_msg);
 }
 
+InstructionApplier::PathResolver::Status
+InstructionApplier::PathResolver::on_mixed_type_changed(const std::string& err_msg)
+{
+    m_applier->bad_transaction_log(err_msg);
+    return Status::DidNotResolve;
+}
+
 void InstructionApplier::PathResolver::on_column_advance(ColKey col)
 {
     m_applier->m_last_field = col;
@@ -1421,6 +1444,12 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_li
 
 InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_null_link_advance(StringData,
                                                                                                 StringData)
+{
+    return Status::Pending;
+}
+
+InstructionApplier::PathResolver::Status
+InstructionApplier::PathResolver::on_dict_key_not_found(StringData, StringData, StringData)
 {
     return Status::Pending;
 }
@@ -1495,7 +1524,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
             on_set(*set);
         }
         else {
-            on_property(obj, col);
+            return on_property(obj, col);
         }
         return Status::Pending;
     }
@@ -1506,8 +1535,8 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
             ++m_it_begin;
             return resolve_list_element(*list, *pindex);
         }
-        on_error(util::format("%1: List index is not an integer on field '%2' in class '%3'", m_instr_name,
-                              field_name, obj.get_table()->get_name()));
+        on_error(
+            util::format(s_list_index_wrong_type_err.data(), m_instr_name, field_name, obj.get_table()->get_name()));
     }
     else if (col.is_dictionary()) {
         if (auto pkey = mpark::get_if<InternString>(&*m_it_begin)) {
@@ -1515,27 +1544,33 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
             ++m_it_begin;
             return resolve_dictionary_element(dict, *pkey);
         }
-        on_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'", m_instr_name,
-                              field_name, obj.get_table()->get_name()));
+        on_error(
+            util::format(s_dict_key_wrong_type_err.data(), m_instr_name, field_name, obj.get_table()->get_name()));
     }
     else if (col.get_type() == col_type_Mixed) {
         auto val = obj.get<Mixed>(col);
+        std::string_view error_msg;
         if (val.is_type(type_Dictionary)) {
             if (auto pkey = mpark::get_if<InternString>(&*m_it_begin)) {
                 Dictionary dict(obj, col);
                 ++m_it_begin;
                 return resolve_dictionary_element(dict, *pkey);
             }
+            error_msg = s_dict_key_wrong_type_err;
         }
-        if (val.is_type(type_List)) {
+        else if (val.is_type(type_List)) {
             if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
                 Lst<Mixed> list(obj, col);
                 ++m_it_begin;
                 return resolve_list_element(list, *pindex);
             }
+            error_msg = s_list_index_wrong_type_err;
         }
-        on_error(util::format("%1: Not a list or dictionary on field '%2' in class '%3'", m_instr_name, field_name,
-                              obj.get_table()->get_name()));
+        else {
+            error_msg = s_wrong_collection_type_err;
+        }
+        return on_mixed_type_changed(
+            util::format(error_msg.data(), m_instr_name, field_name, obj.get_table()->get_name()));
     }
     else if (col.get_type() == col_type_Link) {
         auto target = obj.get_table()->get_link_target(col);
@@ -1576,13 +1611,14 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
     }
 
     auto col = list.get_col_key();
-    auto field_name = list.get_table()->get_column_name(col);
+    auto table = list.get_table();
+    auto field_name = table->get_column_name(col);
 
     if (col.get_type() == col_type_Link) {
-        auto target = list.get_table()->get_link_target(col);
+        auto target = table->get_link_target(col);
         if (!target->is_embedded()) {
-            on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name, field_name,
-                                  list.get_table()->get_name(), index));
+            on_error(util::format("%1: Reference through non-embedded link at '%2.%3[%4]'", m_instr_name,
+                                  table->get_name(), field_name, index));
             return Status::DidNotResolve;
         }
 
@@ -1594,8 +1630,8 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
         auto& link_list = static_cast<LnkLst&>(list);
         if (index >= link_list.size()) {
-            on_error(util::format("%1: Out-of-bounds index through list at '%3.%2[%4]'", m_instr_name, field_name,
-                                  list.get_table()->get_name(), index));
+            on_error(util::format("%1: Out-of-bounds index through list at '%2.%3[%4]'", m_instr_name,
+                                  table->get_name(), field_name, index));
         }
         else if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
             auto embedded_object = link_list.get_object(index);
@@ -1606,9 +1642,18 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
     }
     else {
         if (list.get_data_type() == type_Mixed) {
+            Status list_status = on_list_index_advance(index);
+            if (list_status != Status::Pending) {
+                return list_status;
+            }
             auto& mixed_list = static_cast<Lst<Mixed>&>(list);
-            if (index < mixed_list.size()) {
+            if (index >= mixed_list.size()) {
+                on_error(util::format("%1: Out-of-bounds index '%2' through list along path '%2.%3'", m_instr_name,
+                                      index, table->get_name(), field_name));
+            }
+            else {
                 auto val = mixed_list.get(index);
+                std::string_view error_msg;
 
                 if (val.is_type(type_Dictionary)) {
                     if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
@@ -1616,20 +1661,26 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
                         ++m_it_begin;
                         return resolve_dictionary_element(d, *pfield);
                     }
+                    error_msg = s_dict_key_wrong_type_err;
                 }
-                if (val.is_type(type_List)) {
+                else if (val.is_type(type_List)) {
                     if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
                         Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
                         ++m_it_begin;
                         return resolve_list_element(l, *pindex);
                     }
+                    error_msg = s_list_index_wrong_type_err;
                 }
+                else {
+                    error_msg = s_wrong_collection_type_err;
+                }
+                return on_mixed_type_changed(
+                    util::format(error_msg.data(), m_instr_name, field_name, table->get_name()));
             }
         }
-
         on_error(util::format(
-            "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
-            m_instr_name, field_name, list.get_table()->get_name(), col.get_type()));
+            "%1: Resolving path through unstructured list element on '%2.%3', which is a list of type '%4'",
+            m_instr_name, table->get_name(), field_name, col.get_type()));
     }
     return Status::DidNotResolve;
 }
@@ -1674,24 +1725,35 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
         }
     }
     else {
-        auto val = dict.get(string_key);
-        if (val.is_type(type_Dictionary)) {
-            if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
-                Dictionary d(dict, dict.build_index(string_key));
-                ++m_it_begin;
-                return resolve_dictionary_element(d, *pfield);
+        if (auto val = dict.try_get(string_key)) {
+            std::string_view error_msg;
+            if (val->is_type(type_Dictionary)) {
+                if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+                    Dictionary d(dict, dict.build_index(string_key));
+                    ++m_it_begin;
+                    return resolve_dictionary_element(d, *pfield);
+                }
+                error_msg = s_dict_key_wrong_type_err;
             }
-        }
-        if (val.is_type(type_List)) {
-            if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
-                Lst<Mixed> l(dict, dict.build_index(string_key));
-                ++m_it_begin;
-                return resolve_list_element(l, *pindex);
+            else if (val->is_type(type_List)) {
+                if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                    Lst<Mixed> l(dict, dict.build_index(string_key));
+                    ++m_it_begin;
+                    return resolve_list_element(l, *pindex);
+                }
+                error_msg = s_list_index_wrong_type_err;
             }
+            else {
+                error_msg = s_wrong_collection_type_err;
+            }
+            return on_mixed_type_changed(util::format(error_msg.data(), m_instr_name, field_name, table->get_name()));
         }
-        on_error(
-            util::format("%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'",
-                         m_instr_name, field_name, table->get_name(), col.get_type()));
+        Status key_not_found_status = on_dict_key_not_found(table->get_name(), field_name, string_key);
+        if (key_not_found_status != Status::Pending) {
+            return key_not_found_status;
+        }
+        on_error(util::format("%1: Unmatched key '%2' through dictionary along path '%3.%4'", m_instr_name,
+                              string_key, table->get_name(), field_name));
     }
     return Status::DidNotResolve;
 }

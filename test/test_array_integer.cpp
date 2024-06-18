@@ -46,7 +46,7 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -69,24 +69,24 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
     std::cout << "   Positive values - Array::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
     t1 = high_resolution_clock::now();
 
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a_encoded.get(i) == a.get(i));
+            REALM_ASSERT(compressed_a.get(i) == a.get(i));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+    std::cout << "   Positive values - ArrayCompress::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
               << std::endl;
-    std::cout << "   Positive values - ArrayEncode::get(): "
+    std::cout << "   Positive values - ArrayCompress::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -111,23 +111,23 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
     std::cout << "   Negative values - Array::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a_encoded.get(i) == a.get(i));
+            REALM_ASSERT(compressed_a.get(i) == a.get(i));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+    std::cout << "   Negative values - ArrayCompress::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
               << std::endl;
-    std::cout << "   Negative values - ArrayEncode::get(): "
+    std::cout << "   Negative values - ArrayCompress::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 
@@ -143,7 +143,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -169,15 +169,15 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     std::cout << "   Positive values - Array::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             auto v = a.find_first(input_array[i]);
-            auto v1 = a_encoded.find_first(input_array[i]);
+            auto v1 = compressed_a.find_first(input_array[i]);
             REALM_ASSERT(v == v1);
         }
     }
@@ -185,21 +185,21 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a_encoded.find_first(input_array[i]);
+            auto ndx = compressed_a.find_first(input_array[i]);
             REALM_ASSERT(ndx != realm::not_found);
-            REALM_ASSERT(a_encoded.get(ndx) == input_array[ndx]);
+            REALM_ASSERT(compressed_a.get(ndx) == input_array[ndx]);
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Positive values - ArrayCompress::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<Equal>(): "
+    std::cout << "   Positive values - ArrayCompress::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -210,15 +210,15 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             auto v = a.find_first(input_array[i]);
-            auto v1 = a_encoded.find_first(input_array[i]);
+            auto v1 = compressed_a.find_first(input_array[i]);
             REALM_ASSERT(v == v1);
         }
     }
@@ -241,19 +241,19 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a_encoded.find_first(input_array[i]);
+            auto ndx = compressed_a.find_first(input_array[i]);
             REALM_ASSERT(ndx != realm::not_found);
-            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
+            REALM_ASSERT(compressed_a.get(ndx) == a.get(ndx));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Negative values - ArrayCompress::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<Equal>(): "
+    std::cout << "   Negative values - ArrayCompress::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
@@ -268,7 +268,7 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -296,15 +296,15 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
     std::cout << "   Positive values - Array::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<NotEqual>(i, 0, a.size(), &state1);
-            a_encoded.find<NotEqual>(i, 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -312,21 +312,21 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            a_encoded.find<NotEqual>(i, 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Positive values - ArrayCompress::find<NotEqual>(): "
               << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Positive values - ArrayCompress::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -337,9 +337,9 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // NEQ for signed integers is not working. TODO: investigate this.
     // verify that both find the same thing
@@ -347,7 +347,7 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<NotEqual>(-i, 0, a.size(), &state1);
-            a_encoded.find<NotEqual>(-i, 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(-i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -370,19 +370,19 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            a_encoded.find<NotEqual>(-i, 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(-i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Negative values - ArrayCompress::find<NotEqual>(): "
               << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Negative values - ArrayCompress::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
@@ -397,7 +397,7 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -425,9 +425,9 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
     std::cout << "   Positive values - Array::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     state1 = {};
@@ -435,7 +435,7 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<Less>(i, 0, a.size(), &state1);
-            a_encoded.find<Less>(i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -443,21 +443,21 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 1; i < n_values; ++i) { // there is nothing less than 0
-            a_encoded.find<Less>(i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Positive values - ArrayCompress::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<Less>(): "
+    std::cout << "   Positive values - ArrayCompress::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -468,9 +468,9 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     state1 = {};
@@ -478,7 +478,7 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<Less>(-i, 0, a.size(), &state1);
-            a_encoded.find<Less>(-i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(-i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -501,19 +501,19 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values - 1; ++i) { // nothing less than the biggest negative number
-            a_encoded.find<Less>(-i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(-i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Negative values - ArrayCompress::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<Less>(): "
+    std::cout << "   Negative values - ArrayCompress::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
@@ -529,7 +529,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -557,9 +557,9 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
     std::cout << "   Positive values - Array::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     state1 = {};
@@ -567,7 +567,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<Greater>(i, 0, a.size(), &state1);
-            a_encoded.find<Greater>(i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -575,21 +575,21 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values - 1; ++i) { // nothing bigger than the last val
-            a_encoded.find<Greater>(i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
-              << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<Greater>(): "
+    std::cout << "   Positive values - ArrayCompress::find<Greater>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Positive values - ArrayCompress::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -600,9 +600,9 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     state1 = {};
@@ -610,7 +610,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<Greater>(-i, 0, a.size(), &state1);
-            a_encoded.find<Greater>(-i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(-i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -633,19 +633,19 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 1; i < n_values; ++i) { // nothing bigger than 0
-            a_encoded.find<Greater>(-i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(-i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
-              << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<Greater>(): "
+    std::cout << "   Negative values - ArrayCompress::find<Greater>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Negative values - ArrayCompress::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_greater_32bit)
@@ -661,7 +661,7 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_greater_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -684,24 +684,24 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_greater_32bit)
     std::cout << "   Positive values - Array::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
     t1 = high_resolution_clock::now();
 
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a_encoded.get(i) == a.get(i));
+            REALM_ASSERT(compressed_a.get(i) == a.get(i));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+    std::cout << "   Positive values - ArrayCompress::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
               << std::endl;
-    std::cout << "   Positive values - ArrayEncode::get(): "
+    std::cout << "   Positive values - ArrayCompress::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -726,23 +726,23 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_greater_32bit)
     std::cout << "   Negative values - Array::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a_encoded.get(i) == a.get(i));
+            REALM_ASSERT(compressed_a.get(i) == a.get(i));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+    std::cout << "   Negative values - ArrayCompress::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
               << std::endl;
-    std::cout << "   Negative values - ArrayEncode::get(): "
+    std::cout << "   Negative values - ArrayCompress::get(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
@@ -758,7 +758,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -784,35 +784,35 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
     std::cout << "   Positive values - Array::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a.find_first(start_value + i) == a_encoded.find_first(start_value + i));
+            REALM_ASSERT(a.find_first(start_value + i) == compressed_a.find_first(start_value + i));
         }
     }
 
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a_encoded.find_first(start_value + i);
+            auto ndx = compressed_a.find_first(start_value + i);
             REALM_ASSERT(ndx != realm::not_found);
-            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
+            REALM_ASSERT(compressed_a.get(ndx) == a.get(ndx));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Positive values - ArrayCompress::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<Equal>(): "
+    std::cout << "   Positive values - ArrayCompress::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -823,16 +823,16 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             const auto k = -(start_value + i);
             const auto v1 = a.find_first(k);
-            const auto v2 = a_encoded.find_first(k);
+            const auto v2 = compressed_a.find_first(k);
             REALM_ASSERT(v1 == v2);
         }
     }
@@ -855,19 +855,19 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a_encoded.find_first(-(start_value + i));
+            auto ndx = compressed_a.find_first(-(start_value + i));
             REALM_ASSERT(ndx != realm::not_found);
-            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
+            REALM_ASSERT(compressed_a.get(ndx) == a.get(ndx));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Negative values - ArrayCompress::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<Equal>(): "
+    std::cout << "   Negative values - ArrayCompress::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
@@ -883,7 +883,7 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -911,15 +911,15 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
     std::cout << "   Positive values - Array::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<NotEqual>(start_value + i, 0, a.size(), &state1);
-            a_encoded.find<NotEqual>(start_value + i, 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(start_value + i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -927,21 +927,21 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            a_encoded.find<NotEqual>(start_value + i, 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(start_value + i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Positive values - ArrayCompress::find<NotEqual>(): "
               << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Positive values - ArrayCompress::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -952,15 +952,15 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<NotEqual>(-(start_value + i), 0, a.size(), &state1);
-            a_encoded.find<NotEqual>(-(start_value + i), 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(-(start_value + i), 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -983,19 +983,19 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_greater_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            a_encoded.find<NotEqual>(-(start_value + i), 0, a_encoded.size(), &state2);
+            compressed_a.find<NotEqual>(-(start_value + i), 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Negative values - ArrayCompress::find<NotEqual>(): "
               << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<NotEqual>(): "
+    std::cout << "   Negative values - ArrayCompress::find<NotEqual>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
@@ -1011,7 +1011,7 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -1039,9 +1039,9 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     std::cout << "   Positive values - Array::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     state1 = {};
@@ -1049,7 +1049,7 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<Less>(start_value + i, 0, a.size(), &state1);
-            a_encoded.find<Less>(start_value + i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(start_value + i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -1057,21 +1057,21 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 1; i < n_values; ++i) {
-            a_encoded.find<Less>(start_value + i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(start_value + i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Positive values - ArrayCompress::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<Less>(): "
+    std::cout << "   Positive values - ArrayCompress::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -1082,15 +1082,15 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a.find<Less>(-(start_value + i), 0, a.size(), &state1);
-            a_encoded.find<Less>(-(start_value + i), 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(-(start_value + i), 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -1113,19 +1113,19 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            a_encoded.find<Less>(-(start_value + i), 0, a_encoded.size(), &state2);
+            compressed_a.find<Less>(-(start_value + i), 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    std::cout << "   Negative values - ArrayCompress::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
               << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<Less>(): "
+    std::cout << "   Negative values - ArrayCompress::find<Less>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
@@ -1141,7 +1141,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
 
     std::vector<int64_t> input_array;
     ArrayInteger a(Allocator::get_default());
-    ArrayInteger a_encoded(Allocator::get_default());
+    ArrayInteger compressed_a(Allocator::get_default());
     a.create();
 
     for (size_t i = 0; i < n_values; i++)
@@ -1169,9 +1169,9 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
     std::cout << "   Positive values - Array::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     state1 = {};
@@ -1180,7 +1180,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
         for (size_t i = 0; i < n_values; ++i) {
             const auto k = start_value + i;
             a.find<Greater>(k, 0, a.size(), &state1);
-            a_encoded.find<Greater>(k, 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(k, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -1188,21 +1188,21 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values - 1; ++i) {
-            a_encoded.find<Greater>(start_value + i, 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(start_value + i, 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
-              << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find<Greater>(): "
+    std::cout << "   Positive values - ArrayCompress::find<Greater>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Positive values - ArrayCompress::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
     a.create();
     input_array.clear();
     for (size_t i = 0; i < n_values; i++)
@@ -1213,15 +1213,15 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
     for (const auto& v : input_array)
         a.add(v);
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
+    a.try_compress(compressed_a);
+    CHECK(compressed_a.is_compressed());
+    CHECK(compressed_a.size() == a.size());
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 1; i < n_values; ++i) {
             a.find<Greater>(-(start_value + i), 0, a.size(), &state1);
-            a_encoded.find<Greater>(-(start_value + i), 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(-(start_value + i), 0, compressed_a.size(), &state2);
             REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
@@ -1244,26 +1244,26 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 1; i < n_values; ++i) {
-            a_encoded.find<Greater>(-(start_value + i), 0, a_encoded.size(), &state2);
+            compressed_a.find<Greater>(-(start_value + i), 0, compressed_a.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
-            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+            REALM_ASSERT(compressed_a.get(state2.m_state) == a.get(state2.m_state));
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
-              << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<Greater>(): "
+    std::cout << "   Negative values - ArrayCompress::find<Greater>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Negative values - ArrayCompress::find<Greater>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
-    a_encoded.destroy();
+    compressed_a.destroy();
 }
 
 #endif
 
 // disable this test if forcing compression to Packed.
 #if !REALM_COMPRESS
-TEST(Test_ArrayInt_no_encode)
+TEST(Test_ArrayInt_no_compress)
 {
     ArrayInteger a(Allocator::get_default());
     ArrayInteger a1(Allocator::get_default());
@@ -1282,7 +1282,7 @@ TEST(Test_ArrayInt_no_encode)
     a1.destroy();
 }
 
-TEST(Test_ArrayInt_encode_decode_needed)
+TEST(Test_ArrayInt_compress_decompress_needed)
 {
     ArrayInteger a(Allocator::get_default());
     ArrayInteger a1(Allocator::get_default());
@@ -1332,6 +1332,24 @@ TEST(Test_ArrayInt_encode_decode_needed)
     a1.destroy();
 }
 #endif
+
+TEST(Test_ArrayInt_get_all)
+{
+    std::vector<int64_t> vs = {3656152302, 2814021986, 4195757081, 3272933168, 3466127978, 2777289082,
+                               4247467684, 3825361855, 2496524560, 4052938301, 3765455798, 2527633011,
+                               3448934593, 3699340964, 4057735040, 3294068800};
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
+    a.create();
+    for (const auto i : vs)
+        a.add(i);
+    CHECK(a.try_compress(a1));
+    CHECK(a1.is_compressed());
+    auto res = a1.get_all(0, a1.size());
+    CHECK(res == vs);
+    a.destroy();
+    a1.destroy();
+}
 
 TEST(Test_array_same_size_less_bits)
 {
@@ -1795,4 +1813,115 @@ TEST(ArrayRef_Basic)
     CHECK_EQUAL(a.get(2), 16);
 
     a.destroy();
+}
+
+TEST_TYPES(ArrayInt_comparison, Equal, NotEqual, Less, Greater)
+{
+    using Cond = TEST_TYPE;
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
+    a.create();
+
+    // check first positive values < 32 bits
+    constexpr auto N = 300;
+    constexpr auto M = 3;
+    for (size_t i = 0; i < N; i++)
+        for (size_t j = 0; j < M; ++j)
+            a.add(i);
+
+    auto sz = a.size();
+    CHECK(sz == M * N);
+
+    CHECK(a.try_compress(a1));
+    CHECK(a1.is_compressed());
+
+    //  Array should be in compressed form now and values should match
+    for (size_t i = 0; i < sz; ++i)
+        CHECK(a.get(i) == a1.get(i));
+
+    for (int i = (int)(sz)-1; i >= 0; --i) {
+        QueryStateFindFirst m_first1, m_first2;
+        CHECK(a.find<Less>(i, 0, sz, &m_first1) == a1.find<Less>(i, 0, sz, &m_first2));
+        CHECK(m_first1.m_state == m_first2.m_state);
+    }
+
+    IntegerColumn accu1(Allocator::get_default());
+    IntegerColumn accu2(Allocator::get_default());
+    accu1.create();
+    accu2.create();
+    for (int i = (int)(sz)-1; i >= 0; --i) {
+        QueryStateFindAll m1{accu1}, m2{accu2};
+        CHECK(a.find<Cond>(i, 0, sz, &m1) == a1.find<Cond>(i, 0, sz, &m2));
+        CHECK(m1.match_count() == m2.match_count());
+    }
+
+    // check negative numbers now.
+    a1.destroy();
+    a.clear();
+
+    for (size_t i = 0; i < N; i++)
+        for (size_t j = 0; j < M; ++j)
+            a.add(-i);
+
+    sz = a.size();
+    CHECK(sz == M * N);
+
+    CHECK(a.try_compress(a1));
+    CHECK(a1.is_compressed());
+
+    //  Array should be in compressed form now and values should match
+    for (size_t i = 0; i < sz; ++i)
+        CHECK(a.get(i) == a1.get(i));
+
+    for (int64_t i = (int64_t)(sz)-1; i >= 0; --i) {
+        QueryStateFindFirst m_first1, m_first2;
+        CHECK(a.find<Cond>(-i, 0, sz, &m_first1) == a1.find<Cond>(-i, 0, sz, &m_first2));
+        CHECK(m_first1.m_state == m_first2.m_state);
+    }
+
+    accu1.clear();
+    accu2.clear();
+    for (int i = (int)(sz)-1; i >= 0; --i) {
+        QueryStateFindAll m1{accu1}, m2{accu2};
+        CHECK(a.find<Cond>(-i, 0, sz, &m1) == a1.find<Cond>(-i, 0, sz, &m2));
+        CHECK(m1.match_count() == m2.match_count());
+    }
+
+    accu1.destroy();
+    accu2.destroy();
+    a.destroy();
+    a1.destroy();
+
+#if REALM_COMPRESS
+    a.create();
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    const auto min_range_t = (size_t)std::numeric_limits<int>::min();
+    const auto max_range_t = (size_t)std::numeric_limits<int>::max();
+    std::uniform_int_distribution<std::mt19937::result_type> dist(min_range_t, max_range_t);
+    sz = 100;
+    for (size_t i = 0; i < sz; ++i) {
+        auto v = (int)dist(rng);
+        a.add(v);
+    }
+    a.try_compress(a1);
+
+    for (size_t i = 0; i < sz; ++i)
+        CHECK(a.get(i) == a1.get(i));
+
+    CHECK(a1.is_compressed());
+    for (size_t i = 0; i < sz; ++i) {
+        QueryStateFindFirst m_first1, m_first2;
+        CHECK(a.find<Cond>(a.get(i), 0, sz, &m_first1) == a1.find<Cond>(a1.get(i), 0, sz, &m_first2));
+        CHECK(m_first1.m_state == m_first2.m_state);
+        if (m_first1.m_state != realm::not_found)
+            CHECK(a.get(m_first1.m_state) == a1.get(m_first2.m_state));
+    }
+
+    a.destroy();
+    a1.destroy();
+#endif
+
+    CHECK_NOT(a.is_attached());
+    CHECK_NOT(a1.is_attached());
 }

@@ -65,7 +65,7 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
         for (auto it = list.begin() + 1; it != list.end(); ++it) {
             if (prev->start + prev->length != it->start) {
                 if (prev->start + prev->length > it->start) {
-                    std::cout << "*** Overlapping entries:" << std::endl;
+                    std::cout << "*** Overlapping entries:\n";
                     std::cout << std::hex;
                     std::cout << "    0x" << prev->start << "..0x" << prev->start + prev->length << std::endl;
                     std::cout << "    0x" << it->start << "..0x" << it->start + it->length << std::endl;
@@ -455,7 +455,16 @@ public:
             for (size_t n = 0; n < m_history.size(); n++) {
                 ref = m_history.get_ref(n);
                 Node node(m_alloc, ref);
-                ret.emplace_back(node.data(), node.size());
+                if (!node.has_refs()) {
+                    ret.emplace_back(node.data(), node.size());
+                    continue;
+                }
+
+                Array array(m_alloc, ref);
+                for (size_t j = 0; j < array.size(); ++j) {
+                    Node node(m_alloc, array.get_ref(j));
+                    ret.emplace_back(node.data(), node.size());
+                }
             }
         }
         return ret;
@@ -473,7 +482,7 @@ public:
         if (m_evacuation_info.valid()) {
             ostr << "Evacuation limit: " << size_t(m_evacuation_info.get_val(0));
             if (m_evacuation_info.get_val(1)) {
-                ostr << " Scan done" << std::endl;
+                ostr << " Scan done\n";
             }
             else {
                 ostr << " Progress: [";
@@ -482,7 +491,7 @@ public:
                         ostr << ',';
                     ostr << m_evacuation_info.get_val(i);
                 }
-                ostr << "]" << std::endl;
+                ostr << "]\n";
             }
         }
     }
@@ -588,14 +597,14 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
         }
     }
     else {
-        ostr << "*** Invalid group ***" << std::endl;
+        ostr << "*** Invalid group ***\n";
     }
     return ostr;
 }
 
 void Table::print_columns(const Group& group) const
 {
-    std::cout << "        <" << m_table_type << ">" << std::endl;
+    std::cout << "        <" << m_table_type << ">\n";
     for (unsigned i = 0; i < m_column_names.size(); i++) {
         auto type = realm::ColumnType(m_column_types.get_val(i) & 0xFFFF);
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
@@ -646,7 +655,7 @@ void Table::print_columns(const Group& group) const
 void Group::print_schema() const
 {
     if (valid()) {
-        std::cout << "Tables: " << std::endl;
+        std::cout << "Tables: \n";
 
         for (unsigned i = 0; i < get_nb_tables(); i++) {
             Table* table = get_table(i);
@@ -808,7 +817,7 @@ void RealmFile::node_scan()
     }
     uint64_t bad_ref = 0;
     if (free_list.empty()) {
-        std::cout << "*** No free list - results may be unreliable ***" << std::endl;
+        std::cout << "*** No free list - results may be unreliable ***\n";
     }
     std::cout << std::hex;
     while (ref < end) {
@@ -847,7 +856,7 @@ void RealmFile::node_scan()
                   << "Start: 0x" << bad_ref << "..0x" << end << std::endl;
     }
     std::cout << std::dec;
-    std::cout << "Allocated space:" << std::endl;
+    std::cout << "Allocated space:\n";
     for (auto s : sizes) {
         std::cout << "    Size: " << s.first << " count: " << s.second << std::endl;
     }
@@ -870,7 +879,7 @@ void RealmFile::memory_leaks()
         consolidate_lists(nodes, free_blocks);
         auto it = nodes.begin();
         if (nodes.size() > 1) {
-            std::cout << "Memory leaked:" << std::endl;
+            std::cout << "Memory leaked:\n";
             auto prev = it;
             ++it;
             while (it != nodes.end()) {
@@ -882,7 +891,7 @@ void RealmFile::memory_leaks()
         }
         else {
             REALM_ASSERT(it->length == m_group->get_file_size());
-            std::cout << "No memory leaks" << std::endl;
+            std::cout << "No memory leaks\n";
         }
     }
 }
@@ -891,7 +900,7 @@ void RealmFile::free_list_info() const
 {
     std::map<uint64_t, unsigned> free_sizes;
     std::map<uint64_t, unsigned> pinned_sizes;
-    std::cout << "Free space:" << std::endl;
+    std::cout << "Free space:\n";
     auto free_list = m_group->get_free_list();
     uint64_t pinned_free_list_size = 0;
     uint64_t total_free_list_size = 0;
@@ -911,11 +920,11 @@ void RealmFile::free_list_info() const
 
         ++it;
     }
-    std::cout << "Free space sizes:" << std::endl;
+    std::cout << "Free space sizes:\n";
     for (auto s : free_sizes) {
         std::cout << "    Size: " << s.first << " count: " << s.second << std::endl;
     }
-    std::cout << "Pinned sizes:" << std::endl;
+    std::cout << "Pinned sizes:\n";
     for (auto s : pinned_sizes) {
         std::cout << "    Size: " << s.first << " count: " << s.second << std::endl;
     }
@@ -984,7 +993,7 @@ public:
 
     bool dictionary_clear(size_t)
     {
-        std::cout << "Dictionary clear " << std::endl;
+        std::cout << "Dictionary clear \n";
         return true;
     }
 
@@ -1052,8 +1061,13 @@ void RealmFile::changes() const
 
     for (auto c : changesets) {
         realm::util::SimpleInputStream stream(c);
-        parser.parse(stream, logger);
-        std::cout << "--------------------------------------------" << std::endl;
+        try {
+            parser.parse(stream, logger);
+        }
+        catch (const std::exception& ex) {
+            std::cout << "Bad history: " << ex.what() << "\n";
+        }
+        std::cout << "--------------------------------------------\n";
     }
 }
 
@@ -1161,15 +1175,14 @@ int main(int argc, const char* argv[])
         }
     }
     else {
-        std::cout << "Usage: realm-trawler [-afmsw] [--keyfile file-with-binary-crypt-key] [--hexkey "
+        std::cout << "Usage: realm-trawler [-cfmsw] [--keyfile file-with-binary-crypt-key] [--hexkey "
                      "crypt-key-in-hex] [--top "
-                     "top_ref] <realmfile>"
-                  << std::endl;
-        std::cout << "   c : dump changelog" << std::endl;
-        std::cout << "   f : free list analysis" << std::endl;
-        std::cout << "   m : memory leak check" << std::endl;
-        std::cout << "   s : schema dump" << std::endl;
-        std::cout << "   w : node walk" << std::endl;
+                     "top_ref] <realmfile>\n";
+        std::cout << "   c : dump changelog\n";
+        std::cout << "   f : free list analysis\n";
+        std::cout << "   m : memory leak check\n";
+        std::cout << "   s : schema dump\n";
+        std::cout << "   w : node walk\n";
     }
 
     return 0;

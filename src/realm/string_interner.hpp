@@ -19,36 +19,25 @@
 #ifndef REALM_STRING_INTERNER_HPP
 #define REALM_STRING_INTERNER_HPP
 
+#include <realm/array_unsigned.hpp>
 #include <realm/utilities.hpp>
-#include <realm/string_compressor.hpp>
+#include <realm/array.hpp>
 #include <realm/keys.hpp>
+#include <realm/alloc.hpp>
 
 #include <unordered_map>
 #include <vector>
 #include <mutex>
+#include <string>
 
-template <>
-struct std::hash<CompressedString> {
-    std::size_t operator()(const CompressedString& c) const noexcept
-    {
-        // Why this hash function? I dreamt it up! Feel free to find a better!
-        auto seed = c.size();
-        for (auto& x : c) {
-            seed = (seed + 3) * (x + 7);
-        }
-        return seed;
-    }
-};
-
+struct CompressedStringView;
 
 namespace realm {
 
-
 using StringID = size_t;
 
-class Array;
-class ArrayUnsigned;
-class Allocator;
+class StringCompressor;
+
 struct CachedString {
     uint8_t m_weight = 0;
     std::unique_ptr<std::string> m_decompressed;
@@ -70,20 +59,35 @@ public:
 
 private:
     Array& m_parent; // need to be able to check if this is attached or not
-    std::unique_ptr<Array> m_top;
-    std::unique_ptr<Array> m_data;     // raw compressed data area
-    std::unique_ptr<Array> m_hash_map; // mapping hash of uncompressed string to string id.
-    std::unique_ptr<ArrayUnsigned> m_current_string_leaf;
+    Array m_top;
+    // Compressed strings are stored in blocks of 256.
+    // One array holds refs to all blocks:
+    Array m_data;
+    // In-memory representation of a block. Either only the ref to it,
+    // or a full vector of views into the block.
+    struct DataLeaf;
+    // in-memory metadata for faster access to compressed strings. Mirrors m_data.
+    std::vector<DataLeaf> m_compressed_leafs;
+    // 'm_hash_map' is used for mapping hash of uncompressed string to string id.
+    Array m_hash_map;
+    // the block of compressed strings we're currently appending to:
+    ArrayUnsigned m_current_string_leaf;
+    // an array of strings we're currently appending to. This is used instead
+    // when ever we meet a string too large to be placed inline.
+    Array m_current_long_string_node;
     void rebuild_internal();
-
+    CompressedStringView& get_compressed(StringID id);
+    // return true if the leaf was reloaded
+    bool load_leaf_if_needed(DataLeaf& leaf);
+    // return 'true' if the new ref was different and forced a reload
+    bool load_leaf_if_new_ref(DataLeaf& leaf, ref_type new_ref);
     ColKey m_col_key; // for validation
     std::unique_ptr<StringCompressor> m_compressor;
-    std::vector<CompressedString> m_compressed_strings;
-    bool null_seen = false;
     // At the moment we need to keep decompressed strings around if they've been
     // returned to the caller, since we're handing
     // out StringData references to their storage. This is a temporary solution.
     std::vector<CachedString> m_decompressed_strings;
+    std::vector<StringID> m_in_memory_strings;
     // Mutual exclusion is needed for frozen transactions only. Live objects are
     // only used in single threaded contexts so don't need them. For now, just use always.
     std::mutex m_mutex;

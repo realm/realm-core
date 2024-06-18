@@ -29,6 +29,7 @@
 #include <realm/array_unsigned.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/query_conditions.hpp>
+#include <realm/array_direct.hpp>
 
 #include "test.hpp"
 
@@ -1585,7 +1586,7 @@ TEST(DirectBitFields)
     uint64_t a[2];
     a[0] = a[1] = 0;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 0);
         auto it2(it);
         ++it2;
@@ -1599,7 +1600,7 @@ TEST(DirectBitFields)
     // reverse polarity
     a[0] = a[1] = -1ULL;
     {
-        bf_iterator it(a, 0, 7, 7, 8);
+        BfIterator it(a, 0, 7, 7, 8);
         REALM_ASSERT(*it == 127);
         auto it2(it);
         ++it2;
@@ -1612,30 +1613,7 @@ TEST(DirectBitFields)
     }
 }
 
-TEST(B_Array_creation)
-{
-    //    using Encoding = NodeHeader::Encoding;
-    //    Array array(Allocator::get_default());
-    //    auto& allocator = array.get_alloc();
-    //    auto mem = allocator.alloc(10);
-    //    init_header(mem.get_addr(), Encoding::Flex, 6, 1, 1, 1, 1);
-    //    array.init_from_mem(mem);
-    //    auto array_header = array.get_header();
-    //    auto encoding = array.get_encoding(array_header);
-    //    REALM_ASSERT(encoding == Encoding::Flex); // this is missing << operator in order to be printed in case of
-    //    error CHECK_EQUAL(array.get_flags(array_header), 6); CHECK_EQUAL(array.get_elementA_size(array_header), 1);
-    //    CHECK_EQUAL(array.get_elementB_size(array_header), 1);
-    //    CHECK_EQUAL(array.get_arrayA_num_elements(array_header), 1);
-    //    CHECK_EQUAL(array.get_arrayB_num_elements(array_header), 1);
-    //    // set flags explicitely (this should not change kind and encoding)
-    //    array.set_flags(array_header, 5);
-    //    auto flags = array.get_flags(array_header);
-    //    CHECK_EQUAL(flags, 5);
-    //    REALM_ASSERT(array.get_encoding(array_header) == Encoding::Flex);
-    //    allocator.free_(mem);
-}
-
-TEST(B_Array_encoding)
+TEST(Extended_Array_encoding)
 {
     using Encoding = NodeHeader::Encoding;
     Array array(Allocator::get_default());
@@ -1654,5 +1632,504 @@ TEST(B_Array_encoding)
 
     array.get_alloc().free_(mem);
 }
+
+TEST(Array_cares_about)
+{
+    std::vector<uint64_t> expected{
+        0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff,
+        0xfffffffffffffff,  0xfffffffffffffff,  0x7fffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff,
+        0xfffffffffffffff,  0x7fffffffffffff,   0xfffffffffffffff,  0xfffffffffffff,    0xffffffffffffff,
+        0xfffffffffffffff,  0xffffffffffffffff, 0x7ffffffffffff,    0x3fffffffffffff,   0x1ffffffffffffff,
+        0xfffffffffffffff,  0x7fffffffffffffff, 0xfffffffffff,      0x3fffffffffff,     0xffffffffffff,
+        0x3ffffffffffff,    0xfffffffffffff,    0x3fffffffffffff,   0xffffffffffffff,   0x3ffffffffffffff,
+        0xfffffffffffffff,  0x3fffffffffffffff, 0xffffffffffffffff, 0x1ffffffff,        0x3ffffffff,
+        0x7ffffffff,        0xfffffffff,        0x1fffffffff,       0x3fffffffff,       0x7fffffffff,
+        0xffffffffff,       0x1ffffffffff,      0x3ffffffffff,      0x7ffffffffff,      0xfffffffffff,
+        0x1fffffffffff,     0x3fffffffffff,     0x7fffffffffff,     0xffffffffffff,     0x1ffffffffffff,
+        0x3ffffffffffff,    0x7ffffffffffff,    0xfffffffffffff,    0x1fffffffffffff,   0x3fffffffffffff,
+        0x7fffffffffffff,   0xffffffffffffff,   0x1ffffffffffffff,  0x3ffffffffffffff,  0x7ffffffffffffff,
+        0xfffffffffffffff,  0x1fffffffffffffff, 0x3fffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff};
+    std::vector<uint64_t> res;
+    for (uint8_t i = 0; i <= 64; i++) {
+        res.push_back(cares_about(i));
+    }
+    CHECK_EQUAL(res, expected);
+}
+
+TEST(AlignDirectBitFields)
+{
+    uint64_t a[2];
+    a[0] = a[1] = 0;
+    {
+        BfIterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 0);
+        auto it2(it);
+        ++it2;
+        it2.set_value(127 + 128);
+        REALM_ASSERT(*it == 0);
+        ++it;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 0);
+    }
+    // reverse polarity
+    a[0] = a[1] = -1ULL;
+    {
+        BfIterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 127);
+        auto it2(it);
+        ++it2;
+        it2.set_value(42 + 128);
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 42);
+        ++it;
+        REALM_ASSERT(*it == 127);
+    }
+}
+
+TEST(TestSignValuesStoredIterator)
+{
+    {
+        // positive values are easy.
+        uint64_t a[2];
+        BfIterator it(a, 0, 8, 8, 0);
+        for (size_t i = 0; i < 16; ++i) {
+            it.set_value(i);
+            ++it;
+        }
+        it.move(0);
+        for (size_t i = 0; i < 16; ++i) {
+            auto v = *it;
+            CHECK_EQUAL(v, i);
+            ++it;
+        }
+    }
+    {
+        // negative values require a bit more work
+        uint64_t a[2];
+        BfIterator it(a, 0, 8, 8, 0);
+        for (size_t i = 0; i < 16; ++i) {
+            it.set_value(-i);
+            ++it;
+        }
+        it.move(0);
+        for (int64_t i = 0; i < 16; ++i) {
+            const auto sv = sign_extend_value(8, *it);
+            CHECK_EQUAL(sv, -i);
+            ++it;
+        }
+        it.move(0);
+        const auto sign_mask = 1ULL << (7);
+        for (int64_t i = 0; i < 16; ++i) {
+            const auto sv = sign_extend_field_by_mask(sign_mask, *it);
+            CHECK_EQUAL(sv, -i);
+            ++it;
+        }
+    }
+}
+
+TEST(VerifyIterationAcrossWords)
+{
+    uint64_t a[4]{0, 0, 0, 0}; // 4 64 bit words, let's store N elements of 5bits each
+    BfIterator it(a, 0, 5, 5, 0);
+    // 51 is the max amount of values we can fit in 4 words. Writting beyond this point is likely going
+    // to crash. Writing beyond the 4 words is not possible in practice because the Array has boundery checks
+    // and enough memory is reserved during compression.
+    srand((unsigned)time(0)); // no need to use complex stuff
+    std::vector<int64_t> values;
+    for (size_t i = 0; i < 51; i++) {
+        int64_t randomNumber = rand() % 16; // max value that can fit in 5 bits (4 bit for the value + 1 sign)
+        values.push_back(randomNumber);
+        it.set_value(randomNumber);
+        ++it;
+    }
+
+    {
+        // normal bf iterator
+        it.move(0); // reset to first value.
+        // go through the memory, 5 bits by 5 bits.
+        // every 12 values, we will read the value across
+        // 2 words.
+        for (size_t i = 0; i < 51; ++i) {
+            const auto v = sign_extend_value(5, *it);
+            CHECK_EQUAL(v, values[i]);
+            ++it;
+        }
+    }
+
+    {
+        // unaligned iterator
+        UnalignedWordIter u_it(a, 0);
+        for (size_t i = 0; i < 51; ++i) {
+            const auto v = sign_extend_value(5, u_it.consume(5) & 0x1F);
+            CHECK_EQUAL(v, values[i]);
+        }
+    }
+}
+
+TEST(LowerBoundCorrectness)
+{
+    constexpr auto size = 16;
+    int64_t a[size]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+
+    std::vector<size_t> expected_default_lb;
+    for (const auto v : a) {
+        const auto pos = lower_bound<64>((const char*)(&a), size, v);
+        expected_default_lb.push_back(pos);
+    }
+
+    // now simulate the compression of a in less bits
+    uint64_t buff[2] = {0, 0};
+    BfIterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
+    for (size_t i = 0; i < 16; ++i) {
+        it.set_value(i);
+        CHECK_EQUAL(*it, a[i]);
+        ++it;
+    }
+    struct MyClass {
+        uint64_t* _data;
+        int64_t get(size_t ndx) const
+        {
+            BfIterator it(_data, 0, 5, 5, ndx);
+            return sign_extend_value(5, *it);
+        }
+    };
+    // a bit of set up here.
+    MyClass my_class;
+    my_class._data = buff;
+    using Fetcher = impl::CompressedDataFetcher<MyClass>;
+    Fetcher my_fetcher;
+    my_fetcher.ptr = &my_class;
+
+    // verify that the fetcher returns the same values
+    for (size_t i = 0; i < size; ++i) {
+        CHECK_EQUAL(my_fetcher.ptr->get(i), a[i]);
+    }
+
+    std::vector<size_t> diffent_width_lb;
+    for (const auto v : a) {
+        const auto pos = lower_bound((const char*)buff, size, v, my_fetcher);
+        diffent_width_lb.push_back(pos);
+    }
+
+    CHECK_EQUAL(expected_default_lb, diffent_width_lb);
+}
+
+TEST(UpperBoundCorrectness)
+{
+    constexpr auto size = 16;
+    int64_t a[size]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    std::vector<size_t> expected_default_ub;
+    for (const auto v : a) {
+        const auto pos = upper_bound<64>((const char*)(&a), size, v);
+        expected_default_ub.push_back(pos);
+    }
+
+    // now simulate the compression of a in less bits
+    uint64_t buff[2] = {0, 0};
+    BfIterator it(buff, 0, 5, 5, 0); // 5 bits because 4 bits for the values + 1 bit for the sign
+    for (size_t i = 0; i < size; ++i) {
+        it.set_value(i);
+        CHECK_EQUAL(*it, a[i]);
+        ++it;
+    }
+    struct MyClass {
+        uint64_t* _data;
+        int64_t get(size_t ndx) const
+        {
+            BfIterator it(_data, 0, 5, 5, ndx);
+            return sign_extend_value(5, *it);
+        }
+    };
+    // a bit of set up here.
+    MyClass my_class;
+    my_class._data = buff;
+    using Fetcher = impl::CompressedDataFetcher<MyClass>;
+    Fetcher my_fetcher;
+    my_fetcher.ptr = &my_class;
+
+    // verify that the fetcher returns the same values
+    for (size_t i = 0; i < size; ++i) {
+        CHECK_EQUAL(my_fetcher.ptr->get(i), a[i]);
+    }
+
+    std::vector<size_t> diffent_width_ub;
+    for (const auto v : a) {
+        const auto pos = upper_bound((const char*)buff, size, v, my_fetcher);
+        diffent_width_ub.push_back(pos);
+    }
+
+    CHECK_EQUAL(expected_default_ub, diffent_width_ub);
+}
+
+TEST(ParallelSearchEqualMatch)
+{
+    std::mt19937_64 gen64;
+    constexpr size_t buflen = 4;
+    uint64_t buff[buflen];
+    std::vector<int64_t> values;
+    for (uint8_t width = 1; width <= 64; width++) {
+        const size_t size = (buflen * 64) / width;
+        const uint64_t bit_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - width); // (1ULL << width) - 1;
+
+        values.resize(size);
+        BfIterator it(buff, 0, width, width, 0);
+        for (size_t i = 0; i < size; ++i) {
+            uint64_t u_val = gen64() & bit_mask;
+            int64_t val = sign_extend_value(width, u_val);
+            values[i] = val;
+            it.set_value(val);
+            ++it;
+        }
+        it.move(0);
+        for (size_t i = 0; i < size; ++i) {
+            auto v = sign_extend_value(width, *it);
+            CHECK_EQUAL(v, values[i]);
+            ++it;
+        }
+
+        std::sort(values.begin(), values.end());
+        auto last = std::unique(values.begin(), values.end());
+        for (auto val = values.begin(); val != last; val++) {
+            const auto mask = 1ULL << (width - 1);
+            const auto msb = populate(width, mask);
+            const auto search_vector = populate(width, *val);
+
+            // perform the check with a normal iteration
+            size_t start = 0;
+            const auto end = size;
+            std::vector<size_t> linear_scan_result;
+            while (start < end) {
+                it.move(start);
+                const auto sv = sign_extend_value(width, *it);
+                if (sv == *val)
+                    linear_scan_result.push_back(start);
+                ++start;
+            }
+
+            // Now use the optimized version
+            static auto vector_compare_eq = [](auto msb, auto a, auto b) {
+                return find_all_fields<Equal>(msb, a, b);
+            };
+
+            start = 0;
+            std::vector<size_t> parallel_result;
+            while (start < end) {
+                start =
+                    parallel_subword_find(vector_compare_eq, buff, size_t{0}, width, msb, search_vector, start, end);
+                if (start != end)
+                    parallel_result.push_back(start);
+                start += 1;
+            }
+
+            CHECK(!parallel_result.empty());
+            CHECK(!linear_scan_result.empty());
+            CHECK_EQUAL(linear_scan_result, parallel_result);
+        }
+    }
+}
+
+TEST(ParallelSearchEqualNoMatch)
+{
+    uint64_t buff[2] = {0, 0};
+    constexpr size_t width = 2;
+    constexpr size_t size = 64;
+    constexpr int64_t key = 2;
+    BfIterator it(buff, 0, width, width, 0);
+    for (size_t i = 0; i < size; ++i) {
+        it.set_value(1);
+        ++it;
+    }
+    it.move(0);
+    for (size_t i = 0; i < size; ++i) {
+        auto v = sign_extend_value(width, *it);
+        CHECK_EQUAL(v, 1);
+        ++it;
+    }
+    const auto mask = 1ULL << (width - 1);
+    const auto msb = populate(width, mask);
+    const auto search_vector = populate(width, key);
+
+    static auto vector_compare_eq = [](auto msb, auto a, auto b) {
+        return find_all_fields<Equal>(msb, a, b);
+    };
+
+    size_t start = 0;
+    const auto end = size;
+    std::vector<size_t> parallel_result;
+    while (start < end) {
+        start = parallel_subword_find(vector_compare_eq, buff, size_t{0}, width, msb, search_vector, start, end);
+        if (start != end)
+            parallel_result.push_back(start);
+        start += 1;
+    }
+
+    // perform the same check but with a normal iteration
+    start = 0;
+    std::vector<size_t> linear_scan_result;
+    while (start < end) {
+        it.move(start);
+        const auto sv = sign_extend_value(width, *it);
+        if (sv == key)
+            linear_scan_result.push_back(start);
+        ++start;
+    }
+
+    CHECK(parallel_result.empty());
+    CHECK(linear_scan_result.empty());
+}
+
+TEST(ParallelSearchNotEqual)
+{
+    uint64_t buff[2] = {0, 0};
+    constexpr size_t width = 2;
+    constexpr size_t size = 64;
+    constexpr int64_t key = 2;
+    BfIterator it(buff, 0, width, width, 0);
+    for (size_t i = 0; i < size; ++i) {
+        it.set_value(1);
+        ++it;
+    }
+    it.move(0);
+    for (size_t i = 0; i < size; ++i) {
+        auto v = sign_extend_value(width, *it);
+        CHECK_EQUAL(v, 1);
+        ++it;
+    }
+    const auto mask = 1ULL << (width - 1);
+    const auto msb = populate(width, mask);
+    const auto search_vector = populate(width, key);
+
+    static auto vector_compare_neq = [](auto msb, auto a, auto b) {
+        return find_all_fields<NotEqual>(msb, a, b);
+    };
+
+    size_t start = 0;
+    const auto end = size;
+    std::vector<size_t> parallel_result;
+    while (start < end) {
+        start = parallel_subword_find(vector_compare_neq, buff, size_t{0}, width, msb, search_vector, start, end);
+        if (start != end)
+            parallel_result.push_back(start);
+        start += 1;
+    }
+
+    // perform the same check but with a normal iteration
+    start = 0;
+    std::vector<size_t> linear_scan_result;
+    while (start < end) {
+        it.move(start);
+        const auto sv = sign_extend_value(width, *it);
+        if (sv != key)
+            linear_scan_result.push_back(start);
+        ++start;
+    }
+
+    CHECK(!parallel_result.empty());
+    CHECK(!linear_scan_result.empty());
+    CHECK_EQUAL(parallel_result, linear_scan_result);
+}
+
+TEST(ParallelSearchLessThan)
+{
+    uint64_t buff[2] = {0, 0};
+    constexpr size_t width = 4;
+    constexpr size_t size = 32;
+    constexpr int64_t key = 3;
+    BfIterator it(buff, 0, width, width, 0);
+    for (size_t i = 0; i < size; ++i) {
+        it.set_value(2);
+        ++it;
+    }
+    it.move(0);
+    for (size_t i = 0; i < size; ++i) {
+        auto v = sign_extend_value(width, *it);
+        CHECK_EQUAL(v, 2);
+        ++it;
+    }
+    const auto mask = 1ULL << (width - 1);
+    const auto msb = populate(width, mask);
+    const auto search_vector = populate(width, key);
+
+    static auto vector_compare_lt = [](auto msb, auto a, auto b) {
+        return find_all_fields<Less>(msb, a, b);
+    };
+
+    size_t start = 0;
+    const auto end = size;
+    std::vector<size_t> parallel_result;
+    while (start < end) {
+        start = parallel_subword_find(vector_compare_lt, buff, size_t{0}, width, msb, search_vector, start, end);
+        if (start != end)
+            parallel_result.push_back(start);
+        start += 1;
+    }
+
+    // perform the same check but with a normal iteration
+    start = 0;
+    std::vector<size_t> linear_scan_result;
+    while (start < end) {
+        it.move(start);
+        const auto sv = sign_extend_value(width, *it);
+        if (sv < key)
+            linear_scan_result.push_back(start);
+        ++start;
+    }
+    CHECK(!parallel_result.empty());
+    CHECK(!linear_scan_result.empty());
+    CHECK_EQUAL(parallel_result, linear_scan_result);
+}
+
+TEST(ParallelSearchGreaterThan)
+{
+    uint64_t buff[2] = {0, 0};
+    constexpr size_t width = 4;
+    constexpr size_t size = 32;
+    constexpr int64_t key = 2;
+    BfIterator it(buff, 0, width, width, 0);
+    for (size_t i = 0; i < size; ++i) {
+        it.set_value(3);
+        ++it;
+    }
+    it.move(0);
+    for (size_t i = 0; i < size; ++i) {
+        auto v = sign_extend_value(width, *it);
+        CHECK_EQUAL(v, 3);
+        ++it;
+    }
+    const auto mask = 1ULL << (width - 1);
+    const auto msb = populate(width, mask);
+    const auto search_vector = populate(width, key);
+
+    static auto vector_compare_gt = [](auto msb, auto a, auto b) {
+        return find_all_fields<Greater>(msb, a, b);
+    };
+
+    size_t start = 0;
+    const auto end = size;
+    std::vector<size_t> parallel_result;
+    while (start < end) {
+        start = parallel_subword_find(vector_compare_gt, buff, size_t{0}, width, msb, search_vector, start, end);
+        if (start != end)
+            parallel_result.push_back(start);
+        start += 1;
+    }
+
+    // perform the same check but with a normal iteration
+    start = 0;
+    std::vector<size_t> linear_scan_result;
+    while (start < end) {
+        it.move(start);
+        const auto sv = sign_extend_value(width, *it);
+        if (sv > key)
+            linear_scan_result.push_back(start);
+        ++start;
+    }
+    CHECK(!parallel_result.empty());
+    CHECK(!linear_scan_result.empty());
+    CHECK_EQUAL(parallel_result, linear_scan_result);
+}
+
 
 #endif // TEST_ARRAY

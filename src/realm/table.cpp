@@ -36,6 +36,7 @@
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
 #include <realm/util/serializer.hpp>
+#include <realm/string_interner.hpp>
 
 #include <stdexcept>
 
@@ -541,6 +542,7 @@ void Table::remove_column(ColKey col_key)
     erase_root_column(col_key); // Throws
     m_has_any_embedded_objects.reset();
     auto i = col_key.get_index().val;
+
     if (i < m_string_interners.size() && m_string_interners[i])
         m_string_interners[i].reset();
 }
@@ -1070,19 +1072,19 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     if (m_tombstones) {
         m_tombstones->insert_column(col_key);
     }
-    // create string interners internal rep as well as data area
-    REALM_ASSERT_DEBUG(m_interner_data.is_attached());
-    while (col_ndx >= m_string_interners.size()) {
-        m_string_interners.push_back({});
+    if (col_key.get_type() == col_type_String || col_key.get_type() == col_type_Mixed) {
+        // create string interners internal rep as well as data area
+        REALM_ASSERT_DEBUG(m_interner_data.is_attached());
+        while (col_ndx >= m_string_interners.size()) {
+            m_string_interners.push_back({});
+        }
+        while (col_ndx >= m_interner_data.size()) {
+            m_interner_data.add(0);
+        }
+        REALM_ASSERT(!m_string_interners[col_ndx]);
+        m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, true);
     }
-    while (col_ndx >= m_interner_data.size()) {
-        m_interner_data.add(0);
-    }
-    REALM_ASSERT(!m_string_interners[col_ndx]);
-    // FIXME: Limit creation of interners to EXACTLY the columns, where they can be
-    // relevant.
-    // if (col_key.get_type() == col_type_String)
-    m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, true);
+
     bump_storage_version();
 
     return col_key;
@@ -1114,16 +1116,16 @@ void Table::do_erase_root_column(ColKey col_key)
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.pop_back();
     }
-    REALM_ASSERT_DEBUG(col_ndx < m_string_interners.size());
-    if (m_string_interners[col_ndx]) {
-        REALM_ASSERT_DEBUG(m_interner_data.is_attached());
-        REALM_ASSERT_DEBUG(col_ndx < m_interner_data.size());
-        auto data_ref = m_interner_data.get_as_ref(col_ndx);
-        if (data_ref)
-            Array::destroy_deep(data_ref, m_alloc);
-        m_interner_data.set(col_ndx, 0);
-        // m_string_interners[col_ndx]->update_from_parent(true);
-        m_string_interners[col_ndx].reset();
+    if (col_key.get_type() == col_type_String || col_key.get_type() == col_type_Mixed) {
+        if (col_ndx < m_string_interners.size() && m_string_interners[col_ndx]) {
+            REALM_ASSERT_DEBUG(m_interner_data.is_attached());
+            REALM_ASSERT_DEBUG(col_ndx < m_interner_data.size());
+            auto data_ref = m_interner_data.get_as_ref(col_ndx);
+            if (data_ref)
+                Array::destroy_deep(data_ref, m_alloc);
+            m_interner_data.set(col_ndx, 0);
+            m_string_interners[col_ndx].reset();
+        }
     }
     bump_content_version();
     bump_storage_version();
@@ -1621,16 +1623,6 @@ uint64_t Table::allocate_sequence_number()
     return sn;
 }
 
-void Table::set_sequence_number(uint64_t seq)
-{
-    m_top.set(top_position_for_sequence_number, RefOrTagged::make_tagged(seq));
-}
-
-void Table::set_collision_map(ref_type ref)
-{
-    m_top.set(top_position_for_collision_map, RefOrTagged::make_ref(ref));
-}
-
 void Table::set_col_key_sequence_number(uint64_t seq)
 {
     m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(seq));
@@ -1774,20 +1766,10 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     ObjKey key;
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
-    std::optional<StringID> string_id;
-    if constexpr (std::is_same_v<T, StringData>) {
-        string_id = get_string_interner(col_key)->lookup(value);
-    }
 
-    auto f = [&key, &col_key, &value, &leaf, string_id](const Cluster* cluster) {
+    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
-        size_t row;
-        if constexpr (std::is_same_v<T, StringData>) {
-            row = leaf.find_first(value, 0, cluster->node_size(), string_id);
-        }
-        else {
-            row = leaf.find_first(value, 0, cluster->node_size());
-        }
+        size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
             key = cluster->get_real_key(row);
             return IteratorControl::Stop;
@@ -2251,6 +2233,10 @@ void Table::refresh_string_interners(bool writable)
                 m_string_interners[idx].reset();
             continue;
         }
+
+        if (col_key.get_type() != col_type_String && col_key.get_type() != col_type_Mixed)
+            continue;
+
         REALM_ASSERT_DEBUG(col_key.get_index().val == idx);
         // maintain sufficient size of interner arrays to cover all columns
         while (idx >= m_string_interners.size()) {
@@ -2380,8 +2366,10 @@ Obj Table::create_linked_object()
 
     GlobalKey object_id = allocate_object_id_squeezed();
     ObjKey key = object_id.get_local_key(get_sync_file_id());
-
     REALM_ASSERT(key.value >= 0);
+
+    if (auto repl = get_repl())
+        repl->create_linked_object(this, key);
 
     Obj obj = m_clusters.insert(key, {});
 
@@ -2494,6 +2482,13 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     // Check if unresolved exists
     if (unres_key) {
+        if (Replication* repl = get_repl()) {
+            if (auto logger = repl->would_log(util::Logger::Level::debug)) {
+                logger->log(LogCategory::object, util::Logger::Level::debug, "Cancel tombstone on '%1': %2",
+                            get_class_name(), unres_key);
+            }
+        }
+
         auto tombstone = m_tombstones->get(unres_key);
         ret.assign_pk_and_backlinks(tombstone);
         // If tombstones had no links to it, it may still be alive
@@ -2764,6 +2759,13 @@ Obj Table::get_or_create_tombstone(ObjKey key, ColKey pk_col, Mixed pk_val)
             }
         }
         return tombstone;
+    }
+    if (Replication* repl = get_repl()) {
+        if (auto logger = repl->would_log(util::Logger::Level::debug)) {
+            logger->log(LogCategory::object, util::Logger::Level::debug,
+                        "Create tombstone for object '%1' with primary key %2 : %3", get_class_name(), pk_val,
+                        unres_key);
+        }
     }
     return m_tombstones->insert(unres_key, {{pk_col, pk_val}});
 }

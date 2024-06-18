@@ -152,7 +152,7 @@ bool WriteWindowMgr::MapWindow::extends_to_match(util::File& f, ref_type start_r
     size_t window_size = get_window_size(f, start_ref, size);
     m_map.sync();
     m_map.unmap();
-    m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+    m_map.map(f, File::access_ReadWrite, window_size, m_base_ref);
     return true;
 }
 
@@ -162,7 +162,7 @@ WriteWindowMgr::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type s
 {
     m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
-    m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+    m_map.map(f, File::access_ReadWrite, window_size, m_base_ref);
 #if REALM_ENABLE_ENCRYPTION
     if (auto p = m_map.get_encrypted_mapping())
         p->set_marker(write_marker);
@@ -195,7 +195,7 @@ char* WriteWindowMgr::MapWindow::translate(ref_type ref)
 
 void WriteWindowMgr::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
 {
-    realm::util::encryption_read_barrier_for_write(start_addr, size, m_map.get_encrypted_mapping());
+    util::encryption_read_barrier_for_write(start_addr, size, m_map.get_encrypted_mapping());
 }
 
 void WriteWindowMgr::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
@@ -684,8 +684,8 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_hist_ref_ndx) {
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_modified, false);    // Throws
-            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                                     // Throws
+            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_modified, false); // Throws
+            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                                  // Throws
         }
     }
     if (top.size() > Group::s_evacuation_point_ndx) {

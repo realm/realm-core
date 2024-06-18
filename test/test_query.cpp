@@ -706,17 +706,18 @@ TEST(Query_NextGenSyntaxMonkey0)
     }
 }
 
-TEST(Query_NextGenSyntaxMonkey)
+TEST_TYPES(Query_NextGenSyntaxMonkey, std::true_type, std::false_type)
 {
+    static const bool nullable = TEST_TYPE::value;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows = 1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
                                                             (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
-        auto col_int0 = table.add_column(type_Int, "first");
-        auto col_int1 = table.add_column(type_Int, "second");
-        auto col_int2 = table.add_column(type_Int, "third");
+        auto col_int0 = table.add_column(type_Int, "first", nullable);
+        auto col_int1 = table.add_column(type_Int, "second", nullable);
+        auto col_int2 = table.add_column(type_Int, "third", nullable);
 
         for (size_t r = 0; r < rows; r++) {
             Obj obj = table.create_object();
@@ -5770,6 +5771,40 @@ TEST(Query_NestedLinkCount)
     CHECK_EQUAL(q.count(), 2);
     q = table->query("Object.@links.TestClass.Object.@size > 0");
     CHECK_EQUAL(q.count(), 3);
+}
+
+TEST_TYPES(Query_IntCompressed, Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual)
+{
+    TEST_TYPE c;
+    SHARED_GROUP_TEST_PATH(path);
+    int ints[] = {-120, -111, -70, -61, -55, -45, -22, -15, -3, 2, 7, 18, 25, 33, 55, 56, 66, 78, 104, 125};
+    std::vector<int> values;
+    for (int j = 1; j < 21; j++) {
+        for (int i = 0; i < j; i++) {
+            values.push_back(ints[i]);
+        }
+    }
+
+    auto db = DB::create(path);
+    auto wt = db->start_write();
+    auto t = wt->add_table("table");
+    auto col = t->add_column(type_Int, "id");
+    for (auto val : values) {
+        t->create_object().set(col, val);
+    }
+    wt->commit_and_continue_as_read();
+
+    for (int val : {-1000, -125, 2, 3, 6, 126, 1000}) {
+        size_t num_matches = 0;
+        for (auto i : values) {
+            if (c(i, val))
+                num_matches++;
+        }
+
+        char query_str[20];
+        snprintf(query_str, 20, "id %s %d", c.description().c_str(), val);
+        CHECK_EQUAL(t->query(query_str).count(), num_matches);
+    }
 }
 
 #endif // TEST_QUERY
