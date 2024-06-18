@@ -930,10 +930,11 @@ inline LnkLst Obj::get_linklist(StringData col_name) const
 template <class T>
 void Lst<T>::clear()
 {
-    if (size() > 0) {
-        if (Replication* repl = Base::get_replication()) {
-            repl->list_clear(*this);
-        }
+    auto sz = size();
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_clear(*this);
+    }
+    if (sz > 0) {
         do_clear();
         bump_content_version();
     }
