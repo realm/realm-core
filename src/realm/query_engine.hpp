@@ -1686,7 +1686,16 @@ public:
         TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
+
             StringData t = get_string(s);
+
+            if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
+                if (m_interned_string) {
+                    const auto id = m_string_interner->lookup(get_string(s));
+                    if (id && m_string_interner->compare(*m_interned_string, *id))
+                        return s;
+                }
+            }
 
             if constexpr (case_sensitive_comparison) {
                 // case insensitive not implemented for: >, >=, <, <=
@@ -2014,7 +2023,6 @@ private:
     std::vector<ObjKey> storage;
     size_t _find_first_local(size_t start, size_t end) override;
 };
-
 
 class StringNodeFulltext : public StringNodeEqualBase {
 public:
