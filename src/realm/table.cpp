@@ -1123,7 +1123,6 @@ void Table::do_erase_root_column(ColKey col_key)
         if (data_ref)
             Array::destroy_deep(data_ref, m_alloc);
         m_interner_data.set(col_ndx, 0);
-        // m_string_interners[col_ndx]->update_from_parent(true);
         m_string_interners[col_ndx].reset();
     }
     bump_content_version();

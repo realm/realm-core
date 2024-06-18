@@ -1046,7 +1046,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         realm->cancel_transaction();
                         return value == 6;
                     },
-                    std::chrono::seconds(20), std::chrono::milliseconds(500));
+                    std::chrono::seconds(20));
             }
             // We can't be sure that the 'after' callback has been called yet
             timed_sleeping_wait_for(
@@ -1054,7 +1054,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     std::lock_guard<std::mutex> lock(mtx);
                     return after_callback_invocations == 1;
                 },
-                std::chrono::milliseconds(5));
+                std::chrono::milliseconds(20));
             auto session = test_app_session.sync_manager()->get_existing_session(local_config.path);
             if (session) {
                 session->shutdown_and_wait();

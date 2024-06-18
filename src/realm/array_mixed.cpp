@@ -457,7 +457,6 @@ void ArrayMixed::ensure_string_array() const
             m_strings.create();
             m_strings.update_parent();
         }
-        m_strings.set_string_interner(m_string_interner);
     }
 }
 

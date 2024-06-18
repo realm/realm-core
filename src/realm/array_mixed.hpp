@@ -70,7 +70,7 @@ public:
     }
     virtual void set_string_interner(StringInterner* interner) const override
     {
-        m_string_interner = interner;
+        m_strings.set_string_interner(interner);
     }
 
     void init_from_parent()
@@ -144,7 +144,6 @@ private:
     mutable ArrayString m_strings;
     // Used to store nested collection refs
     mutable ArrayRef m_refs;
-    mutable StringInterner* m_string_interner = nullptr;
 
     DataType get_type(size_t ndx) const
     {
