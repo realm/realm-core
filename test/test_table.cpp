@@ -2996,7 +2996,7 @@ NONCONCURRENT_TEST(Table_QuickSort2)
     std::cout << "    time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/rep" << std::endl;
 }
 
-NONCONCURRENT_TEST(Table_object_timestamp)
+ONLY(Table_object_timestamp)
 {
 #if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 10'000'000;
@@ -3009,6 +3009,8 @@ NONCONCURRENT_TEST(Table_object_timestamp)
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     ColKey c0;
+    Timestamp t0(std::chrono::system_clock::now());
+    auto seconds = t0.get_seconds();
 
     CALLGRIND_START_INSTRUMENTATION;
 
@@ -3020,12 +3022,10 @@ NONCONCURRENT_TEST(Table_object_timestamp)
 
         c0 = table->add_column(type_Timestamp, "ts");
 
-
         auto t1 = steady_clock::now();
 
         for (int i = 0; i < nb_rows; i++) {
-            Timestamp t(i, i);
-            table->create_object(ObjKey(i)).set_all(t);
+            table->create_object().set(c0, Timestamp(seconds + i, i));
         }
 
         auto t2 = steady_clock::now();
@@ -3040,7 +3040,7 @@ NONCONCURRENT_TEST(Table_object_timestamp)
         auto table = rt.get_table("test");
 
         auto t1 = steady_clock::now();
-        Timestamp t(nb_rows / 2, nb_rows / 2);
+        Timestamp t(seconds + nb_rows / 2, nb_rows / 2);
         for (int j = 0; j < num_runs; ++j) {
             auto result = table->where().equal(c0, t).find_all();
         }

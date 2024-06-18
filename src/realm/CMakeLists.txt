@@ -39,6 +39,7 @@ set(REALM_SOURCES
     history.cpp
     integer_compressor.cpp
     integer_flex_compressor.cpp
+    integer_delta_compressor.cpp
     integer_packed_compressor.cpp
     impl/copy_replication.cpp
     impl/output_stream.cpp
@@ -169,6 +170,7 @@ set(REALM_INSTALL_HEADERS
     index_string.hpp
     integer_compressor.hpp
     integer_flex_compressor.hpp
+    integer_delta_compressor.hpp
     integer_packed_compressor.hpp
     keys.hpp
     list.hpp

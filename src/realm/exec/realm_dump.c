@@ -27,10 +27,13 @@ typedef struct _FileHeader {
 typedef struct _NodeHeader {
     unsigned wtype;
     unsigned width;
+    unsigned a_width;
     int is_inner;
+    int is_flex;
     int has_refs;
     int context;
     size_t size;
+    size_t a_size;
     char* type;
     size_t num_bytes;
 } NodeHeader;
@@ -95,40 +98,83 @@ static int get_header(NodeHeader* node_header, FILE* fp, int64_t offset)
     unsigned char header[8];
     do_seek(fp, (size_t)offset, SEEK_SET);
     fread(header, 1, 8, fp);
-    if (strncmp((const char*)header, "AAAA", 4) != 0) {
+    unsigned flags = header[4];
+    node_header->wtype = (flags & 0x18) >> 3;
+    node_header->is_inner = (flags & 0x80) ? 1 : 0;
+    node_header->has_refs = (flags & 0x40) ? 1 : 0;
+    node_header->context = (flags & 0x20) ? 1 : 0;
+
+    if (strncmp((const char*)header, "AAAA", 4) == 0) {
+        node_header->size = (header[5] << 16) + (header[6] << 8) + header[7];
+        node_header->width = (1 << (flags & 0x07)) >> 1;
+
+        node_header->type = "";
+        switch (node_header->wtype) {
+            case 0: {
+                assert(node_header->size < 0x1000000);
+                size_t num_bits = node_header->size * node_header->width;
+                node_header->num_bytes = (num_bits + 7) >> 3;
+                node_header->type = "bits";
+                break;
+            }
+            case 1: {
+                node_header->num_bytes = node_header->size * node_header->width;
+                node_header->type = "bytes";
+                break;
+            }
+            case 2:
+                node_header->num_bytes = node_header->size;
+                break;
+        }
+    }
+    if (strncmp((const char*)header, "BB", 2) == 0) {
+        if (node_header->wtype != 3) {
+            printf("Ref '0x%llx' has invalid wtype\n", (ULL)offset);
+            dump(fp, offset, 64);
+            return 0;
+        }
+        int encoding = header[5];
+        unsigned hw1 = (header[3] << 8) + header[2];
+        unsigned hw3 = (header[7] << 8) + header[6];
+        switch (encoding) {
+            case 0: {
+                // Packed
+                node_header->type = "packed";
+                node_header->size = hw3;
+                node_header->width = header[3];
+                node_header->num_bytes = (node_header->size * node_header->width + 7) & ~7;
+                break;
+            }
+            case 1: {
+                node_header->type = "flex";
+                node_header->width = (hw3 >> 10) + 1;
+                node_header->size = hw3 & 0x3ff;
+                node_header->a_width = (hw1 >> 10) + 1;
+                node_header->a_size = hw1 & 0x3ff;
+                node_header->num_bytes =
+                    ((node_header->size * node_header->width + node_header->a_size * node_header->a_width) / 8 + 7) & ~7;
+                node_header->is_flex = 1;
+                break;
+            }
+            case 2:
+                node_header->type = "delta";
+                node_header->width = (hw3 >> 10) + 1;
+                node_header->size = hw3 & 0x3ff;
+                node_header->a_width = (hw1 >> 10) + 1;
+                node_header->a_size = hw1 & 0x3ff;
+                node_header->num_bytes =
+                    ((node_header->size * node_header->width + node_header->a_size * node_header->a_width) / 8 + 7) & ~7;
+                node_header->is_flex = 1;
+                break;
+        }
+    }
+    else {
         printf("Ref '0x%llx' does not point to an array\n", (ULL)offset);
         dump(fp, offset, 64);
         return 0;
     }
     /* dump_buffer(header, offset, 8); */
 
-    node_header->size = (header[5] << 16) + (header[6] << 8) + header[7];
-
-    unsigned flags = header[4];
-    node_header->wtype = (flags & 0x18) >> 3;
-    node_header->width = (1 << (flags & 0x07)) >> 1;
-    node_header->is_inner = (flags & 0x80) ? 1 : 0;
-    node_header->has_refs = (flags & 0x40) ? 1 : 0;
-    node_header->context = (flags & 0x20) ? 1 : 0;
-
-    node_header->type = "";
-    switch (node_header->wtype) {
-        case 0: {
-            assert(node_header->size < 0x1000000);
-            size_t num_bits = node_header->size * node_header->width;
-            node_header->num_bytes = (num_bits + 7) >> 3;
-            node_header->type = "bits";
-            break;
-        }
-        case 1: {
-            node_header->num_bytes = node_header->size * node_header->width;
-            node_header->type = "bytes";
-            break;
-        }
-        case 2:
-            node_header->num_bytes = node_header->size;
-            break;
-    }
     return 1;
 }
 
@@ -139,6 +185,9 @@ static size_t dump_header(FILE* fp, int64_t offset)
         if (header.is_inner && header.has_refs) {
             printf("Ref: 0x%llx, Size: %zd, width: %d %s Inner B+tree node\n", (ULL)offset, header.size, header.width,
                    header.type);
+        }
+        else if (header.is_flex) {
+            printf("Ref: 0x%llx, SizeA: %zd, WidthA: %d, SizeB: %zd, WidthB: %d Type: %s\n", (ULL)offset, header.a_size, header.a_width, header.size, header.width, header.type);
         }
         else {
             printf("Ref: 0x%llx, Size: %zd, width: %d %s, hasRefs: %d, flag: %d\n", (ULL)offset, header.size,

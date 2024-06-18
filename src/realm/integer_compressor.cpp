@@ -20,6 +20,7 @@
 #include <realm/array.hpp>
 #include <realm/integer_flex_compressor.hpp>
 #include <realm/integer_packed_compressor.hpp>
+#include <realm/integer_delta_compressor.hpp>
 #include <realm/array_with_find.hpp>
 #include <realm/query_conditions.hpp>
 
@@ -75,36 +76,59 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 
 bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 {
+    enum CompressOption { none, flex, packed, delta };
+
     if (origin.m_width < 2 || origin.m_size == 0)
         return false;
 
 #if REALM_COMPRESS
     return always_compress(origin, arr, NodeHeader::Encoding::Flex);
 #else
+    size_t sizes[4];
     std::vector<int64_t> values;
     std::vector<unsigned> indices;
     compress_values(origin, values, indices);
     REALM_ASSERT(!values.empty());
-    const auto uncompressed_size = origin.get_byte_size();
+    sizes[none] = origin.get_byte_size();
     uint8_t ndx_width = NodeHeader::unsigned_to_num_bits(values.size());
+    auto val_sz = values.size();
+    auto end_ofs = val_sz - 1;
+    if (val_sz > 1)
+        end_ofs -= 1;
+    uint8_t ofs_width = NodeHeader::unsigned_to_num_bits(values[end_ofs] - values[0] + 1);
     uint8_t v_width = std::max(Node::signed_to_num_bits(values.front()), Node::signed_to_num_bits(values.back()));
     const auto packed_size = NodeHeader::calc_size(indices.size(), v_width, NodeHeader::Encoding::Packed);
-    const auto flex_size = NodeHeader::calc_size(values.size(), indices.size(), v_width, ndx_width);
+    const auto flex_size = NodeHeader::calc_size(val_sz, indices.size(), v_width, ndx_width);
+    const auto offset_size = NodeHeader::calc_size(2, indices.size(), v_width, ofs_width);
     // heuristic: only compress to packed if gain at least 11.1%
-    const auto adjusted_packed_size = packed_size + packed_size / 8;
+    sizes[packed] = packed_size + packed_size / 8;
     // heuristic: only compress to flex if gain at least 20%
-    const auto adjusted_flex_size = flex_size + flex_size / 4;
-    if (adjusted_flex_size < adjusted_packed_size && adjusted_flex_size < uncompressed_size) {
-        const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-        init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-        FlexCompressor::copy_data(arr, values, indices);
-        return true;
-    }
-    else if (adjusted_packed_size < uncompressed_size) {
-        const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-        init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
-        PackedCompressor::copy_data(origin, arr);
-        return true;
+    sizes[flex] = flex_size + flex_size / 4;
+    sizes[delta] = offset_size + offset_size / 8;
+    auto comp = std::min({none, flex, packed, delta}, [&sizes](const CompressOption& a, const CompressOption& b) {
+        return sizes[a] < sizes[b];
+    });
+    switch (comp) {
+        case none:
+            break;
+        case flex: {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            init_compress_array<FlexCompressor>(arr, flex_size, flags, v_width, ndx_width, val_sz, indices.size());
+            FlexCompressor::copy_data(arr, values, indices);
+            return true;
+        }
+        case packed: {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            init_compress_array<PackedCompressor>(arr, packed_size, flags, v_width, origin.size());
+            PackedCompressor::copy_data(origin, arr);
+            return true;
+        }
+        case delta: {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            init_compress_array<DeltaCompressor>(arr, offset_size, flags, v_width, ofs_width, 2, indices.size());
+            DeltaCompressor::copy_data(origin, arr, values);
+            return true;
+        }
     }
     return false;
 #endif
@@ -180,98 +204,99 @@ bool IntegerCompressor::init(const char* h)
     // avoid to check wtype here, it is another access to the header, that we can avoid.
     // We just need to know if the encoding is packed or flex.
     // This makes Array::init_from_mem faster.
-    if (REALM_LIKELY(!(is_packed() || is_flex())))
-        return false;
-
-    if (is_packed()) {
-        init_packed(h);
-    }
-    else {
-        init_flex(h);
+    switch (m_encoding) {
+        case NodeHeader::Encoding::Packed:
+            init_packed(h);
+            break;
+        case NodeHeader::Encoding::Flex:
+            init_flex(h);
+            break;
+        case NodeHeader::Encoding::Delta:
+            init_delta(h);
+            break;
+        default:
+            return false;
     }
     return true;
 }
-int64_t IntegerCompressor::get_packed(const Array& arr, size_t ndx)
+
+template <class T>
+int64_t IntegerCompressor::get_compressed(const Array& arr, size_t ndx)
 {
-    return PackedCompressor::get(arr.m_integer_compressor, ndx);
+    return T::get(arr.m_integer_compressor, ndx);
 }
 
-int64_t IntegerCompressor::get_flex(const Array& arr, size_t ndx)
+template <class T>
+std::vector<int64_t> IntegerCompressor::get_all_compressed(const Array& arr, size_t begin, size_t end)
 {
-    return FlexCompressor::get(arr.m_integer_compressor, ndx);
+    return T::get_all(arr.m_integer_compressor, begin, end);
 }
 
-std::vector<int64_t> IntegerCompressor::get_all_packed(const Array& arr, size_t begin, size_t end)
+template <class T>
+void IntegerCompressor::get_chunk_compressed(const Array& arr, size_t ndx, int64_t res[8])
 {
-    return PackedCompressor::get_all(arr.m_integer_compressor, begin, end);
+    T::get_chunk(arr.m_integer_compressor, ndx, res);
 }
 
-std::vector<int64_t> IntegerCompressor::get_all_flex(const Array& arr, size_t begin, size_t end)
+template <class T>
+void IntegerCompressor::set_compressed(Array& arr, size_t ndx, int64_t val)
 {
-    return FlexCompressor::get_all(arr.m_integer_compressor, begin, end);
+    T::set_direct(arr.m_integer_compressor, ndx, val);
 }
 
-void IntegerCompressor::get_chunk_packed(const Array& arr, size_t ndx, int64_t res[8])
+template <class T, class Cond>
+bool IntegerCompressor::find_compressed(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
+                                        QueryStateBase* st)
 {
-    PackedCompressor::get_chunk(arr.m_integer_compressor, ndx, res);
+    return T::template find_all<Cond>(arr, val, begin, end, base_index, st);
 }
 
-void IntegerCompressor::get_chunk_flex(const Array& arr, size_t ndx, int64_t res[8])
-{
-    FlexCompressor::get_chunk(arr.m_integer_compressor, ndx, res);
-}
-
-void IntegerCompressor::set_packed(Array& arr, size_t ndx, int64_t val)
-{
-    PackedCompressor::set_direct(arr.m_integer_compressor, ndx, val);
-}
-
-void IntegerCompressor::set_flex(Array& arr, size_t ndx, int64_t val)
-{
-    FlexCompressor::set_direct(arr.m_integer_compressor, ndx, val);
-}
-
-template <class Cond>
-bool IntegerCompressor::find_packed(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
-                                    QueryStateBase* st)
-{
-    return PackedCompressor::find_all<Cond>(arr, val, begin, end, base_index, st);
-}
-
-template <class Cond>
-bool IntegerCompressor::find_flex(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
-                                  QueryStateBase* st)
-{
-    return FlexCompressor::find_all<Cond>(arr, val, begin, end, base_index, st);
-}
 
 void IntegerCompressor::set_vtable(Array& arr)
 {
-    static const Array::VTable vtable_packed = {get_packed,
-                                                get_chunk_packed,
-                                                get_all_packed,
-                                                set_packed,
+    static const Array::VTable vtable_packed = {get_compressed<PackedCompressor>,
+                                                get_chunk_compressed<PackedCompressor>,
+                                                get_all_compressed<PackedCompressor>,
+                                                set_compressed<PackedCompressor>,
                                                 {
-                                                    find_packed<Equal>,
-                                                    find_packed<NotEqual>,
-                                                    find_packed<Greater>,
-                                                    find_packed<Less>,
+                                                    find_compressed<PackedCompressor, Equal>,
+                                                    find_compressed<PackedCompressor, NotEqual>,
+                                                    find_compressed<PackedCompressor, Greater>,
+                                                    find_compressed<PackedCompressor, Less>,
                                                 }};
-    static const Array::VTable vtable_flex = {get_flex,
-                                              get_chunk_flex,
-                                              get_all_flex,
-                                              set_flex,
+    static const Array::VTable vtable_flex = {get_compressed<FlexCompressor>,
+                                              get_chunk_compressed<FlexCompressor>,
+                                              get_all_compressed<FlexCompressor>,
+                                              set_compressed<FlexCompressor>,
                                               {
-                                                  find_flex<Equal>,
-                                                  find_flex<NotEqual>,
-                                                  find_flex<Greater>,
-                                                  find_flex<Less>,
+                                                  find_compressed<FlexCompressor, Equal>,
+                                                  find_compressed<FlexCompressor, NotEqual>,
+                                                  find_compressed<FlexCompressor, Greater>,
+                                                  find_compressed<FlexCompressor, Less>,
                                               }};
-    if (is_packed()) {
-        arr.m_vtable = &vtable_packed;
-    }
-    else {
-        arr.m_vtable = &vtable_flex;
+    static const Array::VTable vtable_delta = {get_compressed<DeltaCompressor>,
+                                               get_chunk_compressed<DeltaCompressor>,
+                                               get_all_compressed<DeltaCompressor>,
+                                               set_compressed<DeltaCompressor>,
+                                               {
+                                                   find_compressed<DeltaCompressor, Equal>,
+                                                   find_compressed<DeltaCompressor, NotEqual>,
+                                                   find_compressed<DeltaCompressor, Greater>,
+                                                   find_compressed<DeltaCompressor, Less>,
+                                               }};
+    switch (m_encoding) {
+        case NodeHeader::Encoding::Packed:
+            arr.m_vtable = &vtable_packed;
+            break;
+        case NodeHeader::Encoding::Flex:
+            arr.m_vtable = &vtable_flex;
+            break;
+        case NodeHeader::Encoding::Delta:
+            arr.m_vtable = &vtable_delta;
+            break;
+        default:
+            REALM_UNREACHABLE();
+            break;
     }
 }
 

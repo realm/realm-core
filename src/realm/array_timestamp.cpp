@@ -260,7 +260,7 @@ ref_type ArrayTimestamp::typed_write(ref_type ref, _impl::ArrayWriterBase& out, 
     auto rot1 = top.get_as_ref_or_tagged(1);
     REALM_ASSERT_DEBUG(rot0.is_ref() && rot0.get_as_ref());
     REALM_ASSERT_DEBUG(rot1.is_ref() && rot1.get_as_ref());
-    written_top.set_as_ref(0, Array::write(rot0.get_as_ref(), alloc, out, out.only_modified, false));
+    written_top.set_as_ref(0, Array::write(rot0.get_as_ref(), alloc, out, out.only_modified, out.compress));
     written_top.set_as_ref(1, Array::write(rot1.get_as_ref(), alloc, out, out.only_modified, false));
 
     return written_top.write(out);

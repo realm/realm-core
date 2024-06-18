@@ -58,42 +58,40 @@ public:
     int64_t get(size_t) const;
 
 private:
-    // getting and setting interface specifically for encoding formats
-    inline void init_packed(const char*);
-    inline void init_flex(const char*);
-
-    static int64_t get_packed(const Array& arr, size_t ndx);
-    static int64_t get_flex(const Array& arr, size_t ndx);
-
-    static std::vector<int64_t> get_all_packed(const Array& arr, size_t begin, size_t end);
-    static std::vector<int64_t> get_all_flex(const Array& arr, size_t begin, size_t end);
-
-    static void get_chunk_packed(const Array& arr, size_t ndx, int64_t res[8]);
-    static void get_chunk_flex(const Array& arr, size_t ndx, int64_t res[8]);
-    static void set_packed(Array& arr, size_t ndx, int64_t val);
-    static void set_flex(Array& arr, size_t ndx, int64_t val);
-    // query interface
-    template <class Cond>
-    static bool find_packed(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
-                            QueryStateBase* st);
-    template <class Cond>
-    static bool find_flex(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
-                          QueryStateBase* st);
-
-    // internal impl
-    void compress_values(const Array&, std::vector<int64_t>&, std::vector<unsigned>&) const;
-    inline bool is_packed() const;
-    inline bool is_flex() const;
-
-    // for testing
-    bool always_compress(const Array&, Array&, Node::Encoding) const;
-
-private:
     using Encoding = NodeHeader::Encoding;
     Encoding m_encoding{NodeHeader::Encoding::WTypBits};
     uint64_t* m_data;
     uint8_t m_v_width = 0, m_ndx_width = 0;
     size_t m_v_size = 0, m_ndx_size = 0;
+
+    // getting and setting interface specifically for encoding formats
+    void init_packed(const char*);
+    void init_flex(const char*);
+    void init_delta(const char*);
+
+    template <class T>
+    static int64_t get_compressed(const Array& arr, size_t ndx);
+
+    template <class T>
+    static std::vector<int64_t> get_all_compressed(const Array& arr, size_t begin, size_t end);
+
+    template <class T>
+    static void get_chunk_compressed(const Array& arr, size_t ndx, int64_t res[8]);
+    template <class T>
+    static void set_compressed(Array& arr, size_t ndx, int64_t val);
+    // query interface
+    template <class T, class Cond>
+    static bool find_compressed(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
+                                QueryStateBase* st);
+
+    // internal impl
+    void compress_values(const Array&, std::vector<int64_t>&, std::vector<unsigned>&) const;
+    inline bool is_packed() const;
+    inline bool is_flex() const;
+    inline bool is_delta() const;
+
+    // for testing
+    bool always_compress(const Array&, Array&, Node::Encoding) const;
 };
 
 inline void IntegerCompressor::init_packed(const char* h)
@@ -108,6 +106,15 @@ inline void IntegerCompressor::init_flex(const char* h)
     m_data = (uint64_t*)NodeHeader::get_data_from_header(h);
     m_v_width = NodeHeader::get_elementA_size(h);
     m_v_size = NodeHeader::get_arrayA_num_elements(h);
+    m_ndx_width = NodeHeader::get_elementB_size(h);
+    m_ndx_size = NodeHeader::get_arrayB_num_elements(h);
+}
+
+inline void IntegerCompressor::init_delta(const char* h)
+{
+    m_data = (uint64_t*)NodeHeader::get_data_from_header(h);
+    m_v_width = NodeHeader::get_elementA_size(h);
+    m_v_size = 2; // Fixed
     m_ndx_width = NodeHeader::get_elementB_size(h);
     m_ndx_size = NodeHeader::get_arrayB_num_elements(h);
 }
@@ -127,33 +134,38 @@ inline bool IntegerCompressor::is_flex() const
     return m_encoding == NodeHeader::Encoding::Flex;
 }
 
+inline bool IntegerCompressor::is_delta() const
+{
+    return m_encoding == NodeHeader::Encoding::Delta;
+}
+
 inline size_t IntegerCompressor::size() const
 {
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex() || is_delta());
     return m_encoding == NodeHeader::Encoding::Packed ? v_size() : ndx_size();
 }
 
 inline size_t IntegerCompressor::v_size() const
 {
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex() || is_delta());
     return m_v_size;
 }
 
 inline size_t IntegerCompressor::ndx_size() const
 {
-    REALM_ASSERT_DEBUG(is_flex());
+    REALM_ASSERT_DEBUG(is_flex() || is_delta());
     return m_ndx_size;
 }
 
 inline uint8_t IntegerCompressor::v_width() const
 {
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex() || is_delta());
     return m_v_width;
 }
 
 inline uint8_t IntegerCompressor::ndx_width() const
 {
-    REALM_ASSERT_DEBUG(is_flex());
+    REALM_ASSERT_DEBUG(is_flex() || is_delta());
     return m_ndx_width;
 }
 
@@ -164,37 +176,37 @@ inline NodeHeader::Encoding IntegerCompressor::get_encoding() const
 
 inline uint64_t IntegerCompressor::v_mask() const
 {
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex() || is_delta());
     return 1ULL << (m_v_width - 1);
 }
 
 inline uint64_t IntegerCompressor::ndx_mask() const
 {
-    REALM_ASSERT_DEBUG(is_flex());
+    REALM_ASSERT_DEBUG(is_flex() || is_delta());
     return 1ULL << (m_ndx_width - 1);
 }
 
 inline uint64_t IntegerCompressor::msb() const
 {
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex() || is_delta());
     return populate(m_v_width, v_mask());
 }
 
 inline uint64_t IntegerCompressor::ndx_msb() const
 {
-    REALM_ASSERT_DEBUG(is_flex());
+    REALM_ASSERT_DEBUG(is_flex() || is_delta());
     return populate(m_ndx_width, ndx_mask());
 }
 
 inline uint64_t IntegerCompressor::bitmask_v() const
 {
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex() || is_delta());
     return 0xFFFFFFFFFFFFFFFFULL >> (64 - m_v_width);
 }
 
 inline uint64_t IntegerCompressor::bitmask_ndx() const
 {
-    REALM_ASSERT_DEBUG(is_flex());
+    REALM_ASSERT_DEBUG(is_flex() || is_delta());
     return 0xFFFFFFFFFFFFFFFFULL >> (64 - m_ndx_width);
 }
 

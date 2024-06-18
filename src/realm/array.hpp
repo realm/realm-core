@@ -607,6 +607,7 @@ private:
     friend class IntegerCompressor;
     friend class PackedCompressor;
     friend class FlexCompressor;
+    friend class DeltaCompressor;
 };
 
 class TempArray : public Array {
@@ -636,7 +637,8 @@ inline Array::Array(Allocator& allocator) noexcept
 inline bool Array::is_compressed() const
 {
     const auto enc = m_integer_compressor.get_encoding();
-    return enc == NodeHeader::Encoding::Flex || enc == NodeHeader::Encoding::Packed;
+    return enc == NodeHeader::Encoding::Flex || enc == NodeHeader::Encoding::Packed ||
+           enc == NodeHeader::Encoding::Delta;
 }
 
 inline const IntegerCompressor& Array::integer_compressor() const
@@ -1104,7 +1106,8 @@ inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterB
         if (compress_in_flight && array.compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
             const auto encoding = compressed_array.m_integer_compressor.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
+                               encoding == Encoding::Delta);
             REALM_ASSERT_DEBUG(array.size() == compressed_array.size());
             for (size_t i = 0; i < compressed_array.size(); ++i) {
                 REALM_ASSERT_DEBUG(array.get(i) == compressed_array.get(i));
