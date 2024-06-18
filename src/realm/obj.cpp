@@ -609,7 +609,6 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
         ArrayString values(get_alloc());
         values.set_spec(const_cast<Spec*>(&spec), spec_ndx);
         values.init_from_ref(ref);
-
         return values.get(m_row_ndx);
     }
     else {

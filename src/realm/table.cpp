@@ -1767,9 +1767,30 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
 
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+    // there might be an interner for this column key. In case there is, and the string is compressed,
+    // we can extract the string id and use it while we scan the leaf values (the ids are just integers,
+    // so searching should be faster)
+    std::optional<StringID> string_id;
+    if constexpr (std::is_same_v<T, StringData>) {
+        if (const auto string_interner = get_string_interner(col_key); string_interner != nullptr) {
+            string_id = string_interner->lookup(value);
+        }
+    }
+
+    auto f = [&key, &col_key, &value, &leaf, &string_id](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
-        size_t row = leaf.find_first(value, 0, cluster->node_size());
+
+        size_t row;
+        if constexpr (std::is_same_v<T, StringData>) {
+            if (string_id)
+                row = leaf.find_first(value, 0, cluster->node_size(), string_id);
+            else
+                row = leaf.find_first(value, 0, cluster->node_size());
+        }
+        else {
+            row = leaf.find_first(value, 0, cluster->node_size());
+        }
+
         if (row != realm::npos) {
             key = cluster->get_real_key(row);
             return IteratorControl::Stop;
@@ -3533,9 +3554,8 @@ void Table::typed_print(std::string prefix, ref_type ref) const
 
 StringInterner* Table::get_string_interner(ColKey col_key) const
 {
-    auto idx = col_key.get_index().val;
-    REALM_ASSERT(idx < m_string_interners.size());
-    auto interner = m_string_interners[idx].get();
-    REALM_ASSERT(interner);
-    return interner;
+    const auto idx = col_key.get_index().val;
+    if (idx < m_string_interners.size())
+        return m_string_interners[idx].get();
+    return nullptr;
 }

@@ -1590,6 +1590,10 @@ public:
     void table_changed() override
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
+        m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
+        if (m_string_interner) {
+            m_interned_string = m_string_interner->lookup(m_value);
+        }
     }
 
     void cluster_changed() override
@@ -1633,6 +1637,8 @@ protected:
     std::optional<std::string> m_value;
     std::optional<ArrayString> m_leaf;
     StringData m_string_value;
+    StringInterner* m_string_interner = nullptr;
+    std::optional<StringID> m_interned_string;
 
     bool m_is_string_enum = false;
 

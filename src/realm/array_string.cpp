@@ -376,6 +376,21 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     return not_found;
 }
 
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::optional<StringID> id) const noexcept
+{
+    switch (m_type) {
+        case Type::interned_strings: {
+            if (id) {
+                return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    return not_found;
+}
+
 namespace {
 
 template <class T>

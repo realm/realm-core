@@ -455,7 +455,10 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
     if (m_needles.empty()) {
-        return m_leaf->find_first(m_string_value, start, end);
+        if (m_string_interner)
+            return m_leaf->find_first(m_string_value, start, end, m_interned_string);
+        else
+            return m_leaf->find_first(m_string_value, start, end);
     }
     else {
         if (end == npos)

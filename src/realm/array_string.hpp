@@ -22,6 +22,7 @@
 #include <realm/array_string_short.hpp>
 #include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
+#include <realm/string_interner.hpp>
 
 namespace realm {
 
@@ -116,6 +117,9 @@ public:
     void clear();
 
     size_t find_first(StringData value, size_t begin, size_t end) const noexcept;
+
+    /// Special version for searching in an array or compressed strings.
+    size_t find_first(StringData value, size_t begin, size_t end, std::optional<StringID>) const noexcept;
 
     size_t lower_bound(StringData value);
 
