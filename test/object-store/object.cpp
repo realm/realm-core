@@ -2011,8 +2011,8 @@ TEST_CASE("object") {
 
         r1->begin_transaction();
         r2->begin_transaction();
-        auto object1 = Object::create(c1, r1, "pk after list", std::any(v1), CreatePolicy::UpdateModified);
-        auto object2 = Object::create(c2, r2, "pk after list", std::any(v2), CreatePolicy::UpdateModified);
+        auto object1 = Object::create(c1, r1, *r1->schema().find("pk after list"), std::any(v1));
+        auto object2 = Object::create(c2, r2, *r2->schema().find("pk after list"), std::any(v2));
         r2->commit_transaction();
         r1->commit_transaction();
 
