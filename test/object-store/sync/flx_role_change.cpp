@@ -671,8 +671,6 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                             return std::nullopt;
 
                         std::optional<BootstrapTestState> new_state = std::nullopt;
-                        logger->trace("ROLE CHANGE: on_sync_client_event_hook: event: %1 - batch_state: %2",
-                                      static_cast<int>(data.event), data.batch_state);
 
                         switch (data.event) {
                             case Event::IdentMessageSent:
@@ -720,8 +718,6 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                         }
                         // If the state is changing and a role change is requested for that state, then
                         // update the role now.
-                        logger->trace("ROLE CHANGE: on_sync_client_event_hook: new_state: %1 - update_role_state: %2",
-                                      new_state ? static_cast<int>(*new_state) : -1, update_role_state);
                         if (new_state && new_state == update_role_state &&
                             update_role_state != BootstrapTestState::not_ready &&
                             bootstrap_msg_count >= update_msg_count) {
