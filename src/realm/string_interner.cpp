@@ -618,6 +618,7 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
 int StringInterner::compare(StringID A, StringID B)
 {
     std::lock_guard lock(m_mutex);
+    // 0 is null, the first index starts from 1.
     REALM_ASSERT_DEBUG(A <= m_decompressed_strings.size());
     REALM_ASSERT_DEBUG(B <= m_decompressed_strings.size());
     // comparisons against null

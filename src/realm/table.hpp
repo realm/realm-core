@@ -573,7 +573,11 @@ public:
     ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const;
     ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
     ColKey spec_ndx2colkey(size_t ndx) const;
-    StringInterner* get_string_interner(ColKey col_key) const;
+    StringInterner* get_string_interner(ColKey::Idx idx) const;
+    StringInterner* get_string_interner(ColKey col_key) const
+    {
+        return get_string_interner(col_key.get_index());
+    }
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
@@ -1415,11 +1419,6 @@ public:
     static const Spec& get_spec(const Table& table) noexcept
     {
         return table.m_spec;
-    }
-
-    static StringInterner* get_string_interner(const Table& table, ColKey col_key)
-    {
-        return table.get_string_interner(col_key);
     }
 
     static TableRef get_opposite_link_table(const Table& table, ColKey col_key);

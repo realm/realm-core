@@ -261,6 +261,12 @@ inline void Cluster::set_string_interner(ArrayString& arr, ColKey col_key) const
     m_tree_top.set_string_interner(arr, col_key);
 }
 
+template <>
+inline void Cluster::set_string_interner(ArrayMixed& arr, ColKey col_key) const
+{
+    m_tree_top.set_string_interner(arr, col_key);
+}
+
 template <class T>
 inline void Cluster::set_spec(T&, ColKey::Idx) const
 {
@@ -314,6 +320,7 @@ inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_valu
 {
     ArrayMixed arr(m_alloc);
     arr.set_parent(this, col_key.get_index().val + s_first_col_index);
+    set_string_interner(arr, col_key);
     arr.init_from_parent();
     arr.insert(ndx, init_value);
 
@@ -798,6 +805,7 @@ inline void Cluster::do_erase_mixed(size_t ndx, ColKey col_key, ObjKey key, Casc
 
     ArrayMixed values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
+    set_string_interner(values, col_key);
     values.init_from_parent();
 
     Mixed value = values.get(ndx);
@@ -1447,6 +1455,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Mixed: {
                     ArrayMixed arr(m_alloc);
+                    set_string_interner(arr, col);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
@@ -1651,32 +1660,8 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
         else {
             // Columns
             auto col_key = out.table->m_leaf_ndx2colkey[j - 1];
+            out.col_key = col_key;
             auto col_type = col_key.get_type();
-            // String columns are interned at this point
-            if (out.compress && col_type == col_type_String && !col_key.is_collection()) {
-                ArrayRef leaf(m_alloc);
-                leaf.init_from_ref(ref);
-                auto header = leaf.get_header();
-                if (NodeHeader::get_hasrefs_from_header(header) ||
-                    NodeHeader::get_wtype_from_header(header) == wtype_Multiply) {
-                    // We're interning these strings
-                    ArrayString as(m_alloc);
-                    as.init_from_ref(leaf_rot.get_as_ref());
-                    written_cluster.set_as_ref(j, as.write(out, out.table->get_string_interner(col_key)));
-                    // in a transactional setting:
-                    // Destroy all sub-arrays if present, in order to release memory in file
-                    // This is contrary to the rest of the handling in this function, but needed
-                    // here since sub-arrays may not have been COW'ed and therefore not freed in file.
-                    // We rely on 'only_modified' to indicate that we're in a transactional setting.
-                    if (only_modified)
-                        leaf.destroy_deep(true);
-                    continue;
-                }
-                // whether it's the old enum strings or the new interned strings,
-                // just write out the array using integer leaf compression
-                written_cluster.set_as_ref(j, leaf.write(out, false, false, false));
-                continue;
-            }
             if (col_key.is_collection()) {
                 ArrayRef arr_ref(m_alloc);
                 arr_ref.init_from_ref(ref);

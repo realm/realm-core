@@ -239,13 +239,15 @@ bool Obj::compare_list_in_mixed(Lst<Mixed>& val1, Lst<Mixed>& val2, ColKey ck, O
         auto m1 = val1.get_any(i);
         auto m2 = val2.get_any(i);
 
+        auto other_table = other.get_table();
+        auto other_col_key = other_table->get_column_key(col_name);
         if (m1.is_type(type_List) && m2.is_type(type_List)) {
-            DummyParent parent(other.get_table(), m2.get_ref());
+            DummyParent parent(other_table, m2.get_ref(), other_col_key);
             Lst<Mixed> list(parent, 0);
             return compare_list_in_mixed(*val1.get_list(i), list, ck, other, col_name);
         }
         else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
-            DummyParent parent(other.get_table(), m2.get_ref());
+            DummyParent parent(other_table, m2.get_ref(), other_col_key);
             Dictionary dict(parent, 0);
             return compare_dict_in_mixed(*val1.get_dictionary(i), dict, ck, other, col_name);
         }
@@ -268,13 +270,15 @@ bool Obj::compare_dict_in_mixed(Dictionary& val1, Dictionary& val2, ColKey ck, O
         if (k1 != k2)
             return false;
 
+        auto other_table = other.get_table();
+        auto other_col_key = other_table->get_column_key(col_name);
         if (m1.is_type(type_List) && m2.is_type(type_List)) {
-            DummyParent parent(other.get_table(), m2.get_ref());
+            DummyParent parent(other_table, m2.get_ref(), other_col_key);
             Lst<Mixed> list(parent, 0);
             return compare_list_in_mixed(*val1.get_list(k1.get_string()), list, ck, other, col_name);
         }
         else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
-            DummyParent parent(other.get_table(), m2.get_ref());
+            DummyParent parent(other_table, m2.get_ref(), other_col_key);
             Dictionary dict(parent, 0);
             return compare_dict_in_mixed(*val1.get_dictionary(k1.get_string()), dict, ck, other, col_name);
         }
@@ -495,6 +499,7 @@ Mixed Obj::get_unfiltered_mixed(ColKey::Idx col_ndx) const
     ArrayMixed values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.init_from_ref(ref);
+    values.set_string_interner(m_table->get_string_interner(col_ndx));
 
     return values.get(m_row_ndx);
 }
@@ -1167,6 +1172,35 @@ REALM_FORCEINLINE void Obj::sync(Node& arr)
     }
 }
 
+// helper functions for filtering out calls to set_string_interner()
+template <class T>
+inline void Obj::set_string_interner(T&, ColKey)
+{
+}
+template <>
+inline void Obj::set_string_interner(ArrayString& values, ColKey col_key)
+{
+    values.set_string_interner(m_table->get_string_interner(col_key));
+}
+template <>
+inline void Obj::set_string_interner(ArrayMixed& values, ColKey col_key)
+{
+    values.set_string_interner(m_table->get_string_interner(col_key));
+}
+
+// helper functions for filtering out calls to set_spec()
+template <class T>
+inline void Obj::set_spec(T&, ColKey)
+{
+}
+template <>
+inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
+{
+    size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
+    Spec* spec = const_cast<Spec*>(&get_spec());
+    values.set_spec(spec, spec_ndx);
+}
+
 template <>
 Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 {
@@ -1224,6 +1258,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         REALM_ASSERT(col_ndx.val + 1 < fields.size());
         ArrayMixed values(alloc);
         values.set_parent(&fields, col_ndx.val + 1);
+        set_string_interner(values, col_key);
         values.init_from_parent();
         values.set(m_row_ndx, value);
         if (value.is_type(type_Dictionary, type_List)) {
@@ -1368,6 +1403,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
     if (col_key.get_type() == col_type_Mixed) {
         ArrayMixed values(alloc);
         values.set_parent(&fields, col_ndx.val + 1);
+        set_string_interner(values, col_key);
         values.init_from_parent();
         Mixed old = values.get(m_row_ndx);
         if (old.is_type(type_Int)) {
@@ -1601,30 +1637,6 @@ inline void check_range(const BinaryData& val)
         throw LogicError(ErrorCodes::LimitExceeded, "Binary too big");
 }
 } // namespace
-
-// helper functions for filtering out calls to set_string_interner()
-template <class T>
-inline void Obj::set_string_interner(T&, ColKey)
-{
-}
-template <>
-inline void Obj::set_string_interner<ArrayString>(ArrayString& values, ColKey col_key)
-{
-    values.set_string_interner(m_table->get_string_interner(col_key));
-}
-
-// helper functions for filtering out calls to set_spec()
-template <class T>
-inline void Obj::set_spec(T&, ColKey)
-{
-}
-template <>
-inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
-{
-    size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
-    Spec* spec = const_cast<Spec*>(&get_spec());
-    values.set_spec(spec, spec_ndx);
-}
 
 #if REALM_ENABLE_GEOSPATIAL
 
