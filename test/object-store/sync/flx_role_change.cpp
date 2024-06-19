@@ -79,16 +79,9 @@ struct TestParams {
     std::optional<size_t> sleep_millis = std::nullopt;
 };
 
-// Common harness used for groups of tests
-static std::unique_ptr<FLXSyncTestHarness> harness;
-
-void setup_harness(std::string app_name, TestParams params)
+std::unique_ptr<FLXSyncTestHarness> setup_harness(std::string app_name, TestParams params)
 {
-    if (harness) {
-        // already intitialized
-        return;
-    }
-    harness = std::make_unique<FLXSyncTestHarness>(
+    auto harness = std::make_unique<FLXSyncTestHarness>(
         app_name, FLXSyncTestHarness::ServerSchema{g_person_schema, {"role", "name"}});
 
     auto& app_session = harness->session().app_session();
@@ -119,13 +112,15 @@ void setup_harness(std::string app_name, TestParams params)
         fill_person_schema(realm, "manager", params.num_mgrs);
         fill_person_schema(realm, "director", params.num_dirs);
     });
+    // Return the unique_ptr for the newly created harness
+    return harness;
 }
 
-void teardown_harness()
+void teardown_harness(std::unique_ptr<FLXSyncTestHarness>& harness)
 {
-    if (!harness)
+    if (!harness) {
         return; // nothing to do
-
+    }
     harness->app()->sync_manager()->wait_for_sessions_to_terminate();
     harness.reset();
 }
@@ -176,8 +171,8 @@ void verify_records(SharedRealm check_realm, size_t emps, size_t mgrs, size_t di
 } // namespace
 
 TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstrap]") {
-
     auto logger = util::Logger::get_default_logger();
+    static std::unique_ptr<FLXSyncTestHarness> harness;
 
     auto pause_download_builder = [](std::weak_ptr<SyncSession> weak_session, bool pause) {
         if (auto session = weak_session.lock()) {
@@ -424,7 +419,9 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
     // 10 objects before flush
     // 4096 download soft max bytes
     TestParams params{};
-    setup_harness("flx_role_change_bootstraps", params);
+    if (!harness) {
+        harness = setup_harness("flx_role_change_bootstraps", params);
+    }
     REQUIRE(harness);
 
     size_t num_total = params.num_emps + params.num_mgrs + params.num_dirs;
@@ -619,24 +616,26 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         do_verify(test_realm, params.num_emps, emp_ids, "employee");
 
         // Tear down the app since some of the records were added and modified
-        harness->app()->sync_manager()->wait_for_sessions_to_terminate();
-        harness.reset();
+        teardown_harness(harness);
     }
     SECTION("teardown") {
-        teardown_harness();
+        teardown_harness(harness);
     }
 }
 
 TEST_CASE("Role changes during bootstrap complete successfully", "[sync][flx][baas][role change][bootstrap]") {
+    auto logger = util::Logger::get_default_logger();
+    static std::unique_ptr<FLXSyncTestHarness> harness;
+
     // 150 emps, 25 mgrs, 10 dirs
     // 10 objects before flush
     // 1536 download soft max bytes
     TestParams params{};
     params.max_download_bytes = 1536;
-    setup_harness("flx_role_change_during_bs", params);
+    if (!harness) {
+        harness = setup_harness("flx_role_change_during_bs", params);
+    }
     REQUIRE(harness);
-
-    auto logger = util::Logger::get_default_logger();
 
     // Get the current rules so it can be updated during the test
     auto& app_session = harness->session().app_session();
@@ -856,7 +855,7 @@ TEST_CASE("Role changes during bootstrap complete successfully", "[sync][flx][ba
         }
     }
     SECTION("teardown") {
-        teardown_harness();
+        teardown_harness(harness);
     }
 }
 
