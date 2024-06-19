@@ -40,7 +40,6 @@ public:
     static int64_t get(const IntegerCompressor&, size_t);
     static std::vector<int64_t> get_all(const IntegerCompressor& c, size_t b, size_t e);
     static void get_chunk(const IntegerCompressor&, size_t, int64_t res[8]);
-    static void set_direct(const IntegerCompressor&, size_t, int64_t);
 
     template <typename Cond>
     static bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
@@ -98,12 +97,6 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
         }
     }
     return res;
-}
-
-inline void PackedCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value)
-{
-    BfIterator it{c.data(), 0, c.v_width(), c.v_width(), ndx};
-    it.set_value(value);
 }
 
 inline void PackedCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8])
