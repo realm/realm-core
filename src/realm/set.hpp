@@ -532,6 +532,9 @@ UpdateStatus Set<T>::init_from_parent(bool allow_create) const
         m_tree.reset(new BPlusTree<T>(get_alloc()));
         const ArrayParent* parent = this;
         m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+        if constexpr (realm::is_any_v<T, StringData, Mixed>) {
+            m_tree->set_interner(get_table()->get_string_interner(m_col_key));
+        }
     }
     return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
 }

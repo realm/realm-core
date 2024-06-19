@@ -126,10 +126,8 @@ public:
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
     void verify() const;
-    // Write to 'out', if needed using 'interner' to intern any strings.
-    // An interner of 0 will disable interning. Interned values may be further
-    // compressed using leaf compression for integer arrays.
-    ref_type write(_impl::ArrayWriterBase& out, StringInterner* interner);
+    template <class T>
+    static ref_type typed_write(ref_type ref, T& out, Allocator& alloc);
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
