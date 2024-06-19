@@ -155,6 +155,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
 
         BPlusTree<StringData> keys(*ctrl.alloc);
         keys.set_parent(&top, 0);
+        keys.set_interner(ctrl.interner);
         keys.init_from_parent();
         size_t start = 0;
         if (size_t finish = keys.size()) {
@@ -177,6 +178,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
             }
             BPlusTree<Mixed> values(*ctrl.alloc);
             values.set_parent(&top, 1);
+            values.set_interner(ctrl.interner);
             values.init_from_parent();
             for (; start < finish; start++) {
                 val = values.get(start);
@@ -194,6 +196,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
         if (!ref)
             return;
         BPlusTree<Mixed> list(*ctrl.alloc);
+        list.set_interner(ctrl.interner);
         list.init_from_ref(ref);
         if (size_t sz = list.size()) {
             size_t start = 0;

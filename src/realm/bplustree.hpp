@@ -30,6 +30,7 @@ namespace realm {
 
 class BPlusTreeBase;
 class BPlusTreeInner;
+class StringInterner;
 
 /*****************************************************************************/
 /* BPlusTreeNode                                                             */
@@ -207,6 +208,16 @@ public:
             m_root->bp_set_parent(parent, ndx_in_parent);
     }
 
+    void set_interner(StringInterner* interner)
+    {
+        m_interner = interner;
+    }
+
+    StringInterner* get_interner()
+    {
+        return m_interner;
+    }
+
     virtual void erase(size_t) = 0;
     virtual void clear() = 0;
     virtual void swap(size_t, size_t) = 0;
@@ -234,6 +245,7 @@ protected:
     std::unique_ptr<BPlusTreeNode> m_root;
     Allocator& m_alloc;
     ArrayParent* m_parent = nullptr;
+    StringInterner* m_interner = nullptr;
     size_t m_ndx_in_parent = 0;
     size_t m_size = 0;
     size_t m_cached_leaf_begin;
@@ -300,6 +312,9 @@ public:
         void init_from_ref(ref_type ref) noexcept override
         {
             LeafArray::init_from_ref(ref);
+            if constexpr (realm::is_any_v<T, StringData, Mixed>) {
+                LeafArray::set_string_interner(m_tree->get_interner());
+            }
         }
 
         ref_type get_ref() const override
@@ -574,19 +589,25 @@ protected:
 
     std::unique_ptr<BPlusTreeLeaf> create_leaf_node() override
     {
-        std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
-        static_cast<LeafNode*>(leaf.get())->create();
+        auto leaf = std::make_unique<LeafNode>(this);
+        leaf->create();
+        if constexpr (realm::is_any_v<T, StringData, Mixed>) {
+            leaf->set_string_interner(m_interner);
+        }
         return leaf;
     }
     std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
     {
-        std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
+        auto leaf = std::make_unique<LeafNode>(this);
         leaf->init_from_ref(ref);
         return leaf;
     }
     BPlusTreeLeaf* cache_leaf(MemRef mem) override
     {
         m_leaf_cache.init_from_mem(mem);
+        if constexpr (realm::is_any_v<T, StringData, Mixed>) {
+            m_leaf_cache.LeafArray::set_string_interner(m_interner);
+        }
         return &m_leaf_cache;
     }
     void replace_root(std::unique_ptr<BPlusTreeNode> new_root) override

@@ -850,9 +850,11 @@ UpdateStatus Dictionary::init_from_parent(bool allow_create) const
             Allocator& alloc = get_alloc();
             m_dictionary_top.reset(new Array(alloc));
             m_dictionary_top->set_parent(const_cast<Dictionary*>(this), 0);
+            StringInterner* interner = m_col_key ? get_table()->get_string_interner(m_col_key) : nullptr;
             switch (m_key_type) {
                 case type_String: {
                     m_keys.reset(new BPlusTree<StringData>(alloc));
+                    m_keys->set_interner(interner);
                     break;
                 }
                 case type_Int: {
@@ -865,6 +867,7 @@ UpdateStatus Dictionary::init_from_parent(bool allow_create) const
             m_keys->set_parent(m_dictionary_top.get(), 0);
             m_values.reset(new BPlusTreeMixed(alloc));
             m_values->set_parent(m_dictionary_top.get(), 1);
+            m_values->set_interner(interner);
         }
 
         if (ref) {
@@ -1153,12 +1156,12 @@ void Dictionary::to_json(std::ostream& out, JSONOutputMode output_mode,
             fn(val);
         }
         else if (val.is_type(type_Dictionary)) {
-            DummyParent parent(this->get_table(), val.get_ref());
+            DummyParent parent(this->get_table(), val.get_ref(), m_col_key);
             Dictionary dict(parent, 0);
             dict.to_json(out, output_mode, fn);
         }
         else if (val.is_type(type_List)) {
-            DummyParent parent(this->get_table(), val.get_ref());
+            DummyParent parent(this->get_table(), val.get_ref(), m_col_key);
             Lst<Mixed> list(parent, 0);
             list.to_json(out, output_mode, fn);
         }

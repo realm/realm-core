@@ -108,9 +108,12 @@ TEST(List_basic)
 
 TEST(List_SimpleTypes)
 {
-    Group g;
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+
+    auto tr = db->start_write();
     std::vector<CollectionBase*> lists;
-    TableRef t = g.add_table("table");
+    TableRef t = tr->add_table("table");
     ColKey int_col = t->add_column_list(type_Int, "integers");
     ColKey bool_col = t->add_column_list(type_Bool, "booleans");
     ColKey string_col = t->add_column_list(type_String, "strings");
@@ -134,6 +137,9 @@ TEST(List_SimpleTypes)
     std::vector<Timestamp> timestamp_vector = {Timestamp(seconds_since_epoc, 0),
                                                Timestamp(seconds_since_epoc + 60, 0)};
     obj.set_list_values(timestamp_col, timestamp_vector);
+
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
 
     auto int_list = obj.get_list<int64_t>(int_col);
     lists.push_back(&int_list);
