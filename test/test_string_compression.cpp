@@ -169,3 +169,117 @@ TEST(StringInterner_Creation_Multiple_String_ColKey)
         CHECK(interners[i]->compare(*stored_id, id) == 0); // compare agaist self.
     }
 }
+
+TEST(StringInterner_Creation_List_Strings)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    const auto col_key = table->add_column_list(type_String, "list_strings");
+    auto o = table->create_object();
+    auto list_string = o.get_list<String>(col_key);
+    auto list_string_interner = table->get_string_interner(col_key);
+    std::string my_string = "testtesttest";
+    for (size_t i = 0; i < 10; i++) {
+        my_string += std::to_string(i);
+        list_string.add({my_string});
+    }
+
+    std::vector<StringID> interned_ids;
+    for (size_t i = 0; i < 10; i++) {
+        auto id = list_string_interner->intern(list_string.get(i));
+        interned_ids.push_back(id);
+    }
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist(0, 9);
+    for (size_t i = 0; i < 10; ++i) {
+        const auto str = list_string_interner->get(interned_ids[i]);
+        CHECK(str == list_string[i]);
+        CHECK(list_string_interner->compare(list_string[i], interned_ids[i]) == 0);
+        for (;;) {
+            // pick a random string and verify that does not match
+            auto index = dist(rng);
+            if (index != i) {
+                CHECK(list_string_interner->compare(list_string[index], interned_ids[i]) != 0);
+                break;
+            }
+        }
+    }
+}
+
+TEST(StringInterner_Creation_Set_String)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    const auto col_key = table->add_column_set(type_String, "set_strings");
+    auto o = table->create_object();
+    auto set_string = o.get_set<String>(col_key);
+    auto set_string_interner = table->get_string_interner(col_key);
+    std::string my_string = "testtesttest";
+    for (size_t i = 0; i < 10; i++) {
+        my_string += std::to_string(i);
+        set_string.insert({my_string});
+    }
+
+    std::vector<StringID> interned_ids;
+    for (size_t i = 0; i < 10; i++) {
+        auto id = set_string_interner->intern(set_string.get(i));
+        interned_ids.push_back(id);
+    }
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist(0, 9);
+    for (size_t i = 0; i < 10; ++i) {
+        const auto str = set_string_interner->get(interned_ids[i]);
+        CHECK(str == set_string.get(i));
+        CHECK(set_string_interner->compare(set_string.get(i), interned_ids[i]) == 0);
+        for (;;) {
+            // pick a random string and verify that does not match
+            auto index = dist(rng);
+            if (index != i) {
+                CHECK(set_string_interner->compare(set_string.get(index), interned_ids[i]) != 0);
+                break;
+            }
+        }
+    }
+}
+
+TEST(StringInterner_Creation_Dictionary_String)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    const auto col_key = table->add_column_dictionary(type_String, "dict_string");
+    auto o = table->create_object();
+    auto dictionary = o.get_dictionary(col_key);
+    auto dictionary_interner = table->get_string_interner(col_key);
+    std::string my_string = "testtesttest";
+    for (size_t i = 0; i < 10; i++) {
+        my_string += std::to_string(i);
+        dictionary.insert({my_string}, {my_string});
+    }
+
+    std::vector<StringID> interned_ids;
+    for (size_t i = 0; i < 10; i++) {
+        auto id = dictionary_interner->intern(dictionary.get_any(i).get_string());
+        interned_ids.push_back(id);
+    }
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist(0, 9);
+    for (size_t i = 0; i < 10; ++i) {
+        const auto str = dictionary_interner->get(interned_ids[i]);
+        CHECK(str == dictionary.get_any(i).get_string());
+        CHECK(dictionary_interner->compare(dictionary.get_any(i).get_string(), interned_ids[i]) == 0);
+        for (;;) {
+            // pick a random string and verify that does not match
+            auto index = dist(rng);
+            if (index != i) {
+                CHECK(dictionary_interner->compare(dictionary.get_any(index).get_string(), interned_ids[i]) != 0);
+                break;
+            }
+        }
+    }
+}
