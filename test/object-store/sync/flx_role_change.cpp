@@ -523,9 +523,10 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
             };
             auto test_realm = Realm::get_shared_realm(config);
             set_up_realm(test_realm, num_total);
-            test_realm->sync_session()->pause(); // Perform the local updates offline
-            // Modify 10 records with new names - pause the sync session so
-            // the changes aren't sync'ed prematurely
+            // Perform the local updates offline
+            test_realm->sync_session()->shutdown_and_wait();
+            // Modify a set of records with new roles and create some new records as well
+            // This should be called offline so the changes aren't sync'ed prematurely
             auto update_records = [](SharedRealm update_realm, std::string_view role_to_change,
                                      std::vector<ObjectId>& saved_ids, size_t num_to_modify, size_t num_to_create) {
                 update_realm->begin_transaction();
@@ -792,7 +793,7 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
             // The test will update the rule to change access from all records to only the employee
             // records while a new subscription for all Person entries is being bootstrapped.
             update_role(default_rule, {{"role", "employee"}});
-            realm_1->sync_session()->pause();
+            realm_1->sync_session()->shutdown_and_wait();
             {
                 // Set up a new bootstrap while offline
                 auto table = realm_1->read_group().get_table("class_Person");

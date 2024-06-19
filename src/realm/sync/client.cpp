@@ -1192,10 +1192,6 @@ bool SessionWrapper::has_flx_subscription_store() const
 void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
 {
     REALM_ASSERT(!m_finalized);
-    // Don't report errors on server initiated bootstraps to the subscription store
-    if (m_flx_active_version == version) {
-        return;
-    }
     get_flx_subscription_store()->update_state(version, SubscriptionSet::State::Error, err_msg);
 }
 
