@@ -451,8 +451,6 @@ public:
     // special conditions under which it can be called!
     SaltedVersion get_salted_server_version() const noexcept;
 
-    const ObjectIDHistoryState& get_object_id_history_state() const;
-
     // Overriding member functions in Replication
     void initialize(DB&) override;
     HistoryType get_history_type() const noexcept override;

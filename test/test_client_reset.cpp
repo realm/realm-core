@@ -845,7 +845,7 @@ void mark_as_synchronized(DB& db)
     progress.upload.client_version = current_version;
     progress.upload.last_integrated_server_version = current_version;
     sync::VersionInfo info_out;
-    history.set_sync_progress(progress, nullptr, info_out);
+    history.set_sync_progress(progress, 0, info_out);
     history.set_client_file_ident({1, 0}, false);
 }
 
@@ -1433,7 +1433,7 @@ TEST(ClientReset_Recover_UpdatesRemoteServerVersions)
 
         sync::VersionInfo info_out;
         auto& history = static_cast<ClientReplication*>(db_fresh->get_replication())->get_history();
-        history.set_sync_progress(progress, nullptr, info_out);
+        history.set_sync_progress(progress, 0, info_out);
     }
 
     expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
@@ -1493,13 +1493,14 @@ TEST(ClientReset_Recover_UploadableBytes)
 
     auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
     uint_fast64_t unused, pre_reset_uploadable_bytes;
-    history.get_upload_download_bytes(db.get(), unused, unused, unused, pre_reset_uploadable_bytes, unused);
+    DownloadableProgress unused_progress;
+    history.get_upload_download_bytes(db.get(), unused, unused_progress, unused, pre_reset_uploadable_bytes, unused);
     CHECK_GREATER(pre_reset_uploadable_bytes, 0);
 
     expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
 
     uint_fast64_t post_reset_uploadable_bytes;
-    history.get_upload_download_bytes(db.get(), unused, unused, unused, post_reset_uploadable_bytes, unused);
+    history.get_upload_download_bytes(db.get(), unused, unused_progress, unused, post_reset_uploadable_bytes, unused);
     CHECK_GREATER(post_reset_uploadable_bytes, 0);
     CHECK_GREATER(pre_reset_uploadable_bytes, post_reset_uploadable_bytes);
 }
@@ -1648,7 +1649,7 @@ void apply_changes(DB& src, DB& dst)
 
     util::NullLogger logger;
     VersionInfo new_version;
-    dst_history.integrate_server_changesets(dst_progress, nullptr, remote_changesets, new_version,
+    dst_history.integrate_server_changesets(dst_progress, 0, remote_changesets, new_version,
                                             DownloadBatchState::SteadyState, logger, dst.start_read());
 }
 

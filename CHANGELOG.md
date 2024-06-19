@@ -17,7 +17,8 @@
 -----------
 
 ### Internals
-* Added tests to verify role change during sync session bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
+* FLX download estimates are now tracked in a multiprocess-compatible manner ([PR #7780](https://github.com/realm/realm-core/pull/7780)).
+* Create additional role change tests to verify role change during initial schema and subscription bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
 
 ----------------------------------------------
 

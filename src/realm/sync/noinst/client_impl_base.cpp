@@ -1575,14 +1575,14 @@ void Session::integrate_changesets(const SyncProgress& progress, std::uint_fast6
                                        "received empty download message that was not the last in batch",
                                        ProtocolError::bad_progress);
         }
-        history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
+        history.set_sync_progress(progress, downloadable_bytes, version_info); // Throws
         return;
     }
 
     std::vector<ProtocolErrorInfo> pending_compensating_write_errors;
     auto transact = get_db()->start_read();
     history.integrate_server_changesets(
-        progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
+        progress, downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
         [&](const TransactionRef&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
         }); // Throws
@@ -1651,7 +1651,7 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
             m_last_version_selected_for_upload = progress.upload.client_version;
         }
 
-        notify_upload_progress();
+        notify_sync_progress();
         check_for_upload_completion();
     }
 
@@ -1659,8 +1659,8 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
 
     // notify also when final DOWNLOAD received with no changesets
     bool download_progressed = changesets_integrated || (!upload_progressed && resume_upload);
-    if (download_progressed)
-        notify_download_progress();
+    if (download_progressed && !upload_progressed)
+        notify_sync_progress();
 
     check_for_download_completion(); // Throws
 
@@ -2402,7 +2402,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.progress_estimate, message.batch_state, query_version,
+                     message.downloadable.as_estimate(), message.batch_state, query_version,
                      message.changesets.size()); // Throws
     }
     else {
@@ -2413,7 +2413,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.downloadable_bytes, message.changesets.size()); // Throws
+                     message.downloadable.as_bytes(), message.changesets.size()); // Throws
     }
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
@@ -2479,16 +2479,13 @@ Status Session::receive_download_message(const DownloadMessage& message)
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    if (is_flx)
-        update_download_estimate(message.progress_estimate);
-
     if (process_flx_bootstrap_message(progress, message.batch_state, query_version, message.changesets)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
 
-    uint64_t downloadable_bytes = is_flx ? 0 : message.downloadable_bytes;
-    initiate_integrate_changesets(downloadable_bytes, message.batch_state, progress, message.changesets); // Throws
+    initiate_integrate_changesets(message.downloadable.as_bytes(), message.batch_state, progress,
+                                  message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   message.batch_state, message.changesets.size());
