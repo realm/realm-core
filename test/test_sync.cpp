@@ -6204,6 +6204,95 @@ TEST(Sync_DeleteCollectionInCollection)
     }
 }
 
+TEST(Sync_NestedCollectionClear)
+{
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+
+    Timestamp now{std::chrono::system_clock::now()};
+
+    auto tr_1 = db_1->start_write();
+    auto tr_2 = db_2->start_read();
+    auto table_1 = tr_1->add_table_with_primary_key("class_Table", type_Int, "id");
+    auto col = table_1->add_column(type_Mixed, "any");
+    table_1->add_column_list(type_Mixed, "ints");
+    auto col_list = table_1->add_column_list(type_Mixed, "any_list");
+
+    auto foo = table_1->create_object_with_primary_key(123);
+    foo.set_collection(col, CollectionType::List);
+    foo.get_list<Mixed>(col_list).insert_collection(0, CollectionType::List);
+    tr_1->commit_and_continue_as_read();
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        tr_1->promote_to_write();
+        auto list = foo.get_list<Mixed>("any");
+        list.clear();
+        list.add("Hello");
+
+        list = foo.get_list<Mixed>("any_list");
+        auto sub_list = list.get_list(0);
+        sub_list->clear();
+        sub_list->add(1);
+        sub_list->add(2);
+
+        auto list_int = foo.get_list<Mixed>("ints");
+        list_int.clear();
+        list_int.add(1);
+        list_int.add(2);
+        tr_1->commit_and_continue_as_read();
+    }
+
+    {
+        tr_2->promote_to_write();
+        auto table_2 = tr_2->get_table("class_Table");
+
+        auto bar = table_2->get_object_with_primary_key(123);
+        auto list = bar.get_list<Mixed>("any");
+        list.clear();
+        list.add("Godbye");
+
+        list = bar.get_list<Mixed>("any_list");
+        auto sub_list = list.get_list(0);
+        sub_list->clear();
+        sub_list->add(3);
+        sub_list->add(4);
+
+        auto list_int = bar.get_list<Mixed>("ints");
+        list_int.clear();
+        list_int.add(3);
+        list_int.add(4);
+        tr_2->commit_and_continue_as_read();
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    tr_1->advance_read();
+    tr_2->advance_read();
+    auto list = foo.get_list<Mixed>("any");
+    CHECK_EQUAL(list.size(), 1);
+
+    list = foo.get_list<Mixed>("any_list");
+    CHECK_EQUAL(list.get_list(0)->size(), 2);
+
+    auto list_int = foo.get_list<Mixed>("ints");
+    CHECK_EQUAL(list_int.size(), 4); // We should stille have odd behavior for normal lists
+
+    CHECK(compare_groups(*tr_1, *tr_2));
+}
+
 TEST(Sync_Dictionary_Links)
 {
     TEST_CLIENT_DB(db_1);

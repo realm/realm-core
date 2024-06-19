@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* You could get unexpected merge results when assigning to a nested collection ([#7809](https://github.com/realm/realm-core/issues/7809), since v14.0.0)
 
 ### Breaking changes
 * None.
