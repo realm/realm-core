@@ -83,16 +83,19 @@ public:
      *                    │           │                                         │
      *                    │           │                                         ▼
      *   Uncommitted──►Pending──►Bootstrapping──►AwaitingMark──►Complete───►Superseded
-     *                    │                            ▲
-     *                    │                            │
-     *                    └────────────────────────────┘
-     *
+     *                  ▲   │             │          ▲  │
+     *                  │   │             │          │  │
+     *                  │   └────────────────────────┘  │
+     *                  │                 │             │
+     *                  └─────────────────┴─────────────┘
      */
     enum class State {
         // This subscription set has not been persisted and has not been sent to the server. This state is only valid
         // for MutableSubscriptionSets
         Uncommitted = 0,
-        // The subscription set has been persisted locally but has not been acknowledged by the server yet.
+        // The subscription set has been persisted locally but has not been acknowledged by the server yet. A
+        // subscription can potentially be reset to pending from Bootstrapping or AwaitingMark if a server inititiate
+        // bootstrap is started while a subscription bootstrap is in progress.
         Pending,
         // The server is currently sending the initial state that represents this subscription set to the client.
         Bootstrapping,
@@ -123,9 +126,6 @@ public:
             case State::Bootstrapping:
                 o << "Bootstrapping";
                 break;
-            case State::AwaitingMark:
-                o << "AwaitingMark";
-                break;
             case State::Complete:
                 o << "Complete";
                 break;
@@ -134,6 +134,9 @@ public:
                 break;
             case State::Superseded:
                 o << "Superseded";
+                break;
+            case State::AwaitingMark:
+                o << "AwaitingMark";
                 break;
         }
         return o;

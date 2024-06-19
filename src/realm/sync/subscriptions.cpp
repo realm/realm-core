@@ -127,8 +127,9 @@ size_t state_to_order(SubscriptionSet::State needle)
             return 5;
         case State::Superseded:
             return 6;
+        default:
+            REALM_UNREACHABLE();
     }
-    REALM_UNREACHABLE();
 }
 
 template <typename T, typename Predicate>
@@ -818,7 +819,6 @@ void SubscriptionStore::reset(Transaction& wt)
 void SubscriptionStore::update_state(int64_t version, State new_state, std::optional<std::string_view> error_str)
 {
     REALM_ASSERT(error_str.has_value() == (new_state == State::Error));
-    REALM_ASSERT(new_state != State::Pending);
     REALM_ASSERT(new_state != State::Superseded);
 
     auto tr = m_db->start_write();
@@ -854,9 +854,14 @@ void SubscriptionStore::update_state(int64_t version, State new_state, std::opti
             supercede_prior_to(tr, version);
             break;
 
+        case State::Pending:
+            // A subscription can be reset to pending if a server-initiated bootstrap
+            // occurs before the subscription bootstrap completes.
+            REALM_ASSERT((old_state == State::Bootstrapping || old_state == State::AwaitingMark));
+            break;
+
         case State::Uncommitted:
         case State::Superseded:
-        case State::Pending:
             REALM_TERMINATE("Illegal new state for subscription set");
     }
 

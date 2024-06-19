@@ -73,8 +73,8 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
         size_t num_emps = 150;
         size_t num_mgrs = 25;
         size_t num_dirs = 10;
-        std::optional<size_t> num_objects = std::nullopt;
-        std::optional<size_t> max_download_bytes = std::nullopt;
+        std::optional<size_t> num_objects = 10;
+        std::optional<size_t> max_download_bytes = 4096;
         std::optional<size_t> sleep_millis = std::nullopt;
     };
 
@@ -400,10 +400,8 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
 
         // 150 emps, 25 mgrs, 10 dirs
         // 10 objects before flush
-        // 3096 download soft max bytes
+        // 4096 download soft max bytes
         TestParams params{};
-        params.num_objects = 10;
-        params.max_download_bytes = 3096;
         if (!harness) {
             harness = std::make_unique<FLXSyncTestHarness>(
                 "flx_role_change_bootstraps", FLXSyncTestHarness::ServerSchema{g_person_schema, {"role", "name"}});
@@ -529,23 +527,31 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
             // Modify 10 records with new names - pause the sync session so
             // the changes aren't sync'ed prematurely
             auto update_records = [](SharedRealm update_realm, std::string_view role_to_change,
-                                     std::vector<ObjectId>& saved_ids, size_t num_records) {
+                                     std::vector<ObjectId>& saved_ids, size_t num_to_modify, size_t num_to_create) {
                 update_realm->begin_transaction();
                 auto table = update_realm->read_group().get_table("class_Person");
                 auto id_col = table->get_column_key("_id");
                 auto role_col = table->get_column_key("role");
+                auto name_col = table->get_column_key("name");
+                auto empid_col = table->get_column_key("emp_id");
                 auto table_query = Query(table).equal(role_col, role_to_change.data());
                 auto results = Results(update_realm, table_query);
                 REQUIRE(results.size() > 0);
-                for (size_t i = 0; i < num_records; i++) {
+                // Modify the role of some existing objects
+                for (size_t i = 0; i < num_to_modify; i++) {
                     auto obj = results.get(i);
                     saved_ids.push_back(obj.get<ObjectId>(id_col));
                     obj.set(role_col, "worker-bee");
                 }
+                // And create some new objects
+                for (size_t i = 0; i < num_to_create; i++) {
+                    auto obj = table->create_object_with_primary_key(ObjectId::gen());
+                    obj.set(role_col, role_to_change.data());
+                    obj.set(name_col, util::format("%1-%2(new)", role_to_change.data(), i));
+                    obj.set(empid_col, static_cast<int64_t>(i + 2500)); // actual # doesnt matter
+                }
                 update_realm->commit_transaction();
             };
-            // Update the rules so employees are not allowed and removed from view
-            // This will also remove the existing changes to the 10 employee records
             auto do_update_rules = [&](nlohmann::json new_rules) {
                 update_role(test_rules, new_rules);
                 logger->debug("ROLE CHANGE: Updating rule definitions: %1", test_rules);
@@ -573,31 +579,41 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                     }
                 }
             };
-            update_records(test_realm, "employee", emp_ids, 10); // Update 10 employees to worker-bee
-            update_records(test_realm, "manager", mgr_ids, 5);   // Update 5 managers to worker-bee
+            // Update the rules so employees are not allowed and removed from view
+            // This will also remove the existing changes to the 10 employee records
+            // and the 5 new employee records.
+            size_t num_to_create = 5;
+            // Update 10 employees to worker-bee and create 5 new employees
+            update_records(test_realm, "employee", emp_ids, 10, num_to_create);
+            // Update 5 managers to worker-bee and create 5 new managers
+            update_records(test_realm, "manager", mgr_ids, 5, num_to_create);
             // Update the allowed roles to "manager" and "worker-bee"
             do_update_rules({{"role", {{"$in", {"manager", "worker-bee"}}}}});
-            // Resume the session and verify none of the records are present
+            // Resume the session and verify none of the new/modified employee
+            // records are present
             test_realm->sync_session()->resume();
             // Verify none of the employee object IDs are present in the local data
-            do_verify(test_realm, params.num_mgrs, emp_ids, std::nullopt);
+            do_verify(test_realm, params.num_mgrs + num_to_create, emp_ids, std::nullopt);
             // Verify all of the manager object IDs are present in the local data
-            do_verify(test_realm, params.num_mgrs, mgr_ids, "worker-bee");
+            do_verify(test_realm, params.num_mgrs + num_to_create, mgr_ids, "worker-bee");
 
             // Update the allowed roles to "employee"
             do_update_rules({{"role", "employee"}});
             // Verify the items with the object IDs are still listed as employees
             do_verify(test_realm, params.num_emps, emp_ids, "employee");
 
+            // Tear down the app since some of the records were added and modified
             harness->app()->sync_manager()->wait_for_sessions_to_terminate();
             harness.reset();
         }
     }
     SECTION("Role changes during bootstrap complete successfully") {
         static std::unique_ptr<FLXSyncTestHarness> harness;
-        // Create a bunch of data and set params to slow it down a bit
-        // 5000 emps, 1000 mgrs, 200 dirs
-        TestParams params{5000, 1000, 200, 100, 250};
+        // 150 emps, 25 mgrs, 10 dirs
+        // 10 objects before flush
+        // 1536 download soft max bytes
+        TestParams params{};
+        params.max_download_bytes = 1536;
 
         if (!harness) {
             harness = std::make_unique<FLXSyncTestHarness>(
@@ -611,9 +627,15 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
         auto& app_session = harness->session().app_session();
         auto default_rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
 
+        // Make sure the rules are reset back to the original value (all records allowed)
+        update_role(default_rule, true);
+        logger->debug("ROLE CHANGE: Initial rule definitions: %1", default_rule);
+        REQUIRE(app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule));
+
         enum BootstrapTestState {
             not_ready,
             start,
+            ident_sent,
             reconnect_received,
             downloading,
             downloaded,
@@ -623,9 +645,10 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
         };
 
         BootstrapTestState update_role_state = BootstrapTestState::not_ready;
-        size_t bootstrap_count = 0;
-        size_t bootstrap_msg_count = 0;
-        size_t integration_count = 0;
+        int update_msg_count = -1;
+        int bootstrap_count = 0;
+        int bootstrap_msg_count = 0;
+        bool session_restarted = false;
         std::optional<util::Future<void>> role_change_future;
         TestingStateMachine<BootstrapTestState> bootstrap_state(BootstrapTestState::not_ready);
 
@@ -643,12 +666,29 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                             bootstrap_count++;
                         }
 
-                        // Is the test done?
+                        // Has the test started?
                         if (cur_state == BootstrapTestState::not_ready)
                             return std::nullopt;
 
                         std::optional<BootstrapTestState> new_state = std::nullopt;
+                        logger->trace("ROLE CHANGE: on_sync_client_event_hook: event: %1 - batch_state: %2",
+                                      static_cast<int>(data.event), data.batch_state);
+
                         switch (data.event) {
+                            case Event::IdentMessageSent:
+                                new_state = BootstrapTestState::ident_sent;
+                                break;
+
+                            case Event::ErrorMessageReceived:
+                                REQUIRE(data.error_info);
+                                if (data.error_info->raw_error_code == 200) {
+                                    REQUIRE(data.error_info->server_requests_action ==
+                                            sync::ProtocolErrorInfo::Action::Transient);
+                                    REQUIRE_FALSE(data.error_info->is_fatal);
+                                    session_restarted = true;
+                                }
+                                break;
+
                             // A bootstrap message was processed
                             case Event::BootstrapMessageProcessed:
                                 bootstrap_msg_count++;
@@ -667,7 +707,6 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                                 REQUIRE((cur_state == BootstrapTestState::downloaded ||
                                          cur_state == BootstrapTestState::integrating));
                                 new_state = BootstrapTestState::integrating;
-                                integration_count++;
                                 break;
 
                             // The bootstrap has been received and processed
@@ -681,14 +720,15 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                         }
                         // If the state is changing and a role change is requested for that state, then
                         // update the role now.
+                        logger->trace("ROLE CHANGE: on_sync_client_event_hook: new_state: %1 - update_role_state: %2",
+                                      new_state ? static_cast<int>(*new_state) : -1, update_role_state);
                         if (new_state && new_state == update_role_state &&
                             update_role_state != BootstrapTestState::not_ready &&
-                            update_role_state != BootstrapTestState::complete) {
+                            bootstrap_msg_count >= update_msg_count) {
                             logger->debug("ROLE CHANGE: Updating rule definitions: %1", default_rule);
                             REQUIRE(
                                 app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule));
-                            update_role_state = BootstrapTestState::complete; // Bootstrap tracking is complete
-                            bootstrap_count = 0; // Reset to 0 to track the number of bootstraps after the role change
+                            update_role_state = BootstrapTestState::not_ready; // Bootstrap tracking is complete
                         }
                         return new_state;
                     });
@@ -703,34 +743,31 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
             };
         };
 
-        auto set_role_change_state = [&](BootstrapTestState change_state) {
+        auto set_role_change_state = [&](BootstrapTestState change_state, int msg_count = -1) {
             bootstrap_state.transition_with([&](BootstrapTestState) {
                 bootstrap_count = 0;
                 bootstrap_msg_count = 0;
-                integration_count = 0;
                 update_role_state = change_state;
+                update_msg_count = msg_count;
                 return BootstrapTestState::start;
             });
         };
-
-        // Make sure the rules are reset back to the original value (all records allowed)
-        update_role(default_rule, true);
-        logger->debug("ROLE CHANGE: Initial rule definitions: %1", default_rule);
-        REQUIRE(app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule));
 
         // Create the shared realm and configure a subscription for the manager and director records
         auto config = harness->make_test_file();
         setup_config_callbacks(config);
 
         SECTION("Role change during initial schema bootstrap") {
-            set_role_change_state(BootstrapTestState::downloading);
+            set_role_change_state(BootstrapTestState::ident_sent); // Only one download message
             auto realm_1 = Realm::get_shared_realm(config);
             REQUIRE(!wait_for_download(*realm_1));
             REQUIRE(!wait_for_upload(*realm_1));
             bootstrap_state.transition_with([&](BootstrapTestState) {
-                // Only the initial schema bootstrap should take place
+                // Only the initial schema bootstrap with 1 download message should take place
+                // without restarting the session
                 REQUIRE(bootstrap_count == 1);
                 REQUIRE(bootstrap_msg_count == 1);
+                REQUIRE_FALSE(session_restarted);
                 return std::nullopt;
             });
         }
@@ -756,21 +793,40 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
                 REQUIRE(results.size() == params.num_mgrs + params.num_dirs);
             }
 
-            // Update the rule to allow access for only the employee records
-            // Will be applied during the bootstrap
+            // The test will update the rule to change access from all records to only the employee
+            // records while a new subscription for all Person entries is being bootstrapped.
             update_role(default_rule, {{"role", "employee"}});
             realm_1->sync_session()->pause();
             {
+                // Set up a new bootstrap while offline
                 auto table = realm_1->read_group().get_table("class_Person");
                 auto new_subs = realm_1->get_latest_subscription_set().make_mutable_copy();
+                new_subs.clear();
                 new_subs.insert_or_assign(Query(table));
                 auto subs = new_subs.commit();
-
                 SECTION("During bootstrap download") {
-                    set_role_change_state(BootstrapTestState::downloading);
+                    logger->debug("ROLE CHANGE: Role change bootstrap during query bootstrap download");
+                    // Wait for the downloading state and 3 messages have been downloaded
+                    set_role_change_state(BootstrapTestState::downloading, 3);
+                }
+                SECTION("After bootstrap downloaded") {
+                    logger->debug("ROLE CHANGE: Role change bootstrap after query bootstrap download");
+                    // Wait for the downloaded state
+                    set_role_change_state(BootstrapTestState::downloaded);
+                }
+                SECTION("During bootstrap integration") {
+                    logger->debug("ROLE CHANGE: Role change bootstrap during query bootstrap integration");
+                    // Wait for bootstrap messages to be integrated
+                    set_role_change_state(BootstrapTestState::integrating);
+                }
+                SECTION("After bootstrap integration") {
+                    logger->debug("ROLE CHANGE: Role change bootstrap after query bootstrap integration");
+                    // Wait for the end of the bootstrap integration
+                    set_role_change_state(BootstrapTestState::integration_complete);
                 }
 
-                // Wait for subscription bootstrap to and sync to complete
+                // Resume the session an wait for subscription bootstrap to and sync to complete
+                realm_1->sync_session()->resume();
                 subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
                 REQUIRE(!wait_for_download(*realm_1));
                 REQUIRE(!wait_for_upload(*realm_1));
@@ -778,9 +834,17 @@ TEST_CASE("flx: role change", "[sync][flx][baas][role change][bootstrap]") {
 
                 // Verify the data was downloaded
                 table = realm_1->read_group().get_table("class_Person");
-                table = realm_1->read_group().get_table("class_Person");
                 Results results(realm_1, Query(table));
-                REQUIRE(results.size() == params.num_mgrs + params.num_dirs);
+                REQUIRE(results.size() == params.num_emps);
+
+                bootstrap_state.transition_with([&](BootstrapTestState) {
+                    // Two bootstraps occurred (role change and subscription)
+                    // and the session was restarted with 200 error.
+                    REQUIRE(bootstrap_count == 2);
+                    REQUIRE(bootstrap_msg_count > 1);
+                    REQUIRE(session_restarted);
+                    return std::nullopt;
+                });
             }
         }
     }

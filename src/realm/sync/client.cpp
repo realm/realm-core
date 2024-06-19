@@ -1236,9 +1236,23 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
         return;
     }
     REALM_ASSERT(!m_finalized);
-    REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
     REALM_ASSERT(batch_state != DownloadBatchState::SteadyState);
+
+    // Is this a server initiated bootstrap?
+    if (new_version == m_flx_active_version) {
+        // Was a query bootstrap in progress? If so, reset the state for the bootstrapping
+        // subscription back to Pending and last seen version to the active version
+        if (m_flx_last_seen_version > m_flx_active_version) {
+            // Reset the current bootstrapping subscription back to Pending
+            get_flx_subscription_store()->update_state(m_flx_last_seen_version, SubscriptionSet::State::Pending);
+            // Reset the last_seen_version to the server initated bootstrap (current active version)
+            m_flx_last_seen_version = new_version;
+        }
+        return;
+    }
+
+    REALM_ASSERT(new_version >= m_flx_last_seen_version);
 
     SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
@@ -1247,7 +1261,6 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             // Cannot be called with this value.
             REALM_UNREACHABLE();
         case DownloadBatchState::LastInBatch:
-            // Server initiated bootstraps don't go through the subscription store
             if (m_flx_active_version == new_version) {
                 return;
             }
@@ -1261,9 +1274,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             }
             break;
         case DownloadBatchState::MoreToCome:
-            // Skip if this bootstrap version has already been seen or is a server
-            // initiated bootstrap.
-            if (m_flx_last_seen_version == new_version || m_flx_active_version == new_version) {
+            if (m_flx_last_seen_version == new_version) {
                 return;
             }
 
