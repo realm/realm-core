@@ -40,7 +40,6 @@ public:
     static int64_t get(const IntegerCompressor&, size_t);
     static std::vector<int64_t> get_all(const IntegerCompressor&, size_t, size_t);
     static void get_chunk(const IntegerCompressor&, size_t, int64_t[8]);
-    static void set_direct(const IntegerCompressor&, size_t, int64_t);
 
     template <typename Cond>
     static bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*);
@@ -140,17 +139,6 @@ inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, in
     for (; index < 8; ++index) {
         res[index++] = get(c, i++);
     }
-}
-
-inline void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value)
-{
-    const auto offset = c.v_width() * c.v_size();
-    const auto ndx_w = c.ndx_width();
-    const auto v_w = c.v_width();
-    const auto data = c.data();
-    BfIterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
-    BfIterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
-    data_iterator.set_value(value);
 }
 
 template <typename T>
