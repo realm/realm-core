@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* FLX download estimates are now tracked in a multiprocess-compatible manner ([PR #7780](https://github.com/realm/realm-core/pull/7780)).
 
 ----------------------------------------------
 

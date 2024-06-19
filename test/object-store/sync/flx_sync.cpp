@@ -1264,27 +1264,21 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     SECTION("Adding a local property matching a server addition is allowed") {
         auto mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
         config_local.sync_config->client_resync_mode = mode;
-        seed_realm(config_local, ResetMode::InitiateClientReset);
+        CHECK_NOTHROW(seed_realm(config_local, ResetMode::InitiateClientReset));
         std::vector<ObjectSchema> changed_schema = schema;
         changed_schema[0].persisted_properties.push_back(
             {"queryable_oid_field", PropertyType::ObjectId | PropertyType::Nullable});
         // In a separate Realm, make the property addition.
         // Since this is dev mode, it will be added to the server's schema.
         config_remote.schema = changed_schema;
-        seed_realm(config_remote, ResetMode::NoReset);
+        CHECK_NOTHROW(seed_realm(config_remote, ResetMode::NoReset));
         std::swap(changed_schema[0].persisted_properties[1], changed_schema[0].persisted_properties[2]);
         config_local.schema = changed_schema;
         auto future = setup_reset_handlers_for_schema_validation(config_local, changed_schema);
-
-        async_open_realm(config_local,
-                         [&, fut = std::move(future)](ThreadSafeReference&& ref, std::exception_ptr error) {
-                             REQUIRE(ref);
-                             REQUIRE_FALSE(error);
-                             auto realm = Realm::get_shared_realm(std::move(ref));
-                             fut.get();
-                             CHECK(before_reset_count == 1);
-                             CHECK(after_reset_count == 1);
-                         });
+        successfully_async_open_realm(config_local);
+        CHECK_NOTHROW(future.get());
+        CHECK(before_reset_count == 1);
+        CHECK(after_reset_count == 1);
     }
 
     SECTION("Adding a local property matching a server addition inside the before reset callback is allowed") {
@@ -1316,15 +1310,10 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             notify_after(before, std::move(after), did_recover);
         };
 
-        async_open_realm(config_local,
-                         [&, fut = std::move(future)](ThreadSafeReference&& ref, std::exception_ptr error) {
-                             REQUIRE(ref);
-                             REQUIRE_FALSE(error);
-                             auto realm = Realm::get_shared_realm(std::move(ref));
-                             fut.get();
-                             CHECK(before_reset_count == 1);
-                             CHECK(after_reset_count == 1);
-                         });
+        successfully_async_open_realm(config_local);
+        future.get();
+        CHECK(before_reset_count == 1);
+        CHECK(after_reset_count == 1);
     }
 
     auto make_additive_changes = [](std::vector<ObjectSchema> schema) {
@@ -1347,16 +1336,12 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         ThreadSafeReference ref_async;
         auto future = setup_reset_handlers_for_schema_validation(config_local, changed_schema);
-        async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(ref);
-            REQUIRE_FALSE(error);
-            ref_async = std::move(ref);
-        });
-        future.get();
-        CHECK(before_reset_count == 1);
-        CHECK(after_reset_count == 1);
         {
-            auto realm = Realm::get_shared_realm(std::move(ref_async));
+            auto realm = successfully_async_open_realm(config_local);
+            future.get();
+            CHECK(before_reset_count == 1);
+            CHECK(after_reset_count == 1);
+
             // make changes to the newly added property
             realm->begin_transaction();
             auto table = realm->read_group().get_table("class_TopLevel");
@@ -1417,12 +1402,11 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
-        async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(!ref);
-            REQUIRE(error);
-            REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                                      "'Client reset cannot recover when classes have been removed: {AddedClass}'");
-        });
+        auto status = async_open_realm(config_local);
+        REQUIRE_FALSE(status.is_ok());
+        REQUIRE_THAT(status.get_status().reason(),
+                     Catch::Matchers::ContainsSubstring(
+                         "'Client reset cannot recover when classes have been removed: {AddedClass}'"));
         error_future.get();
         CHECK(before_reset_count == 1);
         CHECK(after_reset_count == 0);
@@ -1436,15 +1420,14 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
-        async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(!ref);
-            REQUIRE(error);
-            REQUIRE_THROWS_CONTAINING(
-                std::rethrow_exception(error),
+        auto status = async_open_realm(config_local);
+        REQUIRE_FALSE(status.is_ok());
+        REQUIRE_THAT(
+            status.get_status().reason(),
+            Catch::Matchers::ContainsSubstring(
                 "'The following changes cannot be made in additive-only schema mode:\n"
                 "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.\nIf your app is running in "
-                "development mode, you can delete the realm and restart the app to update your schema.'");
-        });
+                "development mode, you can delete the realm and restart the app to update your schema.'"));
         error_future.get();
         CHECK(before_reset_count == 0); // we didn't even get this far because opening the frozen realm fails
         CHECK(after_reset_count == 0);
@@ -1467,21 +1450,16 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         (void)setup_reset_handlers_for_schema_validation(config_local, changed_schema);
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
-        async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(ref);
-            REQUIRE_FALSE(error);
-            auto realm = Realm::get_shared_realm(std::move(ref));
-            // make changes to the new property
-            realm->begin_transaction();
-            auto table = realm->read_group().get_table("class_TopLevel");
-            ColKey new_col = table->get_column_key("added_oid_field");
-            REQUIRE(new_col);
-            for (auto it = table->begin(); it != table->end(); ++it) {
-                it->set(new_col, ObjectId::gen());
-            }
-            realm->commit_transaction();
-        });
-        auto realm = Realm::get_shared_realm(config_local);
+        auto realm = successfully_async_open_realm(config_local);
+        // make changes to the new property
+        realm->begin_transaction();
+        auto table = realm->read_group().get_table("class_TopLevel");
+        ColKey new_col = table->get_column_key("added_oid_field");
+        REQUIRE(new_col);
+        for (auto it = table->begin(); it != table->end(); ++it) {
+            it->set(new_col, ObjectId::gen());
+        }
+        realm->commit_transaction();
         auto err = error_future.get();
         std::string property_err = "Invalid schema change (UPLOAD): non-breaking schema change: adding "
                                    "\"ObjectID\" column at field \"added_oid_field\" in schema \"TopLevel\", "

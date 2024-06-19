@@ -6882,7 +6882,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
     bool is_compressed = false;
@@ -6925,7 +6925,7 @@ TEST(Sync_InvalidChangesetFromServer)
 
     VersionInfo version_info;
     auto transact = db->start_read();
-    CHECK_THROW_EX(history.integrate_server_changesets({}, nullptr, util::Span(&server_changeset, 1), version_info,
+    CHECK_THROW_EX(history.integrate_server_changesets({}, 0, util::Span(&server_changeset, 1), version_info,
                                                        DownloadBatchState::SteadyState, *test_context.logger,
                                                        transact),
                    sync::IntegrationException,
@@ -6973,7 +6973,7 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
     version_type current_version;
@@ -7060,7 +7060,7 @@ TEST(Sync_NonIncreasingServerVersions)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 }
 
