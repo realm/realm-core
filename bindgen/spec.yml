@@ -808,6 +808,7 @@ classes:
         - sig: '(column: ColKey, value: Mixed, is_default: bool)'
           suffix: with_default
       set_collection: '(column: ColKey, type: CollectionType) -> Obj'
+      add_int: '(column: ColKey, value: int64_t) -> Obj'
       get_linked_object: '(column: ColKey) const -> Nullable<Obj>'
       to_string: () const -> std::string
       get_backlink_count: '() const -> count_t'

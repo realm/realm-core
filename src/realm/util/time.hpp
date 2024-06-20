@@ -69,7 +69,7 @@ inline std::string format_utc_time(std::time_t time, const char* format)
 
 } // namespace realm::util
 
-#if __cplusplus < 202002L
+#if __cplusplus < 202002L || (defined(__apple_build_version__) && __apple_build_version__ < 15000309)
 // This is a C++17 version of https://en.cppreference.com/w/cpp/chrono/duration/operator_ltlt to make
 // logging and comparing durations easier - especially in tests.
 //
