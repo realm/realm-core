@@ -854,11 +854,6 @@ void SubscriptionStore::update_state(int64_t version, State new_state, std::opti
             supercede_prior_to(tr, version);
             break;
 
-            // A subscription can be reset to pending if a server-initiated bootstrap
-            // occurs before the subscription bootstrap completes.
-            REALM_ASSERT((old_state == State::Bootstrapping || old_state == State::AwaitingMark));
-            break;
-
         case State::Uncommitted:
         case State::Superseded:
         case State::Pending:
