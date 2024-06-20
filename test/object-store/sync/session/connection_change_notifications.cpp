@@ -83,7 +83,7 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
         REQUIRE(sessions_are_disconnected(*session));
         // ensure callback 1 was not called anymore
         REQUIRE(listener1_call_cnt == listener1_called);
-        REQUIRE(listener2_called == true);
+        REQUIRE(listener2_called);
     }
 
     SECTION("unregister connection change listener during callback") {
@@ -112,6 +112,6 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
         user->log_out();
         REQUIRE(sessions_are_disconnected(*session));
         REQUIRE(listener1_call_cnt == 1); // Only called once before unregister
-        REQUIRE(listener2_called == true);
+        REQUIRE(listener2_called);
     }
 }
