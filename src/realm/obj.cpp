@@ -700,9 +700,7 @@ Mixed Obj::get_additional_prop(StringData prop_name) const
             return *val;
         }
     }
-    else {
-        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
-    }
+    throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
     return {};
 }
 
