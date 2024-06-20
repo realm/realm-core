@@ -788,11 +788,8 @@ inline void Cluster::do_erase_mixed(size_t ndx, ColKey col_key, ObjKey key, Casc
     Mixed value = values.get(ndx);
     if (value.is_type(type_TypedLink)) {
         ObjLink link = value.get<ObjLink>();
-        auto target_obj = origin_table->get_parent_group()->get_object(link);
-
-        ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-        REALM_ASSERT(backlink_col_key);
-        target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
+        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+        obj.remove_backlink(col_key, link, state);
     }
     if (value.is_type(type_List)) {
         Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
@@ -1541,7 +1538,7 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
             bool last_removed = target_obj.remove_one_backlink(backlink_col_key, origin_key); // Throws
             if (is_unres) {
                 if (last_removed) {
-                    // Check is there are more backlinks
+                    // Check if there are more backlinks
                     if (!target_obj.has_backlinks(false)) {
                         // Tombstones can be erased right away - there is no cascading effect
                         target_table->m_tombstones->erase(link.get_obj_key(), state);

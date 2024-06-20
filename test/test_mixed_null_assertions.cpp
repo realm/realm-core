@@ -549,3 +549,24 @@ TEST(Mixed_EmbeddedLstMixedRecursiveDelete)
     CHECK_EQUAL(top3_obj4.get_backlink_count(), 0);
 }
 
+TEST(Mixed_SingleLinkRecursiveDelete)
+{
+    Group g;
+    auto top1 = g.add_table_with_primary_key("source", type_String, "_id");
+    auto top2 = g.add_table_with_primary_key("top2", type_String, "_id");
+
+    ColKey top1_mixed_col = top1->add_column(type_Mixed, "mixed");
+    auto top1_obj1 = top1->create_object_with_primary_key("top1_obj1");
+    auto top2_obj1 = top2->create_object_with_primary_key("top2_obj1");
+
+    top1_obj1.set<Mixed>(top1_mixed_col, ObjLink{top2->get_key(), top2_obj1.get_key()});
+
+    CHECK_EQUAL(top2_obj1.get_backlink_count(), 1);
+
+    top1->remove_object_recursive(top1_obj1.get_key());
+
+    CHECK_NOT(top1_obj1.is_valid());
+    CHECK_EQUAL(top1->size(), 0);
+    CHECK_NOT(top2_obj1.is_valid());
+    CHECK_EQUAL(top2->size(), 0);
+}
