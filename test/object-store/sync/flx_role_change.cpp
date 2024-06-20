@@ -85,10 +85,6 @@ std::unique_ptr<FLXSyncTestHarness> setup_harness(std::string app_name, TestPara
         app_name, FLXSyncTestHarness::ServerSchema{g_person_schema, {"role", "name"}});
 
     auto& app_session = harness->session().app_session();
-    /** TODO: Remove once the server has been updated to use the protocol version */
-    // Enable the role change bootstraps
-    REQUIRE(app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
-    REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
 
     if (params.num_objects) {
         REQUIRE(app_session.admin_api.patch_app_settings(
