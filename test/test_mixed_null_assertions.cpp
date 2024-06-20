@@ -466,3 +466,86 @@ TEST(Mixed_LinkSelfAssignment)
     CHECK_EQUAL(source_obj.get<Mixed>(mixed_col), Mixed());
     source_obj.remove();
 }
+
+TEST(Mixed_EmbeddedLstMixedRecursiveDelete)
+{
+    Group g;
+    auto top1 = g.add_table_with_primary_key("source", type_String, "_id");
+    auto embedded = g.add_table("embedded", Table::Type::Embedded);
+    auto top2 = g.add_table_with_primary_key("top2", type_String, "_id");
+    auto top3 = g.add_table_with_primary_key("top3", type_String, "_id");
+
+    ColKey top1_lst_col = top1->add_column_list(*embedded, "groups");
+    ColKey embedded_lst_col = embedded->add_column_list(type_Mixed, "items");
+    auto source_obj1 = top1->create_object_with_primary_key("top1_obj1");
+
+    auto top2_obj1 = top2->create_object_with_primary_key("top2_obj1");
+    auto top2_obj2 = top2->create_object_with_primary_key("top2_obj2");
+    auto top2_obj3 = top2->create_object_with_primary_key("top2_obj3");
+    auto top2_obj4 = top2->create_object_with_primary_key("top2_obj4");
+
+    auto top3_obj1 = top3->create_object_with_primary_key("top3_obj1");
+    auto top3_obj2 = top3->create_object_with_primary_key("top3_obj2");
+    auto top3_obj3 = top3->create_object_with_primary_key("top3_obj3");
+    auto top3_obj4 = top3->create_object_with_primary_key("top3_obj4");
+
+    {
+        LnkLst top1_lst = source_obj1.get_linklist(top1_lst_col);
+        auto embedded1 = top1_lst.create_and_insert_linked_object(0);
+        auto embedded2 = top1_lst.create_and_insert_linked_object(0);
+        auto embedded3 = top1_lst.create_and_insert_linked_object(0);
+
+        auto e1_lst = embedded1.get_list<Mixed>(embedded_lst_col);
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj1.get_key()));
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj2.get_key()));
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj3.get_key()));
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj4.get_key()));
+
+        auto e2_lst = embedded2.get_list<Mixed>(embedded_lst_col);
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj1.get_key()));
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj2.get_key()));
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj3.get_key()));
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj4.get_key()));
+
+        auto e3_lst = embedded3.get_list<Mixed>(embedded_lst_col);
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj1.get_key()));
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj2.get_key()));
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj3.get_key()));
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj4.get_key()));
+    }
+    std::vector<ObjKey> keys_to_delete = {source_obj1.get_key()};
+
+    CHECK_EQUAL(top2_obj1.get_backlink_count(), 2);
+    CHECK_EQUAL(top2_obj2.get_backlink_count(), 2);
+    CHECK_EQUAL(top2_obj3.get_backlink_count(), 2);
+    CHECK_EQUAL(top2_obj4.get_backlink_count(), 2);
+
+    CHECK_EQUAL(top3_obj1.get_backlink_count(), 1);
+    CHECK_EQUAL(top3_obj2.get_backlink_count(), 1);
+    CHECK_EQUAL(top3_obj3.get_backlink_count(), 1);
+    CHECK_EQUAL(top3_obj4.get_backlink_count(), 1);
+
+    top2_obj3.invalidate();
+
+    _impl::TableFriend::batch_erase_objects(*top1, keys_to_delete);
+
+    CHECK(top2_obj1.is_valid());
+    CHECK(top2_obj2.is_valid());
+    CHECK_NOT(top2_obj3.is_valid());
+    CHECK(top2_obj4.is_valid());
+
+    CHECK_EQUAL(top2_obj1.get_backlink_count(), 0);
+    CHECK_EQUAL(top2_obj2.get_backlink_count(), 0);
+    CHECK_EQUAL(top2_obj4.get_backlink_count(), 0);
+
+    CHECK(top3_obj1.is_valid());
+    CHECK(top3_obj2.is_valid());
+    CHECK(top3_obj3.is_valid());
+    CHECK(top3_obj4.is_valid());
+
+    CHECK_EQUAL(top3_obj1.get_backlink_count(), 0);
+    CHECK_EQUAL(top3_obj2.get_backlink_count(), 0);
+    CHECK_EQUAL(top3_obj3.get_backlink_count(), 0);
+    CHECK_EQUAL(top3_obj4.get_backlink_count(), 0);
+}
+
