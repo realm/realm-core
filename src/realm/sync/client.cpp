@@ -1207,24 +1207,14 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     if (!has_flx_subscription_store()) {
         return;
     }
-    REALM_ASSERT(!m_finalized);
-    REALM_ASSERT(new_version >= m_flx_active_version);
-    REALM_ASSERT(batch_state != DownloadBatchState::SteadyState);
-
-    // Is this a server initiated bootstrap?
+    // Is this a server-initiated bootstrap? Skip notifying the subscription store
     if (new_version == m_flx_active_version) {
-        // Was a query bootstrap in progress? If so, reset the state for the bootstrapping
-        // subscription back to Pending and last seen version to the active version
-        if (m_flx_last_seen_version > m_flx_active_version) {
-            // Reset the current bootstrapping subscription back to Pending
-            get_flx_subscription_store()->update_state(m_flx_last_seen_version, SubscriptionSet::State::Pending);
-            // Reset the last_seen_version to the server initated bootstrap (current active version)
-            m_flx_last_seen_version = new_version;
-        }
         return;
     }
-
+    REALM_ASSERT(!m_finalized);
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
+    REALM_ASSERT(new_version >= m_flx_active_version);
+    REALM_ASSERT(batch_state != DownloadBatchState::SteadyState);
 
     SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
@@ -1642,7 +1632,6 @@ void SessionWrapper::on_download_completion()
         m_sync_completion_handlers.pop_back();
     }
 
-    // If there is a query bootstrap in progress, then complete it now
     if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
         m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
                              m_flx_pending_mark_version);

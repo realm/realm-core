@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2021 Realm Inc.
+// Copyright 2024 MongoDB Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -623,7 +623,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
     }
 }
 
-TEST_CASE("Role changes during bootstrap complete successfully", "[sync][flx][baas][role change][bootstrap]") {
+TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][flx][baas][role change][bootstrap]") {
     auto logger = util::Logger::get_default_logger();
     static std::unique_ptr<FLXSyncTestHarness> harness;
 
@@ -780,7 +780,10 @@ TEST_CASE("Role changes during bootstrap complete successfully", "[sync][flx][ba
     }
     SECTION("Role change during subscription bootstrap") {
         auto realm_1 = Realm::get_shared_realm(config);
-        {
+        /// TODO: update to:
+        ///       bool initial_subscription = GENERATE(false, true);
+        bool initial_subscription = true;
+        if (initial_subscription) {
             auto table = realm_1->read_group().get_table("class_Person");
             auto role_col = table->get_column_key("role");
             auto sub_query = Query(table).equal(role_col, "manager").Or().equal(role_col, "director");
@@ -812,22 +815,26 @@ TEST_CASE("Role changes during bootstrap complete successfully", "[sync][flx][ba
             new_subs.insert_or_assign(Query(table));
             auto subs = new_subs.commit();
             SECTION("During bootstrap download") {
-                logger->debug("ROLE CHANGE: Role change bootstrap during query bootstrap download");
+                logger->debug("ROLE CHANGE: Role change during %1 query bootstrap download",
+                              initial_subscription ? "second" : "first");
                 // Wait for the downloading state and 3 messages have been downloaded
                 set_role_change_state(BootstrapTestState::downloading, 3);
             }
             SECTION("After bootstrap downloaded") {
-                logger->debug("ROLE CHANGE: Role change bootstrap after query bootstrap download");
+                logger->debug("ROLE CHANGE: Role change after %1 query bootstrap download",
+                              initial_subscription ? "second" : "first");
                 // Wait for the downloaded state
                 set_role_change_state(BootstrapTestState::downloaded);
             }
             SECTION("During bootstrap integration") {
-                logger->debug("ROLE CHANGE: Role change bootstrap during query bootstrap integration");
+                logger->debug("ROLE CHANGE: Role change during %1 query bootstrap integration",
+                              initial_subscription ? "second" : "first");
                 // Wait for bootstrap messages to be integrated
                 set_role_change_state(BootstrapTestState::integrating);
             }
             SECTION("After bootstrap integration") {
-                logger->debug("ROLE CHANGE: Role change bootstrap after query bootstrap integration");
+                logger->debug("ROLE CHANGE: Role change after %1 query bootstrap integration",
+                              initial_subscription ? "second" : "first");
                 // Wait for the end of the bootstrap integration
                 set_role_change_state(BootstrapTestState::integration_complete);
             }
