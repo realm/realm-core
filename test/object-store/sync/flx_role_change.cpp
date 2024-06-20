@@ -842,19 +842,19 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
             REQUIRE(!wait_for_upload(*realm_1));
             wait_for_advance(*realm_1);
 
+            bootstrap_state.transition_with([&](BootstrapTestState) {
+                // Two bootstraps occurred (role change and subscription)
+                // and the session was restarted with 200 error.
+                REQUIRE(session_restarted);
+                REQUIRE(bootstrap_count == 2);
+                REQUIRE(bootstrap_msg_count > 1);
+                return std::nullopt;
+            });
+
             // Verify the data was downloaded/updated (only the employee records)
             table = realm_1->read_group().get_table("class_Person");
             Results results(realm_1, Query(table));
             REQUIRE(results.size() == params.num_emps);
-
-            bootstrap_state.transition_with([&](BootstrapTestState) {
-                // Two bootstraps occurred (role change and subscription)
-                // and the session was restarted with 200 error.
-                REQUIRE(bootstrap_count == 2);
-                REQUIRE(bootstrap_msg_count > 1);
-                REQUIRE(session_restarted);
-                return std::nullopt;
-            });
         }
     }
     SECTION("teardown") {
