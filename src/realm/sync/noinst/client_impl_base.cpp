@@ -1524,6 +1524,8 @@ void Session::cancel_resumption_delay()
 
     logger.debug("Resumed"); // Throws
 
+    process_pending_flx_bootstrap();
+
     if (unbind_process_complete())
         initiate_rebind(); // Throws
 

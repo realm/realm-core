@@ -869,8 +869,6 @@ void SessionImpl::process_pending_flx_bootstrap()
     if (!m_is_flx_sync_session || m_state != State::Active) {
         return;
     }
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == SessionImpl::Active, m_state);
     auto bootstrap_store = m_wrapper.get_flx_pending_bootstrap_store();
     if (!bootstrap_store->has_pending()) {
         return;

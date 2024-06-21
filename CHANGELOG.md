@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix pending bootstrap store was not applying a pending bootstrap or clearing a partial bootstrap when the session is restarted. ([#7827](https://github.com/realm/realm-core/issues/7827), since 14.8.0)
 
 ### Breaking changes
 * None.
