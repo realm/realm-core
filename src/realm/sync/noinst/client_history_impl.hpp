@@ -252,10 +252,11 @@ public:
         const SyncProgress& progress, DownloadableProgress downloadable_bytes,
         util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
         util::Logger&, const TransactionRef& transact,
-        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr);
+        util::UniqueFunction<void(const Transaction&, util::Span<Changeset>)> run_in_write_tr = nullptr);
 
-    static void get_upload_download_state(DB&, std::uint_fast64_t&, DownloadableProgress&, std::uint_fast64_t&,
-                                          std::uint_fast64_t&, std::uint_fast64_t&, version_type&);
+    static void get_upload_download_state(Transaction&, Allocator& alloc, std::uint_fast64_t&, DownloadableProgress&,
+                                          std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
+                                          version_type&);
     static void get_upload_download_state(DB*, std::uint_fast64_t&, std::uint_fast64_t&);
 
     /// Record the current download progress.

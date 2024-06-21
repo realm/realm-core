@@ -2793,6 +2793,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
     };
 
+    auto peek_pending_state = [](const DBRef& db) {
+        auto logger = util::Logger::get_default_logger();
+        sync::PendingBootstrapStore bootstrap_store(db, *logger, nullptr);
+        REQUIRE(bootstrap_store.has_pending());
+        return bootstrap_store.peek_pending(*db->start_read(), 1024 * 1024 * 16);
+    };
+
     auto mutate_realm = [&] {
         harness.load_initial_data([&](SharedRealm realm) {
             auto table = realm->read_group().get_table("class_TopLevel");
@@ -2847,10 +2854,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            auto logger = util::Logger::get_default_logger();
-            sync::PendingBootstrapStore bootstrap_store(realm, *logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(pending_batch.progress);
 
@@ -2940,10 +2944,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            util::StderrLogger logger;
-            sync::PendingBootstrapStore bootstrap_store(realm, logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(pending_batch.progress);
 
@@ -3009,10 +3010,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            auto logger = util::Logger::get_default_logger();
-            sync::PendingBootstrapStore bootstrap_store(realm, *logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(!pending_batch.progress);
             REQUIRE(pending_batch.remaining_changesets == 0);
@@ -3086,10 +3084,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            auto logger = util::Logger::get_default_logger();
-            sync::PendingBootstrapStore bootstrap_store(realm, *logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(static_cast<bool>(pending_batch.progress));
             REQUIRE(pending_batch.remaining_changesets == 0);
