@@ -127,7 +127,7 @@ void update_role(nlohmann::json& rule, nlohmann::json doc_filter)
     rule["roles"][0]["document_filters"]["write"] = doc_filter;
 }
 
-void set_up_realm(SharedRealm setup_realm, size_t expected_cnt)
+void set_up_realm(SharedRealm& setup_realm, size_t expected_cnt)
 {
     // Set up the initial subscription
     auto table = setup_realm->read_group().get_table("class_Person");
@@ -147,7 +147,7 @@ void set_up_realm(SharedRealm setup_realm, size_t expected_cnt)
     REQUIRE(results.size() == expected_cnt);
 }
 
-void verify_records(SharedRealm check_realm, size_t emps, size_t mgrs, size_t dirs)
+void verify_records(SharedRealm& check_realm, size_t emps, size_t mgrs, size_t dirs)
 {
     // Validate the expected number of entries for each role type after the role change
     auto table = check_realm->read_group().get_table("class_Person");
@@ -793,10 +793,8 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
             REQUIRE(!wait_for_upload(*realm_1));
             wait_for_advance(*realm_1);
 
-            // Verify the data was downloaded
-            table = realm_1->read_group().get_table("class_Person");
-            Results results(realm_1, Query(table));
-            REQUIRE(results.size() == params.num_mgrs + params.num_dirs);
+            // Verify the data was downloaded and only includes managers and directors
+            verify_records(realm_1, 0, params.num_mgrs, params.num_dirs);
         }
 
         // The test will update the rule to change access from all records to only the employee
@@ -852,9 +850,7 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
             });
 
             // Verify the data was downloaded/updated (only the employee records)
-            table = realm_1->read_group().get_table("class_Person");
-            Results results(realm_1, Query(table));
-            REQUIRE(results.size() == params.num_emps);
+            verify_records(realm_1, params.num_emps, 0, 0);
         }
     }
     SECTION("teardown") {
