@@ -18,6 +18,7 @@
 
 ### Internals
 * FLX download estimates are now tracked in a multiprocess-compatible manner ([PR #7780](https://github.com/realm/realm-core/pull/7780)).
+* Fixed util::FlatMap so it uses the custom Compare for both ordering and equality checking so you can use util::FlatMap with case-insensitive string keys ([PR #7845](https://github.com/realm/realm-core/pull/7845)).
 
 ----------------------------------------------
 
