@@ -128,7 +128,22 @@ struct WindowsFileHandleHolder {
 #endif
 
 #if REALM_HAVE_STD_FILESYSTEM
+#if __cplusplus < 202002L
 using std::filesystem::u8path;
+inline std::string path_to_string(const std::filesystem::path& path)
+{
+    return path.u8string();
+}
+#else
+inline std::string path_to_string(const std::filesystem::path& path)
+{
+    return reinterpret_cast<const char*>(path.u8string().c_str());
+}
+inline auto u8path(const std::string& str)
+{
+    return std::filesystem::path(reinterpret_cast<const char8_t*>(str.c_str()));
+};
+#endif
 
 void throwIfCreateDirectoryError(std::error_code error, const std::string& path)
 {
@@ -340,11 +355,7 @@ std::string make_temp_dir()
         }
         break;
     }
-#if __cplusplus < 202002L
-    return path.u8string();
-#else
-    return path.string();
-#endif
+    return path_to_string(path);
 
 #else // POSIX.1-2008 version
 
@@ -378,11 +389,7 @@ std::string make_temp_file(const char* prefix)
         throw SystemError(error, get_last_error_msg("GetTempFileName() failed: ", error));
     }
 
-#if __cplusplus < 202002L
-    return std::filesystem::path(buffer).u8string();
-#else
-    return std::filesystem::path(buffer).string();
-#endif
+    return path_to_string(std::filesystem::path(buffer));
 
 #else // POSIX.1-2008 version
 
@@ -1581,11 +1588,7 @@ std::string File::get_path() const
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-#if __cplusplus < 202002L
-    return (u8path(base_dir) / u8path(path)).lexically_normal().u8string();
-#else
-    return (u8path(base_dir) / u8path(path)).lexically_normal().string();
-#endif
+    return path_to_string((u8path(base_dir) / u8path(path)).lexically_normal());
 #else
     char dir_sep = '/';
     std::string path_2 = path;
@@ -1627,11 +1630,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 std::string File::parent_dir(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-#if __cplusplus < 202002L
-    return u8path(path).parent_path().u8string(); // Throws
-#else
-    return u8path(path).parent_path().string(); // Throws
-#endif
+    return path_to_string(u8path(path).parent_path()); // Throws
 #else
     auto is_sep = [](char c) -> bool {
         return c == '/' || c == '\\';
@@ -1880,11 +1879,7 @@ bool DirScanner::next(std::string& name)
     const std::filesystem::directory_iterator end;
     if (m_iterator == end)
         return false;
-#if __cplusplus < 202002L
-    name = m_iterator->path().filename().u8string();
-#else
-    name = m_iterator->path().filename().string();
-#endif
+    name = path_to_string(m_iterator->path().filename());
     m_iterator++;
     return true;
 }
