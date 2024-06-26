@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fix pending bootstrap store was not applying a pending bootstrap or clearing a partial bootstrap when the session is restarted. ([#7827](https://github.com/realm/realm-core/issues/7827), since 14.8.0)
+* Fix data from a previous interrupted bootstrap was potentially being included with the bootstrap data during retry attempt
+  and complete bootstraps were potentially not being applied if the session restarted once fully downloaded. ([#7827](https://github.com/realm/realm-core/issues/7827), since 14.8.0)
 
 ### Breaking changes
 * None.

@@ -1524,10 +1524,18 @@ void Session::cancel_resumption_delay()
 
     logger.debug("Resumed"); // Throws
 
-    process_pending_flx_bootstrap();
-
     if (unbind_process_complete())
         initiate_rebind(); // Throws
+
+    try {
+        process_pending_flx_bootstrap(); // throws
+    }
+    catch (const IntegrationException& error) {
+        on_integration_failure(error);
+    }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
 
     m_conn.one_more_active_unsuspended_session(); // Throws
     if (m_try_again_activation_timer) {
@@ -1735,7 +1743,7 @@ void Session::activate()
     m_conn.one_more_active_unsuspended_session(); // Throws
 
     try {
-        process_pending_flx_bootstrap();
+        process_pending_flx_bootstrap(); // throws
     }
     catch (const IntegrationException& error) {
         on_integration_failure(error);
