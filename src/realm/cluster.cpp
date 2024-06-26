@@ -811,7 +811,7 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
     values.set_parent(this, col_ndx.val + s_first_col_index);
     values.init_from_parent();
 
-    ObjKey key = values.get(ndx); // FIXME: check if this needs get_real_key()
+    ObjKey key = values.get(ndx);
     if (key != null_key) {
         do_remove_backlinks(get_real_key(ndx), col_key, std::vector<ObjKey>{key}, state);
     }
