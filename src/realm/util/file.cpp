@@ -378,7 +378,7 @@ std::string make_temp_file(const char* prefix)
         throw SystemError(error, get_last_error_msg("GetTempFileName() failed: ", error));
     }
 
-#ifdef __cplusplus < 202002L
+#if __cplusplus < 202002L
     return std::filesystem::path(buffer).u8string();
 #else
     return std::filesystem::path(buffer).string();
@@ -1581,7 +1581,7 @@ std::string File::get_path() const
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-#ifdef __cplusplus < 202002L
+#if __cplusplus < 202002L
     return (u8path(base_dir) / u8path(path)).lexically_normal().u8string();
 #else
     return (u8path(base_dir) / u8path(path)).lexically_normal().string();
@@ -1627,7 +1627,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 std::string File::parent_dir(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-#ifdef __cplusplus < 202002L
+#if __cplusplus < 202002L
     return u8path(path).parent_path().u8string(); // Throws
 #else
     return u8path(path).parent_path().string(); // Throws
@@ -1880,7 +1880,7 @@ bool DirScanner::next(std::string& name)
     const std::filesystem::directory_iterator end;
     if (m_iterator == end)
         return false;
-#ifdef __cplusplus < 202002L
+#if __cplusplus < 202002L
     name = m_iterator->path().filename().u8string();
 #else
     name = m_iterator->path().filename().string();
