@@ -287,9 +287,12 @@ typedef enum realm_web_socket_errno {
     RLM_ERR_WEBSOCKET_UNAUTHORIZED = 4001,
     RLM_ERR_WEBSOCKET_FORBIDDEN = 4002,
     RLM_ERR_WEBSOCKET_MOVEDPERMANENTLY = 4003,
-    RLM_ERR_WEBSOCKET_CLIENT_TOO_OLD = 4004,
-    RLM_ERR_WEBSOCKET_CLIENT_TOO_NEW = 4005,
-    RLM_ERR_WEBSOCKET_PROTOCOL_MISMATCH = 4006,
+    // These error codes were never used by BAAS report errors. The sync server will
+    // respond to a client that's too old with an in-band error message with error
+    // code 105.
+    // RLM_ERR_WEBSOCKET_CLIENT_TOO_OLD = 4004,
+    // RLM_ERR_WEBSOCKET_CLIENT_TOO_NEW = 4005,
+    // RLM_ERR_WEBSOCKET_PROTOCOL_MISMATCH = 4006,
 
     RLM_ERR_WEBSOCKET_RESOLVE_FAILED = 4400,
     RLM_ERR_WEBSOCKET_CONNECTION_FAILED = 4401,

@@ -28,6 +28,7 @@ set(SYNC_SOURCES
     network/default_socket.cpp
     network/http.cpp
     network/network.cpp
+    network/network_error.cpp
     network/network_ssl.cpp
     network/websocket.cpp
 )
@@ -60,6 +61,7 @@ set(SYNC_NETWORK_INSTALL_HEADERS
     network/default_socket.hpp
     network/http.hpp
     network/network.hpp
+    network/network_error.hpp
     network/network_ssl.hpp
     network/websocket.hpp
     network/websocket_error.hpp

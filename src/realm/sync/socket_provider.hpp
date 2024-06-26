@@ -154,15 +154,15 @@ struct WebSocketEndpoint {
     using port_type = sync::port_type;
 
     std::string address;                // Host address
-    port_type port;                     // Host port number
+    port_type port = 0;                 // Host port number
     std::string path;                   // Includes access token in query.
     std::vector<std::string> protocols; // Array of one or more websocket protocols
-    bool is_ssl;                        // true if SSL should be used
+    bool is_ssl = false;                // true if SSL should be used
 
     /// DEPRECATED - These will be removed in a future release
     /// These fields are deprecated and should not be used by custom socket provider implementations
     std::map<std::string, std::string> headers; // Only includes "custom" headers.
-    bool verify_servers_ssl_certificate;
+    bool verify_servers_ssl_certificate = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;
     util::Optional<SyncConfig::ProxyConfig> proxy;

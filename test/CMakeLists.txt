@@ -223,6 +223,7 @@ if(REALM_ENABLE_SYNC)
         test_util_network_ssl.cpp
         test_util_uri.cpp
         test_util_websocket.cpp
+        test_sync_socket_provider.cpp
     )
 
     set(SYNC_TEST_HEADERS

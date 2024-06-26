@@ -2,6 +2,7 @@
 
 #include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/network/network.hpp>
+#include <realm/sync/network/network_error.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/util/basic_system_errors.hpp>
@@ -38,7 +39,7 @@ public:
     {
         m_websocket.async_write_binary(data.data(), data.size(),
                                        [write_handler = std::move(handler)](std::error_code ec, size_t) {
-                                           write_handler(DefaultWebSocketImpl::get_status_from_util_error(ec));
+                                           write_handler(network::get_status_from_network_error(ec));
                                        });
     }
 
@@ -90,7 +91,7 @@ private:
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, WebSocketError::websocket_write_error, ec.message());
     }
-    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view body) override
+    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view) override
     {
         WebSocketError error = WebSocketError::websocket_ok;
         bool was_clean = true;
@@ -120,29 +121,6 @@ private:
         else {
             error = WebSocketError::websocket_fatal_error;
             was_clean = false;
-            if (!body.empty()) {
-                std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
-                auto i = body.find(identifier);
-                if (i != std::string_view::npos) {
-                    std::string_view rest = body.substr(i + identifier.size());
-                    // FIXME: Use std::string_view::begins_with() in C++20.
-                    auto begins_with = [](std::string_view string, std::string_view prefix) {
-                        return (string.size() >= prefix.size() &&
-                                std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
-                    };
-                    if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                        error = WebSocketError::websocket_client_too_old;
-                    }
-                    else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                        error = WebSocketError::websocket_client_too_new;
-                    }
-                    else {
-                        // Other more complicated forms of mismatch
-                        error = WebSocketError::websocket_protocol_mismatch;
-                    }
-                    was_clean = true;
-                }
-            }
         }
 
         websocket_error_and_close_handler(was_clean, error, ec.message());
@@ -168,33 +146,6 @@ private:
     bool websocket_binary_message_received(const char* ptr, std::size_t size) override
     {
         return m_observer->websocket_binary_message_received(util::Span<const char>(ptr, size));
-    }
-
-    static Status get_status_from_util_error(std::error_code ec)
-    {
-        if (!ec) {
-            return Status::OK();
-        }
-        switch (ec.value()) {
-            case util::error::operation_aborted:
-                return {ErrorCodes::Error::OperationAborted, "Write operation cancelled"};
-            case util::error::address_family_not_supported:
-                [[fallthrough]];
-            case util::error::invalid_argument:
-                return {ErrorCodes::Error::InvalidArgument, ec.message()};
-            case util::error::no_memory:
-                return {ErrorCodes::Error::OutOfMemory, ec.message()};
-            case util::error::connection_aborted:
-                [[fallthrough]];
-            case util::error::connection_reset:
-                [[fallthrough]];
-            case util::error::broken_pipe:
-                [[fallthrough]];
-            case util::error::resource_unavailable_try_again:
-                return {ErrorCodes::Error::ConnectionClosed, ec.message()};
-            default:
-                return {ErrorCodes::Error::UnknownError, ec.message()};
-        }
     }
 
     void initiate_resolve();

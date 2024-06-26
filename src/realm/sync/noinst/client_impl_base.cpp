@@ -594,15 +594,6 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
                 ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
-        case WebSocketError::websocket_client_too_old:
-            [[fallthrough]];
-        case WebSocketError::websocket_client_too_new:
-            [[fallthrough]];
-        case WebSocketError::websocket_protocol_mismatch: {
-            close_due_to_client_side_error({ErrorCodes::SyncProtocolNegotiationFailed, msg}, IsFatal{true},
-                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
-            break;
-        }
         case WebSocketError::websocket_fatal_error: {
             // Error is fatal if the sync_route has already been verified - if the sync_route has not
             // been verified, then use a non-fatal error and try to perform a location update.

@@ -352,7 +352,7 @@ public:
     std::size_t write_some(const char* data, std::size_t size, std::error_code&);
 
     void shutdown();
-    std::error_code shutdown(std::error_code&);
+    void shutdown(std::error_code&);
 
     template <class H>
     void async_handshake(H handler);
@@ -919,8 +919,10 @@ inline std::size_t Stream::write_some(const char* data, std::size_t size, std::e
 inline void Stream::shutdown()
 {
     std::error_code ec;
-    if (shutdown(ec)) // Throws
+    shutdown(ec); // Throws
+    if (ec) {
         throw std::system_error(ec);
+    }
 }
 
 template <class H>

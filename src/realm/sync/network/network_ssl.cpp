@@ -237,14 +237,13 @@ std::error_code Stream::handshake(std::error_code& ec)
 }
 
 
-std::error_code Stream::shutdown(std::error_code& ec)
+void Stream::shutdown(std::error_code& ec)
 {
     REALM_ASSERT(!m_tcp_socket.m_write_oper || !m_tcp_socket.m_write_oper->in_use());
     m_tcp_socket.m_desc.ensure_blocking_mode(); // Throws
     Want want = Want::nothing;
     ssl_shutdown(ec, want);
     REALM_ASSERT(want == Want::nothing);
-    return ec;
 }
 
 

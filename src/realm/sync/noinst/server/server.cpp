@@ -1785,18 +1785,6 @@ private:
             }
             Formatter& formatter = misc_buffers.formatter;
             if (REALM_UNLIKELY(best_match == 0)) {
-                const char* elaboration = "No version supported by both client and server";
-                const char* identifier_hint = nullptr;
-                if (overall_client_max < server_min) {
-                    // Client is too old
-                    elaboration = "Client is too old for server";
-                    identifier_hint = "CLIENT_TOO_OLD";
-                }
-                else if (overall_client_min > server_max) {
-                    // Client is too new
-                    elaboration = "Client is too new for server";
-                    identifier_hint = "CLIENT_TOO_NEW";
-                }
                 auto format_ranges = [&](const auto& list) {
                     bool nonfirst = false;
                     for (auto range : list) {
@@ -1810,27 +1798,12 @@ private:
                         nonfirst = true;
                     }
                 };
-                using Range = ProtocolVersionRange;
                 formatter.reset();
                 format_ranges(protocol_version_ranges); // Throws
-                logger.error("Protocol version negotiation failed: %1 "
-                             "(client supports: %2)",
-                             elaboration, std::string_view(formatter.data(), formatter.size())); // Throws
+                logger.error("Protocol version negotiation failed. (client supports: %1)",
+                             std::string_view(formatter.data(), formatter.size())); // Throws
                 formatter.reset();
-                formatter << "Protocol version negotiation failed: "
-                             ""
-                          << elaboration << ".\n\n";                                   // Throws
-                formatter << "Server supports: ";                                      // Throws
-                format_ranges(std::initializer_list<Range>{{server_min, server_max}}); // Throws
-                formatter << "\n";                                                     // Throws
-                formatter << "Client supports: ";                                      // Throws
-                format_ranges(protocol_version_ranges);                                // Throws
-                formatter << "\n\n";                                                   // Throws
-                formatter << "REALM_SYNC_PROTOCOL_MISMATCH";                           // Throws
-                if (identifier_hint)
-                    formatter << ":" << identifier_hint;                      // Throws
-                formatter << "\n";                                            // Throws
-                handle_400_bad_request({formatter.data(), formatter.size()}); // Throws
+                handle_400_bad_request("Protocol version negotiation failed."); // Throws
                 return;
             }
             m_negotiated_protocol_version = best_match;
