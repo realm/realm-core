@@ -81,7 +81,6 @@ TEST(Util_FlatMap_Construct)
 
 class HeterogeneousCaseInsensitiveCompare {
 public:
-    using is_transparent = std::true_type;
     template <class A, class B>
     bool operator()(const A& a, const B& b) const noexcept
     {
