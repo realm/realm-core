@@ -3,6 +3,7 @@
 #include <realm/object_converter.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/client_reset_recovery.hpp>
 #include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/table_view.hpp>
@@ -863,6 +864,20 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
 
     auto db_version = target->get_version_of_latest_snapshot();
     auto fresh_path = fresh->get_path();
+    sync::SaltedFileIdent fresh_client_id = {99, 101};
+    {
+        // Initialize the fresh file ident
+        version_type current_client_version;
+        SaltedFileIdent file_ident;
+        SyncProgress sync_progress;
+        std::vector<_impl::client_reset::RecoveredChange> changes{};
+        auto wt = fresh->start_write();
+        auto& history = static_cast<ClientReplication*>(fresh->get_replication())->get_history();
+        history.get_status(current_client_version, file_ident, sync_progress);
+        history.set_history_adjustments(*test_context.logger, current_client_version, fresh_client_id, sync_progress.latest_server_version, changes);
+        wt->commit();
+    }
+
     Status error{ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
     auto action = allow_recovery ? sync::ProtocolErrorInfo::Action::ClientReset
                                  : sync::ProtocolErrorInfo::Action::ClientResetNoRecovery;
@@ -891,7 +906,11 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
     CHECK_EQUAL(target->get_version_of_latest_snapshot(), db_version + 2);
 
     // Should have set the client file ident
-    CHECK_EQUAL(target->start_read()->get_sync_file_id(), 100);
+    auto new_target_file_ident = target->start_read()->get_sync_file_id();
+    CHECK_EQUAL(file_ident_out.ident, fresh_client_id.ident);
+    CHECK_EQUAL(file_ident_out.salt, fresh_client_id.salt);
+    CHECK_EQUAL(new_target_file_ident, fresh_client_id.ident);
+    CHECK_EQUAL(new_target_file_ident, file_ident_out.ident);
 
     // Client resets aren't marked as complete until the server has acknowledged
     // sync completion to avoid reset cycles
@@ -1449,8 +1468,8 @@ TEST(ClientReset_Recover_UpdatesRemoteServerVersions)
     SyncProgress sync_progress;
     history.get_status(current_client_version, file_ident, sync_progress);
 
-    CHECK_EQUAL(file_ident.ident, 100);
-    CHECK_EQUAL(file_ident.salt, 200);
+    CHECK_EQUAL(file_ident.ident, 99);
+    CHECK_EQUAL(file_ident.salt, 101);
     CHECK_EQUAL(sync_progress.upload.client_version, 0);
     CHECK_EQUAL(sync_progress.download.last_integrated_client_version, 0);
     CHECK_EQUAL(sync_progress.upload.last_integrated_server_version, 123);
