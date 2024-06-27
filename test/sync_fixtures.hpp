@@ -456,8 +456,7 @@ public:
         // empty string.
         std::string server_public_key_path = test_server_key_path();
 
-        // Must be empty (encryption disabled) or contain 64 bytes.
-        std::string server_encryption_key;
+        std::optional<std::array<char, 64>> server_encryption_key;
 
         int server_max_protocol_version = 0;
 
@@ -527,7 +526,7 @@ public:
             config_2.disable_download_compaction = config.disable_download_compaction;
             config_2.tcp_no_delay = true;
             config_2.authorization_header_name = config.authorization_header_name;
-            config_2.encryption_key = make_crypt_key(config.server_encryption_key);
+            config_2.encryption_key = config.server_encryption_key;
             config_2.max_protocol_version = config.server_max_protocol_version;
             config_2.disable_download_for = std::move(config.server_disable_download_for);
             config_2.session_bootstrap_callback = std::move(config.server_session_bootstrap_callback);
