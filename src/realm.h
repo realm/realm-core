@@ -1641,6 +1641,13 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t*, 
 RLM_API bool realm_get_value(const realm_object_t*, realm_property_key_t, realm_value_t* out_value);
 
 /**
+ * Get the value for a property.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_get_value_by_name(const realm_object_t*, const char* property_name, realm_value_t* out_value);
+
+/**
  * Get the values for several properties.
  *
  * This is provided as an alternative to calling `realm_get_value()` multiple
@@ -1676,6 +1683,41 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
+ * Set the value for a property. Property need not be defined in schema if flexible
+ * schema is enabled in configuration
+ *
+ * @param property_name The name of the property.
+ * @param new_value The new value for the property.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_value_by_name(realm_object_t*, const char* property_name, realm_value_t new_value);
+
+/**
+ * Examines if the object has a property with the given name.
+ * @param out_has_property will be true if the property exists.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_has_property(realm_object_t*, const char* property_name, bool* out_has_property);
+
+/**
+ * Get a list of properties set on the object that are not defined in the schema.
+ *
+ * @param out_prop_names A pointer to an array of const char* of size @a max. If the pointer is NULL,
+ *                       no names will be copied, but @a out_n will be set to the required size.
+ * @param max size of @a out_prop_names
+ * @param out_n number of names actually returned.
+ */
+RLM_API void realm_get_additional_properties(realm_object_t*, const char** out_prop_names, size_t max, size_t* out_n);
+
+/**
+ * Erases a property from an object. You can't erase a property that is defined in the current schema.
+ *
+ * @param property_name The name of the property.
+ * @return True if the property was removed.
+ */
+RLM_API bool realm_erase_property(realm_object_t*, const char* property_name);
+
+/**
  * Assign a JSON formatted string to a Mixed property. Underlying structures will be created as needed
  *
  * @param json_string The new value for the property.
@@ -1696,6 +1738,8 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
  */
 RLM_API realm_list_t* realm_set_list(realm_object_t*, realm_property_key_t);
 RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t*, realm_property_key_t);
+RLM_API realm_list_t* realm_set_list_by_name(realm_object_t*, const char* property_name);
+RLM_API realm_dictionary_t* realm_set_dictionary_by_name(realm_object_t*, const char* property_name);
 
 /** Return the object linked by the given property
  *
