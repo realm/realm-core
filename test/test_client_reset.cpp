@@ -874,7 +874,8 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
         auto wt = fresh->start_write();
         auto& history = static_cast<ClientReplication*>(fresh->get_replication())->get_history();
         history.get_status(current_client_version, file_ident, sync_progress);
-        history.set_history_adjustments(*test_context.logger, current_client_version, fresh_client_id, sync_progress.latest_server_version, changes);
+        history.set_history_adjustments(*test_context.logger, current_client_version, fresh_client_id,
+                                        sync_progress.latest_server_version, changes);
         wt->commit();
     }
 
