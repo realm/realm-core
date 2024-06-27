@@ -1236,7 +1236,19 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_sending_session = nullptr;
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
-    m_appservices_coid.clear();
+
+    if (!m_appservices_coid.empty()) {
+        // When we're disconnected we don't know what our co_id is anymore, so we should
+        // revert our logger back to a numeric ident.
+        logger.info(
+            "Log messages for this connection will be prefixed with \"Connection[%1]\" instead of \"Connection[%2]\"",
+            m_ident, m_appservices_coid);
+        m_appservices_coid.clear();
+        logger.base_logger = make_logger(m_ident, get_client().logger.base_logger);
+        for (auto& [ident, sess] : m_sessions) {
+            sess->logger.base_logger = Session::make_logger(ident, logger.base_logger);
+        }
+    }
 
     report_connection_state_change(ConnectionState::disconnected, info); // Throws
     initiate_reconnect_wait();                                           // Throws
