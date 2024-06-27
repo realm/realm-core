@@ -1894,9 +1894,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    Optional<std::string> ssl_trust_certificate_path,
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::session, make_logger_prefix(ident),
-                                                      client.logger_ptr)} // Throws
-    , logger{*logger_ptr}
+    : logger{make_logger(ident, client.logger.base_logger)} // Throws
     , m_client{client}
     , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}    // DEPRECATED
     , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)} // DEPRECATED
@@ -1973,9 +1971,18 @@ std::string ClientImpl::Connection::get_http_request_path() const
 }
 
 
-std::string ClientImpl::Connection::make_logger_prefix(connection_ident_type ident)
+std::shared_ptr<util::Logger>
+ClientImpl::Connection::make_logger(mpark::variant<connection_ident_type, std::string> ident,
+                                    std::shared_ptr<util::Logger> base_logger)
 {
-    return util::format("Connection[%1] ", ident);
+    std::string prefix;
+    if (auto conn_id = mpark::get_if<connection_ident_type>(&ident)) {
+        prefix = util::format("Connection[%1] ", *conn_id);
+    }
+    else if (auto co_id = mpark::get_if<std::string>(&ident)) {
+        prefix = util::format("Connection[%1] ", *co_id);
+    }
+    return std::make_shared<util::PrefixLogger>(util::LogCategory::session, std::move(prefix), base_logger);
 }
 
 
