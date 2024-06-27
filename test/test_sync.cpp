@@ -6228,6 +6228,8 @@ TEST(Sync_NestedCollectionClear)
     auto foo = table_1->create_object_with_primary_key(123);
     foo.set_collection(col, CollectionType::List);
     foo.get_list<Mixed>(col_list).insert_collection(0, CollectionType::List);
+    auto foo1 = table_1->create_object_with_primary_key(456);
+    foo1.set_collection(col, CollectionType::Dictionary);
     tr_1->commit_and_continue_as_read();
 
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -6244,6 +6246,10 @@ TEST(Sync_NestedCollectionClear)
         sub_list->clear();
         sub_list->add(1);
         sub_list->add(2);
+
+        auto dict = foo1.get_dictionary("any");
+        dict.clear();
+        dict.insert("age", 42);
 
         auto list_int = foo.get_list<Mixed>("ints");
         list_int.clear();
@@ -6267,6 +6273,11 @@ TEST(Sync_NestedCollectionClear)
         sub_list->add(3);
         sub_list->add(4);
 
+        auto bar1 = table_2->get_object_with_primary_key(456);
+        auto dict = bar1.get_dictionary("any");
+        dict.clear();
+        dict.insert("weight", 70);
+
         auto list_int = bar.get_list<Mixed>("ints");
         list_int.clear();
         list_int.add(3);
@@ -6286,6 +6297,9 @@ TEST(Sync_NestedCollectionClear)
 
     list = foo.get_list<Mixed>("any_list");
     CHECK_EQUAL(list.get_list(0)->size(), 2);
+
+    auto dict = foo1.get_dictionary("any");
+    CHECK_EQUAL(dict.size(), 1);
 
     auto list_int = foo.get_list<Mixed>("ints");
     CHECK_EQUAL(list_int.size(), 4); // We should stille have odd behavior for normal lists
