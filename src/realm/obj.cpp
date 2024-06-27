@@ -634,6 +634,17 @@ BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
     return ArrayBinary::get(alloc.translate(ref), m_row_ndx, alloc);
 }
 
+bool Obj::has_property(StringData prop_name) const
+{
+    if  (m_table->get_column_key(prop_name))
+        return true;
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        return dict.contains(prop_name);
+    }
+    return false;
+}
+
 std::vector<StringData> Obj::get_additional_properties() const
 {
     std::vector<StringData> ret;
@@ -2055,6 +2066,11 @@ Obj& Obj::set_collection(StringData prop_name, CollectionType type)
     if (auto ck = get_column_key(prop_name)) {
         return set_collection(ck, type);
     }
+    return set_additional_collection(prop_name, type);
+}
+
+Obj& Obj::set_additional_collection(StringData prop_name, CollectionType type)
+{
     if (auto ck = m_table->m_additional_prop_col) {
         Dictionary dict(*this, ck);
         dict.insert_collection(prop_name, type);

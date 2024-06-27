@@ -5842,6 +5842,12 @@ TEST_CASE("C API: flexible schema", "[c_api]") {
         realm_get_additional_properties(obj1.get(), prop_names, 10, &actual);
         REQUIRE(actual == 1);
         CHECK(prop_names[0] == std::string_view("age"));
+        realm_has_property(obj1.get(), "age", &found);
+        REQUIRE(found);
+        realm_has_property(obj1.get(), "_id", &found);
+        REQUIRE(found);
+        realm_has_property(obj1.get(), "weight", &found);
+        REQUIRE(!found);
 
         realm_value_t value;
         CHECK(checked(realm_get_value_by_name(obj1.get(), "age", &value)));
@@ -5853,6 +5859,41 @@ TEST_CASE("C API: flexible schema", "[c_api]") {
         REQUIRE(actual == 0);
         realm_commit(realm);
     }
+
+    SECTION("Set/get nested list") {
+        checked(realm_begin_write(realm));
+
+        realm_value_t pk = rlm_int_val(42);
+        auto obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+        auto list = cptr_checked(realm_set_list_by_name(obj1.get(), "scores"));
+        REQUIRE(list);
+        realm_has_property(obj1.get(), "scores", &found);
+        REQUIRE(found);
+
+        realm_value_t value;
+        CHECK(checked(realm_get_value_by_name(obj1.get(), "scores", &value)));
+        CHECK(value.type == RLM_TYPE_LIST);
+
+        realm_commit(realm);
+    }
+
+    SECTION("Set/get nested dictionary") {
+        checked(realm_begin_write(realm));
+
+        realm_value_t pk = rlm_int_val(42);
+        auto obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+        auto dict = cptr_checked(realm_set_dictionary_by_name(obj1.get(), "properties"));
+        REQUIRE(dict);
+        realm_has_property(obj1.get(), "properties", &found);
+        REQUIRE(found);
+
+        realm_value_t value;
+        CHECK(checked(realm_get_value_by_name(obj1.get(), "properties", &value)));
+        CHECK(value.type == RLM_TYPE_DICTIONARY);
+
+        realm_commit(realm);
+    }
+
     realm_close(realm);
     REQUIRE(realm_is_closed(realm));
     realm_release(realm);

@@ -1693,6 +1693,13 @@ RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_
 RLM_API bool realm_set_value_by_name(realm_object_t*, const char* property_name, realm_value_t new_value);
 
 /**
+ * Examines if the object has a property with the given name.
+ * @param out_has_property will be true if the property exists.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_has_property(realm_object_t*, const char* property_name, bool* out_has_property);
+
+/**
  * Get a list of properties set on the object that are not defined in the schema.
  *
  * @param out_prop_names A pointer to an array of const char* of size @a max. If the pointer is NULL,
@@ -1701,6 +1708,7 @@ RLM_API bool realm_set_value_by_name(realm_object_t*, const char* property_name,
  * @param out_n number of names actually returned.
  */
 RLM_API void realm_get_additional_properties(realm_object_t*, const char** out_prop_names, size_t max, size_t* out_n);
+
 /**
  * Erases a property from an object. You can't erase a property that is defined in the current schema.
  *
@@ -1730,6 +1738,8 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
  */
 RLM_API realm_list_t* realm_set_list(realm_object_t*, realm_property_key_t);
 RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t*, realm_property_key_t);
+RLM_API realm_list_t* realm_set_list_by_name(realm_object_t*, const char* property_name);
+RLM_API realm_dictionary_t* realm_set_dictionary_by_name(realm_object_t*, const char* property_name);
 
 /** Return the object linked by the given property
  *

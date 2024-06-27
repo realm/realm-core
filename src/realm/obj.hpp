@@ -117,6 +117,8 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
+    bool has_property(StringData prop_name) const;
+
     std::vector<StringData> get_additional_properties() const;
 
     Mixed get_any(ColKey col_key) const;
@@ -268,6 +270,11 @@ public:
     {
         return std::dynamic_pointer_cast<Lst<U>>(get_collection_ptr(path));
     }
+    template <typename U>
+    std::shared_ptr<Lst<U>> get_list_ptr(StringData prop_name) const
+    {
+        return get_list_ptr<U>(Path{prop_name});
+    }
 
     template <typename U>
     Lst<U> get_list(StringData col_name) const
@@ -310,8 +317,13 @@ public:
 
     Obj& set_collection(ColKey col_key, CollectionType type);
     Obj& set_collection(StringData, CollectionType type);
+    Obj& set_additional_collection(StringData, CollectionType type);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(const Path& path) const;
+    DictionaryPtr get_dictionary_ptr(StringData prop_name) const
+    {
+        return get_dictionary_ptr(Path{prop_name});
+    }
 
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;

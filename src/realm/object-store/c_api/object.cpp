@@ -352,6 +352,18 @@ RLM_API bool realm_set_value_by_name(realm_object_t* obj, const char* property_n
     });
 }
 
+RLM_API bool realm_has_property(realm_object_t* obj, const char* property_name, bool* out_has_property)
+{
+    return wrap_err([&]() {
+		obj->verify_attached();
+        if (out_has_property) {
+            auto o = obj->get_obj();
+            *out_has_property = o.has_property(property_name);
+        }
+        return true;
+	});
+}
+
 RLM_API void realm_get_additional_properties(realm_object_t* obj, const char** out_prop_names, size_t max,
                                              size_t* out_n)
 {
@@ -437,6 +449,29 @@ RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t* object, realm_p
 
         obj.set_collection(col_key, CollectionType::Dictionary);
         return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), obj, col_key}};
+    });
+}
+
+RLM_API realm_list_t* realm_set_list_by_name(realm_object_t* object, const char* property_name)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        obj.set_collection(property_name, CollectionType::List);
+        return new realm_list_t{List{object->get_realm(), obj.get_list_ptr<Mixed>(property_name)}};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_set_dictionary_by_name(realm_object_t* object, const char* property_name)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        obj.set_collection(property_name, CollectionType::Dictionary);
+        return new realm_dictionary_t{
+            object_store::Dictionary{object->get_realm(), obj.get_dictionary_ptr(property_name)}};
     });
 }
 
