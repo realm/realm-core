@@ -72,8 +72,8 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
 // Realm is removed.
 // If the fresh path is provided, the local Realm is changed such that its state is equal
 // to the fresh Realm. Then the local Realm will have its client file ident set to
-// 'client_file_ident'
-bool perform_client_reset_diff(DB& db, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
+// the file ident from the fresh realm and this value will be provided to 'file_ident_out'
+bool perform_client_reset_diff(DB& db, sync::ClientReset& reset_config, sync::SaltedFileIdent& file_ident_out,
                                util::Logger& logger, sync::SubscriptionStore* sub_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete);
 

@@ -1502,6 +1502,12 @@ inline void ClientImpl::Session::message_sent()
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_send_complete);
 
+    // Is there a pending client reset diff to try to perform once the bind
+    // message has been sent?
+    if (m_bind_message_sent && m_performing_client_reset) {
+        client_reset_if_needed(); // resets m_performing_client_reset to false
+    }
+
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);
 

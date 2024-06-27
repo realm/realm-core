@@ -876,9 +876,10 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
     }(mode, allow_recovery);
 
     sync::ClientReset cr_config{mode, fresh, error, action};
+    sync::SaltedFileIdent file_ident_out = {0, 0};
 
     bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *target, std::move(cr_config),
-                                                               {100, 200}, sub_store, [](int64_t) {});
+                                                               file_ident_out, sub_store, [](int64_t) {});
     CHECK(did_reset);
 
     // Should have closed and deleted the fresh realm
@@ -1074,8 +1075,9 @@ TEST(ClientReset_UninitializedFile)
 
     // Should not perform a client reset because the target file has never been
     // written to
+    sync::SaltedFileIdent file_ident_out = {0, 0};
     bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *db_empty, std::move(cr_config),
-                                                               {100, 200}, nullptr, [](int64_t) {});
+                                                               file_ident_out, nullptr, [](int64_t) {});
     CHECK_NOT(did_reset);
     auto rd_tr = db_empty->start_frozen();
     CHECK_NOT(PendingResetStore::has_pending_reset(rd_tr));
@@ -1246,8 +1248,9 @@ TEST(ClientReset_Recover_RecoveryDisabled)
                                 {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"},
                                 sync::ProtocolErrorInfo::Action::ClientResetNoRecovery};
 
+    sync::SaltedFileIdent file_ident_out = {0, 0};
     CHECK_THROW((_impl::client_reset::perform_client_reset(*test_context.logger, *dbs.first, std::move(cr_config),
-                                                           {100, 200}, nullptr, [](int64_t) {})),
+                                                           file_ident_out, nullptr, [](int64_t) {})),
                 sync::ClientResetFailed);
     auto rd_tr = dbs.first->start_frozen();
     CHECK_NOT(PendingResetStore::has_pending_reset(rd_tr));

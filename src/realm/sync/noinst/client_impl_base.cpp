@@ -1905,7 +1905,7 @@ void Session::send_bind_message()
     REALM_ASSERT_EX(m_state == Active, m_state);
 
     session_ident_type session_ident = m_ident;
-    bool need_client_file_ident = !have_client_file_ident();
+    bool need_client_file_ident = !have_client_file_ident() && !m_performing_client_reset;
     const bool is_subserver = false;
 
 
@@ -2265,20 +2265,39 @@ bool Session::client_reset_if_needed()
         return false;
     }
 
+    // Save a copy of the status and action in case an error/exception occurs
+    Status cr_status = client_reset_config->error;
+    ProtocolErrorInfo::Action cr_action = client_reset_config->action;
+
     auto on_flx_version_complete = [this](int64_t version) {
         this->on_flx_sync_version_complete(version);
     };
-    bool did_reset =
-        client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config), m_client_file_ident,
-                                           get_flx_subscription_store(), on_flx_version_complete);
+    try {
+        // Storage for the file ident from the fresh realm that was migrated to the local realm
+        SaltedFileIdent client_file_ident_out;
+        bool did_reset = client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config),
+                                                            client_file_ident_out, get_flx_subscription_store(),
+                                                            on_flx_version_complete);
+        m_client_file_ident = client_file_ident_out;
 
-    call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
-    if (!did_reset) {
+        call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
+        if (!did_reset) {
+            return false;
+        }
+    }
+    catch (const std::exception& e) {
+        auto err_msg = util::format("A fatal error occurred during '%1' client reset diff for %2: '%3'", cr_action,
+                                    cr_status, e.what());
+        logger.error(err_msg.c_str());
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
+        suspend(err_info);
         return false;
     }
 
     // The fresh Realm has been used to reset the state
     logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
+    logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
+                 m_client_file_ident.salt); // Throws
 
     SaltedFileIdent client_file_ident;
     get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
@@ -2287,10 +2306,16 @@ bool Session::client_reset_if_needed()
     REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
                     m_progress.download.last_integrated_client_version);
     REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
-    logger.trace("last_version_available  = %1", m_last_version_available); // Throws
+    logger.debug("last_version_available  = %1", m_last_version_available); // Throws
 
     m_upload_progress = m_progress.upload;
+    logger.debug("upload_progress_client_version = %1, upload_progress_server_version = %2",
+                 m_upload_progress.client_version,
+                 m_upload_progress.last_integrated_server_version); // Throws
     m_download_progress = m_progress.download;
+    logger.debug("download_progress_client_version = %1, download_progress_server_version = %2",
+                 m_download_progress.last_integrated_client_version,
+                 m_download_progress.server_version); // Throws
     init_progress_handler();
     // In recovery mode, there may be new changesets to upload and nothing left to download.
     // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
@@ -2342,36 +2367,11 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         return Status::OK();       // Success
     }
 
-    // if a client reset happens, it will take care of setting the file ident
-    // and if not, we do it here
-    bool did_client_reset = false;
-
-    // Save some of the client reset info for reporting to the client if an error occurs.
-    Status cr_status(Status::OK()); // Start with no client reset
-    ProtocolErrorInfo::Action cr_action = ProtocolErrorInfo::Action::NoAction;
-    if (auto& cr_config = get_client_reset_config()) {
-        cr_status = cr_config->error;
-        cr_action = cr_config->action;
-    }
-
-    try {
-        did_client_reset = client_reset_if_needed();
-    }
-    catch (const std::exception& e) {
-        auto err_msg = util::format("A fatal error occurred during '%1' client reset for %2: '%3'", cr_action,
-                                    cr_status, e.what());
-        logger.error(err_msg.c_str());
-        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
-        suspend(err_info);
-        return Status::OK();
-    }
-    if (!did_client_reset) {
-        get_history().set_client_file_ident(client_file_ident,
-                                            m_fix_up_object_ids); // Throws
-        m_progress.download.last_integrated_client_version = 0;
-        m_progress.upload.client_version = 0;
-        m_last_version_selected_for_upload = 0;
-    }
+    get_history().set_client_file_ident(client_file_ident,
+                                        m_fix_up_object_ids); // Throws
+    m_progress.download.last_integrated_client_version = 0;
+    m_progress.upload.client_version = 0;
+    m_last_version_selected_for_upload = 0;
 
     // Ready to send the IDENT message
     ensure_enlisted_to_send(); // Throws

@@ -480,7 +480,7 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
     return mode;
 }
 
-bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
+bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sync::SaltedFileIdent& file_ident_out,
                                util::Logger& logger, sync::SubscriptionStore* sub_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete)
 {
@@ -491,13 +491,6 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
     bool recover_local_changes =
         actual_mode == ClientResyncMode::Recover || actual_mode == ClientResyncMode::RecoverOrDiscard;
 
-    logger.info(util::LogCategory::reset,
-                "Client reset: path_local = %1, client_file_ident = (ident: %2, salt: %3), "
-                "remote_path = %4, requested_mode = %5, action = %6, actual_mode = %7, will_recover = %8, "
-                "originating_error = %9",
-                db_local.get_path(), client_file_ident.ident, client_file_ident.salt, db_remote.get_path(),
-                reset_config.mode, reset_config.action, actual_mode, recover_local_changes, reset_config.error);
-
     auto& repl_local = dynamic_cast<ClientReplication&>(*db_local.get_replication());
     auto& history_local = repl_local.get_history();
     history_local.ensure_updated(wt_local->get_version());
@@ -507,13 +500,21 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
     auto& history_remote = repl_remote.get_history();
 
     sync::SaltedVersion fresh_server_version = {0, 0};
+    sync::SaltedFileIdent fresh_file_ident = {0, 0};
     {
         SyncProgress remote_progress;
         sync::version_type remote_version_unused;
-        SaltedFileIdent remote_ident_unused;
-        history_remote.get_status(remote_version_unused, remote_ident_unused, remote_progress);
+        history_remote.get_status(remote_version_unused, fresh_file_ident, remote_progress);
         fresh_server_version = remote_progress.latest_server_version;
     }
+
+    logger.info(util::LogCategory::reset,
+                "Client reset: path_local = %1, fresh_file_ident = (ident: %2, salt: %3), "
+                "fresh_server_version = (ident: %4, salt: %5), remote_path = %6, requested_mode = %7, action = %8, "
+                "actual_mode = %9, will_recover = %10, originating_error = %11",
+                db_local.get_path(), fresh_file_ident.ident, fresh_file_ident.salt, fresh_server_version.version,
+                fresh_server_version.salt, db_remote.get_path(), reset_config.mode, reset_config.action, actual_mode,
+                recover_local_changes, reset_config.error);
 
     TransactionRef tr_remote;
     std::vector<client_reset::RecoveredChange> recovered;
@@ -534,7 +535,7 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
 
     // now that the state of the fresh and local Realms are identical,
     // reset the local sync history and steal the fresh Realm's ident
-    history_local.set_history_adjustments(logger, wt_local->get_version(), client_file_ident, fresh_server_version,
+    history_local.set_history_adjustments(logger, wt_local->get_version(), fresh_file_ident, fresh_server_version,
                                           recovered);
 
     int64_t subscription_version = 0;
@@ -549,6 +550,7 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
 
     wt_local->commit_and_continue_as_read();
     on_flx_version_complete(subscription_version);
+    file_ident_out = fresh_file_ident;
 
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger.info(util::LogCategory::reset,
