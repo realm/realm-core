@@ -197,7 +197,7 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     m_has_pending = true;
 }
 
-bool PendingBootstrapStore::has_pending()
+bool PendingBootstrapStore::has_pending() const noexcept
 {
     return m_has_pending;
 }

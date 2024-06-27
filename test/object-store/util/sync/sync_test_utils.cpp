@@ -287,26 +287,34 @@ void wait_for_advance(Realm& realm)
     realm.m_binding_context = nullptr;
 }
 
-void async_open_realm(const Realm::Config& config,
-                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish)
+StatusWith<std::shared_ptr<Realm>> async_open_realm(const Realm::Config& config)
 {
-    std::mutex mutex;
-    bool did_finish = false;
     auto task = Realm::get_synchronized_realm(config);
-    ThreadSafeReference tsr;
-    std::exception_ptr err = nullptr;
+    auto pf = util::make_promise_future<ThreadSafeReference>();
     task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-        std::lock_guard lock(mutex);
-        did_finish = true;
-        tsr = std::move(ref);
-        err = e;
+        if (e) {
+            try {
+                std::rethrow_exception(e);
+            }
+            catch (...) {
+                pf.promise.set_error(exception_to_status());
+            }
+        }
+        else {
+            pf.promise.emplace_value(std::move(ref));
+        }
     });
-    util::EventLoop::main().run_until([&] {
-        std::lock_guard lock(mutex);
-        return did_finish;
-    });
-    task->cancel(); // don't run the above notifier again on this session
-    finish(std::move(tsr), err);
+    auto sw = std::move(pf.future).get_no_throw();
+    if (sw.is_ok())
+        return Realm::get_shared_realm(std::move(sw.get_value()));
+    return sw.get_status();
+}
+
+std::shared_ptr<Realm> successfully_async_open_realm(const Realm::Config& config)
+{
+    auto status = async_open_realm(config);
+    REQUIRE(status.is_ok());
+    return status.get_value();
 }
 
 #endif // REALM_ENABLE_SYNC
@@ -383,7 +391,7 @@ struct FakeLocalClientReset : public TestClientReset {
             progress.upload.client_version = current_version;
             progress.upload.last_integrated_server_version = current_version;
             sync::VersionInfo info_out;
-            history_local->set_sync_progress(progress, nullptr, info_out);
+            history_local->set_sync_progress(progress, 0, info_out);
         }
         {
             local_realm->begin_transaction();

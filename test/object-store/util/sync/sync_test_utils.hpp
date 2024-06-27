@@ -164,8 +164,8 @@ std::string get_compile_time_admin_url();
 
 void wait_for_advance(Realm& realm);
 
-void async_open_realm(const Realm::Config& config,
-                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
+StatusWith<std::shared_ptr<Realm>> async_open_realm(const Realm::Config& config);
+std::shared_ptr<Realm> successfully_async_open_realm(const Realm::Config& config);
 
 app::Response do_http_request(const app::Request& request);
 
