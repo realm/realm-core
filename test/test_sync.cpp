@@ -6302,7 +6302,7 @@ TEST(Sync_NestedCollectionClear)
     CHECK_EQUAL(dict.size(), 1);
 
     auto list_int = foo.get_list<Mixed>("ints");
-    CHECK_EQUAL(list_int.size(), 4); // We should stille have odd behavior for normal lists
+    CHECK_EQUAL(list_int.size(), 4); // We should still have odd behavior for normal lists
 
     CHECK(compare_groups(*tr_1, *tr_2));
 }
