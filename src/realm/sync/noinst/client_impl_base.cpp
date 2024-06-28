@@ -1889,7 +1889,8 @@ void Session::send_message()
             return false;
         }
 
-        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
+        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version ||
+               get_session_reason() == SessionReason::FreshRealm;
     };
 
     if (check_pending_flx_version()) {
@@ -2838,7 +2839,7 @@ void Session::check_for_download_completion()
     if (m_download_progress.server_version < m_server_version_at_last_download_mark)
         return;
     m_last_triggering_download_mark = m_target_download_mark;
-    if (REALM_UNLIKELY(!m_allow_upload)) {
+    if (REALM_UNLIKELY(!m_allow_upload || get_session_reason() == SessionReason::FreshRealm)) {
         // Activate the upload process now, and enable immediate reactivation
         // after a subsequent fast reconnect.
         m_allow_upload = true;
