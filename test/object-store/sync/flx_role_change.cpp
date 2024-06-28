@@ -76,7 +76,7 @@ struct TestParams {
     size_t num_dirs = 10;
     std::optional<size_t> num_objects = 10;
     std::optional<size_t> max_download_bytes = 4096;
-    std::optional<size_t> sleep_millis = std::nullopt;
+    std::optional<size_t> sleep_millis;
 };
 
 std::unique_ptr<FLXSyncTestHarness> setup_harness(std::string app_name, TestParams params)
@@ -110,15 +110,6 @@ std::unique_ptr<FLXSyncTestHarness> setup_harness(std::string app_name, TestPara
     });
     // Return the unique_ptr for the newly created harness
     return harness;
-}
-
-void teardown_harness(std::unique_ptr<FLXSyncTestHarness>& harness)
-{
-    if (!harness) {
-        return; // nothing to do
-    }
-    harness->app()->sync_manager()->wait_for_sessions_to_terminate();
-    harness.reset();
 }
 
 void update_role(nlohmann::json& rule, nlohmann::json doc_filter)
@@ -181,7 +172,14 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         }
     };
 
-    enum BootstrapMode { NoReconnect, None, SingleMessage, SingleMessageMulti, MultiMessage, Any };
+    enum BootstrapMode {
+        NoErrorNoBootstrap,
+        GotErrorNoBootstrap,
+        SingleMessage,
+        SingleMessageMulti,
+        MultiMessage,
+        AnyBootstrap
+    };
     struct ExpectedResults {
         BootstrapMode bootstrap;
         size_t emps;
@@ -202,7 +200,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
 
     TestingStateMachine<TestState> state_machina(TestState::not_ready);
     int64_t query_version = 0;
-    BootstrapMode bootstrap_mode = BootstrapMode::None;
+    BootstrapMode bootstrap_mode = BootstrapMode::GotErrorNoBootstrap;
     size_t download_msg_count = 0;
     size_t bootstrap_msg_count = 0;
     bool role_change_bootstrap = false;
@@ -222,7 +220,6 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
                 switch (data.event) {
                     case Event::ErrorMessageReceived:
                         REQUIRE(cur_state == TestState::start);
-                        REQUIRE(data.error_info);
                         REQUIRE(data.error_info->raw_error_code == 200);
                         REQUIRE(data.error_info->server_requests_action ==
                                 sync::ProtocolErrorInfo::Action::Transient);
@@ -329,7 +326,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         logger->debug("ROLE CHANGE: Updating rule definitions: %1", new_rules);
         app_session.admin_api.update_default_rule(app_session.server_app_id, new_rules);
 
-        if (expected.bootstrap != BootstrapMode::NoReconnect) {
+        if (expected.bootstrap != BootstrapMode::NoErrorNoBootstrap) {
             // After updating the permissions (if they are different), the server should send an
             // error that will disconnect/reconnect the session - verify the reconnect occurs.
             // Make sure at least the reconnect state (or later) has been reached
@@ -349,18 +346,18 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         // performed matched what was expected.
         state_machina.transition_with([&](TestState cur_state) {
             switch (expected.bootstrap) {
-                case BootstrapMode::NoReconnect:
-                    // Confirm that the session did receive an error and a bootstrap did not occur
+                case BootstrapMode::NoErrorNoBootstrap:
+                    // Confirm that neither an error nor bootstrap occurred
                     REQUIRE(cur_state == TestState::start);
                     REQUIRE_FALSE(role_change_bootstrap);
                     break;
-                case BootstrapMode::None:
-                    // Confirm that a bootstrap nor a client reset did not occur
+                case BootstrapMode::GotErrorNoBootstrap:
+                    // Confirm that the session restarted, but a bootstrap did not occur
                     REQUIRE(cur_state == TestState::reconnect_received);
                     REQUIRE_FALSE(role_change_bootstrap);
                     break;
-                case BootstrapMode::Any:
-                    // Doesn't matter which one, just that a bootstrap occurred and not a client reset
+                case BootstrapMode::AnyBootstrap:
+                    // Confirm that a bootstrap occurred, but it doesn't matter which type
                     REQUIRE(cur_state == TestState::complete);
                     REQUIRE(role_change_bootstrap);
                     break;
@@ -435,7 +432,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         // Write the same rules again - the client should not receive the reconnect (200) error
         logger->trace("ROLE CHANGE: Updating same rules again and verify reconnect doesn't happen");
         update_perms_and_verify(*harness, realm_1, test_rules,
-                                {BootstrapMode::NoReconnect, 0, params.num_mgrs, params.num_dirs});
+                                {BootstrapMode::NoErrorNoBootstrap, 0, params.num_mgrs, params.num_dirs});
         // Multi-message bootstrap - add employeees, remove managers and directors
         logger->trace("ROLE CHANGE: Updating rules to add back the employees and remove mgrs/dirs");
         update_role(test_rules, {{"role", "employee"}});
@@ -461,7 +458,8 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
             set_up_realm(new_realm, num_total);
 
             // Add the initial rule and verify the data in realm 1 and 2 (both should just have the employees)
-            update_perms_and_verify(*harness, realm_1, test_rules, {BootstrapMode::Any, params.num_emps, 0, 0});
+            update_perms_and_verify(*harness, realm_1, test_rules,
+                                    {BootstrapMode::AnyBootstrap, params.num_emps, 0, 0});
             REQUIRE(!wait_for_download(*new_realm));
             REQUIRE(!wait_for_upload(*new_realm));
             wait_for_advance(*new_realm);
@@ -499,8 +497,10 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
             user1_role.apply_when = {{"%%user.id", config_1.sync_config->user->user_id()}};
             // Add two rules, the first applies to user 1 and the second applies to other users
             test_rules["roles"] = {transform_service_role(user1_role), transform_service_role(general_role)};
+            // Realm 1 should receive a role change bootstrap which updates the data to all records
+            // It doesn't matter what type of bootstrap occurs
             update_perms_and_verify(*harness, realm_1, test_rules,
-                                    {BootstrapMode::Any, params.num_emps, params.num_mgrs, params.num_dirs});
+                                    {BootstrapMode::AnyBootstrap, params.num_emps, params.num_mgrs, params.num_dirs});
 
             // Realm 2 data should not change (and there shouldn't be any bootstrap messages)
             verify_records(realm_2, params.num_emps, 0, 0);
@@ -511,15 +511,19 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
             user1_role_2.document_filters.write = {{"role", {{"$in", {"employee", "manager"}}}}};
             // Update the first rule for user 1 and verify the data after the rule is applied
             test_rules["roles"][0] = {transform_service_role(user1_role_2)};
+            // Realm 1 should receive a role change bootstrap which updates the data to employee
+            // and manager records. It doesn't matter what type of bootstrap occurs
             update_perms_and_verify(*harness, realm_1, test_rules,
-                                    {BootstrapMode::Any, params.num_emps, params.num_mgrs, 0});
+                                    {BootstrapMode::AnyBootstrap, params.num_emps, params.num_mgrs, 0});
 
             // Realm 2 data should not change (and there shouldn't be any bootstrap messages)
             verify_records(realm_2, params.num_emps, 0, 0);
         }
     }
 
-    // Add new sections before this
+    // ----------------------------------------------------------------
+    // Add new sections before this one
+    // ----------------------------------------------------------------
     SECTION("Pending changes are lost if not allowed after role change") {
         std::vector<ObjectId> emp_ids;
         std::vector<ObjectId> mgr_ids;
@@ -612,10 +616,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         do_verify(test_realm, params.num_emps, emp_ids, "employee");
 
         // Tear down the app since some of the records were added and modified
-        teardown_harness(harness);
-    }
-    SECTION("teardown") {
-        teardown_harness(harness);
+        harness.reset();
     }
 }
 
@@ -679,7 +680,7 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
                 if (cur_state == BootstrapTestState::not_ready)
                     return std::nullopt;
 
-                std::optional<BootstrapTestState> new_state = std::nullopt;
+                std::optional<BootstrapTestState> new_state;
 
                 switch (data.event) {
                     case Event::IdentMessageSent:
@@ -687,13 +688,11 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
                         break;
 
                     case Event::ErrorMessageReceived:
-                        REQUIRE(data.error_info);
-                        if (data.error_info->raw_error_code == 200) {
-                            REQUIRE(data.error_info->server_requests_action ==
-                                    sync::ProtocolErrorInfo::Action::Transient);
-                            REQUIRE_FALSE(data.error_info->is_fatal);
-                            session_restarted = true;
-                        }
+                        REQUIRE(data.error_info->raw_error_code == 200);
+                        REQUIRE(data.error_info->server_requests_action ==
+                                sync::ProtocolErrorInfo::Action::Transient);
+                        REQUIRE_FALSE(data.error_info->is_fatal);
+                        session_restarted = true;
                         break;
 
                     // A bootstrap message was processed
@@ -854,7 +853,7 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
         }
     }
     SECTION("teardown") {
-        teardown_harness(harness);
+        harness.reset();
     }
 }
 
