@@ -137,7 +137,6 @@ struct ListPath {
     void append(const Element& item);
     bool operator<(const ListPath& other) const noexcept;
     bool operator==(const ListPath& other) const noexcept;
-    bool operator!=(const ListPath& other) const noexcept;
     std::string path_to_string(Transaction& remote, const InterningBuffer& buffer);
 
     using const_iterator = typename std::vector<Element>::const_iterator;
@@ -488,11 +487,6 @@ bool ListPath::operator==(const ListPath& other) const noexcept
         return true;
     }
     return false;
-}
-
-bool ListPath::operator!=(const ListPath& other) const noexcept
-{
-    return !(operator==(other));
 }
 
 std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer& buffer)

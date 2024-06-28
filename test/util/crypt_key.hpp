@@ -36,9 +36,6 @@ namespace test_util {
 /// of always_encrypt().
 const char* crypt_key(bool always = false);
 
-/// Returns the empty string when, and only when crypt_key() returns null.
-std::string crypt_key_2(bool always = false);
-
 /// Returns true if global mode "always encrypt" is enabled.
 ///
 /// This function is thread-safe as long as there are no concurrent invocations
@@ -51,15 +48,6 @@ bool is_always_encrypt_enabled();
 /// prior to any invocation of crypt_key().
 void enable_always_encrypt();
 
-
-// Implementation
-
-inline std::string crypt_key_2(bool always)
-{
-    if (const char* key = crypt_key(always)) // Throws
-        return {key};
-    return {};
-}
 
 } // namespace test_util
 } // namespace realm
