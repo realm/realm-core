@@ -376,7 +376,8 @@ size_t IndexEvaluator::do_search_index(const Cluster* cluster, size_t start, siz
             return not_found;
 
         // Now actual_key must be found in leaf keys
-        return cluster->lower_bound_key(ObjKey(m_actual_key.value - cluster->get_offset()));
+        REALM_ASSERT(uint64_t(m_actual_key.value) >= cluster->get_offset());
+        return cluster->lower_bound_key(ClusterNode::RowKey(m_actual_key.value - cluster->get_offset()));
     }
     return not_found;
 }
