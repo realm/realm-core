@@ -6228,7 +6228,9 @@ TEST(Sync_NestedCollectionClear)
 
     auto foo = table_1->create_object_with_primary_key(123);
     foo.set_collection(col, CollectionType::List);
-    foo.get_list<Mixed>(col_list).insert_collection(0, CollectionType::List);
+    auto parent_list = foo.get_list<Mixed>(col_list);
+    parent_list.insert_collection(0, CollectionType::List);
+    parent_list.insert_collection(1, CollectionType::Dictionary);
     auto foo1 = table_1->create_object_with_primary_key(456);
     foo1.set_collection(col, CollectionType::Dictionary);
     tr_1->commit_and_continue_as_read();
@@ -6247,6 +6249,10 @@ TEST(Sync_NestedCollectionClear)
         sub_list->clear();
         sub_list->add(1);
         sub_list->add(2);
+        auto sub_dict = list.get_dictionary(1);
+        sub_dict->clear();
+        sub_dict->insert("one", 1);
+        sub_dict->insert("two", 2);
 
         auto dict = foo1.get_dictionary("any");
         dict.clear();
@@ -6273,6 +6279,10 @@ TEST(Sync_NestedCollectionClear)
         sub_list->clear();
         sub_list->add(3);
         sub_list->add(4);
+        auto sub_dict = list.get_dictionary(1);
+        sub_dict->clear();
+        sub_dict->insert("three", 3);
+        sub_dict->insert("four", 4);
 
         auto bar1 = table_2->get_object_with_primary_key(456);
         auto dict = bar1.get_dictionary("any");
@@ -6298,6 +6308,7 @@ TEST(Sync_NestedCollectionClear)
 
     list = foo.get_list<Mixed>("any_list");
     CHECK_EQUAL(list.get_list(0)->size(), 2);
+    CHECK_EQUAL(list.get_dictionary(1)->size(), 2);
 
     auto dict = foo1.get_dictionary("any");
     CHECK_EQUAL(dict.size(), 1);
