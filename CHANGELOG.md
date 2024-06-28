@@ -6,9 +6,11 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fix data from a previous interrupted bootstrap was potentially being included with the bootstrap data during retry attempt
-  and complete bootstraps were potentially not being applied if the session restarted once fully downloaded. ([#7827](https://github.com/realm/realm-core/issues/7827), since 14.8.0)
 * `DB::compact()` on an encrypted Realm without explicitly specifying a new encryption key would only work if the old key happened to be a valid nul-terminated string ([#7842](https://github.com/realm/realm-core/issues/7842), since v14.10.0).
+* If a sync session is interrupted by a disconnect or restart while downloading a bootstrap, stale data from the previous
+  bootstrap may be included when the session reconnects and downloads the bootstrap. This can lead to objects stored in
+  the database that do not match the actual state of the server and potentially leading to compensating writes.
+  ([#7827](https://github.com/realm/realm-core/issues/7827), since v12.0.0)
 
 ### Breaking changes
 * None.

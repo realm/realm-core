@@ -1550,16 +1550,17 @@ inline void ClientImpl::Session::initiate_rebind()
 inline void ClientImpl::Session::reset_protocol_state() noexcept
 {
     // clang-format off
-    m_enlisted_to_send                 = false;
-    m_bind_message_sent                = false;
-    m_error_to_send                    = false;
-    m_ident_message_sent               = false;
-    m_unbind_message_sent              = false;
-    m_unbind_message_send_complete     = false;
-    m_error_message_received           = false;
-    m_unbound_message_received         = false;
-    m_client_error                     = util::none;
-    m_upload_progress                  = m_progress.upload;
+    m_enlisted_to_send                    = false;
+    m_bind_message_sent                   = false;
+    m_error_to_send                       = false;
+    m_ident_message_sent = false;
+    m_unbind_message_sent = false;
+    m_unbind_message_send_complete = false;
+    m_error_message_received = false;
+    m_unbound_message_received = false;
+    m_client_error = util::none;
+
+    m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_last_download_mark_sent          = m_last_download_mark_received;
     // clang-format on
