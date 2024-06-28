@@ -35,7 +35,8 @@ const char* crypt_key(bool always)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (always || g_always_encrypt)
-        return "1234567890123456789012345678901123456789012345678901234567890123";
+        return "\0"
+               "123456789012345678901234567890123456789012345678901234567890123";
 #else
     static_cast<void>(always);
 #endif

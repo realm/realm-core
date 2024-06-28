@@ -5363,7 +5363,10 @@ TEST(Sync_ServerSideEncryption)
     std::string server_path;
     {
         ClientServerFixture::Config config;
-        config.server_encryption_key = crypt_key_2(always_encrypt);
+        if (auto key = crypt_key(always_encrypt)) {
+            config.server_encryption_key.emplace();
+            memcpy(config.server_encryption_key->data(), key, config.server_encryption_key->size());
+        }
         ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
 
