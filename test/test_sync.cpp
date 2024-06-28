@@ -6216,8 +6216,6 @@ TEST(Sync_NestedCollectionClear)
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
 
-    Timestamp now{std::chrono::system_clock::now()};
-
     auto tr_1 = db_1->start_write();
     auto tr_2 = db_2->start_read();
     auto table_1 = tr_1->add_table_with_primary_key("class_Table", type_Int, "id");
