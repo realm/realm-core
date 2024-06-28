@@ -736,11 +736,11 @@ bool Cluster::try_get(RowKey k, ClusterNode::State& state) const noexcept
     state.mem = get_mem();
     if (m_keys.is_attached()) {
         state.index = m_keys.lower_bound(k.value);
-        return state.index != m_keys.size() && m_keys.get(state.index) == uint64_t(k.value);
+        return state.index != m_keys.size() && m_keys.get(state.index) == k.value;
     }
     else {
         if (k.value < uint64_t(Array::get(s_key_ref_or_size_index) >> 1)) {
-            state.index = k.value;
+            state.index = size_t(k.value);
             return true;
         }
     }
@@ -823,8 +823,8 @@ size_t Cluster::get_ndx(RowKey k, size_t ndx) const noexcept
 {
     size_t index;
     if (m_keys.is_attached()) {
-        index = m_keys.lower_bound(uint64_t(k.value));
-        if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
+        index = m_keys.lower_bound(k.value);
+        if (index == m_keys.size() || m_keys.get(index) != k.value) {
             return realm::npos;
         }
     }
