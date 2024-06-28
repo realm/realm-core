@@ -197,7 +197,7 @@ public:
         bool tcp_no_delay = false;
 
         /// An optional 64 byte key to encrypt all files with.
-        util::Optional<std::array<char, 64>> encryption_key;
+        std::optional<std::array<char, 64>> encryption_key;
 
         /// Sets a limit on the allowed accumulated size in bytes of buffered
         /// incoming changesets waiting to be processed. If left at zero, an
