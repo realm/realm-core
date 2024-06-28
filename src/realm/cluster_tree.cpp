@@ -152,7 +152,7 @@ private:
             size_t sz = node_size();
             REALM_ASSERT_DEBUG(sz > 0);
             size_t max_ndx = sz - 1;
-            ret.ndx = std::min(key.value >> m_shift_factor, max_ndx);
+            ret.ndx = std::min(size_t(key.value >> m_shift_factor), max_ndx);
             ret.offset = ret.ndx << m_shift_factor;
         }
         ret.key = RowKey(key.value - ret.offset);
@@ -585,14 +585,14 @@ bool ClusterNodeInner::get_leaf(RowKey key, ClusterNode::IteratorState& state) c
 {
     size_t child_ndx;
     if (m_keys.is_attached()) {
-        child_ndx = m_keys.upper_bound(uint64_t(key.value));
+        child_ndx = m_keys.upper_bound(key.value);
         if (child_ndx > 0)
             child_ndx--;
     }
     else {
         REALM_ASSERT_DEBUG(node_size() > 0);
         size_t max_ndx = node_size() - 1;
-        child_ndx = std::min(key.value >> m_shift_factor, max_ndx);
+        child_ndx = std::min(size_t(key.value >> m_shift_factor), max_ndx);
     }
 
     size_t sz = node_size();
