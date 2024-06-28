@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* `DB::compact()` on an encrypted Realm without explicitly specifying a new encryption key would only work if the old key happened to be a valid nul-terminated string ([#7842](https://github.com/realm/realm-core/issues/7842), since v14.10.0).
 
 ### Breaking changes
 * None.
@@ -18,6 +18,7 @@
 
 ### Internals
 * FLX download estimates are now tracked in a multiprocess-compatible manner ([PR #7780](https://github.com/realm/realm-core/pull/7780)).
+* Fixed util::FlatMap so it uses the custom Compare for both ordering and equality checking so you can use util::FlatMap with case-insensitive string keys ([PR #7845](https://github.com/realm/realm-core/pull/7845)).
 * Create additional role change tests to verify role change during initial schema and subscription bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
 
 ----------------------------------------------
