@@ -913,7 +913,7 @@ void SyncSession::create_sync_session()
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
     session_config.session_reason =
-        client_reset::is_fresh_path(m_config.path) ? sync::SessionReason::ClientReset : sync::SessionReason::Sync;
+        client_reset::is_fresh_path(m_config.path) ? sync::SessionReason::FreshRealm : sync::SessionReason::Sync;
     session_config.schema_version = m_config.schema_version;
 
     if (sync_config.on_sync_client_event_hook) {

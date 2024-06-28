@@ -1723,6 +1723,7 @@ void Session::activate()
                  m_progress.download.last_integrated_client_version);                                      // Throws
     logger.debug("progress_upload_server_version = %1", m_progress.upload.last_integrated_server_version); // Throws
     logger.debug("progress_upload_client_version = %1", m_progress.upload.client_version);                 // Throws
+    logger.debug("fresh_download_session = %1", get_session_reason() == SessionReason::FreshRealm ? "yes" : "no");
 
     reset_protocol_state();
     m_state = Active;
@@ -1877,7 +1878,8 @@ void Session::send_message()
             return false;
         }
 
-        if (!m_allow_upload) {
+        // Allow QUERY uploads for client reset fresh realm download sessions
+        if (!m_allow_upload && get_session_reason() != SessionReason::FreshRealm) {
             return false;
         }
 
@@ -1894,7 +1896,9 @@ void Session::send_message()
         return send_query_change_message(); // throws
     }
 
-    if (m_allow_upload && (m_last_version_available > m_upload_progress.client_version)) {
+    // Don't allow UPLOAD messages for client reset fresh realm download sessions
+    if (get_session_reason() != SessionReason::FreshRealm && m_allow_upload &&
+        (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1919,7 +1923,19 @@ void Session::send_bind_message()
         if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
-        bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
+        auto xlate_session_reason = [](SessionReason reason) -> uint64_t {
+            switch (reason) {
+                case SessionReason::FreshRealm:
+                    [[fallthrough]];
+                case SessionReason::ClientResetDiff:
+                    return 1;
+                case SessionReason::Sync:
+                    [[fallthrough]];
+                default:
+                    return 0;
+            }
+        };
+        bind_json_data["sessionReason"] = xlate_session_reason(get_session_reason());
         auto schema_version = get_schema_version();
         // Send 0 if schema is not versioned.
         bind_json_data["schemaVersion"] = schema_version != uint64_t(-1) ? schema_version : 0;

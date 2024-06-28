@@ -285,10 +285,12 @@ inline std::ostream& operator<<(std::ostream& os, ConnectionState state)
 
 // The reason a synchronization session is used for.
 enum class SessionReason {
-    // Regular synchronization
+    // Regular synchronization => BIND message sessionReason = 0
     Sync = 0,
-    // Download a fresh realm
-    ClientReset,
+    // Download a fresh realm => BIND message sessionReason = 1
+    FreshRealm,
+    // Client reset diff session => BIND message sessionReason = 1
+    ClientResetDiff,
 };
 
 } // namespace realm::sync
