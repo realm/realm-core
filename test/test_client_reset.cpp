@@ -593,8 +593,8 @@ TEST(ClientReset_ThreeClients)
         }
 
         // get a fresh copy from the server to reset against
-        SHARED_GROUP_TEST_PATH(path_fresh1);
-        SHARED_GROUP_TEST_PATH(path_fresh2);
+        SHARED_GROUP_FRESH_PATH(path_fresh1);
+        SHARED_GROUP_FRESH_PATH(path_fresh2);
         {
             Session session4 = fixture.make_session(path_fresh1, server_path);
             session4.wait_for_download_complete_or_client_stopped();
@@ -719,7 +719,7 @@ TEST(ClientReset_DoNotRecoverSchema)
     }
 
     // get a fresh copy from the server to reset against
-    SHARED_GROUP_TEST_PATH(path_fresh1);
+    SHARED_GROUP_FRESH_PATH(path_fresh1);
     {
         Session session_fresh = fixture.make_session(path_fresh1, server_path_2);
         session_fresh.wait_for_download_complete_or_client_stopped();
@@ -813,7 +813,7 @@ TEST(ClientReset_PinnedVersion)
     // Trigger a client reset
     {
         // get a fresh copy from the server to reset against
-        SHARED_GROUP_TEST_PATH(path_fresh);
+        SHARED_GROUP_FRESH_PATH(path_fresh);
         {
             Session session_fresh = fixture.make_session(path_fresh, server_path_1);
             session_fresh.wait_for_download_complete_or_client_stopped();
