@@ -593,16 +593,20 @@ TEST(ClientReset_ThreeClients)
         }
 
         // get a fresh copy from the server to reset against
-        SHARED_GROUP_FRESH_PATH(path_fresh1);
-        SHARED_GROUP_FRESH_PATH(path_fresh2);
+        SHARED_GROUP_TEST_PATH(path_fresh1);
+        SHARED_GROUP_TEST_PATH(path_fresh2);
         {
-            Session session4 = fixture.make_session(path_fresh1, server_path);
+            Session::Config config{};
+            config.session_reason = SessionReason::FreshRealm;
+            Session session4 = fixture.make_session(path_fresh1, server_path, std::move(config));
             session4.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
 
         {
-            Session session4 = fixture.make_session(path_fresh2, server_path);
+            Session::Config config{};
+            config.session_reason = SessionReason::FreshRealm;
+            Session session4 = fixture.make_session(path_fresh2, server_path, std::move(config));
             session4.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh2 = DB::create(make_client_replication(), path_fresh2);
@@ -719,9 +723,11 @@ TEST(ClientReset_DoNotRecoverSchema)
     }
 
     // get a fresh copy from the server to reset against
-    SHARED_GROUP_FRESH_PATH(path_fresh1);
+    SHARED_GROUP_TEST_PATH(path_fresh1);
     {
-        Session session_fresh = fixture.make_session(path_fresh1, server_path_2);
+        Session::Config config{};
+        config.session_reason = SessionReason::FreshRealm;
+        Session session_fresh = fixture.make_session(path_fresh1, server_path_2, std::move(config));
         session_fresh.wait_for_download_complete_or_client_stopped();
     }
     DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
@@ -813,9 +819,11 @@ TEST(ClientReset_PinnedVersion)
     // Trigger a client reset
     {
         // get a fresh copy from the server to reset against
-        SHARED_GROUP_FRESH_PATH(path_fresh);
+        SHARED_GROUP_TEST_PATH(path_fresh);
         {
-            Session session_fresh = fixture.make_session(path_fresh, server_path_1);
+            Session::Config config{};
+            config.session_reason = SessionReason::FreshRealm;
+            Session session_fresh = fixture.make_session(path_fresh, server_path_1, std::move(config));
             session_fresh.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);
