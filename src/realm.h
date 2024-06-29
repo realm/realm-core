@@ -3018,7 +3018,7 @@ RLM_API void realm_app_config_set_metadata_mode(realm_app_config_t*,
 RLM_API void realm_app_config_set_metadata_encryption_key(realm_app_config_t*, const uint8_t[64]) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_security_access_group(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 
-RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_sync_client_config(realm_app_config_t* config, realm_sync_client_config_t* sync_client_config) RLM_API_NOEXCEPT;
 
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
