@@ -1,0 +1,160 @@
+name: Pull request build and test
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build for ${{ matrix.variant.os }} ${{ matrix.variant.arch }} ${{ matrix.variant.buildtype }}
+    runs-on: ${{ matrix.variant.runner }}
+    # if container is not set for a variant, this is a noop
+    container: ${{ matrix.variant.container }}
+    env:
+      NDK_VERSION: 22.1.7171670
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - { os: linux, runner: ubuntu-latest, arch: x64, buildtype: Debug, ctest: yes }
+          #- { os: windows, runner: windows-latest, arch: x64, buildtype: Debug }
+          #- { os: android, runner: ubuntu-latest, arch: x86, buildtype: Debug }
+          #- { os: android, runner: ubuntu-latest, arch: x86_64, buildtype: Debug }
+          #- { os: android, runner: ubuntu-latest, arch: armeabi-v7a, buildtype: Debug }
+          #- { os: android, runner: ubuntu-latest, arch: arm64-v8a, buildtype: Debug }
+          #- { os: darwin, runner: macos-latest, arch: x64, buildtype: Debug }
+          #- { os: ios, runner: macos-latest, arch: iphoneos, buildtype: Debug }
+          #- { os: ios, runner: macos-latest, arch: iphonesimulator, buildtype: Debug }
+          #- { os: ios, runner: macos-latest, arch: watchos, buildtype: Debug }
+          #- { os: ios, runner: macos-latest, arch: watchsimulator, buildtype: Debug }
+          #- { os: ios, runner: macos-latest, arch: appletvos, buildtype: Debug}
+          #- { os: ios, runner: macos-latest, arch: appletvsimulator, buildtype: Debug }
+          - { os: emscripten, runner: ubuntu-latest, arch: wasm, buildtype: Debug, container: 'emscripten/emsdk:3.1.37' }
+          #- { os: linux, runner: ubuntu-latest, arch: arm }
+          #- { os: linux, runner: ubuntu-latest, arch: arm64 }
+          #- { os: windows, runner: windows-latest, arch: ia32 }
+          #- { os: darwin, runner: macos-latest, arch: arm64 }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+
+      - name: MSVC Setup
+        if: ${{ runner.os == 'Windows' }}
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Linux Environment setup
+        if: ${{ matrix.variant.runner == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache ninja-build
+
+      - name: Setup Java
+        if: ${{ matrix.variant.os == 'android' }}
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu' # See 'Supported distributions' for available options
+          java-version: '11'
+
+      - name: Setup Android SDK
+        if: ${{ matrix.variant.os == 'android' }}
+        uses: android-actions/setup-android@v2
+
+      - name: Install NDK
+        if: ${{ matrix.variant.os == 'android' }}
+        run: sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
+
+      # The ccache installed by github doesn't want to be moved around. Let the ccache action download a new one.
+      - name: Remove pre-installed ccache
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        # There are two; remove both
+        run: |
+          rm -fv $(which ccache)
+          rm -fv $(which ccache)
+
+      - name: ccache
+        if: ${{ matrix.variant.runner == 'ubuntu-latest' }}
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ matrix.variant.os }}-${{ matrix.variant.arch }}
+          max-size: '2.0G'
+
+      - name: Prepend ccache executables to the PATH
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          echo "/usr/lib/ccache:/usr/local/opt/ccache/libexec" >> $GITHUB_PATH
+
+      # in CI file timestamps change with every run so instead rely on file content hashing
+      # https://reactnative.dev/docs/build-speed#using-this-approach-on-a-ci
+      - name: Configure ccache
+        if: ${{ matrix.variant.runner == 'ubuntu-latest' }}
+        run: ccache --set-config="compiler_check=content"
+
+      - name: Insert ccache executables
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          cl_exe=$(which cl.exe)
+          cl_dir=$(dirname "$cl_exe")
+          # For 32-bit it uses a different compiler than the one in the path
+          if [ ${{ matrix.variant.arch }} = ia32 ]; then
+              cl_dir=$(dirname "$cl_dir")/x86
+              cl_exe="$cl_dir/cl.exe"
+          fi
+          cl_dir_windows="C:${cl_dir#/c}"
+          mv -v "$cl_exe" "$cl_dir"/cl-real.exe
+          cp -v "$cl_dir"/cl.exe.config "$cl_dir"/cl-real.exe.config
+          ccache_exe=$(which ccache.exe)
+          cp -v "$ccache_exe" "$cl_dir"/cl.exe
+          ls -l "$cl_dir"
+          echo "CCACHE_COMPILER=$cl_dir_windows/cl-real.exe" >> $GITHUB_ENV
+          echo 'CCACHE_COMPILERTYPE=msvc' >> $GITHUB_ENV
+          echo 'CCACHE_STATSLOG=C:\Users\runneradmin\ccache\statslog.txt' >> $GITHUB_ENV
+          #echo 'CCACHE_LOGFILE=C:\Users\runneradmin\ccache\logfile.txt' >> $GITHUB_ENV
+          # This tells msbuild to compile only one file at a time; ccache needs that.
+          echo 'UseMultiToolTask=true' >> $GITHUB_ENV
+          echo 'VCPKG_KEEP_ENV_VARS=CCACHE_COMPILER;CCACHE_STATSLOG;CCACHE_LOGFILE;CCACHE_COMPILERTYPE;UseMultiToolTask' >> $GITHUB_ENV
+
+      - name: Set emsdk wrapper
+        if: ${{ (matrix.variant.os == 'emscripten') }}
+        run: echo 'CMAKE_WRAPPER=emcmake' >> $GITHUB_ENV
+
+      - name: Build
+        if: ${{ (matrix.variant.os != 'android') && (matrix.variant.os != 'ios') }}
+        run: |
+          mkdir build
+          cd build
+          $CMAKE_WRAPPER cmake -D CMAKE_BUILD_TYPE=${{ matrix.variant.buildtype }} ..
+          cmake --build . -j
+
+      - name: Unit tests
+        if: ${{ (matrix.variant.ctest == 'yes') }}
+        run: |
+          cd build
+          ctest -C ${{ matrix.variant.buildtype }}
+
+      #TODO: what is version supposed to be
+      - name: Build Android
+        if: ${{ matrix.variant.os == 'android' }}
+        run: ./tools/cross_compile.sh -o ${{ matrix.variant.os }} -a ${{ matrix.variant.arch }} -t ${{ matrix.variant.buildtype }} -v 0.0.1
+
+      #TODO: what is version supposed to be
+      - name: Build iOS
+        if: ${{ matrix.variant.os == 'ios' }}
+        run: ./tools/cross_compile.sh -o ${{ matrix.variant.arch }} -t ${{ matrix.variant.buildtype }} -v 0.0.1
+
+      #TODO: which artifacts to upload
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: realm-core-builds
+          path: |
+            README.md
+
