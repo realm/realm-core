@@ -323,6 +323,12 @@ public:
     void reset() noexcept;
     /// @}
 
+    /// \brief Stops event loop execution when all pending work is complete.
+    ///
+    /// This lets you run the event loop with run_until_stopped() and stop
+    /// the event loop without interrupting or aborting any pending events.
+    void drain() noexcept;
+
     /// \brief Submit a handler to be executed by the event loop thread.
     ///
     /// Register the sepcified completion handler for immediate asynchronous
@@ -1132,7 +1138,7 @@ public:
     /// It is an error to call this function when the socket is not both open
     /// and connected.
     void shutdown(shutdown_type);
-    std::error_code shutdown(shutdown_type, std::error_code&);
+    void shutdown(shutdown_type, std::error_code&);
     /// @}
 
     /// @{ \brief Initialize socket with an already-connected native socket
@@ -3257,8 +3263,10 @@ inline void Socket::async_write_some(const char* data, std::size_t size, H&& han
 inline void Socket::shutdown(shutdown_type what)
 {
     std::error_code ec;
-    if (shutdown(what, ec)) // Throws
+    shutdown(what, ec); // Throws
+    if (ec) {
         throw std::system_error(ec);
+    }
 }
 
 inline void Socket::assign(const StreamProtocol& prot, native_handle_type native_socket)

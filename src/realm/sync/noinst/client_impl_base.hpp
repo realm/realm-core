@@ -462,9 +462,9 @@ public:
 
     // Methods from WebSocketObserver interface for websockets from the Socket Provider
     void websocket_connected_handler(const std::string& protocol);
-    bool websocket_binary_message_received(util::Span<const char> data);
+    void websocket_binary_message_received(util::Span<const char> data);
     void websocket_error_handler();
-    bool websocket_closed_handler(bool, websocket::WebSocketError, std::string_view msg);
+    void websocket_closed_handler(bool, websocket::WebSocketError, std::string_view msg);
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -488,9 +488,6 @@ public:
     ~Connection();
 
 private:
-    struct LifecycleSentinel : public util::AtomicRefCountBase {
-        bool destroyed = false;
-    };
     struct WebSocketObserverShim;
 
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
@@ -582,7 +579,6 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    util::bind_ptr<LifecycleSentinel> m_websocket_sentinel;
     std::unique_ptr<WebSocketInterface> m_websocket;
 
     /// DEPRECATED - These will be removed in a future release

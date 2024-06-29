@@ -7024,17 +7024,17 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
             realm_sync_socket_websocket_error(m_observer);
         }
 
-        bool websocket_binary_message_received(util::Span<const char> data) override
+        void websocket_binary_message_received(util::Span<const char> data) override
         {
             REALM_ASSERT(m_observer);
-            return realm_sync_socket_websocket_message(m_observer, data.data(), data.size());
+            realm_sync_socket_websocket_message(m_observer, data.data(), data.size());
         }
 
-        bool websocket_closed_handler(bool was_clean, WebSocketError error, std::string_view msg) override
+        void websocket_closed_handler(bool was_clean, WebSocketError error, std::string_view msg) override
         {
             REALM_ASSERT(m_observer);
-            return realm_sync_socket_websocket_closed(m_observer, was_clean,
-                                                      static_cast<realm_web_socket_errno_e>(error), msg.data());
+            realm_sync_socket_websocket_closed(m_observer, was_clean, static_cast<realm_web_socket_errno_e>(error),
+                                               msg.data());
         }
 
     private:

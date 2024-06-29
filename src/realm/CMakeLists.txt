@@ -211,6 +211,7 @@ set(REALM_INSTALL_HEADERS
 
     util/aes_cryptor.hpp
     util/any.hpp
+    util/async_future_adapter.hpp
     util/assert.hpp
     util/backtrace.hpp
     util/base64.hpp

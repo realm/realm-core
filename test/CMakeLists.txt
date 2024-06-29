@@ -213,6 +213,7 @@ if(REALM_ENABLE_SYNC)
         test_sync_subscriptions.cpp
         test_sync_pending_bootstraps.cpp
         test_sync_error_backoff.cpp
+        test_sync_socket_provider.cpp
         test_transform_collections_mixed.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp

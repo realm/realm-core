@@ -4470,13 +4470,10 @@ RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm
  * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
  * @param data a pointer to the buffer that contains the data received over the websocket
  * @param data_size the number of bytes in the data buffer
- * @return bool designates whether the WebSocket object should continue processing messages. The normal return
- *         value is true. False must be returned if the websocket object has been destroyed during execution of
- *         the function.
  * NOTE: This function must be called by the event loop execution thread and should not be called
  *       after the websocket_free_func has been called to release the websocket resources.
  */
-RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
+RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
                                                  const char* data, size_t data_size);
 
 /**
@@ -4488,13 +4485,10 @@ RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
  *                  unreachable, etc.)
  * @param code the websocket close code (per the WebSocket spec) that describes why the websocket was closed.
  * @param reason a string describing details about the error that occurred or empty string if no error.
- * @return bool designates whether the WebSocket object has been destroyed during the execution of this
- *         function. The normal return value is True to indicate the WebSocket object is no longer valid. If
- *         False is returned, the WebSocket object will be destroyed at some point in the future.
  * NOTE: This function must be called by the event loop execution thread and should not be called
  *       after the websocket_free_func has been called to release the websocket resources.
  */
-RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
+RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
                                                 realm_web_socket_errno_e code, const char* reason);
 
 #endif // REALM_H

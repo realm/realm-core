@@ -107,4 +107,6 @@ public:
     virtual void force_handshake_response_for_testing(int status_code, std::string body = "") = 0;
 };
 
+Status status_from_network_error_code(std::error_code ec);
+
 } // namespace realm::sync::websocket

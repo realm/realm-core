@@ -1396,6 +1396,17 @@ public:
         io_reactor.interrupt();
     }
 
+    void drain() noexcept
+    {
+        {
+            std::lock_guard lock{m_mutex};
+            if (m_draining)
+                return;
+            m_draining = true;
+        }
+        io_reactor.interrupt();
+    }
+
     void reset() noexcept
     {
         std::lock_guard lock{m_mutex};
@@ -1538,6 +1549,7 @@ private:
     OperQueue<ResolveOperBase> m_resolve_operations; // Protected by `m_mutex`
     OperQueue<AsyncOper> m_completed_operations_2;   // Protected by `m_mutex`
     bool m_stopped = false;                          // Protected by `m_mutex`
+    bool m_draining = false;                         // Protected by `m_mutex`
     bool m_stop_resolver_thread = false;             // Protected by `m_mutex`
     bool m_resolve_in_progress = false;              // Protected by `m_mutex`
     std::condition_variable m_resolver_cond;         // Protected by `m_mutex`
@@ -1553,11 +1565,13 @@ private:
     void run_impl(bool return_when_idle)
     {
         bool no_incomplete_resolve_operations;
+        bool draining;
 
     on_handlers_executed_or_interrupted : {
         std::lock_guard lock{m_mutex};
         if (m_stopped)
             return;
+        draining = m_draining;
         // Note: Order of post operations must be preserved.
         m_completed_operations.push_back(m_completed_operations_2);
         no_incomplete_resolve_operations = (!m_resolve_in_progress && m_resolve_operations.empty());
@@ -1585,7 +1599,7 @@ private:
 
         bool no_incomplete_operations =
             (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
-        if (no_incomplete_operations && return_when_idle) {
+        if (no_incomplete_operations && (return_when_idle || draining)) {
             // We can only get to this point when there are no completion
             // handlers ready to execute. It happens either because of a
             // fall-through from on_operations_completed, or because of a
@@ -1782,6 +1796,10 @@ void Service::stop() noexcept
     m_impl->stop();
 }
 
+void Service::drain() noexcept
+{
+    m_impl->drain();
+}
 
 void Service::reset() noexcept
 {
@@ -2389,15 +2407,12 @@ std::error_code Socket::connect(const Endpoint& ep, std::error_code& ec)
 }
 
 
-std::error_code Socket::shutdown(shutdown_type what, std::error_code& ec)
+void Socket::shutdown(shutdown_type what, std::error_code& ec)
 {
     native_handle_type sock_fd = m_desc.native_handle();
     int how = what;
     int ret = ::shutdown(sock_fd, how);
-    if (REALM_UNLIKELY(check_socket_error(ret, ec)))
-        return ec;
-    ec = std::error_code(); // Success
-    return ec;
+    check_socket_error(ret, ec);
 }
 
 
