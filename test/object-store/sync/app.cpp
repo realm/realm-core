@@ -737,7 +737,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") 
 // MARK: - UsernamePasswordProviderClient Tests
 
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][baas]") {
-    const std::string base_url = get_base_url();
+    const std::string base_url = get_real_base_url();
     AutoVerifiedEmailCredentials creds;
     auto email = creds.email;
     auto password = creds.password;
