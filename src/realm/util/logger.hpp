@@ -245,6 +245,11 @@ public:
         set_level_threshold(m_category, level);
     }
 
+    const LogCategory& get_category() const noexcept
+    {
+        return m_category;
+    }
+
     // Set threshold level for the specific category
     void set_level_threshold(std::string_view cat_name, Level level) noexcept
     {

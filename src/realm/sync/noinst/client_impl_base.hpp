@@ -195,8 +195,23 @@ public:
     static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
     static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
 
-    const std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    class ForwardingLogger : public util::Logger {
+    public:
+        ForwardingLogger(std::shared_ptr<util::Logger> logger)
+            : Logger(logger->get_category(), *logger)
+            , base_logger(std::move(logger))
+        {
+        }
+
+        void do_log(const util::LogCategory& cat, Level level, const std::string& msg) final
+        {
+            Logger::do_log(*base_logger, cat, level, msg);
+        }
+
+        std::shared_ptr<util::Logger> base_logger;
+    };
+
+    ForwardingLogger logger;
 
     ClientImpl(ClientConfig);
     ~ClientImpl();
@@ -392,8 +407,7 @@ public:
     using ReconnectInfo = ClientImpl::ReconnectInfo;
     using DownloadMessage = ClientProtocol::DownloadMessage;
 
-    std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    ForwardingLogger logger;
 
     ClientImpl& get_client() noexcept;
     ReconnectInfo get_reconnect_info() const noexcept;
@@ -574,7 +588,8 @@ private:
     Session* find_and_validate_session(session_ident_type session_ident, std::string_view message) noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
-    static std::string make_logger_prefix(connection_ident_type);
+    static std::shared_ptr<util::Logger> make_logger(mpark::variant<connection_ident_type, std::string> ident,
+                                                     std::shared_ptr<util::Logger> base_logger);
 
     void report_connection_state_change(ConnectionState, util::Optional<SessionErrorInfo> error_info = util::none);
 
@@ -694,7 +709,6 @@ private:
     std::string m_signed_access_token;
 };
 
-
 /// A synchronization session between a local and a remote Realm file.
 ///
 /// All use of session objects, including construction and destruction, must
@@ -704,8 +718,7 @@ public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
     using DownloadMessage = ClientProtocol::DownloadMessage;
 
-    std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    ForwardingLogger logger;
 
     ClientImpl& get_client() noexcept;
     Connection& get_connection() noexcept;
@@ -1123,7 +1136,7 @@ private:
     request_ident_type m_last_pending_test_command_ident = 0;
     std::list<PendingTestCommand> m_pending_test_commands;
 
-    static std::string make_logger_prefix(session_ident_type);
+    static std::shared_ptr<util::Logger> make_logger(session_ident_type, std::shared_ptr<util::Logger> base_logger);
 
     Session(SessionWrapper& wrapper, Connection&, session_ident_type);
 
@@ -1420,9 +1433,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
 }
 
 inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::session, make_logger_prefix(ident),
-                                                      conn.logger_ptr)} // Throws
-    , logger{*logger_ptr}
+    : logger{make_logger(ident, conn.logger.base_logger)} // Throws
     , m_conn{conn}
     , m_ident{ident}
     , m_try_again_delay_info(conn.get_client().m_reconnect_backoff_info, conn.get_client().get_random())
