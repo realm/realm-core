@@ -293,6 +293,19 @@ enum class SessionReason {
     ClientResetDiff,
 };
 
+inline std::ostream& operator<<(std::ostream& os, SessionReason reason)
+{
+    switch (reason) {
+        case SessionReason::Sync:
+            return os << "Sync";
+        case SessionReason::FreshRealm:
+            return os << "FreshRealm";
+        case SessionReason::ClientResetDiff:
+            return os << "ClientResetDiff";
+    }
+    REALM_TERMINATE("Invalid SessionReason value");
+}
+
 } // namespace realm::sync
 
 #endif // REALM_SYNC_CLIENT_BASE_HPP

@@ -1704,7 +1704,8 @@ void Session::activate()
         bool file_exists = util::File::exists(get_realm_path());
         m_performing_client_reset = get_client_reset_config().has_value();
 
-        logger.info("client_reset_config = %1, Realm exists = %2 ", m_performing_client_reset, file_exists);
+        logger.info("client_reset_config = %1, Realm exists = %2, session_reason = %3 ", m_performing_client_reset,
+                    file_exists, get_session_reason());
         if (!m_performing_client_reset) {
             get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
@@ -1717,13 +1718,12 @@ void Session::activate()
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
     init_progress_handler();
 
-    logger.debug("last_version_available  = %1", m_last_version_available);                    // Throws
+    logger.debug("last_version_available = %1", m_last_version_available);                     // Throws
     logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
     logger.debug("progress_download_client_version = %1",
                  m_progress.download.last_integrated_client_version);                                      // Throws
     logger.debug("progress_upload_server_version = %1", m_progress.upload.last_integrated_server_version); // Throws
     logger.debug("progress_upload_client_version = %1", m_progress.upload.client_version);                 // Throws
-    logger.debug("fresh_download_session = %1", get_session_reason() == SessionReason::FreshRealm ? "yes" : "no");
 
     reset_protocol_state();
     m_state = Active;
@@ -1878,8 +1878,7 @@ void Session::send_message()
             return false;
         }
 
-        // Allow QUERY uploads for client reset fresh realm download sessions
-        if (!m_allow_upload && get_session_reason() != SessionReason::FreshRealm) {
+        if (!m_allow_upload) {
             return false;
         }
 
@@ -1889,8 +1888,11 @@ void Session::send_message()
             return false;
         }
 
+        // Send QUERY messages when the upload progress client version reaches the snapshot version
+        // of a pending subscription, or if this is a fresh realm download session, since UPLOAD
+        // messages are not allowed and the upload progress will not be updated.
         return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version ||
-               get_session_reason() == SessionReason::FreshRealm;
+               REALM_UNLIKELY(is_fresh_realm_download());
     };
 
     if (check_pending_flx_version()) {
@@ -1898,7 +1900,7 @@ void Session::send_message()
     }
 
     // Don't allow UPLOAD messages for client reset fresh realm download sessions
-    if (get_session_reason() != SessionReason::FreshRealm && m_allow_upload &&
+    if (REALM_LIKELY(!is_fresh_realm_download()) && m_allow_upload &&
         (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
@@ -2312,27 +2314,29 @@ bool Session::client_reset_if_needed()
     }
 
     // The fresh Realm has been used to reset the state
-    logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
+    logger.debug("Client reset is completed, path = %1", get_realm_path()); // Throws
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
                  m_client_file_ident.salt); // Throws
 
     SaltedFileIdent client_file_ident;
     get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+    // Print the version/progress information before performing the asserts
+    logger.debug("last_version_available = %1", m_last_version_available); // Throws
+    logger.debug("upload_progress_client_version = %1, upload_progress_server_version = %2",
+                 m_progress.upload.client_version,
+                 m_progress.upload.last_integrated_server_version); // Throws
+    logger.debug("download_progress_client_version = %1, download_progress_server_version = %2",
+                 m_progress.download.last_integrated_client_version,
+                 m_progress.download.server_version); // Throws
+
     REALM_ASSERT_3(m_client_file_ident.ident, ==, client_file_ident.ident);
     REALM_ASSERT_3(m_client_file_ident.salt, ==, client_file_ident.salt);
     REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
                     m_progress.download.last_integrated_client_version);
     REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
-    logger.debug("last_version_available  = %1", m_last_version_available); // Throws
 
     m_upload_progress = m_progress.upload;
-    logger.debug("upload_progress_client_version = %1, upload_progress_server_version = %2",
-                 m_upload_progress.client_version,
-                 m_upload_progress.last_integrated_server_version); // Throws
     m_download_progress = m_progress.download;
-    logger.debug("download_progress_client_version = %1, download_progress_server_version = %2",
-                 m_download_progress.last_integrated_client_version,
-                 m_download_progress.server_version); // Throws
     init_progress_handler();
     // In recovery mode, there may be new changesets to upload and nothing left to download.
     // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
@@ -2367,13 +2371,24 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     bool legal_at_this_time = (m_bind_message_sent && !have_client_file_ident() && !m_error_message_received &&
                                !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        return {ErrorCodes::SyncProtocolInvariantFailed, "Received IDENT message when it was not legal"};
+        std::string_view illegal_reason;
+        if (m_bind_message_sent)
+            illegal_reason = "BIND message not sent";
+        else if (have_client_file_ident())
+            illegal_reason = "file ident has already been assigned to session";
+        else if (m_error_message_received)
+            illegal_reason = "error message has been received from the server";
+        else if (m_unbound_message_received)
+            illegal_reason = "session has already been suspended";
+        return {ErrorCodes::SyncProtocolInvariantFailed,
+                util::format("Received IDENT message when it was not legal: %1", illegal_reason)};
     }
     if (REALM_UNLIKELY(client_file_ident.ident < 1)) {
-        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier in IDENT message"};
+        return {ErrorCodes::SyncProtocolInvariantFailed,
+                util::format("Bad client file identifier in IDENT message: %1", client_file_ident.ident)};
     }
     if (REALM_UNLIKELY(client_file_ident.salt == 0)) {
-        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier salt in IDENT message"};
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier salt (0) in IDENT message"};
     }
 
     m_client_file_ident = client_file_ident;
@@ -2839,7 +2854,7 @@ void Session::check_for_download_completion()
     if (m_download_progress.server_version < m_server_version_at_last_download_mark)
         return;
     m_last_triggering_download_mark = m_target_download_mark;
-    if (REALM_UNLIKELY(!m_allow_upload || get_session_reason() == SessionReason::FreshRealm)) {
+    if (REALM_UNLIKELY(!m_allow_upload)) {
         // Activate the upload process now, and enable immediate reactivation
         // after a subsequent fast reconnect.
         m_allow_upload = true;
