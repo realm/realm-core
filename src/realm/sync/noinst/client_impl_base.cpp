@@ -2174,6 +2174,8 @@ void Session::send_upload_message()
                                                locked_server_version); // Throws
     m_conn.initiate_write_message(out, this);                          // Throws
 
+    call_debug_hook(SyncClientHookEvent::UploadMessageSent);
+
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
 }
