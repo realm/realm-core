@@ -1134,7 +1134,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         });
     }
     SECTION("teardown") {
-        teardown_harness(harness);
+        harness.reset();
     }
 }
 
