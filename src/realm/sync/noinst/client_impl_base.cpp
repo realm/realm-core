@@ -1524,9 +1524,6 @@ void Session::cancel_resumption_delay()
 
     logger.debug("Resumed"); // Throws
 
-    // Pulled temporarily from PR #7831
-    process_pending_flx_bootstrap();
-
     if (unbind_process_complete())
         initiate_rebind(); // Throws
 
