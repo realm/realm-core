@@ -2,11 +2,13 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add support for server initiated bootstraps. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* `DB::compact()` on an encrypted Realm without explicitly specifying a new encryption key would only work if the old key happened to be a valid nul-terminated string ([#7842](https://github.com/realm/realm-core/issues/7842), since v14.10.0).
+* Fixed a change of mode from Strong to All when removing links from an embedded object that links to a tombstone. This affects sync apps that use embedded objects which have a `Lst<Mixed>` that contains a link to another top level object which has been deleted by another sync client (creating a tombstone locally). In this particular case, the switch would cause any remaining link removals to recursively delete the destination object if there were no other links to it. ([#7828](https://github.com/realm/realm-core/issues/7828), since 14.0.0-beta.0)
+* Fixed removing backlinks from the wrong objects if the link came from a nested list, nested dictionary, top-level dictionary, or list of mixed, and the source table had more than 256 objects. This could manifest as `array_backlink.cpp:112: Assertion failed: int64_t(value >> 1) == key.value` when removing an object. ([#7594](https://github.com/realm/realm-core/issues/7594), since v11 for dictionaries)
+* Fixed the collapse/rejoin of clusters which contained nested collections with links. This could manifest as `array.cpp:319: Array::move() Assertion failed: begin <= end [2, 1]` when removing an object. ([#7839](https://github.com/realm/realm-core/issues/7839), since the introduction of nested collections in v14.0.0-beta.0)
 * If a sync session is interrupted by a disconnect or restart while downloading a bootstrap, stale data from the previous
   bootstrap may be included when the session reconnects and downloads the bootstrap. This can lead to objects stored in
   the database that do not match the actual state of the server and potentially leading to compensating writes.
@@ -21,9 +23,32 @@
 -----------
 
 ### Internals
+* Fixed `Table::remove_object_recursive` which wouldn't recursively follow links through a single `Mixed` property. This feature is exposed publicly on `Table` but no SDK currently uses it, so this is considered internal. ([#7829](https://github.com/realm/realm-core/issues/7829), likely since the introduction of Mixed)
+* Protocol version has been updated to v14 to support server intiated bootstraps and role change updates without a client reset. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
+* Create additional role change tests to verify role change during initial schema and subscription bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
+
+----------------------------------------------
+
+# 14.10.2 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* `DB::compact()` on an encrypted Realm without explicitly specifying a new encryption key would only work if the old key happened to be a valid nul-terminated string ([#7842](https://github.com/realm/realm-core/issues/7842), since v14.10.0).
+* You could get unexpected merge results when assigning to a nested collection ([#7809](https://github.com/realm/realm-core/issues/7809), since v14.0.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
 * FLX download estimates are now tracked in a multiprocess-compatible manner ([PR #7780](https://github.com/realm/realm-core/pull/7780)).
 * Fixed util::FlatMap so it uses the custom Compare for both ordering and equality checking so you can use util::FlatMap with case-insensitive string keys ([PR #7845](https://github.com/realm/realm-core/pull/7845)).
-* Create additional role change tests to verify role change during initial schema and subscription bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
 
 ----------------------------------------------
 
@@ -33,7 +58,6 @@
 * It is no longer an error to set a base url for an App with a trailing slash - for example, `https://services.cloud.mongodb.com/` instead of `https://services.cloud.mongodb.com` - before this change that would result in a 404 error from the server ([PR #7791](https://github.com/realm/realm-core/pull/7791)).
 * Performance has been improved for range queries on integers and timestamps. Requires that you use the "BETWEEN" operation in MQL or the Query::between() method when you build the query. (PR [#7785](https://github.com/realm/realm-core/pull/7785))
 * Expose `Obj::add_int()` in the bindgen spec. ([PR #7797](https://github.com/realm/realm-core/pull/7797)).
-* Add support for server initiated bootstraps. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 
 ### Fixed
 * Valgrind could report a branch on an uninitialized read when opening something that is not an encrypted Realm file as an encrypted Realm file ([PR #7789](https://github.com/realm/realm-core/pull/7789), since v14.10.0).
@@ -51,7 +75,6 @@
 
 ### Internals
 * Switch to building the Swift package and Cocoa binaries as C++20 ([PR #7802](https://github.com/realm/realm-core/pull/7802)).
-* Protocol version has been updated to v14 to support server intiated bootstraps and role change updates without a client reset. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 
 ----------------------------------------------
 
