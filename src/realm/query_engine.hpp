@@ -1590,6 +1590,10 @@ public:
     void table_changed() override
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
+        m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
+        if (m_string_interner) {
+            m_interned_string = m_string_interner->lookup(m_value);
+        }
     }
 
     void cluster_changed() override
@@ -1633,6 +1637,8 @@ protected:
     std::optional<std::string> m_value;
     std::optional<ArrayString> m_leaf;
     StringData m_string_value;
+    StringInterner* m_string_interner = nullptr;
+    std::optional<StringID> m_interned_string;
 
     bool m_is_string_enum = false;
 
@@ -1680,7 +1686,16 @@ public:
         TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
+
             StringData t = get_string(s);
+
+            if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
+                if (m_interned_string) {
+                    const auto id = m_string_interner->lookup(get_string(s));
+                    if (id && m_string_interner->compare(*m_interned_string, *id))
+                        return s;
+                }
+            }
 
             if constexpr (case_sensitive_comparison) {
                 // case insensitive not implemented for: >, >=, <, <=
@@ -2008,7 +2023,6 @@ private:
     std::vector<ObjKey> storage;
     size_t _find_first_local(size_t start, size_t end) override;
 };
-
 
 class StringNodeFulltext : public StringNodeEqualBase {
 public:
