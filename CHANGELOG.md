@@ -20,6 +20,7 @@
 
 ### Internals
 * Fixed `Table::remove_object_recursive` which wouldn't recursively follow links through a single `Mixed` property. This feature is exposed publicly on `Table` but no SDK currently uses it, so this is considered internal. ([#7829](https://github.com/realm/realm-core/issues/7829), likely since the introduction of Mixed)
+* Protocol version has been updated to v14 to support server intiated bootstraps and role change updates without a client reset. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 * Create additional role change tests to verify role change during initial schema and subscription bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
 
 ----------------------------------------------
@@ -70,7 +71,6 @@
 
 ### Internals
 * Switch to building the Swift package and Cocoa binaries as C++20 ([PR #7802](https://github.com/realm/realm-core/pull/7802)).
-* Protocol version has been updated to v14 to support server intiated bootstraps and role change updates without a client reset. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 
 ----------------------------------------------
 
