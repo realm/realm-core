@@ -45,6 +45,13 @@ bool ChunkedBinaryData::is_null() const
     return chunk.is_null();
 }
 
+bool ChunkedBinaryData::empty() const
+{
+    BinaryIterator copy = m_begin;
+    BinaryData chunk = copy.get_next();
+    return chunk.size() == 0;
+}
+
 char ChunkedBinaryData::operator[](size_t index) const
 {
     BinaryIterator copy = m_begin;
