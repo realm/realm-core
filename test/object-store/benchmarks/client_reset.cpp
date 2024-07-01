@@ -80,7 +80,7 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
         progress.upload.client_version = current_version;
         progress.upload.last_integrated_server_version = current_version;
         sync::VersionInfo info_out;
-        history_local->set_sync_progress(progress, nullptr, info_out);
+        history_local->set_sync_progress(progress, 0, info_out);
 
         constexpr int64_t shared_pk = -42;
         {

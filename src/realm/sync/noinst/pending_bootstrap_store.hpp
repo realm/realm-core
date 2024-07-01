@@ -52,7 +52,7 @@ public:
     PendingBootstrapStore& operator=(const PendingBootstrapStore&) = delete;
 
     // True if there are pending changesets to process.
-    bool has_pending();
+    bool has_pending() const noexcept;
 
     struct PendingBatch {
         int64_t query_version = 0;

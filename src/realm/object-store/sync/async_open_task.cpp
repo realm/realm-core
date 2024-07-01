@@ -59,7 +59,7 @@ void AsyncOpenTask::start(AsyncOpenCallback callback)
             return;
         }
 
-        self->migrate_schema_or_complete(std::move(callback), coordinator, status);
+        self->migrate_schema_or_complete(std::move(callback), coordinator);
     });
     session->revive_if_needed();
 }
@@ -108,15 +108,21 @@ void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
         m_session->unregister_progress_notifier(token);
 }
 
-void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& callback,
-                                                       std::shared_ptr<_impl::RealmCoordinator> coordinator,
-                                                       bool rerun_on_launch)
+void AsyncOpenTask::wait_for_bootstrap_or_complete(AsyncOpenCallback&& callback,
+                                                   std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                                                   Status status)
 {
-    // Attaching the subscription initializer to the latest subscription that was committed.
-    // This is going to be enough, for waiting that the subscription committed by init_subscription_initializer has
-    // been completed (either if it is the first time that the file is created or if rerun on launch was set to true).
-    // If the same Realm file is already opened, there is the possibility that this code may wait on a subscription
-    // that was not committed by init_subscription_initializer.
+    if (!status.is_ok()) {
+        async_open_complete(std::move(callback), coordinator, status);
+        return;
+    }
+
+    auto config = coordinator->get_config();
+    // FlX sync is not used so there is nothing to bootstrap.
+    if (!config.sync_config || !config.sync_config->flx_sync_requested) {
+        async_open_complete(std::move(callback), coordinator, status);
+        return;
+    }
 
     SharedRealm shared_realm;
     try {
@@ -126,13 +132,13 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& callb
         async_open_complete(std::move(callback), coordinator, exception_to_status());
         return;
     }
-    const auto init_subscription = shared_realm->get_latest_subscription_set();
-    const auto sub_state = init_subscription.state();
+    const auto subscription_set = shared_realm->get_latest_subscription_set();
+    const auto sub_state = subscription_set.state();
 
-    if ((sub_state != sync::SubscriptionSet::State::Complete) || (m_db_first_open && rerun_on_launch)) {
+    if (sub_state != sync::SubscriptionSet::State::Complete) {
         // We need to wait until subscription initializer completes
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-        init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
+        subscription_set.get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([self, coordinator, callback = std::move(callback)](
                            StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
                 self->async_open_complete(std::move(callback), coordinator, state.get_status());
@@ -172,7 +178,7 @@ void AsyncOpenTask::async_open_complete(AsyncOpenCallback&& callback,
 }
 
 void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
-                                               std::shared_ptr<_impl::RealmCoordinator> coordinator, Status status)
+                                               std::shared_ptr<_impl::RealmCoordinator> coordinator)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (!m_session)
@@ -186,7 +192,7 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
     }();
 
     if (!pending_migration) {
-        wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
+        wait_for_bootstrap_or_complete(std::move(callback), coordinator, Status::OK());
         return;
     }
 
@@ -214,21 +220,6 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
             };
             SyncSession::Internal::migrate_schema(*session, std::move(migration_completed_callback));
         });
-}
-
-void AsyncOpenTask::wait_for_bootstrap_or_complete(AsyncOpenCallback&& callback,
-                                                   std::shared_ptr<_impl::RealmCoordinator> coordinator,
-                                                   Status status)
-{
-    auto config = coordinator->get_config();
-    if (config.sync_config && config.sync_config->flx_sync_requested &&
-        config.sync_config->subscription_initializer && status.is_ok()) {
-        const bool rerun_on_launch = config.sync_config->rerun_init_subscription_on_open;
-        attach_to_subscription_initializer(std::move(callback), coordinator, rerun_on_launch);
-    }
-    else {
-        async_open_complete(std::move(callback), coordinator, status);
-    }
 }
 
 } // namespace realm

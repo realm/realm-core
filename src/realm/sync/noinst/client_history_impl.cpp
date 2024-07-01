@@ -336,7 +336,7 @@ void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
 
 
 // Overriding member function in realm::sync::ClientHistoryBase
-void ClientHistory::set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+void ClientHistory::set_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes,
                                       VersionInfo& version_info)
 {
     TransactionRef wt = m_db->start_write(); // Throws
@@ -420,7 +420,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
 
 
 void ClientHistory::integrate_server_changesets(
-    const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+    const SyncProgress& progress, DownloadableProgress downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
     util::Logger& logger, const TransactionRef& transact,
     util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr)
@@ -611,7 +611,7 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
 
 
 void ClientHistory::get_upload_download_bytes(DB* db, std::uint_fast64_t& downloaded_bytes,
-                                              std::uint_fast64_t& downloadable_bytes,
+                                              DownloadableProgress& downloadable_bytes,
                                               std::uint_fast64_t& uploaded_bytes,
                                               std::uint_fast64_t& uploadable_bytes,
                                               std::uint_fast64_t& snapshot_version)
@@ -620,7 +620,7 @@ void ClientHistory::get_upload_download_bytes(DB* db, std::uint_fast64_t& downlo
     version_type current_client_version = rt->get_version();
 
     downloaded_bytes = 0;
-    downloadable_bytes = 0;
+    downloadable_bytes = uint64_t(0);
     uploaded_bytes = 0;
     uploadable_bytes = 0;
     snapshot_version = current_client_version;
@@ -632,6 +632,22 @@ void ClientHistory::get_upload_download_bytes(DB* db, std::uint_fast64_t& downlo
         downloaded_bytes = root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int();
         downloadable_bytes = root.get_as_ref_or_tagged(s_progress_downloadable_bytes_iip).get_as_int();
         uploadable_bytes = root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
+        uploaded_bytes = root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int();
+    }
+}
+
+void ClientHistory::get_upload_download_bytes(DB* db, std::uint_fast64_t& downloaded_bytes,
+                                              std::uint_fast64_t& uploaded_bytes)
+{
+    TransactionRef rt = db->start_read(); // Throws
+    downloaded_bytes = 0;
+    uploaded_bytes = 0;
+
+    using gf = _impl::GroupFriend;
+    if (ref_type ref = gf::get_history_ref(*rt)) {
+        Array root(db->get_alloc());
+        root.init_from_ref(ref);
+        downloaded_bytes = root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int();
         uploaded_bytes = root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int();
     }
 }
@@ -829,7 +845,7 @@ void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 }
 
 
-void ClientHistory::update_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+void ClientHistory::update_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes,
                                          TransactionRef)
 {
     Array& root = m_arrays->root;
@@ -896,10 +912,8 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
                  RefOrTagged::make_tagged(progress.upload.last_integrated_server_version)); // Throws
     }
 
-    if (downloadable_bytes) {
-        root.set(s_progress_downloadable_bytes_iip,
-                 RefOrTagged::make_tagged(*downloadable_bytes)); // Throws
-    }
+    root.set(s_progress_downloadable_bytes_iip,
+             RefOrTagged::make_tagged(downloadable_bytes.as_bytes())); // Throws
     root.set(s_progress_uploaded_bytes_iip,
              RefOrTagged::make_tagged(uploaded_bytes)); // Throws
 

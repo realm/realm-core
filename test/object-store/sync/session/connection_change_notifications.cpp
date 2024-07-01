@@ -64,20 +64,54 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
             return sessions_are_connected(*session);
         });
 
-        std::atomic<bool> listener1_called(false);
+        std::atomic<size_t> listener1_call_cnt(0);
         std::atomic<bool> listener2_called(false);
+
         auto token1 = session->register_connection_change_callback(
             [&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
-                listener1_called = true;
+                listener1_call_cnt = listener1_call_cnt + 1;
             });
         session->unregister_connection_change_callback(token1);
+        // One call may have been in progress when unregistered
+        REQUIRE(listener1_call_cnt <= 1);
+        size_t listener1_called = listener1_call_cnt;
+
+        session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+            listener2_called = true;
+        });
+        user->log_out();
+        REQUIRE(sessions_are_disconnected(*session));
+        // ensure callback 1 was not called anymore
+        REQUIRE(listener1_call_cnt == listener1_called);
+        REQUIRE(listener2_called);
+    }
+
+    SECTION("unregister connection change listener during callback") {
+        uint64_t token1;
+        std::atomic<int> listener1_call_cnt(0);
+        std::atomic<bool> listener2_called(false);
+        auto session = sync_session(
+            user, "/connection-state-changes-3", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
+        token1 = session->register_connection_change_callback(
+            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+                listener1_call_cnt = listener1_call_cnt + 1;
+                session->unregister_connection_change_callback(token1);
+            });
+
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
+        EventLoop::main().run_until([&] {
+            return sessions_are_connected(*session);
+        });
+
         session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
             listener2_called = true;
         });
 
         user->log_out();
         REQUIRE(sessions_are_disconnected(*session));
-        REQUIRE(listener1_called == false);
-        REQUIRE(listener2_called == true);
+        REQUIRE(listener1_call_cnt == 1); // Only called once before unregister
+        REQUIRE(listener2_called);
     }
 }
