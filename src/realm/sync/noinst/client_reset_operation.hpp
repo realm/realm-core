@@ -39,8 +39,7 @@ std::string get_fresh_path_for(const std::string& realm_path);
 bool is_fresh_path(const std::string& realm_path);
 
 bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& reset_config,
-                          sync::SaltedFileIdent& file_ident_out, sync::SubscriptionStore* sub_store,
-                          util::FunctionRef<void(int64_t)> on_flx_version);
+                          sync::SubscriptionStore* sub_store, util::FunctionRef<void(int64_t)> on_flx_version);
 
 } // namespace realm::_impl::client_reset
 

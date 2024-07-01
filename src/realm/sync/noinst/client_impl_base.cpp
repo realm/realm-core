@@ -1703,9 +1703,10 @@ void Session::activate()
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         bool file_exists = util::File::exists(get_realm_path());
         m_performing_client_reset = get_client_reset_config().has_value();
+        m_fresh_realm_download = client_reset::is_fresh_path(get_realm_path());
 
-        logger.info("client_reset_config = %1, Realm exists = %2, session_reason = %3 ", m_performing_client_reset,
-                    file_exists, get_session_reason());
+        logger.info("client_reset_config = %1, Realm exists = %2, fresh realm download = %3 ",
+                    m_performing_client_reset, file_exists, m_fresh_realm_download ? "yes" : "no");
         if (!m_performing_client_reset) {
             get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
@@ -1892,7 +1893,7 @@ void Session::send_message()
         // of a pending subscription, or if this is a fresh realm download session, since UPLOAD
         // messages are not allowed and the upload progress will not be updated.
         return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version ||
-               REALM_UNLIKELY(is_fresh_realm_download());
+               REALM_UNLIKELY(m_fresh_realm_download);
     };
 
     if (check_pending_flx_version()) {
@@ -1900,7 +1901,7 @@ void Session::send_message()
     }
 
     // Don't allow UPLOAD messages for client reset fresh realm download sessions
-    if (REALM_LIKELY(!is_fresh_realm_download()) && m_allow_upload &&
+    if (REALM_LIKELY(!m_fresh_realm_download) && m_allow_upload &&
         (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
@@ -1926,19 +1927,7 @@ void Session::send_bind_message()
         if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
-        auto xlate_session_reason = [](SessionReason reason) -> uint64_t {
-            switch (reason) {
-                case SessionReason::FreshRealm:
-                    [[fallthrough]];
-                case SessionReason::ClientResetDiff:
-                    return 1;
-                case SessionReason::Sync:
-                    [[fallthrough]];
-                default:
-                    return 0;
-            }
-        };
-        bind_json_data["sessionReason"] = xlate_session_reason(get_session_reason());
+        bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
         auto schema_version = get_schema_version();
         // Send 0 if schema is not versioned.
         bind_json_data["schemaVersion"] = schema_version != uint64_t(-1) ? schema_version : 0;
@@ -2294,12 +2283,9 @@ bool Session::client_reset_if_needed()
         this->on_flx_sync_version_complete(version);
     };
     try {
-        // Storage for the file ident from the fresh realm that was migrated to the local realm
-        SaltedFileIdent client_file_ident_out;
+        // The file ident from the fresh realm will be copied over to the local realm
         bool did_reset = client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config),
-                                                            client_file_ident_out, get_flx_subscription_store(),
-                                                            on_flx_version_complete);
-        m_client_file_ident = client_file_ident_out;
+                                                            get_flx_subscription_store(), on_flx_version_complete);
 
         call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
         if (!did_reset) {
@@ -2317,12 +2303,11 @@ bool Session::client_reset_if_needed()
 
     // The fresh Realm has been used to reset the state
     logger.debug("Client reset is completed, path = %1", get_realm_path()); // Throws
-    logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
-                 m_client_file_ident.salt); // Throws
 
-    SaltedFileIdent client_file_ident;
-    get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+    get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
     // Print the version/progress information before performing the asserts
+    logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
+                 m_client_file_ident.salt);                                // Throws
     logger.debug("last_version_available = %1", m_last_version_available); // Throws
     logger.debug("upload_progress_client_version = %1, upload_progress_server_version = %2",
                  m_progress.upload.client_version,
@@ -2331,8 +2316,6 @@ bool Session::client_reset_if_needed()
                  m_progress.download.last_integrated_client_version,
                  m_progress.download.server_version); // Throws
 
-    REALM_ASSERT_3(m_client_file_ident.ident, ==, client_file_ident.ident);
-    REALM_ASSERT_3(m_client_file_ident.salt, ==, client_file_ident.salt);
     REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
                     m_progress.download.last_integrated_client_version);
     REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);

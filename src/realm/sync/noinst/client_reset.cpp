@@ -480,8 +480,8 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
     return mode;
 }
 
-bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sync::SaltedFileIdent& file_ident_out,
-                               util::Logger& logger, sync::SubscriptionStore* sub_store,
+bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, util::Logger& logger,
+                               sync::SubscriptionStore* sub_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete)
 {
     DB& db_remote = *reset_config.fresh_copy;
@@ -550,7 +550,6 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
 
     wt_local->commit_and_continue_as_read();
     on_flx_version_complete(subscription_version);
-    file_ident_out = fresh_file_ident;
 
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger.info(util::LogCategory::reset,

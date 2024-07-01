@@ -892,18 +892,8 @@ private:
     util::Optional<ClientReset>& get_client_reset_config() noexcept;
 
     // Get the reason a synchronization session is used for (regular sync or client reset)
-    // - Sync state means the session is a regular session
-    // - FreshRealm state means the session is going to be used to download a fresh realm.
-    // - ClientResetDiff state means the session is going to perform the client reset diff.
+    // - Client reset state means the session is going to be used to download a fresh realm.
     SessionReason get_session_reason() noexcept;
-
-    // Returns true if the current session is being used to download a fresh realm, since
-    // UPLOAD messages are not allowed to be sent during the fresh realm download for a
-    // client reset, but QUERY and MARK messages are allowed.
-    inline bool is_fresh_realm_download() noexcept
-    {
-        return get_session_reason() == SessionReason::FreshRealm;
-    }
 
     /// Returns the schema version the synchronization session connects with to the server.
     uint64_t get_schema_version() noexcept;
@@ -1048,6 +1038,9 @@ private:
 
     // True while this session is in the process of performing a client reset.
     bool m_performing_client_reset = false;
+
+    // True if this session is used to download a fresh realm during a client reset.
+    bool m_fresh_realm_download = false;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in

@@ -593,20 +593,16 @@ TEST(ClientReset_ThreeClients)
         }
 
         // get a fresh copy from the server to reset against
-        SHARED_GROUP_TEST_PATH(path_fresh1);
-        SHARED_GROUP_TEST_PATH(path_fresh2);
+        SHARED_GROUP_FRESH_PATH(path_fresh1);
+        SHARED_GROUP_FRESH_PATH(path_fresh2);
         {
-            Session::Config config{};
-            config.session_reason = SessionReason::FreshRealm;
-            Session session4 = fixture.make_session(path_fresh1, server_path, std::move(config));
+            Session session4 = fixture.make_session(path_fresh1, server_path);
             session4.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
 
         {
-            Session::Config config{};
-            config.session_reason = SessionReason::FreshRealm;
-            Session session4 = fixture.make_session(path_fresh2, server_path, std::move(config));
+            Session session4 = fixture.make_session(path_fresh2, server_path);
             session4.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh2 = DB::create(make_client_replication(), path_fresh2);
@@ -723,11 +719,9 @@ TEST(ClientReset_DoNotRecoverSchema)
     }
 
     // get a fresh copy from the server to reset against
-    SHARED_GROUP_TEST_PATH(path_fresh1);
+    SHARED_GROUP_FRESH_PATH(path_fresh1);
     {
-        Session::Config config{};
-        config.session_reason = SessionReason::FreshRealm;
-        Session session_fresh = fixture.make_session(path_fresh1, server_path_2, std::move(config));
+        Session session_fresh = fixture.make_session(path_fresh1, server_path_2);
         session_fresh.wait_for_download_complete_or_client_stopped();
     }
     DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
@@ -819,11 +813,9 @@ TEST(ClientReset_PinnedVersion)
     // Trigger a client reset
     {
         // get a fresh copy from the server to reset against
-        SHARED_GROUP_TEST_PATH(path_fresh);
+        SHARED_GROUP_FRESH_PATH(path_fresh);
         {
-            Session::Config config{};
-            config.session_reason = SessionReason::FreshRealm;
-            Session session_fresh = fixture.make_session(path_fresh, server_path_1, std::move(config));
+            Session session_fresh = fixture.make_session(path_fresh, server_path_1);
             session_fresh.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);
@@ -885,6 +877,10 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
         history.set_history_adjustments(*test_context.logger, current_client_version, fresh_client_id,
                                         sync_progress.latest_server_version, changes);
         wt->commit();
+        // Verify the fresh realm file ident after updating
+        history.get_status(current_client_version, file_ident, sync_progress);
+        CHECK(file_ident.ident == fresh_client_id.ident);
+        CHECK(file_ident.salt == fresh_client_id.salt);
     }
 
     Status error{ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"};
@@ -900,10 +896,9 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
     }(mode, allow_recovery);
 
     sync::ClientReset cr_config{mode, fresh, error, action};
-    sync::SaltedFileIdent file_ident_out = {0, 0};
 
     bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *target, std::move(cr_config),
-                                                               file_ident_out, sub_store, [](int64_t) {});
+                                                               sub_store, [](int64_t) {});
     CHECK(did_reset);
 
     // Should have closed and deleted the fresh realm
@@ -914,12 +909,17 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
     // that we're attempting recovery, and one with the actual reset
     CHECK_EQUAL(target->get_version_of_latest_snapshot(), db_version + 2);
 
-    // Should have set the client file ident
-    auto new_target_file_ident = target->start_read()->get_sync_file_id();
-    CHECK_EQUAL(file_ident_out.ident, fresh_client_id.ident);
-    CHECK_EQUAL(file_ident_out.salt, fresh_client_id.salt);
-    CHECK_EQUAL(new_target_file_ident, fresh_client_id.ident);
-    CHECK_EQUAL(new_target_file_ident, file_ident_out.ident);
+    // Should have set the client file ident from the fresh realm
+    {
+        version_type current_client_version;
+        SaltedFileIdent file_ident;
+        SyncProgress sync_progress;
+        auto wt = target->start_read();
+        auto& history = static_cast<ClientReplication*>(target->get_replication())->get_history();
+        history.get_status(current_client_version, file_ident, sync_progress);
+        CHECK_EQUAL(file_ident.ident, fresh_client_id.ident);
+        CHECK_EQUAL(file_ident.salt, fresh_client_id.salt);
+    }
 
     // Client resets aren't marked as complete until the server has acknowledged
     // sync completion to avoid reset cycles
@@ -1103,9 +1103,8 @@ TEST(ClientReset_UninitializedFile)
 
     // Should not perform a client reset because the target file has never been
     // written to
-    sync::SaltedFileIdent file_ident_out = {0, 0};
     bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *db_empty, std::move(cr_config),
-                                                               file_ident_out, nullptr, [](int64_t) {});
+                                                               nullptr, [](int64_t) {});
     CHECK_NOT(did_reset);
     auto rd_tr = db_empty->start_frozen();
     CHECK_NOT(PendingResetStore::has_pending_reset(rd_tr));
@@ -1276,9 +1275,8 @@ TEST(ClientReset_Recover_RecoveryDisabled)
                                 {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"},
                                 sync::ProtocolErrorInfo::Action::ClientResetNoRecovery};
 
-    sync::SaltedFileIdent file_ident_out = {0, 0};
     CHECK_THROW((_impl::client_reset::perform_client_reset(*test_context.logger, *dbs.first, std::move(cr_config),
-                                                           file_ident_out, nullptr, [](int64_t) {})),
+                                                           nullptr, [](int64_t) {})),
                 sync::ClientResetFailed);
     auto rd_tr = dbs.first->start_frozen();
     CHECK_NOT(PendingResetStore::has_pending_reset(rd_tr));

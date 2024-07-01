@@ -1172,7 +1172,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_progress_handler(std::move(config.progress_handler))
     , m_connection_state_change_listener(std::move(config.connection_state_change_listener))
     , m_debug_hook(std::move(config.on_sync_client_event_hook))
-    , m_session_reason(m_client_reset_config ? SessionReason::ClientResetDiff : config.session_reason)
+    , m_session_reason(m_client_reset_config ? SessionReason::ClientReset : config.session_reason)
     , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))

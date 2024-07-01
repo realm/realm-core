@@ -283,28 +283,13 @@ inline std::ostream& operator<<(std::ostream& os, ConnectionState state)
     REALM_TERMINATE("Invalid ConnectionState value");
 }
 
-// The reason a synchronization session is used for.
+// The reason a synchronization session is used for
 enum class SessionReason {
-    // Regular synchronization => BIND message sessionReason = 0
+    // Regular synchronization
     Sync = 0,
-    // Download a fresh realm => BIND message sessionReason = 1
-    FreshRealm,
-    // Client reset diff session => BIND message sessionReason = 1
-    ClientResetDiff,
+    // Download a fresh realm
+    ClientReset,
 };
-
-inline std::ostream& operator<<(std::ostream& os, SessionReason reason)
-{
-    switch (reason) {
-        case SessionReason::Sync:
-            return os << "Sync";
-        case SessionReason::FreshRealm:
-            return os << "FreshRealm";
-        case SessionReason::ClientResetDiff:
-            return os << "ClientResetDiff";
-    }
-    REALM_TERMINATE("Invalid SessionReason value");
-}
 
 } // namespace realm::sync
 
