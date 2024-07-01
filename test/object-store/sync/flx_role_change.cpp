@@ -775,9 +775,8 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
     }
     SECTION("Role change during subscription bootstrap") {
         auto realm_1 = Realm::get_shared_realm(config);
-        /// TODO: update to:
-        ///       bool initial_subscription = GENERATE(false, true);
-        bool initial_subscription = true;
+        bool initial_subscription = GENERATE(false, true);
+
         if (initial_subscription) {
             auto table = realm_1->read_group().get_table("class_Person");
             auto role_col = table->get_column_key("role");
@@ -799,9 +798,10 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
         // The test will update the rule to change access from all records to only the employee
         // records while a new subscription for all Person entries is being bootstrapped.
         update_role(default_rule, {{"role", "employee"}});
+
+        // Set up a new bootstrap while offline
         realm_1->sync_session()->shutdown_and_wait();
         {
-            // Set up a new bootstrap while offline
             auto table = realm_1->read_group().get_table("class_Person");
             auto new_subs = realm_1->get_latest_subscription_set().make_mutable_copy();
             new_subs.clear();
