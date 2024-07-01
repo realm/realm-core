@@ -30,7 +30,7 @@ std::shared_ptr<util::Logger> s_default_logger;
 } // anonymous namespace
 
 size_t LogCategory::s_next_index = 0;
-static std::map<std::string_view, LogCategory*> log_catagory_map;
+static std::map<std::string_view, LogCategory*> log_category_map;
 
 LogCategory LogCategory::realm("Realm", nullptr);
 LogCategory LogCategory::storage("Storage", &realm);
@@ -58,19 +58,19 @@ LogCategory::LogCategory(std::string_view name, LogCategory* parent)
         parent->m_children.push_back(this);
     }
     m_name += name;
-    log_catagory_map.emplace(m_name, this);
+    log_category_map.emplace(m_name, this);
 }
 
 LogCategory& LogCategory::get_category(std::string_view name)
 {
-    return *log_catagory_map.at(name); // Throws
+    return *log_category_map.at(name); // Throws
 }
 
 std::vector<const std::string_view> LogCategory::get_category_names()
 {
     std::vector<const std::string_view> ret;
-    ret.reserve(log_catagory_map.size());
-    for (auto& it : log_catagory_map) {
+    ret.reserve(log_category_map.size());
+    for (auto& it : log_category_map) {
         ret.push_back(it.second->get_name());
     }
     return ret;
