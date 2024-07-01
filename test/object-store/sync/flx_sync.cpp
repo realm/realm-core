@@ -606,8 +606,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         if (data.event == SyncClientHookEvent::UploadMessageSent) {
             // If this is an UPLOAD message event, check to see if the fresh realm is being downloaded
             if (auto session = weak_session.lock()) {
-                // client_resync_mode is set to "Manual" during fresh realm download session
-                if (session->config().client_resync_mode == ClientResyncMode::Manual) {
+                // Check for a "fresh" path to determine if this is a client reset fresh download session
+                if (_impl::client_reset::is_fresh_path(session->path())) {
                     FAIL("UPLOAD messages are not allowed during client reset fresh realm download");
                 }
             }
