@@ -153,7 +153,6 @@ public:
     }
 
     void clear(CascadeState&);
-    void enumerate_string_column(ColKey col_key);
 
     const Table* get_owning_table() const noexcept
     {
@@ -180,7 +179,6 @@ public:
     // Visit all leaves and call the supplied function. The function can modify the leaf.
     void update(UpdateFunction func);
 
-    void set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const;
     void set_string_interner(ArrayPayload& arr, ColKey col_key) const;
 
     virtual std::unique_ptr<ClusterNode> get_root_from_parent();
@@ -225,7 +223,6 @@ protected:
     std::unique_ptr<ClusterNode> create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent);
     std::unique_ptr<ClusterNode> get_node(ArrayParent* parent, size_t ndx_in_parent) const;
     TableRef get_table_ref() const;
-    bool is_string_enum_type(ColKey::Idx col_ndx) const;
     void remove_all_links(CascadeState&);
 };
 

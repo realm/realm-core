@@ -661,35 +661,6 @@ TEST(Query_Binary)
     }
 }
 
-TEST(Query_Enums)
-{
-    Table table;
-    auto col_int = table.add_column(type_Int, "1");
-    auto col_str = table.add_column(type_String, "2");
-
-
-    for (size_t i = 0; i < 5; ++i) {
-        table.create_object().set_all(1, "abd");
-        table.create_object().set_all(2, "eftg");
-        table.create_object().set_all(5, "hijkl");
-        table.create_object().set_all(8, "mnopqr");
-        table.create_object().set_all(9, "stuvxyz");
-    }
-
-    table.enumerate_string_column(col_str);
-
-    Query q1 = table.where().equal(col_str, "eftg");
-    TableView tv1 = q1.find_all();
-
-    CHECK_EQUAL(5, tv1.size());
-    CHECK_EQUAL(2, tv1[0].get<Int>(col_int));
-    CHECK_EQUAL(2, tv1[1].get<Int>(col_int));
-    CHECK_EQUAL(2, tv1[2].get<Int>(col_int));
-    CHECK_EQUAL(2, tv1[3].get<Int>(col_int));
-    CHECK_EQUAL(2, tv1[4].get<Int>(col_int));
-}
-
-
 TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1422,27 +1393,14 @@ TEST(Query_NullStrings)
 
 TEST(Query_Nulls_Fuzzy)
 {
-    for (int attributes = 1; attributes < 5; attributes++) {
+    for (int attributes = 1; attributes < 3; attributes++) {
         Random random(random_int<unsigned long>());
 
         for (size_t t = 0; t < 10; t++) {
             Table table;
             auto col = table.add_column(type_String, "string", true);
 
-            if (attributes == 0) {
-            }
             if (attributes == 1) {
-                table.add_search_index(col);
-            }
-            else if (attributes == 2) {
-                table.enumerate_string_column(col);
-            }
-            else if (attributes == 3) {
-                table.add_search_index(col);
-                table.enumerate_string_column(col);
-            }
-            else if (attributes == 4) {
-                table.enumerate_string_column(col);
                 table.add_search_index(col);
             }
 

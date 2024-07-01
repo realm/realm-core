@@ -916,53 +916,6 @@ TEST(Group_Close)
     Group from_mem(buffer);
 }
 
-TEST(Group_Serialize_Optimized)
-{
-    // Create group with one table
-    Group to_mem;
-    TableRef table = to_mem.add_table("test");
-    test_table_add_columns(table);
-
-    for (size_t i = 0; i < 5; ++i) {
-        table->create_object().set_all("abd", 1, true, int(Mon));
-        table->create_object().set_all("eftg", 2, true, int(Tue));
-        table->create_object().set_all("hijkl", 5, true, int(Wed));
-        table->create_object().set_all("mnopqr", 8, true, int(Thu));
-        table->create_object().set_all("stuvxyz", 9, true, int(Fri));
-    }
-
-    ColKey col_string = table->get_column_keys()[0];
-    table->enumerate_string_column(col_string);
-
-#ifdef REALM_DEBUG
-    to_mem.verify();
-#endif
-
-    // Serialize to memory (we now own the buffer)
-    BinaryData buffer = to_mem.write_to_mem();
-
-    // Load the table
-    Group from_mem(buffer);
-    TableRef t = from_mem.get_table("test");
-
-    CHECK_EQUAL(4, t->get_column_count());
-
-    // Verify that original values are there
-    CHECK(*table == *t);
-
-    // Add a row with a known (but unique) value
-    auto k = table->create_object().set_all("search_target", 9, true, int(Fri)).get_key();
-
-    const auto res = table->find_first_string(col_string, "search_target");
-    CHECK_EQUAL(k, res);
-
-#ifdef REALM_DEBUG
-    to_mem.verify();
-    from_mem.verify();
-#endif
-}
-
-
 TEST(Group_Serialize_All)
 {
     // Create group with one table

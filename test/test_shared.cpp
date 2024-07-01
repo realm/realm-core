@@ -2571,10 +2571,6 @@ TEST(Shared_MovingSearchIndex)
             obj.set<String>(enum_col, "bar");
         }
         table->get_object(obj_keys.back()).set<String>(enum_col, "bar63");
-        table->enumerate_string_column(enum_col);
-        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
-        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
-        CHECK_EQUAL(2, table->get_num_unique_values(enum_col));
 
         table->add_search_index(int_col);
         table->add_search_index(str_col);
@@ -2597,9 +2593,6 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(int_col));
         CHECK(table->has_search_index(str_col));
         CHECK(table->has_search_index(enum_col));
-        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
-        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
-        CHECK_EQUAL(2, table->get_num_unique_values(enum_col));
         CHECK_EQUAL(ObjKey(), table->find_first_int(int_col, 100));
         CHECK_EQUAL(ObjKey(), table->find_first_string(str_col, "bad"));
         CHECK_EQUAL(ObjKey(), table->find_first_string(enum_col, "bad"));
@@ -2613,9 +2606,6 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(int_col));
         CHECK(table->has_search_index(str_col));
         CHECK(table->has_search_index(enum_col));
-        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
-        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
-        CHECK_EQUAL(2, table->get_num_unique_values(enum_col));
         CHECK_EQUAL(ObjKey(), table->find_first_int(int_col, 100));
         CHECK_EQUAL(ObjKey(), table->find_first_string(str_col, "bad"));
         CHECK_EQUAL(ObjKey(), table->find_first_string(enum_col, "bad"));
@@ -2632,9 +2622,6 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(int_col));
         CHECK(table->has_search_index(str_col));
         CHECK(table->has_search_index(enum_col));
-        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
-        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
-        CHECK_EQUAL(3, table->get_num_unique_values(enum_col));
         CHECK_EQUAL(ObjKey(), table->find_first_int(int_col, 100));
         CHECK_EQUAL(ObjKey(), table->find_first_string(str_col, "bad"));
         CHECK_EQUAL(ObjKey(), table->find_first_string(enum_col, "bad"));
@@ -3630,34 +3617,6 @@ TEST(Shared_OpenAfterClose)
     wt = db_w->start_write();
     wt = nullptr;
     db_w->close();
-}
-
-TEST(Shared_RemoveTableWithEnumAndLinkColumns)
-{
-    // Test case generated with fuzzer
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db_w = DB::create(path);
-    TableKey tk;
-    {
-        auto wt = db_w->start_write();
-        wt->add_table("Table_2");
-        wt->commit();
-    }
-    {
-        auto wt = db_w->start_write();
-        auto table = wt->get_table("Table_2");
-        tk = table->get_key();
-        auto col_key = table->add_column(DataType(2), "string_3", false);
-        table->enumerate_string_column(col_key);
-        table->add_column(*table, "link_5");
-        table->add_search_index(col_key);
-        wt->commit();
-    }
-    {
-        auto wt = db_w->start_write();
-        wt->remove_table(tk);
-        wt->commit();
-    }
 }
 
 TEST(Shared_GenerateObjectIdAfterRollback)
