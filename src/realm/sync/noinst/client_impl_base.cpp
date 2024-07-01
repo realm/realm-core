@@ -1690,7 +1690,7 @@ void Session::activate()
         m_performing_client_reset = get_client_reset_config().has_value();
         m_fresh_realm_download = client_reset::is_fresh_path(get_realm_path());
 
-        logger.info("client_reset_config = %1, Realm exists = %2, fresh realm download = %3 ",
+        logger.info("client_reset_config = %1, Realm exists = %2, fresh realm download = %3",
                     m_performing_client_reset, file_exists, m_fresh_realm_download ? "yes" : "no");
         if (!m_performing_client_reset) {
             get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws

@@ -536,47 +536,50 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
     auto error_event_hook = [&config, &state](sync::ProtocolError error) {
         return [&config, &state, error](std::weak_ptr<SyncSession> weak_session,
                                         const SyncClientHookData& data) mutable {
-            if (auto session = weak_session.lock()) {
-                if (data.event == SyncClientHookEvent::BindMessageSent &&
-                    session->path() == _impl::client_reset::get_fresh_path_for(config.path)) {
-                    bool wait_for_resume = false;
-                    state.transition_with([&](State cur_state) -> std::optional<State> {
-                        if (cur_state == State::FirstError) {
-                            wait_for_resume = true;
-                            return State::InClientReset;
-                        }
-                        return std::nullopt;
-                    });
-                    if (wait_for_resume) {
-                        state.wait_for(State::Resumed);
-                    }
-                }
+            auto session = weak_session.lock();
+            if (!session) {
+                return SyncClientHookAction::NoAction;
+            }
 
-                if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
-                    return SyncClientHookAction::NoAction;
-                }
-                if (session->path() != config.path) {
-                    return SyncClientHookAction::NoAction;
-                }
-
-                auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
-                if (error_code == sync::ProtocolError::initial_sync_not_completed) {
-                    return SyncClientHookAction::NoAction;
-                }
-
-                REQUIRE(error_code == error);
+            if (data.event == SyncClientHookEvent::BindMessageSent &&
+                session->path() == _impl::client_reset::get_fresh_path_for(config.path)) {
+                bool wait_for_resume = false;
                 state.transition_with([&](State cur_state) -> std::optional<State> {
-                    switch (cur_state) {
-                        case State::Initial:
-                            return State::FirstError;
-                        case State::Resumed:
-                            return State::SecondError;
-                        default:
-                            FAIL(util::format("Unxpected state %1", static_cast<int>(cur_state)));
+                    if (cur_state == State::FirstError) {
+                        wait_for_resume = true;
+                        return State::InClientReset;
                     }
                     return std::nullopt;
                 });
+                if (wait_for_resume) {
+                    state.wait_for(State::Resumed);
+                }
             }
+
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+            if (session->path() != config.path) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            REQUIRE(error_code == error);
+            state.transition_with([&](State cur_state) -> std::optional<State> {
+                switch (cur_state) {
+                    case State::Initial:
+                        return State::FirstError;
+                    case State::Resumed:
+                        return State::SecondError;
+                    default:
+                        FAIL(util::format("Unxpected state %1", static_cast<int>(cur_state)));
+                }
+                return std::nullopt;
+            });
             return SyncClientHookAction::NoAction;
         };
     };
