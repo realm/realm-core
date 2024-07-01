@@ -351,12 +351,18 @@ class ArrayWriterBase;
 }
 
 /// Base class for all nodes holding user data
+class StringInterner;
 class ArrayPayload {
 public:
     virtual ~ArrayPayload();
     virtual void init_from_ref(ref_type) noexcept = 0;
     virtual void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept = 0;
     virtual Mixed get_any(size_t ndx) const = 0;
+    virtual bool need_string_interner() const
+    {
+        return false;
+    }
+    virtual void set_string_interner(StringInterner*) const {}
     virtual bool need_spec() const
     {
         return false;

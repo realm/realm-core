@@ -297,12 +297,12 @@ void Obj::to_json(std::ostream& out, JSONOutputMode output_mode) const
                     print_link(val);
                 }
                 else if (val.is_type(type_Dictionary)) {
-                    DummyParent parent(m_table, val.get_ref());
+                    DummyParent parent(m_table, val.get_ref(), ck);
                     Dictionary dict(parent, 0);
                     dict.to_json(out, output_mode, print_link);
                 }
                 else if (val.is_type(type_List)) {
-                    DummyParent parent(m_table, val.get_ref());
+                    DummyParent parent(m_table, val.get_ref(), ck);
                     Lst<Mixed> list(parent, 0);
                     list.to_json(out, output_mode, print_link);
                 }

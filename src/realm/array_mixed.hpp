@@ -64,6 +64,15 @@ public:
     {
         Array::set_parent(parent, ndx_in_parent);
     }
+    bool need_string_interner() const override
+    {
+        return true;
+    }
+    virtual void set_string_interner(StringInterner* interner) const override
+    {
+        m_strings.set_string_interner(interner);
+    }
+
     void init_from_parent()
     {
         ref_type ref = get_ref_from_parent();

@@ -521,7 +521,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->verify();
     CHECK_EQUAL(0, rt->size());
 
-    // Create a table via the other SharedGroup
+    // Create a table in a separate transaction
     ObjKey k0;
     {
         WriteTransaction wt(sg);
@@ -542,7 +542,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(0, foo->get_object(k0).get<int64_t>(cols[0]));
     uint_fast64_t version = foo->get_content_version();
 
-    // Modify the table via the other SharedGroup
+    // Modify the table in a separate transaction
     ObjKey k1;
     {
         WriteTransaction wt(sg);

@@ -251,6 +251,23 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 }
 
 template <class T>
+inline void Cluster::set_string_interner(T&, ColKey) const
+{
+}
+
+template <>
+inline void Cluster::set_string_interner(ArrayString& arr, ColKey col_key) const
+{
+    m_tree_top.set_string_interner(arr, col_key);
+}
+
+template <>
+inline void Cluster::set_string_interner(ArrayMixed& arr, ColKey col_key) const
+{
+    m_tree_top.set_string_interner(arr, col_key);
+}
+
+template <class T>
 inline void Cluster::set_spec(T&, ColKey::Idx) const
 {
 }
@@ -270,6 +287,7 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
     set_spec<T>(arr, col_ndx);
+    set_string_interner<T>(arr, col);
     arr.init_from_parent();
     if (init_val.is_null()) {
         arr.insert(ndx, T::default_value(nullable));
@@ -302,6 +320,7 @@ inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_valu
 {
     ArrayMixed arr(m_alloc);
     arr.set_parent(this, col_key.get_index().val + s_first_col_index);
+    set_string_interner(arr, col_key);
     arr.init_from_parent();
     arr.insert(ndx, init_value);
 
@@ -446,10 +465,12 @@ inline void Cluster::do_move(size_t ndx, ColKey col_key, Cluster* to)
     T src(m_alloc);
     src.set_parent(this, col_ndx);
     src.init_from_parent();
+    set_string_interner<T>(src, col_key);
 
     T dst(m_alloc);
     dst.set_parent(to, col_ndx);
     dst.init_from_parent();
+    set_string_interner<T>(dst, col_key);
 
     src.move(dst, ndx);
 }
@@ -760,6 +781,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     T values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
     set_spec<T>(values, col_ndx);
+    set_string_interner<T>(values, col_key);
     values.init_from_parent();
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
         if (ObjLink link = values.get(ndx)) {
@@ -783,6 +805,7 @@ inline void Cluster::do_erase_mixed(size_t ndx, ColKey col_key, ObjKey key, Casc
 
     ArrayMixed values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
+    set_string_interner(values, col_key);
     values.init_from_parent();
 
     Mixed value = values.get(ndx);
@@ -1031,6 +1054,7 @@ void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
     indexes.create(Array::type_Normal, false);
     ArrayString values(m_alloc);
     ref_type ref = Array::get_as_ref(col_ndx.val + s_first_col_index);
+    set_string_interner(values, col_key);
     values.init_from_ref(ref);
     size_t sz = values.size();
     for (size_t i = 0; i < sz; i++) {
@@ -1052,6 +1076,9 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     if (auto t = m_tree_top.get_owning_table())
         t->check_column(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
+    if (leaf->need_string_interner()) {
+        m_tree_top.set_string_interner(*leaf, col_key);
+    }
     if (leaf->need_spec()) {
         m_tree_top.set_spec(*leaf, col_ndx);
     }
@@ -1071,6 +1098,10 @@ void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) con
 {
     ArrayType arr(get_alloc());
     set_spec(arr, ColKey::Idx{unsigned(index) - 1});
+    auto table = get_owning_table();
+    REALM_ASSERT(index <= table->m_leaf_ndx2colkey.size());
+    auto col_key = table->m_leaf_ndx2colkey[index - 1];
+    set_string_interner(arr, col_key);
     arr.set_parent(const_cast<Cluster*>(this), index);
     arr.init_from_ref(ref);
     arr.verify();
@@ -1409,6 +1440,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 case col_type_String: {
                     ArrayString arr(m_alloc);
                     set_spec(arr, col.get_index());
+                    set_string_interner(arr, col);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
@@ -1423,6 +1455,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Mixed: {
                     ArrayMixed arr(m_alloc);
+                    set_string_interner(arr, col);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
@@ -1627,6 +1660,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
         else {
             // Columns
             auto col_key = out.table->m_leaf_ndx2colkey[j - 1];
+            out.col_key = col_key;
             auto col_type = col_key.get_type();
             if (col_key.is_collection()) {
                 ArrayRef arr_ref(m_alloc);

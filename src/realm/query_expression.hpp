@@ -1977,7 +1977,7 @@ public:
         return TypeOfValueOperator<T>(this->clone());
     }
 
-private:
+protected:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
 
@@ -2053,8 +2053,10 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         SimpleQuerySupport::set_base_table(table);
-        m_ctrl.alloc = &get_link_map().get_target_table()->get_alloc();
+        auto target_table = get_link_map().get_target_table();
+        m_ctrl.alloc = &target_table->get_alloc();
         m_ctrl.group = table->get_parent_group();
+        m_ctrl.interner = target_table->get_string_interner(m_column_key);
     }
 
     void evaluate(Subexpr::Index& index, ValueBase& destination) override
@@ -2626,12 +2628,12 @@ public:
                     destination.set(i, int64_t(elem.get_string().size()));
                 }
                 else if (elem.is_type(type_List)) {
-                    DummyParent parent(m_expr->get_base_table().cast_away_const(), elem.get_ref());
+                    DummyParent parent(m_expr->get_base_table().cast_away_const(), elem.get_ref(), ColKey());
                     Lst<Mixed> list(parent, 0);
                     destination.set(i, int64_t(list.size()));
                 }
                 else if (elem.is_type(type_Dictionary)) {
-                    DummyParent parent(m_expr->get_base_table().cast_away_const(), elem.get_ref());
+                    DummyParent parent(m_expr->get_base_table().cast_away_const(), elem.get_ref(), ColKey());
                     Dictionary dict(parent, 0);
                     destination.set(i, int64_t(dict.size()));
                 }
@@ -3309,8 +3311,10 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         ColumnsCollection::set_base_table(table);
-        m_ctrl.alloc = &m_link_map.get_target_table()->get_alloc();
+        auto target_table = m_link_map.get_target_table();
+        m_ctrl.alloc = &target_table->get_alloc();
         m_ctrl.group = table->get_parent_group();
+        m_ctrl.interner = target_table->get_string_interner(m_column_key);
     }
 
     void evaluate(Subexpr::Index& index, ValueBase& destination) override
@@ -3407,8 +3411,10 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         ColumnsCollection::set_base_table(table);
-        m_ctrl.alloc = &m_link_map.get_target_table()->get_alloc();
+        auto target_table = m_link_map.get_target_table();
+        m_ctrl.alloc = &target_table->get_alloc();
         m_ctrl.group = table->get_parent_group();
+        m_ctrl.interner = target_table->get_string_interner(m_column_key);
     }
     SizeOperator<int64_t> size() override;
     std::unique_ptr<Subexpr> get_element_length() override
