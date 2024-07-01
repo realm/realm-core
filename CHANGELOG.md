@@ -25,6 +25,7 @@
 * Upload completion is now tracked in a multiprocess-compatible manner ([PR #7796](https://github.com/realm/realm-core/pull/7796)).
 * Protocol version has been updated to v14 to support server intiated bootstraps and role change updates without a client reset. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
 * Create additional role change tests to verify role change during initial schema and subscription bootstraps. ([PR #7675](https://github.com/realm/realm-core/pull/7675))
+* Create additional role change tests to verify role change during client resets. ([PR #7840](https://github.com/realm/realm-core/pull/7840))
 
 ----------------------------------------------
 

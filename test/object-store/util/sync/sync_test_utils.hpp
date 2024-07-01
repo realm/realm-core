@@ -357,8 +357,12 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<app::User> user, const 
 void wait_for_num_objects_in_atlas(std::shared_ptr<app::User> user, const AppSession& app_session,
                                    const std::string& schema_name, size_t expected_size);
 
+std::pair<util::Future<ClientResyncMode>, std::function<void(SharedRealm, ThreadSafeReference, bool)>>
+make_client_reset_handler();
+
 void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session);
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
