@@ -4514,7 +4514,8 @@ public:
             return not_found;
 
         // key is known to be in this leaf, so find key whithin leaf keys
-        return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
+        REALM_ASSERT(uint64_t(actual_key.value) >= m_cluster->get_offset());
+        return m_cluster->lower_bound_key(ClusterNode::RowKey(actual_key.value - m_cluster->get_offset()));
     }
 
 protected:

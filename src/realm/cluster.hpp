@@ -77,6 +77,21 @@ private:
 
 class ClusterNode : public Array {
 public:
+    struct RowKey {
+        RowKey()
+            : value(-1)
+        {
+        }
+        RowKey(uint64_t v)
+            : value(v)
+        {
+        }
+        explicit RowKey(ObjKey k)
+            : value(k.value)
+        {
+        }
+        uint64_t value;
+    };
     // This structure is used to bring information back to the upper nodes when
     // inserting new objects or finding existing ones.
     struct State {
@@ -141,10 +156,10 @@ public:
     virtual void init(MemRef mem) = 0;
     /// Descend the tree from the root and copy-on-write the leaf
     /// This will update all parents accordingly
-    virtual MemRef ensure_writeable(ObjKey k) = 0;
+    virtual MemRef ensure_writeable(RowKey k) = 0;
     /// A leaf cluster has got a new ref. Descend the tree from the root,
     /// find the leaf and update the ref in the parent node
-    virtual void update_ref_in_parent(ObjKey k, ref_type ref) = 0;
+    virtual void update_ref_in_parent(RowKey k, ref_type ref) = 0;
 
     /// Init and potentially Insert a column
     virtual void insert_column(ColKey col) = 0;
@@ -157,22 +172,22 @@ public:
     }
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
-    virtual ref_type insert(ObjKey k, const FieldValues& init_values, State& state) = 0;
+    virtual ref_type insert(RowKey k, const FieldValues& init_values, State& state) = 0;
     /// Locate object identified by 'key' and update 'state' accordingly
     void get(ObjKey key, State& state) const;
     /// Locate object identified by 'key' and update 'state' accordingly
     /// Returns `false` if the object doesn't not exist.
-    virtual bool try_get(ObjKey key, State& state) const noexcept = 0;
+    virtual bool try_get(RowKey key, State& state) const noexcept = 0;
     /// Locate object identified by 'ndx' and update 'state' accordingly
     virtual ObjKey get(size_t ndx, State& state) const = 0;
     /// Return the index at which key is stored
-    virtual size_t get_ndx(ObjKey key, size_t ndx) const noexcept = 0;
+    virtual size_t get_ndx(RowKey key, size_t ndx) const noexcept = 0;
 
     /// Erase element identified by 'key'
-    virtual size_t erase(ObjKey key, CascadeState& state) = 0;
+    virtual size_t erase(RowKey key, CascadeState& state) = 0;
 
     /// Nullify links pointing to element identified by 'key'
-    virtual void nullify_incoming_links(ObjKey key, CascadeState& state) = 0;
+    virtual void nullify_incoming_links(RowKey key, CascadeState& state) = 0;
 
     /// Move elements from position 'ndx' to 'new_node'. The new node is supposed
     /// to be a sibling positioned right after this one. All key values must
@@ -240,8 +255,8 @@ public:
     {
         return !Array::is_read_only();
     }
-    MemRef ensure_writeable(ObjKey k) override;
-    void update_ref_in_parent(ObjKey, ref_type ref) override;
+    MemRef ensure_writeable(RowKey k) override;
+    void update_ref_in_parent(RowKey, ref_type ref) override;
 
     bool is_leaf() const override
     {
@@ -268,19 +283,13 @@ public:
         auto sz = node_size();
         return sz ? get_key_value(sz - 1) : -1;
     }
-    size_t lower_bound_key(ObjKey key) const
+    size_t lower_bound_key(RowKey key) const
     {
         if (m_keys.is_attached()) {
-            return m_keys.lower_bound(uint64_t(key.value));
+            return m_keys.lower_bound(key.value);
         }
-        else {
-            size_t sz = size_t(Array::get(0)) >> 1;
-            if (key.value < 0)
-                return 0;
-            if (size_t(key.value) > sz)
-                return sz;
-        }
-        return size_t(key.value);
+        size_t sz = size_t(Array::get(0)) >> 1;
+        return key.value > sz ? sz : size_t(key.value);
     }
 
     void adjust_keys(int64_t offset)
@@ -298,12 +307,12 @@ public:
     {
         return size() - s_first_col_index;
     }
-    ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
-    bool try_get(ObjKey k, State& state) const noexcept override;
+    ref_type insert(RowKey k, const FieldValues& init_values, State& state) override;
+    bool try_get(RowKey k, State& state) const noexcept override;
     ObjKey get(size_t, State& state) const override;
-    size_t get_ndx(ObjKey key, size_t ndx) const noexcept override;
-    size_t erase(ObjKey k, CascadeState& state) override;
-    void nullify_incoming_links(ObjKey key, CascadeState& state) override;
+    size_t get_ndx(RowKey key, size_t ndx) const noexcept override;
+    size_t erase(RowKey k, CascadeState& state) override;
+    void nullify_incoming_links(RowKey key, CascadeState& state) override;
     void upgrade_string_to_enum(ColKey col, ArrayString& keys);
 
     void init_leaf(ColKey col, ArrayPayload* leaf) const;
@@ -326,7 +335,7 @@ private:
     {
         return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
     }
-    void insert_row(size_t ndx, ObjKey k, const FieldValues& init_values);
+    void insert_row(size_t ndx, RowKey k, const FieldValues& init_values);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
     void do_create(ColKey col);
@@ -349,7 +358,7 @@ private:
         remove_backlinks(get_owning_table(), origin_key, col, links, state);
     }
     void do_erase_key(size_t ndx, ColKey col, CascadeState& state);
-    void do_erase_mixed(size_t ndx, ColKey col, ObjKey key, CascadeState& state);
+    void do_erase_mixed(size_t ndx, ColKey col, CascadeState& state);
     void do_insert_key(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
     void do_insert_link(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
     void do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_value, ObjKey origin_key);
