@@ -595,8 +595,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                                                                                bool) {
         ++after_reset_count;
     };
-    // NOTE: All the test sections need to set the client_resync_mode to something other than
-    // "Manual" prior to opening or "seed"ing a realm so this check doesn't fail
+
     config_local.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession> weak_session,
                                                              const SyncClientHookData& data) {
         // To prevent the upload cursors from becoming out of sync when the local realm assumes
@@ -1266,7 +1265,6 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         };
 
     SECTION("Recover: schema indexes match in before and after states") {
-        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         seed_realm(config_local, ResetMode::InitiateClientReset);
         // reorder a property such that it does not match the on disk property order
         std::vector<ObjectSchema> local_schema = schema;
@@ -1274,6 +1272,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         local_schema[0].persisted_properties.push_back(
             {"queryable_oid_field", PropertyType::ObjectId | PropertyType::Nullable});
         config_local.schema = local_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         auto future = setup_reset_handlers_for_schema_validation(config_local, local_schema);
         SharedRealm realm = Realm::get_shared_realm(config_local);
         future.get();
@@ -1348,12 +1347,12 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         return schema;
     };
     SECTION("Recover: additive schema changes are recovered in dev mode") {
-        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         const AppSession& app_session = harness.session().app_session();
         app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
         seed_realm(config_local, ResetMode::InitiateClientReset);
         std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
         config_local.schema = changed_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         ThreadSafeReference ref_async;
         auto future = setup_reset_handlers_for_schema_validation(config_local, changed_schema);
         {
@@ -1416,10 +1415,10 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     }
 
     SECTION("DiscardLocal: additive schema changes not allowed") {
-        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         seed_realm(config_local, ResetMode::InitiateClientReset);
         std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
         config_local.schema = changed_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
         auto status = async_open_realm(config_local);
@@ -1433,11 +1432,11 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     }
 
     SECTION("Recover: incompatible schema changes on async open are an error") {
-        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         seed_realm(config_local, ResetMode::InitiateClientReset);
         std::vector<ObjectSchema> changed_schema = schema;
         changed_schema[0].persisted_properties[0].type = PropertyType::UUID; // incompatible type change
         config_local.schema = changed_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
         auto status = async_open_realm(config_local);
@@ -1454,7 +1453,6 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     }
 
     SECTION("Recover: additive schema changes without dev mode produce an error after client reset") {
-        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         const AppSession& app_session = harness.session().app_session();
         app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
         seed_realm(config_local, ResetMode::InitiateClientReset);
@@ -1467,6 +1465,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
         std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
         config_local.schema = changed_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         (void)setup_reset_handlers_for_schema_validation(config_local, changed_schema);
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
