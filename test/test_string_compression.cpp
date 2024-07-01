@@ -34,25 +34,23 @@ using namespace realm;
 
 TEST(StringInterner_Basic_Creation)
 {
-    Group group;
-    TableRef table = group.add_table("test");
-    auto string_col_key = table->add_column(type_String, "string");
-    auto obj = table->create_object();
-    std::string my_string = "aaaaaaaaaaaaaaa";
-    obj.set(string_col_key, StringData(my_string));
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+    StringData my_string = "aaaaaaaaaaaaaaa";
 
-    auto* string_interner = table->get_string_interner(string_col_key);
-    auto id = string_interner->intern(obj.get_any(string_col_key).get_string());
+    auto id = interner.intern(my_string);
 
-    const auto stored_id = string_interner->lookup(StringData(my_string));
+    const auto stored_id = interner.lookup(my_string);
     CHECK(stored_id);
     CHECK(*stored_id == id);
 
-    CHECK(string_interner->compare(StringData(my_string), *stored_id) == 0); // should be equal
-    const auto origin_string = string_interner->get(id);
-    CHECK(obj.get_any(string_col_key).get_string() == origin_string);
+    CHECK(interner.compare(my_string, *stored_id) == 0); // should be equal
+    const auto origin_string = interner.get(id);
+    CHECK_EQUAL(my_string, origin_string);
 
-    CHECK(string_interner->compare(*stored_id, id) == 0); // compare agaist self.
+    CHECK(interner.compare(*stored_id, id) == 0); // compare agaist self.
+    parent.destroy_deep();
 }
 
 TEST(StringInterner_Creation_Multiple_String_One_ColKey)
