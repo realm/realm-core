@@ -2508,5 +2508,84 @@ TEST(Group_ArrayCompression_Correctness_Random_Input)
 #endif
 }
 
+TEST(Group_ArrayCompression_Strings)
+{
+    GROUP_TEST_PATH(path);
+
+    // create a bunch of string related properties that are going to be compressed and verify write/read machinery
+    // and string correctness.
+    Group to_disk;
+    TableRef table = to_disk.add_table("test");
+    auto col_key_string = table->add_column(type_String, "string");
+    auto col_key_list_string = table->add_column_list(type_String, "list_strings");
+    auto col_key_set_string = table->add_column_set(type_String, "set_strings");
+    auto col_key_dict_string = table->add_column_dictionary(type_String, "dict_strings");
+    auto obj = table->create_object();
+
+
+    obj.set_any(col_key_string, {"Test"});
+    auto list_s = obj.get_list<String>(col_key_list_string);
+    auto set_s = obj.get_set<String>(col_key_set_string);
+    auto dictionary_s = obj.get_dictionary(col_key_dict_string);
+
+    std::string tmp{"aabbbcccaaaaddfwregfgklnjytojfs"};
+    for (size_t i = 0; i < 10; ++i) {
+        list_s.add({tmp + std::to_string(i)});
+    }
+    for (size_t i = 0; i < 10; ++i) {
+        set_s.insert({tmp + std::to_string(i)});
+    }
+    for (size_t i = 0; i < 10; ++i) {
+        const auto key_value = tmp + std::to_string(i);
+        dictionary_s.insert({key_value}, {key_value});
+    }
+
+    CHECK(list_s.size() == 10);
+    CHECK(set_s.size() == 10);
+    CHECK(dictionary_s.size() == 10);
+
+    // Serialize to disk (compression should happen when the proper leaf array is serialized to disk)
+    to_disk.write(path, crypt_key());
+
+#ifdef REALM_DEBUG
+    to_disk.verify();
+#endif
+
+    // Load the tables
+    Group from_disk(path, crypt_key());
+    TableRef read_table = from_disk.get_table("test");
+    auto obj1 = read_table->get_object(0);
+
+    auto list_s1 = obj.get_list<String>("list_strings");
+    auto set_s1 = obj.get_set<String>("set_strings");
+    auto dictionary_s1 = obj.get_dictionary("dict_strings");
+
+    CHECK(obj1.get_any("string") == obj.get_any("string"));
+
+
+    CHECK(list_s1.size() == list_s.size());
+    CHECK(set_s1.size() == set_s.size());
+    CHECK(dictionary_s1.size() == dictionary_s.size());
+
+    CHECK(*read_table == *table);
+
+    for (size_t i = 0; i < list_s1.size(); ++i) {
+        CHECK_EQUAL(list_s1.get_any(i), list_s.get_any(i));
+    }
+
+    for (size_t i = 0; i < set_s1.size(); ++i) {
+        CHECK_EQUAL(set_s1.get_any(i), set_s.get_any(i));
+    }
+
+    for (size_t i = 0; i < dictionary_s1.size(); ++i) {
+        CHECK_EQUAL(dictionary_s1.get_key(i), dictionary_s.get_key(i));
+        CHECK_EQUAL(dictionary_s1.get_any(i), dictionary_s.get_any(i));
+    }
+
+#ifdef REALM_DEBUG
+    from_disk.verify();
+#endif
+}
+
 
 #endif // TEST_GROUP
