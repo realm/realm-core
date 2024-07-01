@@ -943,27 +943,9 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
     std::mutex mutex;
 
-    auto async_open_realm = [&](const Realm::Config& config) {
-        ThreadSafeReference realm_ref;
-        std::exception_ptr error;
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-            std::lock_guard lock(mutex);
-            realm_ref = std::move(ref);
-            error = e;
-        });
-        util::EventLoop::main().run_until([&] {
-            std::lock_guard lock(mutex);
-            return realm_ref || error;
-        });
-        return std::pair(std::move(realm_ref), error);
-    };
-
     SECTION("can open synced Realms that don't already exist") {
-        auto [ref, error] = async_open_realm(config);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
+        auto realm = successfully_async_open_realm(config);
+        REQUIRE(realm->read_group().get_table("class_object"));
     }
 
     SECTION("can write a realm file without client file id") {
@@ -982,11 +964,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         // Create realm file without client file id
         {
-            auto [ref, error] = async_open_realm(config);
-            REQUIRE(ref);
-            REQUIRE_FALSE(error);
+            auto realm = successfully_async_open_realm(config);
             // Write some data
-            SharedRealm realm = Realm::get_shared_realm(std::move(ref));
             realm->begin_transaction();
             realm->get_class("object").create_object(2);
             realm->commit_transaction();
@@ -1034,10 +1013,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             wait_for_upload(*realm);
         }
 
-        auto [ref, error] = async_open_realm(config);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
+        auto realm = successfully_async_open_realm(config);
+        REQUIRE(realm->read_group().get_table("class_object"));
     }
 
     SECTION("progress notifiers of a task are cancelled if the task is cancelled") {
@@ -1112,10 +1089,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             wait_for_upload(*realm);
         }
 
-        auto [ref, error] = async_open_realm(config);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
+        auto realm = successfully_async_open_realm(config);
+        REQUIRE(realm->read_group().get_table("class_object")->size() == 1);
     }
 
     SECTION("can download multiple Realms at a time") {
@@ -1261,9 +1236,9 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         app_config.base_file_path = util::make_temp_dir();
         app_config.metadata_mode = app::AppConfig::MetadataMode::NoEncryption;
 
-        auto the_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
-        create_user_and_log_in(the_app);
-        auto user = the_app->current_user();
+        auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+        create_user_and_log_in(app);
+        auto user = app->current_user();
         // User should be logged in at this point
         REQUIRE(user->is_logged_in());
 
@@ -1274,22 +1249,20 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         TestMode test_mode = GENERATE(expired_at_start, expired_by_websocket, websocket_fails);
         FailureMode failure = GENERATE(location_fails, token_fails, token_not_authorized);
 
-        DYNAMIC_SECTION(txt_test_mode(test_mode) << " - " << txt_failure_mode(failure)) {
-            logger->info("TEST: %1 - %2", txt_test_mode(test_mode), txt_failure_mode(failure));
-            if (test_mode == TestMode::expired_at_start) {
-                // invalidate the user's cached access token
-                auto app_user = the_app->current_user();
-                app_user->update_data_for_testing([&](app::UserData& data) {
-                    data.access_token = RealmJWT(expired_token);
-                });
-            }
-            else if (test_mode == TestMode::expired_by_websocket) {
-                // tell websocket to return not authorized to refresh access token
-                not_authorized = true;
-            }
+        logger->info("TEST: %1 - %2", txt_test_mode(test_mode), txt_failure_mode(failure));
+        if (test_mode == TestMode::expired_at_start) {
+            // invalidate the user's cached access token
+            auto app_user = app->current_user();
+            app_user->update_data_for_testing([&](app::UserData& data) {
+                data.access_token = RealmJWT(expired_token);
+            });
+        }
+        else if (test_mode == TestMode::expired_by_websocket) {
+            // tell websocket to return not authorized to refresh access token
+            not_authorized = true;
         }
 
-        the_app.reset();
+        app.reset();
 
         auto err_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
             auto logger = util::Logger::get_default_logger();
@@ -1336,8 +1309,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                                        "Operation timed out");
         };
 
-        the_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
-        SyncTestFile config(the_app->current_user(), "realm");
+        app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+        SyncTestFile config(app->current_user(), "realm");
         config.sync_config->cancel_waits_on_nonfatal_error = true;
         config.sync_config->error_handler = err_handler;
 
@@ -1368,10 +1341,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         }
 
         config2.schema_mode = SchemaMode::ReadOnly;
-        auto [ref, error] = async_open_realm(config2);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        REQUIRE(Realm::get_shared_realm(std::move(ref))->schema_version() == 1);
+        auto realm = successfully_async_open_realm(config2);
+        REQUIRE(realm->schema_version() == 1);
     }
 
     Schema with_added_object = Schema{object_schema,
@@ -1395,10 +1366,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         // Verify that the table gets added when reopening
         config2.schema_mode = SchemaMode::ReadOnly;
-        auto [ref, error] = async_open_realm(config2);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        auto realm = Realm::get_shared_realm(std::move(ref));
+        auto realm = successfully_async_open_realm(config2);
         REQUIRE(realm->schema().find("added") != realm->schema().end());
         REQUIRE(realm->read_group().get_table("class_added"));
     }
@@ -1409,10 +1377,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         config2.schema = with_added_object;
         config2.schema_mode = SchemaMode::ReadOnly;
-        auto [ref, error] = async_open_realm(config2);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        auto realm = Realm::get_shared_realm(std::move(ref));
+        auto realm = successfully_async_open_realm(config2);
         REQUIRE(realm->schema().find("added") != realm->schema().end());
         REQUIRE_FALSE(realm->read_group().get_table("class_added"));
     }
@@ -1429,10 +1394,10 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                                     {"value2", PropertyType::Int},
                                 }}};
 
-        auto [ref, error] = async_open_realm(config);
-        REQUIRE_FALSE(ref);
-        REQUIRE(error);
-        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Property 'object.value2' has been added.");
+        auto status = async_open_realm(config);
+        REQUIRE_FALSE(status.is_ok());
+        REQUIRE_THAT(status.get_status().reason(),
+                     Catch::Matchers::ContainsSubstring("Property 'object.value2' has been added."));
     }
 
     SECTION("adding a property to an existing read-only Realm reports an error") {
@@ -1447,10 +1412,10 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                                 }}};
         REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), "Property 'object.value2' has been added.");
 
-        auto [ref, error] = async_open_realm(config);
-        REQUIRE_FALSE(ref);
-        REQUIRE(error);
-        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Property 'object.value2' has been added.");
+        auto status = async_open_realm(config);
+        REQUIRE_FALSE(status.is_ok());
+        REQUIRE_THAT(status.get_status().reason(),
+                     Catch::Matchers::ContainsSubstring("Property 'object.value2' has been added."));
     }
 
     SECTION("removing a property from a newly downloaded read-only Realm leaves the column in place") {
@@ -1464,13 +1429,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                                     {"_id", PropertyType::Int, Property::IsPrimary{true}},
                                 }}};
 
-        auto [ref, error] = async_open_realm(config);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        REQUIRE(Realm::get_shared_realm(std::move(ref))
-                    ->read_group()
-                    .get_table("class_object")
-                    ->get_column_key("value") != ColKey{});
+        auto realm = successfully_async_open_realm(config);
+        REQUIRE(realm->read_group().get_table("class_object")->get_column_key("value") != ColKey{});
     }
 
     SECTION("removing a property from a existing read-only Realm leaves the column in place") {
@@ -1483,19 +1443,16 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                                     {"_id", PropertyType::Int, Property::IsPrimary{true}},
                                 }}};
 
-        auto [ref, error] = async_open_realm(config);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        REQUIRE(Realm::get_shared_realm(std::move(ref))
-                    ->read_group()
-                    .get_table("class_object")
-                    ->get_column_key("value") != ColKey{});
+        auto realm = successfully_async_open_realm(config);
+        REQUIRE(realm->read_group().get_table("class_object")->get_column_key("value") != ColKey{});
     }
+
+    _impl::RealmCoordinator::assert_no_open_realms();
 }
 
 #if REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
+TEST_CASE("Synchronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     const auto partition = random_string(100);
     auto schema = get_default_schema();
     enum TestMode { expired_at_start, expired_by_websocket, websocket_fails };
