@@ -2335,24 +2335,13 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     bool legal_at_this_time = (m_bind_message_sent && !have_client_file_ident() && !m_error_message_received &&
                                !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        std::string_view illegal_reason;
-        if (m_bind_message_sent)
-            illegal_reason = "BIND message not sent";
-        else if (have_client_file_ident())
-            illegal_reason = "file ident has already been assigned to session";
-        else if (m_error_message_received)
-            illegal_reason = "error message has been received from the server";
-        else if (m_unbound_message_received)
-            illegal_reason = "session has already been suspended";
-        return {ErrorCodes::SyncProtocolInvariantFailed,
-                util::format("Received IDENT message when it was not legal: %1", illegal_reason)};
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Received IDENT message when it was not legal"};
     }
     if (REALM_UNLIKELY(client_file_ident.ident < 1)) {
-        return {ErrorCodes::SyncProtocolInvariantFailed,
-                util::format("Bad client file identifier in IDENT message: %1", client_file_ident.ident)};
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier in IDENT message"};
     }
     if (REALM_UNLIKELY(client_file_ident.salt == 0)) {
-        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier salt (0) in IDENT message"};
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier salt in IDENT message"};
     }
 
     m_client_file_ident = client_file_ident;
