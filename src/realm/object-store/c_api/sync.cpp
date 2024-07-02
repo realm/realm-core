@@ -836,7 +836,7 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
     REALM_ASSERT(session);
     SyncSession::OnlyForTesting::handle_error(
         *session->get(),
-        sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str}, !is_fatal});
+        sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str}, is_fatal});
 }
 
 } // namespace realm::c_api
