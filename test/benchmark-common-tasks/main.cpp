@@ -581,7 +581,7 @@ template <typename Type>
 struct BenchmarkMixedCaseInsensitiveEqual : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkMixedCaseInsensitiveEqual<Type>()
+    BenchmarkMixedCaseInsensitiveEqual()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix("QueryInsensitiveEqual");
@@ -610,7 +610,7 @@ template <typename Type>
 struct BenchmarkRangeForType : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkRangeForType<Type>()
+    BenchmarkRangeForType()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix("QueryRange");
@@ -647,7 +647,7 @@ template <typename Type>
 struct BenchmarkCreateIndexForType : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkCreateIndexForType<Type>()
+    BenchmarkCreateIndexForType()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix("CreateIndexFor");
@@ -669,7 +669,7 @@ template <typename Type>
 struct BenchmarkInsertToIndexForType : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkInsertToIndexForType<Type>()
+    BenchmarkInsertToIndexForType()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix("InsertWithIndex");
@@ -706,7 +706,7 @@ template <typename Type>
 struct BenchmarkInsertPKToIndexForType : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkInsertPKToIndexForType<Type>()
+    BenchmarkInsertPKToIndexForType()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix("InsertPK");
@@ -739,7 +739,7 @@ template <typename Type>
 struct BenchmarkEraseObjectForType : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkEraseObjectForType<Type>()
+    BenchmarkEraseObjectForType()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix("EraseObject");
@@ -760,7 +760,7 @@ template <typename Type, size_t NUM_CONDITIONS>
 struct BenchmarkParsedChainedOrEquality : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkParsedChainedOrEquality<Type, NUM_CONDITIONS>()
+    BenchmarkParsedChainedOrEquality()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix(util::format("QueryChainedOrEquality_%1", NUM_CONDITIONS));
@@ -803,7 +803,7 @@ template <typename Type, size_t NUM_CONDITIONS>
 struct BenchmarkParsedIn : public BenchmarkWithType<Type> {
     using Base = BenchmarkWithType<Type>;
     using underlying_type = typename Type::underlying_type;
-    BenchmarkParsedIn<Type, NUM_CONDITIONS>()
+    BenchmarkParsedIn()
         : BenchmarkWithType<Type>()
     {
         BenchmarkWithType<Type>::set_name_with_prefix(util::format("QueryParsedIN_%1", NUM_CONDITIONS));
