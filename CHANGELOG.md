@@ -23,6 +23,7 @@
 ### Internals
 * Fixed `Table::remove_object_recursive` which wouldn't recursively follow links through a single `Mixed` property. This feature is exposed publicly on `Table` but no SDK currently uses it, so this is considered internal. ([#7829](https://github.com/realm/realm-core/issues/7829), likely since the introduction of Mixed)
 * Upload completion is now tracked in a multiprocess-compatible manner ([PR #7796](https://github.com/realm/realm-core/pull/7796)).
+* Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
 
 ----------------------------------------------
 
@@ -72,7 +73,6 @@
 
 ### Internals
 * Switch to building the Swift package and Cocoa binaries as C++20 ([PR #7802](https://github.com/realm/realm-core/pull/7802)).
-* Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
 
 ----------------------------------------------
 
