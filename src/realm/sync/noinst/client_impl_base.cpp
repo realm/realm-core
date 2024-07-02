@@ -1687,12 +1687,12 @@ void Session::activate()
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         bool file_exists = util::File::exists(get_realm_path());
-        m_performing_client_reset = get_client_reset_config().has_value();
+        m_has_client_reset_config = get_client_reset_config().has_value();
+        m_fresh_realm_download = client_reset::is_fresh_path(get_realm_path());
 
-        logger.info("client_reset_config = %1, Realm exists = %2 ", m_performing_client_reset, file_exists);
-        if (!m_performing_client_reset) {
-            get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
-        }
+        logger.info("client_reset_config = %1, Realm exists = %2, fresh realm download = %3",
+                    m_has_client_reset_config, file_exists, m_fresh_realm_download);
+        get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
                  m_client_file_ident.salt); // Throws
@@ -1701,7 +1701,7 @@ void Session::activate()
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
     init_progress_handler();
 
-    logger.debug("last_version_available  = %1", m_last_version_available);                    // Throws
+    logger.debug("last_version_available = %1", m_last_version_available);                     // Throws
     logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
     logger.debug("progress_download_client_version = %1",
                  m_progress.download.last_integrated_client_version);                                      // Throws
@@ -1871,14 +1871,20 @@ void Session::send_message()
             return false;
         }
 
-        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
+        // Send QUERY messages when the upload progress client version reaches the snapshot version
+        // of a pending subscription, or if this is a fresh realm download session, since UPLOAD
+        // messages are not allowed and the upload progress will not be updated.
+        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version ||
+               REALM_UNLIKELY(m_fresh_realm_download);
     };
 
     if (check_pending_flx_version()) {
         return send_query_change_message(); // throws
     }
 
-    if (m_allow_upload && (m_last_version_available > m_upload_progress.client_version)) {
+    // Don't allow UPLOAD messages for client reset fresh realm download sessions
+    if (REALM_LIKELY(!m_fresh_realm_download) && m_allow_upload &&
+        (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1891,7 +1897,6 @@ void Session::send_bind_message()
     session_ident_type session_ident = m_ident;
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
-
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
@@ -1931,9 +1936,11 @@ void Session::send_bind_message()
     m_bind_message_sent = true;
     call_debug_hook(SyncClientHookEvent::BindMessageSent);
 
-    // Ready to send the IDENT message if the file identifier pair is already
+    // If there is a pending client reset diff, process that when the BIND message has
+    // been sent successfully and wait before sending the IDENT message. Otherwise,
+    // ready to send the IDENT message if the file identifier pair is already
     // available.
-    if (!need_client_file_ident)
+    if (!m_has_client_reset_config && !need_client_file_ident)
         enlist_to_send(); // Throws
 }
 
@@ -1944,7 +1951,6 @@ void Session::send_ident_message()
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(have_client_file_ident());
-
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
@@ -2135,6 +2141,8 @@ void Session::send_upload_message()
                                                locked_server_version); // Throws
     m_conn.initiate_write_message(out, this);                          // Throws
 
+    call_debug_hook(SyncClientHookEvent::UploadMessageSent);
+
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
 }
@@ -2236,7 +2244,7 @@ bool Session::client_reset_if_needed()
 {
     // Regardless of what happens, once we return from this function we will
     // no longer be in the middle of a client reset
-    m_performing_client_reset = false;
+    m_has_client_reset_config = false;
 
     // Even if we end up not actually performing a client reset, consume the
     // config to ensure that the resources it holds are released
@@ -2245,29 +2253,51 @@ bool Session::client_reset_if_needed()
         return false;
     }
 
+    // Save a copy of the status and action in case an error/exception occurs
+    Status cr_status = client_reset_config->error;
+    ProtocolErrorInfo::Action cr_action = client_reset_config->action;
+
     auto on_flx_version_complete = [this](int64_t version) {
         this->on_flx_sync_version_complete(version);
     };
-    bool did_reset =
-        client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config), m_client_file_ident,
-                                           get_flx_subscription_store(), on_flx_version_complete);
+    try {
+        // The file ident from the fresh realm will be copied over to the local realm
+        bool did_reset = client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config),
+                                                            get_flx_subscription_store(), on_flx_version_complete);
 
-    call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
-    if (!did_reset) {
+        call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
+        if (!did_reset) {
+            return false;
+        }
+    }
+    catch (const std::exception& e) {
+        auto err_msg = util::format("A fatal error occurred during '%1' client reset diff for %2: '%3'", cr_action,
+                                    cr_status, e.what());
+        logger.error(err_msg.c_str());
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
+        suspend(err_info);
         return false;
     }
 
     // The fresh Realm has been used to reset the state
-    logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
+    logger.debug("Client reset is completed, path = %1", get_realm_path()); // Throws
 
-    SaltedFileIdent client_file_ident;
-    get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
-    REALM_ASSERT_3(m_client_file_ident.ident, ==, client_file_ident.ident);
-    REALM_ASSERT_3(m_client_file_ident.salt, ==, client_file_ident.salt);
+    // Update the version, file ident and progress info after the client reset diff is done
+    get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
+    // Print the version/progress information before performing the asserts
+    logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
+                 m_client_file_ident.salt);                                // Throws
+    logger.debug("last_version_available = %1", m_last_version_available); // Throws
+    logger.debug("upload_progress_client_version = %1, upload_progress_server_version = %2",
+                 m_progress.upload.client_version,
+                 m_progress.upload.last_integrated_server_version); // Throws
+    logger.debug("download_progress_client_version = %1, download_progress_server_version = %2",
+                 m_progress.download.last_integrated_client_version,
+                 m_progress.download.server_version); // Throws
+
     REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
                     m_progress.download.last_integrated_client_version);
     REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
-    logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
     m_upload_progress = m_progress.upload;
     m_download_progress = m_progress.download;
@@ -2321,35 +2351,10 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         return Status::OK();       // Success
     }
 
-    // if a client reset happens, it will take care of setting the file ident
-    // and if not, we do it here
-    bool did_client_reset = false;
-
-    // Save some of the client reset info for reporting to the client if an error occurs.
-    Status cr_status(Status::OK()); // Start with no client reset
-    ProtocolErrorInfo::Action cr_action = ProtocolErrorInfo::Action::NoAction;
-    if (auto& cr_config = get_client_reset_config()) {
-        cr_status = cr_config->error;
-        cr_action = cr_config->action;
-    }
-
-    try {
-        did_client_reset = client_reset_if_needed();
-    }
-    catch (const std::exception& e) {
-        auto err_msg = util::format("A fatal error occurred during '%1' client reset for %2: '%3'", cr_action,
-                                    cr_status, e.what());
-        logger.error(err_msg.c_str());
-        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
-        suspend(err_info);
-        return Status::OK();
-    }
-    if (!did_client_reset) {
-        get_history().set_client_file_ident(client_file_ident,
-                                            m_fix_up_object_ids); // Throws
-        m_progress.download.last_integrated_client_version = 0;
-        m_progress.upload.client_version = 0;
-    }
+    get_history().set_client_file_ident(client_file_ident,
+                                        m_fix_up_object_ids); // Throws
+    m_progress.download.last_integrated_client_version = 0;
+    m_progress.upload.client_version = 0;
 
     // Ready to send the IDENT message
     ensure_enlisted_to_send(); // Throws

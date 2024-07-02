@@ -981,7 +981,10 @@ private:
     SaltedFileIdent m_client_file_ident = {0, 0};
 
     // True while this session is in the process of performing a client reset.
-    bool m_performing_client_reset = false;
+    bool m_has_client_reset_config = false;
+
+    // True if this session is used to download a fresh realm during a client reset.
+    bool m_fresh_realm_download = false;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in
@@ -1426,6 +1429,14 @@ inline void ClientImpl::Session::message_sent()
 
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_send_complete);
+
+    // If the client reset config structure is populated, then try to perform
+    // the client reset diff once the BIND message has been sent successfully
+    if (m_bind_message_sent && m_has_client_reset_config) {
+        client_reset_if_needed(); // resets m_has_client_reset_config
+        // Ready to send the IDENT message
+        ensure_enlisted_to_send(); // Throws
+    }
 
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);

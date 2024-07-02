@@ -41,6 +41,8 @@
 
 #define SHARED_GROUP_TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::DBTestPathGuard, var_name, "realm");
 
+#define SHARED_GROUP_FRESH_PATH(var_name) TEST_PATH_HELPER(realm::test_util::DBTestPathGuard, var_name, "fresh");
+
 namespace realm {
 
 class DB;
