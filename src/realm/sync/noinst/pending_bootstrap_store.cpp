@@ -197,7 +197,7 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     m_has_pending = true;
 }
 
-bool PendingBootstrapStore::has_pending()
+bool PendingBootstrapStore::has_pending() const noexcept
 {
     return m_has_pending;
 }
@@ -336,7 +336,7 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
                        bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
     }
 
-    m_has_pending = (bootstrap_table->is_empty() == false);
+    m_has_pending = !bootstrap_table->is_empty();
 }
 
 } // namespace realm::sync

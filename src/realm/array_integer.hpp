@@ -70,6 +70,8 @@ public:
     }
     template <class cond>
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state) const;
+
+    size_t find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const;
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {
@@ -138,6 +140,7 @@ public:
 
 
     size_t find_first(value_type value, size_t begin = 0, size_t end = npos) const;
+    size_t find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const;
 
 protected:
     void avoid_null_collision(int64_t value);

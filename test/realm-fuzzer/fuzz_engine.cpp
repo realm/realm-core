@@ -43,17 +43,12 @@ int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bo
                            const std::string& path)
 {
     auto configure = [&](auto& fuzzer) {
-        try {
-            FuzzConfigurator cnf(fuzzer, input, false, name);
-            if (enable_logging) {
-                cnf.get_logger().enable_logging(path);
-                cnf.print_cnf();
-            }
-            return cnf;
+        FuzzConfigurator cnf(fuzzer, input, false, name);
+        if (enable_logging) {
+            cnf.get_logger().enable_logging(path);
+            cnf.print_cnf();
         }
-        catch (const EndOfFile& e) {
-            throw e;
-        }
+        return cnf;
     };
 
     try {
@@ -63,8 +58,10 @@ int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bo
         do_fuzz(cnf);
     }
     catch (const EndOfFile& e) {
+        std::cout << "End of file" << std::endl;
     }
-    catch (...) {
+    catch (const std::exception& e) {
+        std::cout << "Error: " << e.what() << std::endl;
     }
     return 0;
 }

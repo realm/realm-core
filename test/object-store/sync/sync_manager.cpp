@@ -146,9 +146,7 @@ TEST_CASE("App: path_for_realm API", "[sync][app][file]") {
             SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
             std::string path = app->path_for_realm(config, util::make_optional<std::string>("custom.realm"));
             realm::test_util::TestPathGuard guard(path);
-            realm::util::File existing_realm_file(path, File::mode_Write);
-            existing_realm_file.write(std::string("test"));
-            existing_realm_file.sync();
+            realm::util::File(path, File::mode_Write).write(0, "test");
             REQUIRE(app->path_for_realm(config, util::make_optional<std::string>("custom.realm")) ==
                     base_path / "custom.realm");
         }

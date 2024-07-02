@@ -215,7 +215,9 @@ void ArrayMixed::clear()
     Array::set(payload_idx_int, 0);
     Array::set(payload_idx_pair, 0);
     Array::set(payload_idx_str, 0);
-    Array::set(payload_idx_ref, 0);
+    if (Array::size() > payload_idx_ref) {
+        Array::set(payload_idx_ref, 0);
+    }
     if (Array::size() > payload_idx_key) {
         if (auto ref = Array::get_as_ref(payload_idx_key)) {
             Array::destroy(ref, m_composite.get_alloc());
@@ -242,6 +244,7 @@ void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
 {
     auto sz = size();
     size_t i = ndx;
+    const size_t original_dst_size = dst.size();
     while (i < sz) {
         auto val = get(i++);
         dst.add(val);
@@ -252,7 +255,7 @@ void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
             Array keys(Array::get_alloc());
             keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
             keys.init_from_ref(ref);
-            for (size_t j = 0, i = ndx; i < sz; i++, j++) {
+            for (size_t j = original_dst_size, i = ndx; i < sz; i++, j++) {
                 dst.set_key(j, keys.get(i));
             }
             keys.truncate(ndx);

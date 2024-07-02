@@ -104,13 +104,17 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
 template <class cond>
 size_t ArrayIntNull::find_first(value_type value, size_t start, size_t end) const
 {
+    static cond c;
+    REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
+    if (end - start == 1) {
+        std::optional<int64_t> opt_int = get(start);
+        return c(opt_int, value, !opt_int, !value) ? start : realm::not_found;
+    }
+
     QueryStateFindFirst state;
     find_impl<cond>(value, start, end, &state);
 
-    if (state.match_count() > 0)
-        return to_size_t(state.m_state);
-    else
-        return not_found;
+    return static_cast<size_t>(state.m_state);
 }
 
 template <class cond>

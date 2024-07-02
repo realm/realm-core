@@ -29,6 +29,7 @@
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/sync/noinst/client_history_impl.hpp>
 
@@ -66,24 +67,6 @@ void create_schema(const AppSession& app_session, Schema target_schema, int64_t 
     util::EventLoop::main().run_until([&]() -> bool {
         return std::chrono::steady_clock::now() - wait_start >= 2s;
     });
-}
-
-std::pair<SharedRealm, std::exception_ptr> async_open_realm(const Realm::Config& config)
-{
-    auto task = Realm::get_synchronized_realm(config);
-    ThreadSafeReference tsr;
-    SharedRealm realm;
-    std::exception_ptr err = nullptr;
-    auto pf = util::make_promise_future<void>();
-    task->start([&tsr, &err, promise = util::CopyablePromiseHolder(std::move(pf.promise))](
-                    ThreadSafeReference&& ref, std::exception_ptr e) mutable {
-        tsr = std::move(ref);
-        err = e;
-        promise.get_promise().emplace_value();
-    });
-    pf.future.get();
-    realm = err ? nullptr : Realm::get_shared_realm(std::move(tsr));
-    return std::pair(realm, err);
 }
 
 std::vector<ObjectSchema> get_schema_v0()
@@ -373,10 +356,10 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     config.sync_config->error_handler = err_handler;
 
     {
-        auto [realm, error] = async_open_realm(config);
-        REQUIRE_FALSE(realm);
-        REQUIRE(error);
-        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Client provided invalid schema version");
+        auto status = async_open_realm(config);
+        REQUIRE_FALSE(status.is_ok());
+        REQUIRE_THAT(status.get_status().reason(),
+                     Catch::Matchers::ContainsSubstring("Client provided invalid schema version"));
         error_future.get();
         check_realm_schema(config.path, target_schema, target_schema_version);
     }
@@ -384,9 +367,7 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     // Update schema version to 0 and try again (the version now matches the actual schema).
     config.schema_version = 0;
     config.sync_config->error_handler = nullptr;
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    REQUIRE(async_open_realm(config).is_ok());
     check_realm_schema(config.path, schema_v0, 0);
 }
 
@@ -408,7 +389,7 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
         realm->sync_session()->shutdown_and_wait();
         check_realm_schema(config.path, schema_v0, 0);
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     SECTION("Realm already on the latest schema version") {
         DBOptions options;
@@ -443,11 +424,11 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
             return SyncClientHookAction::NoAction;
         };
 
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE_FALSE(realm);
-    REQUIRE(error);
-    REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                              "The following changes cannot be made in additive-only schema mode");
+    auto status = async_open_realm(config);
+    REQUIRE_FALSE(status.is_ok());
+    REQUIRE_THAT(
+        status.get_status().reason(),
+        Catch::Matchers::ContainsSubstring("The following changes cannot be made in additive-only schema mode"));
     REQUIRE(schema_migration_required);
     // Applying the new schema (and version) fails, therefore the schema is unversioned (the metadata table is removed
     // during migration). There is a schema though because the server schema is already applied by the time the client
@@ -479,9 +460,7 @@ TEST_CASE("Fresh realm does not require schema migration", "[sync][flx][flx sche
         return SyncClientHookAction::NoAction;
     };
 
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    REQUIRE(async_open_realm(config).is_ok());
     check_realm_schema(config.path, schema_v1, 1);
 }
 
@@ -564,9 +543,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         config.schema_version = 1;
         config.schema = schema_v1;
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
-        auto [realm, error] = async_open_realm(config);
-        REQUIRE(realm);
-        REQUIRE_FALSE(error);
+        auto realm = successfully_async_open_realm(config);
         check_realm_schema(config.path, schema_v1, 1);
 
         auto table = realm->read_group().get_table("class_TopLevel");
@@ -596,9 +573,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         config.schema = schema_v2;
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v2();
 
-        auto [realm, error] = async_open_realm(config);
-        REQUIRE(realm);
-        REQUIRE_FALSE(error);
+        auto realm = successfully_async_open_realm(config);
         check_realm_schema(config.path, schema_v2, 2);
 
         auto table = realm->read_group().get_table("class_TopLevel");
@@ -616,9 +591,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         config.schema = schema_v1;
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
 
-        auto [realm, error] = async_open_realm(config);
-        REQUIRE(realm);
-        REQUIRE_FALSE(error);
+        auto realm = successfully_async_open_realm(config);
         check_realm_schema(config.path, schema_v1, 1);
 
         auto table = realm->read_group().get_table("class_TopLevel");
@@ -636,9 +609,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         config.schema = schema_v0;
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
 
-        auto [realm, error] = async_open_realm(config);
-        REQUIRE(realm);
-        REQUIRE_FALSE(error);
+        auto realm = successfully_async_open_realm(config);
         check_realm_schema(config.path, schema_v0, 0);
 
         auto table = realm->read_group().get_table("class_TopLevel");
@@ -676,7 +647,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -686,43 +657,41 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
     config.schema = schema_v1;
     auto schema_version_changed_count = 0;
     std::shared_ptr<AsyncOpenTask> task;
-    auto [promise, future] = util::make_promise_future<void>();
+    auto pf = util::make_promise_future<void>();
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
-    config.sync_config->on_sync_client_event_hook =
-        [&schema_version_changed_count, &task, promise = util::CopyablePromiseHolder<void>(std::move(promise))](
-            std::weak_ptr<SyncSession>, const SyncClientHookData& data) mutable {
-            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
-                return SyncClientHookAction::NoAction;
-            }
-
-            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
-            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
-                return SyncClientHookAction::NoAction;
-            }
-
-            CHECK(error_code == sync::ProtocolError::schema_version_changed);
-            // Cancel the async open task (the sync session closes too) the first time a schema migration is required.
-            if (++schema_version_changed_count == 1) {
-                task->cancel();
-                promise.get_promise().emplace_value();
-            }
+    config.sync_config->on_sync_client_event_hook = [&schema_version_changed_count, &task,
+                                                     &pf](std::weak_ptr<SyncSession>,
+                                                          const SyncClientHookData& data) mutable {
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
-        };
+        }
+
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        CHECK(error_code == sync::ProtocolError::schema_version_changed);
+        // Cancel the async open task (the sync session closes too) the first time a schema migration is required.
+        if (++schema_version_changed_count == 1) {
+            task->cancel();
+            pf.promise.emplace_value();
+        }
+        return SyncClientHookAction::NoAction;
+    };
 
     {
         task = Realm::get_synchronized_realm(config);
         task->start([](ThreadSafeReference, std::exception_ptr) {
             FAIL();
         });
-        future.get();
+        pf.future.get();
         task.reset();
         check_realm_schema(config.path, schema_v0, 0);
     }
 
     // Retry the migration.
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    REQUIRE(async_open_realm(config).is_ok());
     REQUIRE(schema_version_changed_count == 2);
     check_realm_schema(config.path, schema_v1, 1);
 }
@@ -752,9 +721,7 @@ TEST_CASE("Migrate to new schema version with a schema subset", "[sync][flx][flx
     config.schema = schema_subset;
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
 
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    REQUIRE(async_open_realm(config).is_ok());
     check_realm_schema(config.path, schema_v1, 1);
 }
 
@@ -787,7 +754,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
             std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_int_field", static_cast<int64_t>(42)}}));
         realm->commit_transaction();
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -835,9 +802,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
         ++after_reset_count;
     };
 
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    auto realm = successfully_async_open_realm(config);
     REQUIRE(before_reset_count == 0);
     REQUIRE(after_reset_count == 0);
     check_realm_schema(config.path, schema_v1, 1);
@@ -877,7 +842,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
         realm->commit_transaction();
         realm->close();
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -889,35 +854,35 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     config.schema = schema_v1;
     auto schema_version_changed_count = 0;
     std::shared_ptr<AsyncOpenTask> task;
-    auto [promise, future] = util::make_promise_future<void>();
+    auto pf = util::make_promise_future<void>();
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
-    config.sync_config->on_sync_client_event_hook =
-        [&schema_version_changed_count, &task, promise = util::CopyablePromiseHolder<void>(std::move(promise))](
-            std::weak_ptr<SyncSession>, const SyncClientHookData& data) mutable {
-            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
-                return SyncClientHookAction::NoAction;
-            }
-
-            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
-            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
-                return SyncClientHookAction::NoAction;
-            }
-
-            CHECK(error_code == sync::ProtocolError::schema_version_changed);
-            // Cancel the async open task (the sync session closes too) the first time a schema migration is required.
-            if (++schema_version_changed_count == 1) {
-                task->cancel();
-                promise.get_promise().emplace_value();
-            }
+    config.sync_config->on_sync_client_event_hook = [&schema_version_changed_count, &task,
+                                                     &pf](std::weak_ptr<SyncSession>,
+                                                          const SyncClientHookData& data) mutable {
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
-        };
+        }
+
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        CHECK(error_code == sync::ProtocolError::schema_version_changed);
+        // Cancel the async open task (the sync session closes too) the first time a schema migration is required.
+        if (++schema_version_changed_count == 1) {
+            task->cancel();
+            pf.promise.emplace_value();
+        }
+        return SyncClientHookAction::NoAction;
+    };
 
     {
         task = Realm::get_synchronized_realm(config);
         task->start([](ThreadSafeReference, std::exception_ptr) {
             FAIL();
         });
-        future.get();
+        pf.future.get();
         task.reset();
         check_realm_schema(config.path, schema_v0, 0);
     }
@@ -926,9 +891,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     config.schema_version = 2;
     config.schema = schema_v2;
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v2();
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    auto realm = successfully_async_open_realm(config);
     REQUIRE(schema_version_changed_count == 2);
     check_realm_schema(config.path, schema_v2, 2);
 
@@ -951,9 +914,7 @@ TEST_CASE("Send schema version zero if no schema is used to open the realm",
 
     config.schema = {};
     config.schema_version = -1; // override the schema version set by SyncTestFile constructor
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    REQUIRE(async_open_realm(config).is_ok());
     // The schema is received from the server, but it is unversioned.
     check_realm_schema(config.path, schema_v0, ObjectStore::NotVersioned);
 }
@@ -1028,7 +989,7 @@ TEST_CASE("Client reset and schema migration", "[sync][flx][flx schema migration
         // Trigger a client reset.
         reset_utils::trigger_client_reset(harness.session().app_session(), *realm->sync_session());
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -1061,9 +1022,7 @@ TEST_CASE("Client reset and schema migration", "[sync][flx][flx schema migration
         ++after_reset_count;
     };
 
-    auto [realm, error] = async_open_realm(config);
-    REQUIRE(realm);
-    REQUIRE_FALSE(error);
+    auto realm = successfully_async_open_realm(config);
     REQUIRE(before_reset_count == 0);
     REQUIRE(after_reset_count == 0);
     check_realm_schema(config.path, schema_v1, 1);
@@ -1132,19 +1091,17 @@ TEST_CASE("Multiple async open tasks trigger a schema migration", "[sync][flx][f
 
     auto open_task1_pf = util::make_promise_future<SharedRealm>();
     auto open_task2_pf = util::make_promise_future<SharedRealm>();
-    auto open_callback1 = [promise_holder = util::CopyablePromiseHolder(std::move(open_task1_pf.promise))](
-                              ThreadSafeReference ref, std::exception_ptr err) mutable {
+    auto open_callback1 = [&](ThreadSafeReference ref, std::exception_ptr err) mutable {
         REQUIRE_FALSE(err);
-        auto realm = Realm::get_shared_realm(std::move(ref));
+        auto realm = Realm::get_shared_realm(std::move(ref), util::Scheduler::make_dummy());
         REQUIRE(realm);
-        promise_holder.get_promise().emplace_value(realm);
+        open_task1_pf.promise.emplace_value(realm);
     };
-    auto open_callback2 = [promise_holder = util::CopyablePromiseHolder(std::move(open_task2_pf.promise))](
-                              ThreadSafeReference ref, std::exception_ptr err) mutable {
+    auto open_callback2 = [&](ThreadSafeReference ref, std::exception_ptr err) mutable {
         REQUIRE_FALSE(err);
-        auto realm = Realm::get_shared_realm(std::move(ref));
+        auto realm = Realm::get_shared_realm(std::move(ref), util::Scheduler::make_dummy());
         REQUIRE(realm);
-        promise_holder.get_promise().emplace_value(realm);
+        open_task2_pf.promise.emplace_value(realm);
     };
 
     task1->start(open_callback1);
@@ -1204,9 +1161,7 @@ TEST_CASE("Upgrade schema version with no subscription initializer", "[sync][flx
         config.schema_version = 1;
         config.schema = schema_v1;
         config.sync_config->subscription_initializer = nullptr;
-        auto [realm, error] = async_open_realm(config);
-        REQUIRE(realm);
-        REQUIRE_FALSE(error);
+        auto realm = successfully_async_open_realm(config);
         check_realm_schema(config.path, schema_v1, 1);
 
         auto table = realm->read_group().get_table("class_TopLevel");
