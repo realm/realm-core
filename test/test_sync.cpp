@@ -5363,7 +5363,10 @@ TEST(Sync_ServerSideEncryption)
     std::string server_path;
     {
         ClientServerFixture::Config config;
-        config.server_encryption_key = crypt_key_2(always_encrypt);
+        if (auto key = crypt_key(always_encrypt)) {
+            config.server_encryption_key.emplace();
+            memcpy(config.server_encryption_key->data(), key, config.server_encryption_key->size());
+        }
         ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
 
@@ -6204,6 +6207,118 @@ TEST(Sync_DeleteCollectionInCollection)
     }
 }
 
+TEST(Sync_NestedCollectionClear)
+{
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+
+    auto tr_1 = db_1->start_write();
+    auto tr_2 = db_2->start_read();
+    auto table_1 = tr_1->add_table_with_primary_key("class_Table", type_Int, "id");
+    auto col = table_1->add_column(type_Mixed, "any");
+    table_1->add_column_list(type_Mixed, "ints");
+    auto col_list = table_1->add_column_list(type_Mixed, "any_list");
+
+    auto foo = table_1->create_object_with_primary_key(123);
+    foo.set_collection(col, CollectionType::List);
+    auto parent_list = foo.get_list<Mixed>(col_list);
+    parent_list.insert_collection(0, CollectionType::List);
+    parent_list.insert_collection(1, CollectionType::Dictionary);
+    auto foo1 = table_1->create_object_with_primary_key(456);
+    foo1.set_collection(col, CollectionType::Dictionary);
+    tr_1->commit_and_continue_as_read();
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        tr_1->promote_to_write();
+        auto list = foo.get_list<Mixed>("any");
+        list.clear();
+        list.add("Hello");
+
+        list = foo.get_list<Mixed>("any_list");
+        auto sub_list = list.get_list(0);
+        sub_list->clear();
+        sub_list->add(1);
+        sub_list->add(2);
+        auto sub_dict = list.get_dictionary(1);
+        sub_dict->clear();
+        sub_dict->insert("one", 1);
+        sub_dict->insert("two", 2);
+
+        auto dict = foo1.get_dictionary("any");
+        dict.clear();
+        dict.insert("age", 42);
+
+        auto list_int = foo.get_list<Mixed>("ints");
+        list_int.clear();
+        list_int.add(1);
+        list_int.add(2);
+        tr_1->commit_and_continue_as_read();
+    }
+
+    {
+        tr_2->promote_to_write();
+        auto table_2 = tr_2->get_table("class_Table");
+
+        auto bar = table_2->get_object_with_primary_key(123);
+        auto list = bar.get_list<Mixed>("any");
+        list.clear();
+        list.add("Godbye");
+
+        list = bar.get_list<Mixed>("any_list");
+        auto sub_list = list.get_list(0);
+        sub_list->clear();
+        sub_list->add(3);
+        sub_list->add(4);
+        auto sub_dict = list.get_dictionary(1);
+        sub_dict->clear();
+        sub_dict->insert("three", 3);
+        sub_dict->insert("four", 4);
+
+        auto bar1 = table_2->get_object_with_primary_key(456);
+        auto dict = bar1.get_dictionary("any");
+        dict.clear();
+        dict.insert("weight", 70);
+
+        auto list_int = bar.get_list<Mixed>("ints");
+        list_int.clear();
+        list_int.add(3);
+        list_int.add(4);
+        tr_2->commit_and_continue_as_read();
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    tr_1->advance_read();
+    tr_2->advance_read();
+    auto list = foo.get_list<Mixed>("any");
+    CHECK_EQUAL(list.size(), 1);
+
+    list = foo.get_list<Mixed>("any_list");
+    CHECK_EQUAL(list.get_list(0)->size(), 2);
+    CHECK_EQUAL(list.get_dictionary(1)->size(), 2);
+
+    auto dict = foo1.get_dictionary("any");
+    CHECK_EQUAL(dict.size(), 1);
+
+    auto list_int = foo.get_list<Mixed>("ints");
+    CHECK_EQUAL(list_int.size(), 4); // We should still have odd behavior for normal lists
+
+    CHECK(compare_groups(*tr_1, *tr_2));
+}
+
 TEST(Sync_Dictionary_Links)
 {
     TEST_CLIENT_DB(db_1);
@@ -6429,8 +6544,6 @@ TEST(Sync_BundledRealmFile)
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    Session session = fixture.make_bound_session(db);
-
     write_transaction(db, [](WriteTransaction& tr) {
         auto foos = tr.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
         foos->create_object_with_primary_key(123);
@@ -6439,6 +6552,7 @@ TEST(Sync_BundledRealmFile)
     // We cannot write out file if changes are not synced to server
     CHECK_THROW_ANY(db->write_copy(path.c_str(), nullptr));
 
+    Session session = fixture.make_bound_session(db);
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -6809,7 +6923,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
     bool is_compressed = false;
@@ -6852,7 +6966,7 @@ TEST(Sync_InvalidChangesetFromServer)
 
     VersionInfo version_info;
     auto transact = db->start_read();
-    CHECK_THROW_EX(history.integrate_server_changesets({}, nullptr, util::Span(&server_changeset, 1), version_info,
+    CHECK_THROW_EX(history.integrate_server_changesets({}, 0, util::Span(&server_changeset, 1), version_info,
                                                        DownloadBatchState::SteadyState, *test_context.logger,
                                                        transact),
                    sync::IntegrationException,
@@ -6900,7 +7014,7 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
     version_type current_version;
@@ -6987,7 +7101,7 @@ TEST(Sync_NonIncreasingServerVersions)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 }
 

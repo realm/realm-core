@@ -180,9 +180,8 @@ S2Loop* S2PolygonBuilder::AssembleLoop(S2Point const& v0, S2Point const& v1,
   path.push_back(v1);
   index[v1] = 1;
   while (path.size() >= 2) {
-    // Note that "v0" and "v1" become invalid if "path" is modified.
-    S2Point const& v0 = path.end()[-2];
-    S2Point const& v1 = path.end()[-1];
+    S2Point const v0 = path.end()[-2];
+    S2Point const v1 = path.end()[-1];
     S2Point v2;
     bool v2_found = false;
     EdgeSet::const_iterator candidates = edges_->find(v1);

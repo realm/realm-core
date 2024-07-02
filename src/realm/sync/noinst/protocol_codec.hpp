@@ -405,10 +405,7 @@ public:
         SyncProgress progress;
         std::optional<int64_t> query_version;
         std::optional<bool> last_in_batch;
-        union {
-            uint64_t downloadable_bytes = 0;
-            double progress_estimate;
-        };
+        sync::DownloadableProgress downloadable;
         ReceivedChangesets changesets;
     };
 
@@ -444,13 +441,14 @@ private:
 
             message.last_in_batch = msg.read_next<bool>();
 
-            message.progress_estimate = msg.read_next<double>();
-            if (message.progress_estimate < 0 || message.progress_estimate > 1)
+            double progress_estimate = msg.read_next<double>();
+            if (progress_estimate < 0 || progress_estimate > 1)
                 return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad progress value: %1",
-                                    message.progress_estimate);
+                                    progress_estimate);
+            message.downloadable = progress_estimate;
         }
         else
-            message.downloadable_bytes = msg.read_next<int64_t>();
+            message.downloadable = uint64_t(msg.read_next<int64_t>());
 
         auto is_body_compressed = msg.read_next<bool>();
         auto uncompressed_body_size = msg.read_next<size_t>();
