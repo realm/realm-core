@@ -1687,14 +1687,12 @@ void Session::activate()
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         bool file_exists = util::File::exists(get_realm_path());
-        m_performing_client_reset = get_client_reset_config().has_value();
+        m_has_client_reset_config = get_client_reset_config().has_value();
         m_fresh_realm_download = client_reset::is_fresh_path(get_realm_path());
 
         logger.info("client_reset_config = %1, Realm exists = %2, fresh realm download = %3",
-                    m_performing_client_reset, file_exists, m_fresh_realm_download ? "yes" : "no");
-        if (!m_performing_client_reset) {
-            get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
-        }
+                    m_has_client_reset_config, file_exists, m_fresh_realm_download);
+        get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
                  m_client_file_ident.salt); // Throws
@@ -1897,9 +1895,8 @@ void Session::send_bind_message()
     REALM_ASSERT_EX(m_state == Active, m_state);
 
     session_ident_type session_ident = m_ident;
-    bool need_client_file_ident = !have_client_file_ident() && !m_performing_client_reset;
+    bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
-
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
@@ -1939,9 +1936,11 @@ void Session::send_bind_message()
     m_bind_message_sent = true;
     call_debug_hook(SyncClientHookEvent::BindMessageSent);
 
-    // Ready to send the IDENT message if the file identifier pair is already
+    // If there is a pending client reset diff, process that when the BIND message has
+    // been sent successfully and wait before sending the IDENT message. Otherwise,
+    // ready to send the IDENT message if the file identifier pair is already
     // available.
-    if (!need_client_file_ident)
+    if (!m_has_client_reset_config && !need_client_file_ident)
         enlist_to_send(); // Throws
 }
 
@@ -1952,7 +1951,6 @@ void Session::send_ident_message()
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(have_client_file_ident());
-
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
@@ -2246,7 +2244,7 @@ bool Session::client_reset_if_needed()
 {
     // Regardless of what happens, once we return from this function we will
     // no longer be in the middle of a client reset
-    m_performing_client_reset = false;
+    m_has_client_reset_config = false;
 
     // Even if we end up not actually performing a client reset, consume the
     // config to ensure that the resources it holds are released
@@ -2284,6 +2282,7 @@ bool Session::client_reset_if_needed()
     // The fresh Realm has been used to reset the state
     logger.debug("Client reset is completed, path = %1", get_realm_path()); // Throws
 
+    // Update the version, file ident and progress info after the client reset diff is done
     get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
     // Print the version/progress information before performing the asserts
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
