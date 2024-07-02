@@ -991,36 +991,6 @@ void Table::remove_search_index(ColKey col_key)
     m_spec.set_column_attr(spec_ndx, attr); // Throws
 }
 
-void Table::enumerate_string_column(ColKey col_key)
-{
-    check_column(col_key);
-    size_t column_ndx = colkey2spec_ndx(col_key);
-    ColumnType type = col_key.get_type();
-    if (type == col_type_String && !col_key.is_collection() && !m_spec.is_string_enum_type(column_ndx)) {
-        m_clusters.enumerate_string_column(col_key);
-    }
-}
-
-bool Table::is_enumerated(ColKey col_key) const noexcept
-{
-    size_t col_ndx = colkey2spec_ndx(col_key);
-    return m_spec.is_string_enum_type(col_ndx);
-}
-
-size_t Table::get_num_unique_values(ColKey col_key) const
-{
-    if (!is_enumerated(col_key))
-        return 0;
-
-    ArrayParent* parent;
-    ref_type ref = const_cast<Spec&>(m_spec).get_enumkeys_ref(colkey2spec_ndx(col_key), parent);
-    BPlusTree<StringData> col(get_alloc());
-    col.init_from_ref(ref);
-
-    return col.size();
-}
-
-
 void Table::erase_root_column(ColKey col_key)
 {
     ColumnType col_type = col_key.get_type();

@@ -363,11 +363,6 @@ public:
         return false;
     }
     virtual void set_string_interner(StringInterner*) const {}
-    virtual bool need_spec() const
-    {
-        return false;
-    }
-    virtual void set_spec(Spec*, size_t) const {}
     static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
 };
 

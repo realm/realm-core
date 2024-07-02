@@ -65,12 +65,6 @@ public:
     void set_dictionary_key_type(size_t column_ndx, DataType key_type);
     DataType get_dictionary_key_type(size_t column_ndx) const;
 
-    // Auto Enumerated string columns
-    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
-    size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
-    bool is_string_enum_type(size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
-
     //@{
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const noexcept;

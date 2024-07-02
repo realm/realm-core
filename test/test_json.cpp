@@ -93,7 +93,6 @@ void setup_multi_table(Table& table, size_t rows)
     table.add_column(type_String, "string");                                   //  5
     table.add_column(type_String, "string_long");                              //  6
     ColKey col_string_big = table.add_column(type_String, "string_big_blobs"); //  7
-    ColKey col_string_enum = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
     ColKey col_binary = table.add_column(type_Binary, "binary");               //  9
     ColKey col_oid = table.add_column(type_ObjectId, "oid");                   //  10
     ColKey col_decimal = table.add_column(type_Decimal, "decimal");            //  11
@@ -128,17 +127,6 @@ void setup_multi_table(Table& table, size_t rows)
                 obj.set(col_string_big, "");
                 break;
         }
-        switch (i % 3) {
-            case 0:
-                obj.set(col_string_enum, "enum1");
-                break;
-            case 1:
-                obj.set(col_string_enum, "enum2");
-                break;
-            case 2:
-                obj.set(col_string_enum, "enum3");
-                break;
-        }
         obj.set(col_binary, BinaryData("binary", 7));
         obj.set(col_oid, ObjectId());
         obj.set(col_decimal, Decimal128("1.2345"));
@@ -158,9 +146,6 @@ void setup_multi_table(Table& table, size_t rows)
         auto set = obj.get_set<Int>(col_set);
         set.insert(123);
     }
-
-    // We also want a StringEnumColumn
-    table.enumerate_string_column(col_string_enum);
 }
 
 bool json_test(std::string json, std::string expected_file, bool generate)

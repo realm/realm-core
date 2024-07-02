@@ -891,32 +891,6 @@ TEST(TableView_QueryCopyStringOr)
     CHECK_EQUAL(after_copy_count, 4);
 }
 
-TEST(TableView_SortEnum)
-{
-    Table table;
-    auto col = table.add_column(type_String, "str");
-
-    table.create_object().set_all("foo");
-    table.create_object().set_all("foo");
-    table.create_object().set_all("foo");
-
-    table.enumerate_string_column(col);
-
-    table.create_object().set_all("bbb");
-    table.create_object().set_all("aaa");
-    table.create_object().set_all("baz");
-
-    TableView tv = table.where().find_all();
-    tv.sort(col);
-
-    CHECK_EQUAL(tv[0].get<String>(col), "aaa");
-    CHECK_EQUAL(tv[1].get<String>(col), "baz");
-    CHECK_EQUAL(tv[2].get<String>(col), "bbb");
-    CHECK_EQUAL(tv[3].get<String>(col), "foo");
-    CHECK_EQUAL(tv[4].get<String>(col), "foo");
-    CHECK_EQUAL(tv[5].get<String>(col), "foo");
-}
-
 TEST(TableView_Backlinks)
 {
     Group group;
@@ -1318,20 +1292,6 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_key(tv, 2), k6);
     CHECK_EQUAL(h.get_key(tv, 3), k0);
     CHECK_EQUAL(h.get_key(tv, 4), k1);
-
-
-    // Same as previous test, but with string column being Enum
-    t.enumerate_string_column(col_str);
-    tv = h.find_all();
-    tv.distinct(h.get_distinct({col_str, col_int}));
-    tv.sort(h.get_sort({col_str}, {false}));
-    CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(h.get_key(tv, 0), k4);
-    CHECK_EQUAL(h.get_key(tv, 1), k5);
-    CHECK_EQUAL(h.get_key(tv, 2), k6);
-    CHECK_EQUAL(h.get_key(tv, 3), k0);
-    CHECK_EQUAL(h.get_key(tv, 4), k1);
-
 
     // Now test sync_if_needed()
     tv = h.find_all();

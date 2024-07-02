@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Ability to enumerate a string column has been removed.
 
 ----------------------------------------------
 
