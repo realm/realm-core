@@ -171,7 +171,7 @@ private:
 
     // If false, QUERY and MARK messages are allowed but UPLOAD messages will not
     // be sent to the server.
-    const bool m_allow_upload_messages = true;
+    const bool m_allow_upload_messages;
 
     const uint64_t m_schema_version;
 
@@ -720,7 +720,7 @@ uint64_t SessionImpl::get_schema_version() noexcept
     return m_wrapper.m_schema_version;
 }
 
-bool SessionImpl::are_uploads_allowed() noexcept
+bool SessionImpl::upload_messages_allowed() noexcept
 {
     // Can only be called if the session is active or being activated
     REALM_ASSERT_EX(m_state == State::Active || m_state == State::Unactivated, m_state);

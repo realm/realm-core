@@ -928,7 +928,6 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
         version_type current_client_version;
         SaltedFileIdent file_ident;
         SyncProgress sync_progress;
-        auto wt = target->start_read();
         auto& history = static_cast<ClientReplication*>(target->get_replication())->get_history();
         history.get_status(current_client_version, file_ident, sync_progress);
         CHECK_EQUAL(file_ident.ident, fresh_client_id.ident);

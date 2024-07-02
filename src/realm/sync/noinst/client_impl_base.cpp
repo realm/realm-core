@@ -1688,8 +1688,8 @@ void Session::activate()
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         bool file_exists = util::File::exists(get_realm_path());
 
-        logger.info("client_reset_config = %1, Realm exists = %2, uploads allowed = %3",
-                    get_client_reset_config().has_value(), file_exists, are_uploads_allowed() ? "yes" : "no");
+        logger.info("client_reset_config = %1, Realm exists = %2, upload messages allowed = %3",
+                    get_client_reset_config().has_value(), file_exists, upload_messages_allowed() ? "yes" : "no");
         get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1859,7 +1859,7 @@ void Session::send_message()
             return false;
         }
 
-        if (!m_allow_upload) {
+        if (m_delay_uploads) {
             return false;
         }
 
@@ -1870,8 +1870,7 @@ void Session::send_message()
         }
 
         // Send QUERY messages when the upload progress client version reaches the snapshot version
-        // of a pending subscription, or if this is a fresh realm download session, since UPLOAD
-        // messages are not allowed and the upload progress will not be updated.
+        // of a pending subscription
         return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
     };
 
@@ -1879,8 +1878,7 @@ void Session::send_message()
         return send_query_change_message(); // throws
     }
 
-    // Don't allow UPLOAD messages for client reset fresh realm download sessions
-    if (m_allow_upload && (m_last_version_available > m_upload_progress.client_version)) {
+    if (!m_delay_uploads && (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -2052,7 +2050,7 @@ void Session::send_upload_message()
     version_type progress_client_version = m_upload_progress.client_version;
     version_type progress_server_version = m_upload_progress.last_integrated_server_version;
 
-    if (!are_uploads_allowed()) {
+    if (!upload_messages_allowed()) {
         logger.debug("UPLOAD not allowed: upload progress(progress_client_version=%1, progress_server_version=%2, "
                      "locked_server_version=%3, num_changesets=%4)",
                      progress_client_version, progress_server_version, locked_server_version,
@@ -2305,7 +2303,7 @@ bool Session::client_reset_if_needed()
     // In recovery mode, there may be new changesets to upload and nothing left to download.
     // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
     // For both, we want to allow uploads again without needing external changes to download first.
-    m_allow_upload = true;
+    m_delay_uploads = false;
 
     // Checks if there is a pending client reset
     handle_pending_client_reset_acknowledgement();
@@ -2777,10 +2775,10 @@ void Session::check_for_download_completion()
     if (m_download_progress.server_version < m_server_version_at_last_download_mark)
         return;
     m_last_triggering_download_mark = m_target_download_mark;
-    if (REALM_UNLIKELY(!m_allow_upload)) {
+    if (REALM_UNLIKELY(m_delay_uploads)) {
         // Activate the upload process now, and enable immediate reactivation
         // after a subsequent fast reconnect.
-        m_allow_upload = true;
+        m_delay_uploads = false;
         ensure_enlisted_to_send(); // Throws
     }
     on_download_completion(); // Throws

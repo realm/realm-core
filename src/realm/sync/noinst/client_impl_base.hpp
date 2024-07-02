@@ -849,7 +849,7 @@ private:
 
     // Returns false if this session is not allowed to send UPLOAD messages to the server to
     // update the cursor info, such as during a client reset fresh realm download
-    bool are_uploads_allowed() noexcept;
+    bool upload_messages_allowed() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///
@@ -956,7 +956,7 @@ private:
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
     // download completion is reached again.
-    bool m_allow_upload = false;
+    bool m_delay_uploads = true;
 
     bool m_is_flx_sync_session = false;
 
@@ -1357,7 +1357,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
-        m_allow_upload = true;
+        m_delay_uploads = false;
 }
 
 inline bool ClientImpl::Session::do_recognize_sync_version(version_type version) noexcept
@@ -1386,10 +1386,10 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
     if (!fast_reconnect && !get_client().m_disable_upload_activation_delay) {
         // Disallow immediate activation of the upload process, even if download
         // completion was reached during an earlier period of connectivity.
-        m_allow_upload = false;
+        m_delay_uploads = true;
     }
 
-    if (!m_allow_upload) {
+    if (m_delay_uploads) {
         // Request download completion notification
         ++m_target_download_mark;
     }
