@@ -1242,6 +1242,13 @@ RLM_API realm_schema_t* realm_get_schema(const realm_t*);
 RLM_API uint64_t realm_get_schema_version(const realm_t* realm);
 
 /**
+ * Get the schema version for this realm at the path.
+ *
+ * This function cannot fail.
+ */
+RLM_API uint64_t realm_get_persisted_schema_version(const realm_config_t* config);
+
+/**
  * Update the schema of an open realm.
  *
  * This is equivalent to calling `realm_update_schema_advanced(realm, schema, 0,
