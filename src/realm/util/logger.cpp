@@ -66,9 +66,9 @@ LogCategory& LogCategory::get_category(std::string_view name)
     return *log_category_map.at(name); // Throws
 }
 
-std::vector<const std::string_view> LogCategory::get_category_names()
+std::vector<std::string_view> LogCategory::get_category_names()
 {
-    std::vector<const std::string_view> ret;
+    std::vector<std::string_view> ret;
     ret.reserve(log_category_map.size());
     for (auto& it : log_category_map) {
         ret.push_back(it.second->get_name());
