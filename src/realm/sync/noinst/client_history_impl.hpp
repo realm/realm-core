@@ -254,9 +254,9 @@ public:
         util::Logger&, const TransactionRef& transact,
         util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr);
 
-    static void get_upload_download_bytes(DB*, std::uint_fast64_t&, DownloadableProgress&, std::uint_fast64_t&,
-                                          std::uint_fast64_t&, std::uint_fast64_t&);
-    static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&);
+    static void get_upload_download_state(DB&, std::uint_fast64_t&, DownloadableProgress&, std::uint_fast64_t&,
+                                          std::uint_fast64_t&, std::uint_fast64_t&, version_type&);
+    static void get_upload_download_state(DB*, std::uint_fast64_t&, std::uint_fast64_t&);
 
     // Overriding member functions in realm::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override;
@@ -411,7 +411,7 @@ private:
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(const HistoryEntry&);
-    void update_sync_progress(const SyncProgress&, DownloadableProgress downloadable_bytes, TransactionRef);
+    void update_sync_progress(const SyncProgress&, DownloadableProgress downloadable_bytes);
     void trim_ct_history();
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);

@@ -228,6 +228,11 @@ public:
         return m_audit_context.get();
     }
 
+    bool try_claim_sync_agent()
+    {
+        return m_db->try_claim_sync_agent();
+    }
+
 private:
     friend Realm::Internal;
     Realm::Config m_config;

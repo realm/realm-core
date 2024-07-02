@@ -1040,9 +1040,9 @@ TEST_CASE("notifications: skip", "[notifications]") {
     SECTION("skipping must be done from the Realm's thread") {
         advance_and_notify(*r);
         r->begin_transaction();
-        std::thread([&] {
+        JoiningThread([&] {
             REQUIRE_EXCEPTION(token1.suppress_next(), WrongThread, "Realm accessed from incorrect thread.");
-        }).join();
+        });
         r->cancel_transaction();
     }
 
