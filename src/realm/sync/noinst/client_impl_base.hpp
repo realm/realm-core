@@ -847,6 +847,10 @@ private:
     /// Returns the schema version the synchronization session connects with to the server.
     uint64_t get_schema_version() noexcept;
 
+    // Returns false if this session is not allowed to send UPLOAD messages to the server to
+    // update the cursor info, such as during a client reset fresh realm download
+    bool are_uploads_allowed() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
@@ -982,9 +986,6 @@ private:
 
     // True while this session is in the process of performing a client reset.
     bool m_has_client_reset_config = false;
-
-    // True if this session is used to download a fresh realm during a client reset.
-    bool m_fresh_realm_download = false;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in

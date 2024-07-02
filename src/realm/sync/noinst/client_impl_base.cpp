@@ -1688,10 +1688,9 @@ void Session::activate()
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         bool file_exists = util::File::exists(get_realm_path());
         m_has_client_reset_config = get_client_reset_config().has_value();
-        m_fresh_realm_download = client_reset::is_fresh_path(get_realm_path());
 
-        logger.info("client_reset_config = %1, Realm exists = %2, fresh realm download = %3",
-                    m_has_client_reset_config, file_exists, m_fresh_realm_download);
+        logger.info("client_reset_config = %1, Realm exists = %2, uploads allowed = %3", m_has_client_reset_config,
+                    file_exists, are_uploads_allowed() ? "yes" : "no");
         get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1874,8 +1873,7 @@ void Session::send_message()
         // Send QUERY messages when the upload progress client version reaches the snapshot version
         // of a pending subscription, or if this is a fresh realm download session, since UPLOAD
         // messages are not allowed and the upload progress will not be updated.
-        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version ||
-               REALM_UNLIKELY(m_fresh_realm_download);
+        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
     };
 
     if (check_pending_flx_version()) {
@@ -1883,8 +1881,7 @@ void Session::send_message()
     }
 
     // Don't allow UPLOAD messages for client reset fresh realm download sessions
-    if (REALM_LIKELY(!m_fresh_realm_download) && m_allow_upload &&
-        (m_last_version_available > m_upload_progress.client_version)) {
+    if (m_allow_upload && (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1895,7 +1892,8 @@ void Session::send_bind_message()
     REALM_ASSERT_EX(m_state == Active, m_state);
 
     session_ident_type session_ident = m_ident;
-    bool need_client_file_ident = !have_client_file_ident();
+    // Request an ident if we don't already have one and there isn't a pending client reset diff
+    bool need_client_file_ident = !have_client_file_ident() && !m_has_client_reset_config;
     const bool is_subserver = false;
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
@@ -1938,9 +1936,8 @@ void Session::send_bind_message()
 
     // If there is a pending client reset diff, process that when the BIND message has
     // been sent successfully and wait before sending the IDENT message. Otherwise,
-    // ready to send the IDENT message if the file identifier pair is already
-    // available.
-    if (!m_has_client_reset_config && !need_client_file_ident)
+    // ready to send the IDENT message if the file identifier pair is already available.
+    if (!need_client_file_ident)
         enlist_to_send(); // Throws
 }
 
@@ -2055,6 +2052,14 @@ void Session::send_upload_message()
 
     version_type progress_client_version = m_upload_progress.client_version;
     version_type progress_server_version = m_upload_progress.last_integrated_server_version;
+
+    if (!are_uploads_allowed()) {
+        logger.debug("UPLOAD not allowed: upload progress(progress_client_version=%1, progress_server_version=%2, "
+                     "locked_server_version=%3, num_changesets=%4)",
+                     progress_client_version, progress_server_version, locked_server_version,
+                     uploadable_changesets.size()); // Throws
+        return;
+    }
 
     logger.debug("Sending: UPLOAD(progress_client_version=%1, progress_server_version=%2, "
                  "locked_server_version=%3, num_changesets=%4)",
