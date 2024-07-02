@@ -984,9 +984,6 @@ private:
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
 
-    // True while this session is in the process of performing a client reset.
-    bool m_has_client_reset_config = false;
-
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in
     // `m_progress` either are persisted, or are about to be.
@@ -1433,8 +1430,8 @@ inline void ClientImpl::Session::message_sent()
 
     // If the client reset config structure is populated, then try to perform
     // the client reset diff once the BIND message has been sent successfully
-    if (m_bind_message_sent && m_has_client_reset_config) {
-        client_reset_if_needed(); // resets m_has_client_reset_config
+    if (m_bind_message_sent && m_state == Active && get_client_reset_config()) {
+        client_reset_if_needed();
         // Ready to send the IDENT message
         ensure_enlisted_to_send(); // Throws
     }

@@ -1687,10 +1687,9 @@ void Session::activate()
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         bool file_exists = util::File::exists(get_realm_path());
-        m_has_client_reset_config = get_client_reset_config().has_value();
 
-        logger.info("client_reset_config = %1, Realm exists = %2, uploads allowed = %3", m_has_client_reset_config,
-                    file_exists, are_uploads_allowed() ? "yes" : "no");
+        logger.info("client_reset_config = %1, Realm exists = %2, uploads allowed = %3",
+                    get_client_reset_config().has_value(), file_exists, are_uploads_allowed() ? "yes" : "no");
         get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1893,7 +1892,7 @@ void Session::send_bind_message()
 
     session_ident_type session_ident = m_ident;
     // Request an ident if we don't already have one and there isn't a pending client reset diff
-    bool need_client_file_ident = !have_client_file_ident() && !m_has_client_reset_config;
+    bool need_client_file_ident = !have_client_file_ident() && !get_client_reset_config();
     const bool is_subserver = false;
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
@@ -2247,10 +2246,6 @@ void Session::send_test_command_message()
 
 bool Session::client_reset_if_needed()
 {
-    // Regardless of what happens, once we return from this function we will
-    // no longer be in the middle of a client reset
-    m_has_client_reset_config = false;
-
     // Even if we end up not actually performing a client reset, consume the
     // config to ensure that the resources it holds are released
     auto client_reset_config = std::exchange(get_client_reset_config(), std::nullopt);
