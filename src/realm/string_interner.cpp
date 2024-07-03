@@ -636,7 +636,7 @@ int StringInterner::compare(StringID A, StringID B)
 int StringInterner::compare(StringData s, StringID A)
 {
     std::lock_guard lock(m_mutex);
-    REALM_ASSERT_DEBUG((A - 1) < m_decompressed_strings.size());
+    REALM_ASSERT_DEBUG(A <= m_decompressed_strings.size());
     // comparisons against null
     if (s.data() == nullptr && A == 0)
         return 0;
