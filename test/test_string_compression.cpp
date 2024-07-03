@@ -53,18 +53,6 @@ TEST(StringInterner_Basic_Creation)
     parent.destroy_deep();
 }
 
-TEST(StringInterner_VerifyInterningNull)
-{
-    Array parent(Allocator::get_default());
-    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
-    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
-    const auto id = interner.intern({});
-    CHECK_EQUAL(id, 0);
-    const auto stored_id = interner.lookup({});
-    CHECK_EQUAL(stored_id, 0);
-    CHECK(interner.compare({}, 0) == 0);
-}
-
 TEST(StringInterner_InternMultipleStrings)
 {
     Array parent(Allocator::get_default());
@@ -111,5 +99,38 @@ TEST(StringInterner_TestLookup)
         CHECK(id);
         CHECK(interner.compare(StringData(s), *id) == 0);
     }
+    parent.destroy_deep();
+}
+
+TEST(StringInterner_VerifyInterningNull)
+{
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+    const auto id = interner.intern({});
+    CHECK_EQUAL(id, 0);
+    const auto stored_id = interner.lookup({});
+    CHECK_EQUAL(stored_id, 0);
+    CHECK(interner.compare({}, 0) == 0);
+    parent.destroy_deep();
+}
+
+TEST(StringInterner_VerifyLongString)
+{
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    const auto N = 7000000; // a lot of characters for triggering long string handling.
+
+    std::string long_string = "";
+    for (size_t i = 0; i < N; ++i)
+        long_string += 'a';
+
+    const auto id = interner.intern(StringData(long_string));
+    CHECK_EQUAL(id, 1);
+    const auto stored_id = interner.lookup(StringData(long_string));
+    CHECK_EQUAL(stored_id, 1);
+    CHECK(interner.compare(StringData(long_string), *stored_id) == 0);
     parent.destroy_deep();
 }
