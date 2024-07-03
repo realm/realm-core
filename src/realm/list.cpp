@@ -878,9 +878,6 @@ bool Lst<Mixed>::clear_backlink(size_t ndx, CascadeState& state) const
     if (value.is_type(type_TypedLink, type_Dictionary, type_List)) {
         if (value.is_type(type_TypedLink)) {
             auto link = value.get<ObjLink>();
-            if (link.get_obj_key().is_unresolved()) {
-                state.m_mode = CascadeState::Mode::All;
-            }
             return Base::remove_backlink(m_col_key, link, state);
         }
         else if (value.is_type(type_List)) {

@@ -1634,33 +1634,18 @@ void Session::on_integration_failure(const IntegrationException& error)
     }
 }
 
-void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress,
-                                       bool changesets_integrated)
+void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT_3(progress.download.server_version, >=, m_download_progress.server_version);
-    bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
 
     m_download_progress = progress.download;
     m_progress = progress;
 
-    if (upload_progressed) {
-        if (progress.upload.client_version > m_last_version_selected_for_upload) {
-            if (progress.upload.client_version > m_upload_progress.client_version)
-                m_upload_progress = progress.upload;
-            m_last_version_selected_for_upload = progress.upload.client_version;
-        }
+    if (progress.upload.client_version > m_upload_progress.client_version)
+        m_upload_progress = progress.upload;
 
-        notify_sync_progress();
-        check_for_upload_completion();
-    }
-
-    bool resume_upload = do_recognize_sync_version(client_version); // Allows upload process to resume
-
-    // notify also when final DOWNLOAD received with no changesets
-    bool download_progressed = changesets_integrated || (!upload_progressed && resume_upload);
-    if (download_progressed && !upload_progressed)
-        notify_sync_progress();
+    do_recognize_sync_version(client_version); // Allows upload process to resume
 
     check_for_download_completion(); // Throws
 
@@ -1712,7 +1697,6 @@ void Session::activate()
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
                  m_client_file_ident.salt); // Throws
     m_upload_progress = m_progress.upload;
-    m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_download_progress = m_progress.download;
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
     init_progress_handler();
@@ -2048,7 +2032,6 @@ void Session::send_upload_message()
 
     if (uploadable_changesets.empty()) {
         // Nothing more to upload right now
-        check_for_upload_completion(); // Throws
         // If we need to limit upload up to some version other than the last client version available and there are no
         // changes to upload, then there is no need to send an empty message.
         if (m_pending_flx_sub_set) {
@@ -2057,9 +2040,6 @@ void Session::send_upload_message()
             // Other messages may be waiting to be sent
             return enlist_to_send(); // Throws
         }
-    }
-    else {
-        m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
     }
 
     if (m_pending_flx_sub_set && target_upload_version < m_last_version_available) {
@@ -2296,7 +2276,6 @@ bool Session::client_reset_if_needed()
     // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
     // For both, we want to allow uploads again without needing external changes to download first.
     m_allow_upload = true;
-    REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
     // Checks if there is a pending client reset
     handle_pending_client_reset_acknowledgement();
@@ -2370,7 +2349,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
                                             m_fix_up_object_ids); // Throws
         m_progress.download.last_integrated_client_version = 0;
         m_progress.upload.client_version = 0;
-        m_last_version_selected_for_upload = 0;
     }
 
     // Ready to send the IDENT message
@@ -2780,34 +2758,6 @@ Status Session::check_received_sync_progress(const SyncProgress& progress) noexc
         return Status::OK();
     }
     return {ErrorCodes::SyncProtocolInvariantFailed, std::move(message)};
-}
-
-
-void Session::check_for_upload_completion()
-{
-    REALM_ASSERT_EX(m_state == Active, m_state);
-    if (!m_upload_completion_notification_requested) {
-        return;
-    }
-
-    // during an ongoing client reset operation, we never upload anything
-    if (m_performing_client_reset)
-        return;
-
-    // Upload process must have reached end of history
-    REALM_ASSERT_3(m_upload_progress.client_version, <=, m_last_version_available);
-    bool scan_complete = (m_upload_progress.client_version == m_last_version_available);
-    if (!scan_complete)
-        return;
-
-    // All uploaded changesets must have been acknowledged by the server
-    REALM_ASSERT_3(m_progress.upload.client_version, <=, m_last_version_selected_for_upload);
-    bool all_uploads_accepted = (m_progress.upload.client_version == m_last_version_selected_for_upload);
-    if (!all_uploads_accepted)
-        return;
-
-    m_upload_completion_notification_requested = false;
-    on_upload_completion(); // Throws
 }
 
 

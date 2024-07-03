@@ -466,3 +466,421 @@ TEST(Mixed_LinkSelfAssignment)
     CHECK_EQUAL(source_obj.get<Mixed>(mixed_col), Mixed());
     source_obj.remove();
 }
+
+TEST(Mixed_EmbeddedLstMixedRecursiveDelete)
+{
+    Group g;
+    auto top1 = g.add_table_with_primary_key("source", type_String, "_id");
+    auto embedded = g.add_table("embedded", Table::Type::Embedded);
+    auto top2 = g.add_table_with_primary_key("top2", type_String, "_id");
+    auto top3 = g.add_table_with_primary_key("top3", type_String, "_id");
+
+    ColKey top1_lst_col = top1->add_column_list(*embedded, "groups");
+    ColKey embedded_lst_col = embedded->add_column_list(type_Mixed, "items");
+    auto source_obj1 = top1->create_object_with_primary_key("top1_obj1");
+
+    auto top2_obj1 = top2->create_object_with_primary_key("top2_obj1");
+    auto top2_obj2 = top2->create_object_with_primary_key("top2_obj2");
+    auto top2_obj3 = top2->create_object_with_primary_key("top2_obj3");
+    auto top2_obj4 = top2->create_object_with_primary_key("top2_obj4");
+
+    auto top3_obj1 = top3->create_object_with_primary_key("top3_obj1");
+    auto top3_obj2 = top3->create_object_with_primary_key("top3_obj2");
+    auto top3_obj3 = top3->create_object_with_primary_key("top3_obj3");
+    auto top3_obj4 = top3->create_object_with_primary_key("top3_obj4");
+
+    {
+        LnkLst top1_lst = source_obj1.get_linklist(top1_lst_col);
+        auto embedded1 = top1_lst.create_and_insert_linked_object(0);
+        auto embedded2 = top1_lst.create_and_insert_linked_object(0);
+        auto embedded3 = top1_lst.create_and_insert_linked_object(0);
+
+        auto e1_lst = embedded1.get_list<Mixed>(embedded_lst_col);
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj1.get_key()));
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj2.get_key()));
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj3.get_key()));
+        e1_lst.add(ObjLink(top2->get_key(), top2_obj4.get_key()));
+
+        auto e2_lst = embedded2.get_list<Mixed>(embedded_lst_col);
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj1.get_key()));
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj2.get_key()));
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj3.get_key()));
+        e2_lst.add(ObjLink(top3->get_key(), top3_obj4.get_key()));
+
+        auto e3_lst = embedded3.get_list<Mixed>(embedded_lst_col);
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj1.get_key()));
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj2.get_key()));
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj3.get_key()));
+        e3_lst.add(ObjLink(top2->get_key(), top2_obj4.get_key()));
+    }
+    std::vector<ObjKey> keys_to_delete = {source_obj1.get_key()};
+
+    CHECK_EQUAL(top2_obj1.get_backlink_count(), 2);
+    CHECK_EQUAL(top2_obj2.get_backlink_count(), 2);
+    CHECK_EQUAL(top2_obj3.get_backlink_count(), 2);
+    CHECK_EQUAL(top2_obj4.get_backlink_count(), 2);
+
+    CHECK_EQUAL(top3_obj1.get_backlink_count(), 1);
+    CHECK_EQUAL(top3_obj2.get_backlink_count(), 1);
+    CHECK_EQUAL(top3_obj3.get_backlink_count(), 1);
+    CHECK_EQUAL(top3_obj4.get_backlink_count(), 1);
+
+    top2_obj3.invalidate();
+
+    _impl::TableFriend::batch_erase_objects(*top1, keys_to_delete);
+
+    CHECK(top2_obj1.is_valid());
+    CHECK(top2_obj2.is_valid());
+    CHECK_NOT(top2_obj3.is_valid());
+    CHECK(top2_obj4.is_valid());
+
+    CHECK_EQUAL(top2_obj1.get_backlink_count(), 0);
+    CHECK_EQUAL(top2_obj2.get_backlink_count(), 0);
+    CHECK_EQUAL(top2_obj4.get_backlink_count(), 0);
+
+    CHECK(top3_obj1.is_valid());
+    CHECK(top3_obj2.is_valid());
+    CHECK(top3_obj3.is_valid());
+    CHECK(top3_obj4.is_valid());
+
+    CHECK_EQUAL(top3_obj1.get_backlink_count(), 0);
+    CHECK_EQUAL(top3_obj2.get_backlink_count(), 0);
+    CHECK_EQUAL(top3_obj3.get_backlink_count(), 0);
+    CHECK_EQUAL(top3_obj4.get_backlink_count(), 0);
+}
+
+TEST(Mixed_SingleLinkRecursiveDelete)
+{
+    Group g;
+    auto top1 = g.add_table_with_primary_key("source", type_String, "_id");
+    auto top2 = g.add_table_with_primary_key("top2", type_String, "_id");
+
+    ColKey top1_mixed_col = top1->add_column(type_Mixed, "mixed");
+    auto top1_obj1 = top1->create_object_with_primary_key("top1_obj1");
+    auto top2_obj1 = top2->create_object_with_primary_key("top2_obj1");
+
+    top1_obj1.set<Mixed>(top1_mixed_col, ObjLink{top2->get_key(), top2_obj1.get_key()});
+
+    CHECK_EQUAL(top2_obj1.get_backlink_count(), 1);
+
+    top1->remove_object_recursive(top1_obj1.get_key());
+
+    CHECK_NOT(top1_obj1.is_valid());
+    CHECK_EQUAL(top1->size(), 0);
+    CHECK_NOT(top2_obj1.is_valid());
+    CHECK_EQUAL(top2->size(), 0);
+}
+
+static void find_nested_links(Lst<Mixed>&, std::vector<ObjLink>&);
+
+static void find_nested_links(Dictionary& dict, std::vector<ObjLink>& links)
+{
+    for (size_t i = 0; i < dict.size(); ++i) {
+        auto [key, val] = dict.get_pair(i);
+        if (val.is_type(type_TypedLink)) {
+            links.push_back(val.get_link());
+        }
+        else if (val.is_type(type_List)) {
+            std::shared_ptr<Lst<Mixed>> list_i = dict.get_list(i);
+            find_nested_links(*list_i, links);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            DictionaryPtr dict_i = dict.get_dictionary(key.get_string());
+            find_nested_links(*dict_i, links);
+        }
+    }
+}
+
+static void find_nested_links(Lst<Mixed>& list, std::vector<ObjLink>& links)
+{
+    for (size_t i = 0; i < list.size(); ++i) {
+        Mixed val = list.get(i);
+        if (val.is_type(type_TypedLink)) {
+            links.push_back(val.get_link());
+        }
+        else if (val.is_type(type_List)) {
+            std::shared_ptr<Lst<Mixed>> list_i = list.get_list(i);
+            find_nested_links(*list_i, links);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            DictionaryPtr dict_i = list.get_dictionary(i);
+            find_nested_links(*dict_i, links);
+        }
+    }
+}
+
+struct ListOfMixedLinks {
+    void init_table(TableRef table)
+    {
+        m_col_key = table->add_column_list(type_Mixed, "list_of_mixed");
+    }
+    void set_links(Obj from, std::vector<ObjLink> to)
+    {
+        Lst<Mixed> lst = from.get_list<Mixed>(m_col_key);
+        for (ObjLink& link : to) {
+            lst.add(link);
+        }
+    }
+    void get_links(Obj from, std::vector<ObjLink>& links)
+    {
+        Lst<Mixed> lst = from.get_list<Mixed>(m_col_key);
+        find_nested_links(lst, links);
+    }
+    ColKey m_col_key;
+};
+
+struct DictionaryOfMixedLinks {
+    void init_table(TableRef table)
+    {
+        m_col_key = table->add_column_dictionary(type_Mixed, "dict_of_mixed");
+    }
+    void set_links(Obj from, std::vector<ObjLink> to)
+    {
+        size_t count = 0;
+        Dictionary dict = from.get_dictionary(m_col_key);
+        for (ObjLink& link : to) {
+            dict.insert(util::format("key_%1", count++), link);
+        }
+    }
+    void get_links(Obj from, std::vector<ObjLink>& links)
+    {
+        Dictionary dict = from.get_dictionary(m_col_key);
+        find_nested_links(dict, links);
+    }
+    ColKey m_col_key;
+};
+
+struct NestedDictionary {
+    void init_table(TableRef table)
+    {
+        m_col_key = table->add_column(type_Mixed, "nested_dictionary");
+    }
+    void set_links(Obj from, std::vector<ObjLink> to)
+    {
+        from.set_collection(m_col_key, CollectionType::Dictionary);
+        size_t count = 0;
+        Dictionary dict = from.get_dictionary(m_col_key);
+        for (ObjLink& link : to) {
+            dict.insert(util::format("key_%1", count++), link);
+        }
+    }
+    void get_links(Obj from, std::vector<ObjLink>& links)
+    {
+        Dictionary dict = from.get_dictionary(m_col_key);
+        find_nested_links(dict, links);
+    }
+    ColKey m_col_key;
+};
+
+struct NestedList {
+    void init_table(TableRef table)
+    {
+        m_col_key = table->add_column(type_Mixed, "nested_list");
+    }
+    void set_links(Obj from, std::vector<ObjLink> to)
+    {
+        from.set_collection(m_col_key, CollectionType::List);
+        Lst<Mixed> list = from.get_list<Mixed>(m_col_key);
+        for (ObjLink& link : to) {
+            list.add(link);
+        }
+    }
+    void get_links(Obj from, std::vector<ObjLink>& links)
+    {
+        Lst<Mixed> list = from.get_list<Mixed>(m_col_key);
+        find_nested_links(list, links);
+    }
+    ColKey m_col_key;
+};
+
+struct NestedListOfLists {
+    void init_table(TableRef table)
+    {
+        m_col_key = table->add_column(type_Mixed, "nested_lols");
+    }
+    void set_links(Obj from, std::vector<ObjLink> to)
+    {
+        from.set_collection(m_col_key, CollectionType::List);
+        Lst<Mixed> list = from.get_list<Mixed>(m_col_key);
+        list.add("lol_0");
+        list.add("lol_1");
+
+        for (ObjLink& link : to) {
+            size_t list_ndx = list.size();
+            list.insert_collection(list_ndx, CollectionType::List);
+
+            std::shared_ptr<Lst<Mixed>> list_n = list.get_list(list_ndx);
+            list_n->add(util::format("lol_%1_0", list_ndx));
+            list_n->add(util::format("lol_%1_1", list_ndx));
+            list_n->add(link);
+        }
+    }
+    void get_links(Obj from, std::vector<ObjLink>& links)
+    {
+        Lst<Mixed> list = from.get_list<Mixed>(m_col_key);
+        find_nested_links(list, links);
+    }
+    ColKey m_col_key;
+};
+
+struct NestedDictOfDicts {
+    void init_table(TableRef table)
+    {
+        m_col_key = table->add_column(type_Mixed, "nested_dods");
+    }
+    void set_links(Obj from, std::vector<ObjLink> to)
+    {
+        from.set_collection(m_col_key, CollectionType::Dictionary);
+        Dictionary dict = from.get_dictionary(m_col_key);
+        dict.insert("dict_0", 0);
+        dict.insert("dict_1", 1);
+
+        for (ObjLink& link : to) {
+            std::string key = util::format("dict_%1", dict.size());
+            dict.insert_collection(key, CollectionType::Dictionary);
+
+            DictionaryPtr dict_n = dict.get_dictionary(key);
+            dict_n->insert("key0", 0);
+            dict_n->insert("key1", "value 1");
+            dict_n->insert("link", link);
+        }
+    }
+    void get_links(Obj from, std::vector<ObjLink>& links)
+    {
+        Dictionary dict = from.get_dictionary(m_col_key);
+        find_nested_links(dict, links);
+    }
+    ColKey m_col_key;
+};
+
+struct SingleLink {
+    void init_table(TableRef) {}
+    void set_links(Obj from, std::vector<ObjLink> to)
+    {
+        REALM_ASSERT(to.size() == 1);
+        TableRef src_table = from.get_table();
+        if (!m_col_key) {
+            TableRef dest_table = src_table->get_parent_group()->get_table(to[0].get_table_key());
+            m_col_key = src_table->add_column(*dest_table, "link");
+        }
+        TableKey dest_table_key = src_table->get_opposite_table_key(m_col_key);
+        REALM_ASSERT(to[0].get_table_key() == dest_table_key);
+        from.set<ObjKey>(m_col_key, to[0].get_obj_key());
+    }
+    void get_links(Obj from, std::vector<ObjLink>& links)
+    {
+        if (!m_col_key) {
+            return;
+        }
+        TableRef src_table = from.get_table();
+        TableKey dest_table_key = src_table->get_opposite_table_key(m_col_key);
+        ObjKey link = from.get<ObjKey>(m_col_key);
+        links.push_back(ObjLink{dest_table_key, link});
+    }
+    ColKey m_col_key;
+};
+
+TEST_TYPES(Mixed_ContainerOfLinksFromLargeCluster, ListOfMixedLinks, DictionaryOfMixedLinks, NestedDictionary,
+           NestedList, NestedListOfLists, NestedDictOfDicts)
+{
+    Group g;
+    auto top1 = g.add_table_with_primary_key("top1", type_String, "_id");
+    auto top2 = g.add_table_with_primary_key("top2", type_String, "_id");
+    TEST_TYPE type;
+    type.init_table(top1);
+
+    constexpr size_t num_objects = 2000; // more than BPNODE_SIZE
+
+    for (size_t i = 0; i < num_objects; ++i) {
+        auto top1_obj = top1->create_object_with_primary_key(util::format("top1_%1", i));
+        auto top2_obj1 = top2->create_object_with_primary_key(util::format("top2_1_%1", i));
+        auto top2_obj2 = top2->create_object_with_primary_key(util::format("top2_2_%1", i));
+
+        std::vector<ObjLink> dest_links = {ObjLink(top2->get_key(), top2_obj1.get_key()),
+                                           ObjLink(top2->get_key(), top2_obj2.get_key())};
+        type.set_links(top1_obj, dest_links);
+    }
+
+    auto remove_one_object = [&](size_t ndx) {
+        Obj obj_to_remove = top1->get_object(ndx);
+        std::vector<ObjLink> links;
+        type.get_links(obj_to_remove, links);
+        CHECK_EQUAL(links.size(), 2);
+        ObjLink link_1 = links[0];
+        ObjLink link_2 = links[1];
+        CHECK_EQUAL(link_1.get_table_key(), top2->get_key());
+        CHECK_EQUAL(link_2.get_table_key(), top2->get_key());
+
+        Obj obj_linked1 = top2->get_object(link_1.get_obj_key());
+        Obj obj_linked2 = top2->get_object(link_2.get_obj_key());
+        CHECK_EQUAL(obj_linked1.get_backlink_count(), 1);
+        CHECK_EQUAL(obj_linked2.get_backlink_count(), 1);
+
+        obj_to_remove.remove();
+        CHECK_NOT(obj_to_remove.is_valid());
+        CHECK_EQUAL(obj_linked1.get_backlink_count(), 0);
+        CHECK_EQUAL(obj_linked2.get_backlink_count(), 0);
+    };
+
+    // erase at random, to exercise the collapse/join of cluster leafs
+    Random random(test_util::random_int<unsigned long>()); // Seed from slow global generator
+    while (!top1->is_empty()) {
+        size_t rnd = random.draw_int_mod(top1->size());
+        remove_one_object(rnd);
+    }
+}
+
+TEST_TYPES(Mixed_RemoveRecursiveSingleLink, SingleLink, ListOfMixedLinks, DictionaryOfMixedLinks, NestedDictionary,
+           NestedList, NestedListOfLists, NestedDictOfDicts)
+{
+    Group g;
+    auto top1 = g.add_table_with_primary_key("top1", type_String, "_id");
+    auto top2 = g.add_table_with_primary_key("top2", type_String, "_id");
+    TEST_TYPE type;
+    type.init_table(top1);
+
+    constexpr size_t num_src_objects = 4000; // more than BPNODE_SIZE
+    constexpr size_t num_dst_objects = 1000;
+    for (size_t i = 0; i < num_src_objects; ++i) {
+        auto top1_obj = top1->create_object_with_primary_key(util::format("top1_%1", i));
+
+        // get or create
+        auto top2_obj = top2->create_object_with_primary_key(util::format("top2_%1", i % num_dst_objects));
+
+        std::vector<ObjLink> dest_links = {ObjLink(top2->get_key(), top2_obj.get_key())};
+        type.set_links(top1_obj, dest_links);
+    }
+
+    auto remove_one_object = [&](size_t ndx) {
+        Obj obj_to_remove = top1->get_object(ndx);
+        std::vector<ObjLink> links;
+        type.get_links(obj_to_remove, links);
+        CHECK_EQUAL(links.size(), 1);
+        ObjLink link_1 = links[0];
+        CHECK_EQUAL(link_1.get_table_key(), top2->get_key());
+
+        Obj obj_linked = top2->get_object(link_1.get_obj_key());
+        size_t previous_backlink_count = obj_linked.get_backlink_count();
+        CHECK_NOT_EQUAL(previous_backlink_count, 0);
+
+        top1->remove_object_recursive(obj_to_remove.get_key());
+        CHECK_NOT(obj_to_remove.is_valid());
+        if (previous_backlink_count == 1) {
+            CHECK_NOT(obj_linked.is_valid());
+        }
+        else {
+            CHECK(obj_linked.is_valid());
+            size_t new_backlink_count = obj_linked.get_backlink_count();
+            CHECK_EQUAL(new_backlink_count, previous_backlink_count - 1);
+        }
+    };
+
+    // erase at random, to exercise the collapse/join of cluster leafs
+    Random random(test_util::random_int<unsigned long>()); // Seed from slow global generator
+    while (!top1->is_empty()) {
+        size_t rnd = random.draw_int_mod(top1->size());
+        remove_one_object(rnd);
+    }
+    CHECK_EQUAL(top1->size(), 0);
+    CHECK_EQUAL(top2->size(), 0);
+}

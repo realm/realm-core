@@ -6544,8 +6544,6 @@ TEST(Sync_BundledRealmFile)
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    Session session = fixture.make_bound_session(db);
-
     write_transaction(db, [](WriteTransaction& tr) {
         auto foos = tr.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
         foos->create_object_with_primary_key(123);
@@ -6554,6 +6552,7 @@ TEST(Sync_BundledRealmFile)
     // We cannot write out file if changes are not synced to server
     CHECK_THROW_ANY(db->write_copy(path.c_str(), nullptr));
 
+    Session session = fixture.make_bound_session(db);
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
