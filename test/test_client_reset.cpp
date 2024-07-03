@@ -227,6 +227,11 @@ TEST(ClientReset_InitialLocalChanges)
     DBRef db_2 = DB::create(make_client_replication(), path_2);
 
     Session session_1 = fixture.make_session(db_1, server_path);
+    {
+        // Initialize a session for db_2 and grab a file ident so the client reset can occur
+        Session session_2a = fixture.make_session(db_2, server_path);
+        session_2a.wait_for_download_complete_or_client_stopped();
+    }
 
     // First we make a changeset and upload it
     {

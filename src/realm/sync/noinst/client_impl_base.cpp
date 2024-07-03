@@ -1890,6 +1890,9 @@ void Session::send_bind_message()
 
     session_ident_type session_ident = m_ident;
     // Request an ident if we don't already have one and there isn't a pending client reset diff
+    // The file ident can be 0 when a client reset is being performed if a brand new local realm
+    // has been opened (or using Async open) and a FLX/PBS migration occurs when first connecting
+    // to the server.
     bool need_client_file_ident = !have_client_file_ident() && !get_client_reset_config();
     const bool is_subserver = false;
 
