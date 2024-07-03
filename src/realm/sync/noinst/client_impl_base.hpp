@@ -953,9 +953,10 @@ private:
     SyncSocketProvider::SyncTimer m_try_again_activation_timer;
     ErrorBackoffState<sync::ProtocolError, RandomEngine> m_try_again_delay_info;
 
-    // Set to true when download completion is reached. Set to false after a
-    // slow reconnect, such that the upload process will become suspended until
-    // download completion is reached again.
+    // Set to false when download completion is reached. Set to true after a
+    // slow reconnect, such that UPLOAD and QUERY messages will not be sent until
+    // download completion is reached again. This feature can be disabled (always
+    // false) if ClientConfig::disable_upload_activation_delay is true.
     bool m_delay_uploads = true;
 
     bool m_is_flx_sync_session = false;
