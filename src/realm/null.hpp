@@ -117,6 +117,12 @@ struct null {
     }
 };
 
+template <typename T>
+inline bool is_null(const T&)
+{
+    return false;
+}
+
 template <class OS>
 OS& operator<<(OS& os, const null&)
 {

@@ -221,16 +221,6 @@ void IntegerCompressor::get_chunk_flex(const Array& arr, size_t ndx, int64_t res
     FlexCompressor::get_chunk(arr.m_integer_compressor, ndx, res);
 }
 
-void IntegerCompressor::set_packed(Array& arr, size_t ndx, int64_t val)
-{
-    PackedCompressor::set_direct(arr.m_integer_compressor, ndx, val);
-}
-
-void IntegerCompressor::set_flex(Array& arr, size_t ndx, int64_t val)
-{
-    FlexCompressor::set_direct(arr.m_integer_compressor, ndx, val);
-}
-
 template <class Cond>
 bool IntegerCompressor::find_packed(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,
                                     QueryStateBase* st)
@@ -250,7 +240,7 @@ void IntegerCompressor::set_vtable(Array& arr)
     static const Array::VTable vtable_packed = {get_packed,
                                                 get_chunk_packed,
                                                 get_all_packed,
-                                                set_packed,
+                                                nullptr,
                                                 {
                                                     find_packed<Equal>,
                                                     find_packed<NotEqual>,
@@ -260,7 +250,7 @@ void IntegerCompressor::set_vtable(Array& arr)
     static const Array::VTable vtable_flex = {get_flex,
                                               get_chunk_flex,
                                               get_all_flex,
-                                              set_flex,
+                                              nullptr,
                                               {
                                                   find_flex<Equal>,
                                                   find_flex<NotEqual>,

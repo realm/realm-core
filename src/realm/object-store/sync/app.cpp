@@ -157,6 +157,24 @@ HttpHeaders get_request_headers(const std::shared_ptr<User>& user, RequestTokenT
     return headers;
 }
 
+std::string trim_base_url(std::string base_url)
+{
+    while (!base_url.empty() && base_url.back() == '/') {
+        base_url.pop_back();
+    }
+
+    return base_url;
+}
+
+std::string base_url_from_app_config(const AppConfig& app_config)
+{
+    if (!app_config.base_url) {
+        return std::string{App::default_base_url()};
+    }
+
+    return trim_base_url(*app_config.base_url);
+}
+
 UniqueFunction<void(const Response&)> handle_default_response(UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     return [completion = std::move(completion)](const Response& response) {
@@ -190,7 +208,7 @@ SharedApp App::get_app(CacheMode mode, const AppConfig& config) NO_THREAD_SAFETY
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard lock(s_apps_mutex);
-        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(App::default_base_url()))];
+        auto& app = s_apps_cache[config.app_id][base_url_from_app_config(config)];
         if (!app) {
             app = std::make_shared<App>(Private(), config);
         }
@@ -206,7 +224,7 @@ SharedApp App::get_cached_app(const std::string& app_id, const std::optional<std
     if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
         const auto& apps_by_url = it->second;
 
-        auto app_it = base_url ? apps_by_url.find(*base_url) : apps_by_url.begin();
+        auto app_it = base_url ? apps_by_url.find(trim_base_url(*base_url)) : apps_by_url.begin();
         if (app_it != apps_by_url.end()) {
             return app_it->second;
         }
@@ -233,7 +251,7 @@ void App::close_all_sync_sessions()
 
 App::App(Private, const AppConfig& config)
     : m_config(config)
-    , m_base_url(m_config.base_url.value_or(std::string(App::default_base_url())))
+    , m_base_url(base_url_from_app_config(m_config))
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(s_default_timeout_ms))
     , m_file_manager(std::make_unique<SyncFileManager>(config))
     , m_metadata_store(create_metadata_store(config, *m_file_manager))
@@ -393,7 +411,7 @@ void App::update_hostname(const std::string& host_url, const std::string& ws_hos
                           const std::string& new_base_url)
 {
     log_debug("App: update_hostname: %1 | %2 | %3", host_url, ws_host_url, new_base_url);
-    m_base_url = new_base_url;
+    m_base_url = trim_base_url(new_base_url);
     // If a new host url was returned from the server, use it to configure the routes
     // Otherwise, use the m_base_url value
     std::string base_url = host_url.length() > 0 ? host_url : m_base_url;
@@ -697,12 +715,11 @@ void App::get_profile(const std::shared_ptr<User>& user,
                     identities.push_back({get<std::string>(doc, "id"), get<std::string>(doc, "provider_type")});
                 }
 
-                if (auto data = m_metadata_store->get_user(user->user_id())) {
-                    data->identities = std::move(identities);
-                    data->profile = UserProfile(get<BsonDocument>(profile_json, "data"));
-                    m_metadata_store->update_user(user->user_id(), *data);
-                    user->update_backing_data(std::move(data));
-                }
+                m_metadata_store->update_user(user->user_id(), [&](auto& data) {
+                    data.identities = std::move(identities);
+                    data.profile = UserProfile(get<BsonDocument>(profile_json, "data"));
+                    user->update_backing_data(data); // FIXME
+                });
             }
             catch (const AppError& err) {
                 return completion(nullptr, err);
@@ -794,12 +811,11 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
             try {
                 auto json = parse<BsonDocument>(response.body);
                 if (linking_user) {
-                    if (auto user_data = m_metadata_store->get_user(linking_user->user_id())) {
-                        user_data->access_token = RealmJWT(get<std::string>(json, "access_token"));
-                        // maybe a callback for this?
-                        m_metadata_store->update_user(linking_user->user_id(), *user_data);
-                        linking_user->update_backing_data(std::move(user_data));
-                    }
+                    m_metadata_store->update_user(linking_user->user_id(), [&](auto& data) {
+                        data.access_token = RealmJWT(get<std::string>(json, "access_token"));
+                        // FIXME: should be powered by callback
+                        linking_user->update_backing_data(data);
+                    });
                 }
                 else {
                     auto user_id = get<std::string>(json, "user_id");
@@ -1320,11 +1336,10 @@ void App::refresh_access_token(const std::shared_ptr<User>& user, bool update_lo
             try {
                 auto json = parse<BsonDocument>(response.body);
                 RealmJWT access_token{get<std::string>(json, "access_token")};
-                if (auto data = self->m_metadata_store->get_user(user->user_id())) {
-                    data->access_token = access_token;
-                    self->m_metadata_store->update_user(user->user_id(), *data);
-                    user->update_backing_data(std::move(data));
-                }
+                self->m_metadata_store->update_user(user->user_id(), [&](auto& data) {
+                    data.access_token = access_token;
+                    user->update_backing_data(data);
+                });
             }
             catch (AppError& err) {
                 return completion(std::move(err));

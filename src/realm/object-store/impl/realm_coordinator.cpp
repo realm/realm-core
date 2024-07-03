@@ -386,7 +386,7 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         const auto subscription_version = current_subscription.version();
         // in case we are hitting this check while during a normal open, we need to take in
         // consideration if the db was created during this call. Since this may be the first time
-        // we are actually creating a realm. For async open this does not apply, infact db_created
+        // we are actually creating a realm. For async open this does not apply, in fact db_created
         // will always be false.
         if (!first_time_open)
             first_time_open = db_created;

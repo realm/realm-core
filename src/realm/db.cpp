@@ -1626,7 +1626,7 @@ bool DB::compact(bool bump_version_number, std::optional<const char*> output_enc
     }
     auto info = m_info;
     Durability dura = Durability(info->durability);
-    std::string key_buffer;
+    std::unique_ptr<char[]> key_buffer;
     const char* write_key = nullptr;
     if (output_encryption_key) {
         if (*output_encryption_key) {
@@ -1635,8 +1635,9 @@ bool DB::compact(bool bump_version_number, std::optional<const char*> output_enc
     }
 #if REALM_ENABLE_ENCRYPTION
     else if (auto encryption = m_alloc.get_file().get_encryption()) {
-        key_buffer = encryption->get_key();
-        write_key = key_buffer.data();
+        key_buffer = std::make_unique<char[]>(64);
+        memcpy(key_buffer.get(), encryption->get_key(), 64);
+        write_key = key_buffer.get();
     }
 #endif
     {
@@ -2184,7 +2185,7 @@ void DB::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
-bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key)
+bool DB::needs_file_format_upgrade(const std::string& file, Span<const char> encryption_key)
 {
     SlabAlloc alloc;
     SlabAlloc::Config cfg;
@@ -2192,6 +2193,7 @@ bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<ch
     cfg.read_only = true;
     cfg.no_create = true;
     if (!encryption_key.empty()) {
+        REALM_ASSERT(encryption_key.size() == 64);
         cfg.encryption_key = encryption_key.data();
     }
     try {
@@ -2862,20 +2864,27 @@ DBRef DB::create(BinaryData buffer, bool take_ownership) NO_THREAD_SAFETY_ANALYS
     return retval;
 }
 
-void DB::claim_sync_agent()
+bool DB::try_claim_sync_agent()
 {
     REALM_ASSERT(is_attached());
-    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    std::lock_guard lock(m_controlmutex);
     if (m_info->sync_agent_present)
-        throw MultipleSyncAgents{};
+        return false;
     m_info->sync_agent_present = 1; // Set to true
     m_is_sync_agent = true;
+    return true;
+}
+
+void DB::claim_sync_agent()
+{
+    if (!try_claim_sync_agent())
+        throw MultipleSyncAgents{};
 }
 
 void DB::release_sync_agent()
 {
     REALM_ASSERT(is_attached());
-    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    std::lock_guard lock(m_controlmutex);
     if (!m_is_sync_agent)
         return;
     REALM_ASSERT(m_info->sync_agent_present);

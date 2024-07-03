@@ -117,9 +117,15 @@ TEST(Utils_File_dir)
 
 TEST(Utils_File_dir_unicode)
 {
+#if __cplusplus < 202002L
     using std::filesystem::u8path;
+#else
+    auto u8path = [](const std::string& str) {
+        return std::filesystem::path(reinterpret_cast<const char8_t*>(str.c_str()));
+    };
+#endif
 
-    constexpr char all_the_unicode[] = u8"фоо-бар Λορεμ ლორემ 植物 החלל جمعت søren";
+    const char* all_the_unicode = (const char*)u8"фоо-бар Λορεμ ლორემ 植物 החלל جمعت søren";
     std::string dir_name = File::resolve(all_the_unicode, test_util::get_test_path_prefix());
 
     // Create directory
