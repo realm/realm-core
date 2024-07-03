@@ -789,7 +789,7 @@ bool Obj::is_null(ColKey col_key) const
 }
 
 
-// Figure out if this object has any remaining backlinkss
+// Figure out if this object has any remaining backlinks
 bool Obj::has_backlinks(bool only_strong_links) const
 {
     const Table& target_table = *m_table;

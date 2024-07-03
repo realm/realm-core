@@ -1448,6 +1448,15 @@ buildvariants:
   tasks:
   - name: compile_local_tests
 
+- name: ubuntu-2404-GCC
+  display_name: "Ubuntu 24.04 arm64 (native GCC)"
+  run_on: ubuntu2404-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
+
 - name: ubuntu-encryption-tsan
   display_name: "Ubuntu (Encryption Enabled w/TSAN)"
   run_on: ubuntu2204-arm64-small
@@ -1496,7 +1505,7 @@ buildvariants:
   - name: generate-sync-corpus
 
 - name: ubuntu2004-arm64
-  display_name: "Ubuntu 20.04 ARM64 (Clang 11 release benchmarks)"
+  display_name: "Ubuntu 20.04 ARM64 (GCC 9 release benchmarks)"
   run_on: ubuntu2004-arm64-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"

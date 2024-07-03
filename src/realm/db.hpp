@@ -432,6 +432,7 @@ public:
     /// Mark this DB as the sync agent for the file.
     /// \throw MultipleSyncAgents if another DB is already the sync agent.
     void claim_sync_agent();
+    bool try_claim_sync_agent();
     void release_sync_agent();
 
     /// Returns true if there are threads waiting to acquire the write lock, false otherwise.

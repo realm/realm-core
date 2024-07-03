@@ -187,11 +187,12 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
 
     SECTION("create_user() only updates the given fields and leaves the rest unchanged") {
         store->create_user(user_id, refresh_token, access_token, device_id);
-        auto data = store->get_user(user_id);
-        REQUIRE(data);
-        data->profile = bson::BsonDocument{{"name", "user's name"}, {"email", "user's email"}};
-        data->identities = {{"identity", "provider"}};
-        store->update_user(user_id, *data);
+        UserProfile profile = bson::BsonDocument{{"name", "user's name"}, {"email", "user's email"}};
+        std::vector<UserIdentity> identities{{"identity", "provider"}};
+        store->update_user(user_id, [&](UserData& data) {
+            data.profile = profile;
+            data.identities = identities;
+        });
 
         const auto access_token_2 = encode_fake_jwt("access_token_2", 123, 456);
         const auto refresh_token_2 = encode_fake_jwt("refresh_token_2", 123, 456);
@@ -203,8 +204,8 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
         CHECK(data2->refresh_token.token == refresh_token_2);
         CHECK(data2->legacy_identities.empty());
         CHECK(data2->device_id == "device id 2");
-        CHECK(data2->identities == data->identities);
-        CHECK(data2->profile.data() == data->profile.data());
+        CHECK(data2->identities == identities);
+        CHECK(data2->profile.data() == profile.data());
     }
 
     SECTION("has_logged_in_user() is only true if user is present and valid") {
@@ -296,12 +297,15 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
         store->create_user("user 2", refresh_token, access_token, device_id);
         store->create_user("user 3", refresh_token, access_token, device_id);
 
-        auto data = store->get_user("user 3");
-        data->access_token.token.clear();
-        data->refresh_token.token.clear();
-        store->update_user("user 3", *data);
+        store->update_user("user 3", [](auto& data) {
+            data.access_token.token.clear();
+            data.refresh_token.token.clear();
+        });
         CHECK(store->get_current_user() == "user 1");
-        store->update_user("user 1", *data);
+        store->update_user("user 1", [](auto& data) {
+            data.access_token.token.clear();
+            data.refresh_token.token.clear();
+        });
         CHECK(store->get_current_user() == "user 2");
 
         store->set_current_user("not a user");
@@ -334,10 +338,10 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
 
     SECTION("update_user() does not set legacy identities") {
         store->create_user(user_id, refresh_token, access_token, device_id);
+        store->update_user(user_id, [](auto& data) {
+            data.legacy_identities.push_back("legacy uuid");
+        });
         auto data = store->get_user(user_id);
-        data->legacy_identities.push_back("legacy uuid");
-        store->update_user(user_id, *data);
-        data = store->get_user(user_id);
         REQUIRE(data->legacy_identities.empty());
     }
 
@@ -609,6 +613,83 @@ TEST_CASE("app metadata: persisted", "[sync][metadata]") {
     }
 }
 
+TEST_CASE("app metadata: multiple stores", "[sync][metadata]") {
+    test_util::TestDirGuard test_dir(base_path);
+
+    AppConfig config;
+    config.app_id = "app id";
+    config.metadata_mode = AppConfig::MetadataMode::NoEncryption;
+    config.base_file_path = base_path;
+    SyncFileManager file_manager(config);
+
+    auto store_1 = create_metadata_store(config, file_manager);
+    auto store_2 = create_metadata_store(config, file_manager);
+    REQUIRE(store_1 != store_2);
+
+    SECTION("create user in one store then read from the other") {
+        store_1->create_user(user_id, refresh_token, access_token, device_id);
+        auto user = store_2->get_user(user_id);
+        REQUIRE(user);
+    }
+
+    SECTION("update existing user in one store then read from the other") {
+        store_1->create_user(user_id, refresh_token, access_token, device_id);
+        auto user_1 = store_1->get_user(user_id);
+
+        std::vector<UserIdentity> identities{{"identity", "provider"}};
+        store_2->update_user(user_id, [&](UserData& data) {
+            data.identities = identities;
+        });
+
+        auto user_2 = store_1->get_user(user_id);
+        CHECK(user_1->identities.empty());
+        CHECK(user_2->identities == identities);
+    }
+
+    SECTION("non-conflicting writes from multiple stores") {
+        store_1->create_user(user_id, refresh_token, access_token, device_id);
+        auto user_1 = store_1->get_user(user_id);
+        auto user_2 = store_2->get_user(user_id);
+
+        UserProfile profile = bson::BsonDocument{{"name", "user's name"}, {"email", "user's email"}};
+        std::vector<UserIdentity> identities{{"identity", "provider"}};
+        store_1->update_user(user_id, [&](UserData& data) {
+            data.identities = identities;
+        });
+        store_2->update_user(user_id, [&](UserData& data) {
+            data.profile = profile;
+        });
+
+        // The second write should not have discarded the change made by the first store
+        user_1 = store_1->get_user(user_id);
+        user_2 = store_2->get_user(user_id);
+        REQUIRE(user_1->identities == user_2->identities);
+        REQUIRE(user_1->identities == identities);
+        REQUIRE(user_1->profile.data() == user_2->profile.data());
+        REQUIRE(user_1->profile.data() == profile.data());
+    }
+
+    SECTION("file actions are not performed on open if there is already a live store") {
+        auto path = util::make_temp_file("file_to_delete");
+        store_1->create_user(user_id, refresh_token, access_token, device_id);
+        store_1->add_realm_path(user_id, path);
+        store_1->log_out(user_id, SyncUser::State::Removed);
+
+        create_metadata_store(config, file_manager);
+        REQUIRE(File::exists(path));
+
+        store_1.reset();
+
+        create_metadata_store(config, file_manager);
+        REQUIRE(File::exists(path));
+
+        store_2.reset();
+
+        create_metadata_store(config, file_manager);
+        REQUIRE_FALSE(File::exists(path));
+    }
+}
+
 #if REALM_ENABLE_ENCRYPTION
 TEST_CASE("app metadata: encryption", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
@@ -735,7 +816,7 @@ TEST_CASE("app metadata: encryption", "[sync][metadata]") {
 #endif // REALM_PLATFORM_APPLE
 }
 
-#endif
+#endif // REALM_ENABLE_ENCRYPTION
 
 #ifndef SWIFT_PACKAGE // The SPM build currently doesn't copy resource files
 TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
