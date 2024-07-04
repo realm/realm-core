@@ -594,6 +594,24 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         ++after_reset_count;
     };
 
+    config_local.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession> weak_session,
+                                                             const SyncClientHookData& data) {
+        // To prevent the upload cursors from becoming out of sync when the local realm assumes
+        // the client file ident of the fresh realm, UPLOAD messages are not allowed during the
+        // fresh realm download so the server's upload cursor versions start at 0 when the
+        // local realm resumes after the client reset.
+        if (data.event == SyncClientHookEvent::UploadMessageSent) {
+            // If this is an UPLOAD message event, check to see if the fresh realm is being downloaded
+            if (auto session = weak_session.lock()) {
+                // Check for a "fresh" path to determine if this is a client reset fresh download session
+                if (_impl::client_reset::is_fresh_path(session->path())) {
+                    FAIL("UPLOAD messages are not allowed during client reset fresh realm download");
+                }
+            }
+        }
+        return SyncClientHookAction::NoAction;
+    };
+
     SECTION("Recover: offline writes and subscription (single subscription)") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         auto&& [reset_future, reset_handler] = make_client_reset_handler();

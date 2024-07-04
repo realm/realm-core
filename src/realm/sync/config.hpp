@@ -137,6 +137,7 @@ enum class SyncClientHookEvent {
     IdentMessageSent,
     ClientResetMergeComplete,
     BootstrapBatchAboutToProcess,
+    UploadMessageSent,
 };
 
 enum class SyncClientHookAction {
