@@ -639,7 +639,7 @@ public:
         }
         else {
             if (!mode_spec.empty()) {
-                throw std::runtime_error("Excepted BAASAAS_START_MODE to be \"githash\", \"patchid\", or \"branch\"");
+                throw std::runtime_error("Expected BAASAAS_START_MODE to be \"githash\", \"patchid\", or \"branch\"");
             }
             ref_spec = {};
         }

@@ -847,7 +847,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
 
     try {
-        process_pending_flx_bootstrap();
+        process_pending_flx_bootstrap(); // throws
     }
     catch (const IntegrationException& e) {
         on_integration_failure(e);
@@ -866,8 +866,6 @@ void SessionImpl::process_pending_flx_bootstrap()
     if (!m_is_flx_sync_session || m_state != State::Active) {
         return;
     }
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == SessionImpl::Active, m_state);
     auto bootstrap_store = m_wrapper.get_flx_pending_bootstrap_store();
     if (!bootstrap_store->has_pending()) {
         return;
@@ -1196,6 +1194,10 @@ void SessionWrapper::on_flx_sync_version_complete(int64_t version)
 void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
 {
     if (!has_flx_subscription_store()) {
+        return;
+    }
+    // Is this a server-initiated bootstrap? Skip notifying the subscription store
+    if (new_version == m_flx_active_version) {
         return;
     }
     REALM_ASSERT(!m_finalized);
