@@ -589,11 +589,7 @@ CompressedStringView& StringInterner::get_compressed(StringID id)
 {
     auto index = id - 1; // 0 represents null
     auto hi = index >> 8;
-#if defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
-    auto lo = index & 0xFF;
-#else
     auto lo = index & 0xFFUL;
-#endif
 
     DataLeaf& leaf = m_compressed_leafs[hi];
     load_leaf_if_needed(leaf);

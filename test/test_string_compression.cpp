@@ -63,12 +63,9 @@ TEST(StringInterner_InternMultipleStrings)
     for (size_t i = 0; i < 100; i++)
         strings.push_back("aaaaaaaaaaaaa" + std::to_string(i));
 
-    std::vector<StringID> ids;
-    for (const auto& s : strings)
-        ids.push_back(interner.intern(s));
-
     size_t i = 0;
-    for (const auto& id : ids) {
+    for (const auto& s : strings) {
+        const auto id = interner.intern(s);
         const auto& str = interner.get(id);
         CHECK(str == strings[i++]);
         auto stored_id = interner.lookup(str);
@@ -99,6 +96,7 @@ TEST(StringInterner_TestLookup)
         CHECK(id);
         CHECK(interner.compare(StringData(s), *id) == 0);
     }
+
     parent.destroy_deep();
 }
 
@@ -107,11 +105,24 @@ TEST(StringInterner_VerifyInterningNull)
     Array parent(Allocator::get_default());
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
-    const auto id = interner.intern({});
-    CHECK_EQUAL(id, 0);
+    auto null_id = interner.intern({});
+    CHECK_EQUAL(null_id, 0);
+    CHECK_EQUAL(interner.get(null_id), StringData{});
     const auto stored_id = interner.lookup({});
     CHECK_EQUAL(stored_id, 0);
-    CHECK(interner.compare({}, 0) == 0);
+    // comparison StringID vs StringID
+    CHECK_EQUAL(interner.compare({}, 0), 0);
+    // interned string id vs null id
+    auto str_id = interner.intern(StringData("test"));
+    CHECK_EQUAL(interner.compare(str_id, null_id), 1);
+    // null id vs interned string id
+    CHECK_EQUAL(interner.compare(null_id, str_id), -1);
+
+    // comparison String vs StringID
+    CHECK_EQUAL(interner.compare(StringData{}, null_id), 0);
+    CHECK_EQUAL(interner.compare(StringData{}, str_id), 1);
+    CHECK_EQUAL(interner.compare(StringData{"test"}, null_id), -1);
+
     parent.destroy_deep();
 }
 
@@ -132,5 +143,36 @@ TEST(StringInterner_VerifyLongString)
     const auto stored_id = interner.lookup(StringData(long_string));
     CHECK_EQUAL(stored_id, 1);
     CHECK(interner.compare(StringData(long_string), *stored_id) == 0);
+
+    parent.destroy_deep();
+}
+
+TEST(StringInterner_VerifyExpansionFromSmallStringToLongString)
+{
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    const auto M = 1000;
+    std::string small_string = "";
+    for (size_t i = 0; i < M; ++i)
+        small_string += 'a';
+
+    auto id = interner.intern(StringData(small_string));
+    CHECK_EQUAL(id, 1);
+    auto stored_id = interner.lookup(StringData(small_string));
+    CHECK_EQUAL(stored_id, 1);
+    CHECK(interner.compare(StringData(small_string), *stored_id) == 0);
+
+    const auto N = 7000000; // a lot of characters for triggering long string handling.
+    std::string long_string = "";
+    for (size_t i = 0; i < N; ++i)
+        long_string += 'b';
+    id = interner.intern(StringData(long_string));
+    CHECK_EQUAL(id, 2);
+    stored_id = interner.lookup(StringData(long_string));
+    CHECK_EQUAL(stored_id, id);
+    CHECK(interner.compare(StringData(long_string), *stored_id) == 0);
+
     parent.destroy_deep();
 }
