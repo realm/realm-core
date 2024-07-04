@@ -147,20 +147,9 @@ enum class SyncClientHookAction {
     TriggerReconnect,
 };
 
-inline std::ostream& operator<<(std::ostream& os, SyncClientHookAction action)
-{
-    switch (action) {
-        case SyncClientHookAction::NoAction:
-            return os << "NoAction";
-        case SyncClientHookAction::EarlyReturn:
-            return os << "EarlyReturn";
-        case SyncClientHookAction::SuspendWithRetryableError:
-            return os << "SuspendWithRetryableError";
-        case SyncClientHookAction::TriggerReconnect:
-            return os << "TriggerReconnect";
-    }
-    REALM_TERMINATE("Invalid SyncClientHookAction value");
-}
+std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
+std::ostream& operator<<(std::ostream& os, const SyncClientHookEvent& event);
+std::ostream& operator<<(std::ostream& os, const SyncClientHookAction& action);
 
 struct SyncClientHookData {
     SyncClientHookEvent event;

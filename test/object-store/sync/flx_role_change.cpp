@@ -660,7 +660,6 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
     int bootstrap_count = 0;
     int bootstrap_msg_count = 0;
     bool session_restarted = false;
-    std::optional<util::Future<void>> role_change_future;
     TestingStateMachine<BootstrapTestState> bootstrap_state(BootstrapTestState::not_ready);
 
     auto setup_config_callbacks = [&](SyncTestFile& config) {
@@ -851,6 +850,284 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
             // Verify the data was downloaded/updated (only the employee records)
             verify_records(realm_1, params.num_emps, 0, 0);
         }
+    }
+    SECTION("teardown") {
+        harness.reset();
+    }
+}
+
+TEST_CASE("flx: role changes during client resets complete successfully",
+          "[sync][flx][baas][role change][client reset]") {
+    auto logger = util::Logger::get_default_logger();
+    static std::unique_ptr<FLXSyncTestHarness> harness;
+
+    // 150 emps, 25 mgrs, 10 dirs
+    // 10 objects before flush
+    // 1536 download soft max bytes
+    TestParams params{};
+    params.max_download_bytes = 1536;
+    // size_t total_num = params.num_emps + params.num_mgrs + params.num_dirs;
+    if (!harness) {
+        harness = setup_harness("flx_role_change_during_cr", params);
+    }
+    REQUIRE(harness);
+
+    SECTION("Role change during client reset") {
+        // Get the current rules so it can be updated during the test
+        auto& app_session = harness->session().app_session();
+        auto default_rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
+
+        enum ClientResetTestState {
+            not_ready,
+            start,
+            bind_before_cr_session,
+            cr_session_ident,
+            cr_session_downloading,
+            cr_session_downloaded,
+            cr_session_integrating,
+            cr_session_integrated,
+            bind_after_cr_session,
+            merged_after_cr_session,
+            ident_after_cr_session,
+        };
+
+        // int update_msg_count = -1;
+        // int bootstrap_count = 0;
+        bool client_reset_error = false;
+        bool role_change_error = false;
+        std::optional<ClientResetTestState> update_role_state = std::nullopt;
+        int client_reset_count = 0;
+        TestingStateMachine<ClientResetTestState> client_reset_state(ClientResetTestState::not_ready);
+
+        auto setup_config_callbacks = [&](SyncTestFile& config) {
+            // Use the sync client event hook to check for the error received and for tracking
+            // download messages and bootstraps
+            config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> session_ptr,
+                                                                const SyncClientHookData& data) {
+                ClientResyncMode mode = ClientResyncMode::DiscardLocal; // Start with an unused value
+                if (auto session = session_ptr.lock()) {
+                    mode = session->config().client_resync_mode; // The client reset session uses Manual
+                    // logger->info("sync_client_event_hook(%1) - mode: %2", data.event, mode);
+                }
+                else {
+                    // logger->info("sync_client_event_hook(%1) - session not valid", data.event);
+                    //  Session is not valid anymore... exit now
+                    return SyncClientHookAction::NoAction;
+                }
+
+                client_reset_state.transition_with(
+                    [&](ClientResetTestState cur_state) -> std::optional<ClientResetTestState> {
+                        using BatchState = sync::DownloadBatchState;
+                        using Event = SyncClientHookEvent;
+
+                        if (cur_state == ClientResetTestState::not_ready)
+                            return std::nullopt;
+
+                        // Record that the error occurred
+                        if (data.event == Event::ErrorMessageReceived) {
+                            REQUIRE(data.error_info);
+                            if (data.error_info->raw_error_code == 208) {
+                                REQUIRE(data.error_info->should_client_reset);
+                                REQUIRE(data.error_info->server_requests_action ==
+                                        sync::ProtocolErrorInfo::Action::ClientReset);
+                                REQUIRE(data.error_info->is_fatal);
+                                client_reset_error = true;
+                            }
+                            else if (data.error_info->raw_error_code == 200) {
+                                REQUIRE(data.error_info->server_requests_action ==
+                                        sync::ProtocolErrorInfo::Action::Transient);
+                                REQUIRE_FALSE(data.error_info->is_fatal);
+                                role_change_error = true;
+                            }
+                        }
+                        std::optional<ClientResetTestState> new_state = std::nullopt;
+                        if (!update_role_state) {
+                            // If update_role_state is cleared, then no longer need to track the state
+                            return std::nullopt;
+                        }
+                        switch (data.event) {
+                            case Event::BindMessageSent:
+                                // Capture the bind message prior to the client reset error
+                                if (cur_state == ClientResetTestState::start) {
+                                    REQUIRE_FALSE(client_reset_error);
+                                    new_state = ClientResetTestState::bind_before_cr_session;
+                                }
+                                else if (cur_state == ClientResetTestState::cr_session_integrated) {
+                                    REQUIRE(client_reset_error);
+                                    new_state = ClientResetTestState::bind_after_cr_session;
+                                }
+                                break;
+                            case Event::ClientResetMergeComplete:
+                                REQUIRE(cur_state == ClientResetTestState::bind_after_cr_session);
+                                REQUIRE(mode != ClientResyncMode::Manual);
+                                REQUIRE(client_reset_error);
+                                new_state = ClientResetTestState::merged_after_cr_session;
+                                break;
+                            case Event::IdentMessageSent:
+                                // Skip the IDENT message if the client reset error hasn't occurred
+                                if (!client_reset_error)
+                                    break;
+                                // Wait for the ident after the client reset error
+                                if (cur_state == ClientResetTestState::bind_before_cr_session) {
+                                    REQUIRE(mode == ClientResyncMode::Manual);
+                                    new_state = ClientResetTestState::cr_session_ident;
+                                }
+                                else if (cur_state == ClientResetTestState::merged_after_cr_session) {
+                                    REQUIRE(mode != ClientResyncMode::Manual);
+                                    new_state = ClientResetTestState::ident_after_cr_session;
+                                }
+                                break;
+                            // A bootstrap message was processed by the client reset session
+                            case Event::BootstrapMessageProcessed:
+                                if (!client_reset_error || data.batch_state == BatchState::SteadyState)
+                                    break;
+                                if (data.batch_state == BatchState::LastInBatch) {
+                                    new_state = ClientResetTestState::cr_session_downloaded;
+                                }
+                                // Wait for a couple of messages before changing state
+                                else if (data.batch_state == BatchState::MoreToCome) {
+                                    new_state = ClientResetTestState::cr_session_downloading;
+                                }
+                                break;
+                            case Event::DownloadMessageIntegrated:
+                                if (!client_reset_error)
+                                    break;
+                                new_state = ClientResetTestState::cr_session_integrating;
+                                break;
+                            // The client reset session has processed the bootstrap
+                            case Event::BootstrapProcessed:
+                                if (!client_reset_error)
+                                    break;
+                                new_state = ClientResetTestState::cr_session_integrated;
+                                break;
+                            default:
+                                break;
+                        }
+
+
+                        // If the state is changing and a role change is requested for that state, then
+                        // update the role now.
+                        if (new_state && update_role_state && *new_state == *update_role_state) {
+                            logger->debug("ROLE CHANGE: Updating rule definitions: %1", default_rule);
+                            REQUIRE(
+                                app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule));
+                            update_role_state = std::nullopt; // Bootstrap tracking is complete
+                        }
+                        return new_state;
+                    });
+                return SyncClientHookAction::NoAction;
+            };
+
+            // Add client reset callback to verify a client reset occurred
+            config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
+                client_reset_state.transition_with([&](ClientResetTestState) {
+                    // Save that a client reset took place
+                    client_reset_count++;
+                    return std::nullopt;
+                });
+            };
+
+            config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+                // Only expecting a client reset error to be reported
+                REQUIRE(error.status == ErrorCodes::SyncClientResetRequired);
+            };
+        };
+
+        // Make sure the rules are reset back to the original value (only manager & director records)
+        update_role(default_rule, {{"role", {{"$in", {"manager", "director"}}}}});
+        logger->debug("ROLE CHANGE: Initial rule definitions: %1", default_rule);
+        REQUIRE(app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule));
+
+        auto config_1 = harness->make_test_file();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
+        config_1.sync_config->notify_after_client_reset = std::move(reset_handler);
+        config_1.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        setup_config_callbacks(config_1);
+
+        auto realm_1 = Realm::get_shared_realm(config_1);
+        {
+            // Set up a new bootstrap while offline
+            auto table = realm_1->read_group().get_table("class_Person");
+            auto new_subs = realm_1->get_latest_subscription_set().make_mutable_copy();
+            new_subs.clear();
+            new_subs.insert_or_assign(Query(table));
+            auto subs = new_subs.commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            REQUIRE(!wait_for_download(*realm_1));
+            REQUIRE(!wait_for_upload(*realm_1));
+            wait_for_advance(*realm_1);
+            verify_records(realm_1, 0, params.num_mgrs, params.num_dirs);
+        }
+        // The test will update the rule to change access from only manager and director records
+        // to only the employee records while a client reset is in progress.
+        update_role(default_rule, {{"role", "employee"}});
+        // Invalidate the file idents so a client reset will happen upon reconnect
+        reset_utils::trigger_client_reset(app_session, realm_1);
+        bool skip_role_change_check = false;
+
+        auto set_expected_role_state = [&](ClientResetTestState state, bool skip_role_check = false) {
+            client_reset_state.transition_with([&](ClientResetTestState) {
+                update_role_state = state;
+                skip_role_change_check = skip_role_check;
+                return ClientResetTestState::start;
+            });
+        };
+
+        SECTION("Bind before client reset") {
+            logger->debug("ROLE CHANGE: Role change after BIND before client reset");
+            set_expected_role_state(ClientResetTestState::bind_before_cr_session, true);
+        }
+        SECTION("Client reset session ident") {
+            logger->debug("ROLE CHANGE: Role change after client reset session IDENT");
+            set_expected_role_state(ClientResetTestState::cr_session_ident);
+        }
+        SECTION("Client reset session downloading") {
+            logger->debug("ROLE CHANGE: Role change while client reset session downloading");
+            set_expected_role_state(ClientResetTestState::cr_session_downloading);
+        }
+        SECTION("Client reset session downloaded") {
+            logger->debug("ROLE CHANGE: Role change after client reset session donwloaded");
+            set_expected_role_state(ClientResetTestState::cr_session_downloaded);
+        }
+        SECTION("Client reset session integrating") {
+            logger->debug("ROLE CHANGE: Role change after client reset session integrating");
+            set_expected_role_state(ClientResetTestState::cr_session_integrating);
+        }
+        SECTION("Client reset session integrated") {
+            logger->debug("ROLE CHANGE: Role change after client reset session integrated");
+            set_expected_role_state(ClientResetTestState::cr_session_integrated);
+        }
+        SECTION("BIND after client reset session") {
+            logger->debug("ROLE CHANGE: Role change after BIND after client reset session");
+            set_expected_role_state(ClientResetTestState::bind_after_cr_session, true);
+        }
+        SECTION("Merged after client reset session") {
+            logger->debug("ROLE CHANGE: Role change after merge after client reset session");
+            set_expected_role_state(ClientResetTestState::merged_after_cr_session, true);
+        }
+        SECTION("Merged after client reset session") {
+            logger->debug("ROLE CHANGE: Role change after IDENT after client reset session");
+            set_expected_role_state(ClientResetTestState::ident_after_cr_session);
+        }
+
+        // Client reset will happen when session tries to reconnect
+        realm_1->sync_session()->restart_session();
+        auto resync_mode = wait_for_future(std::move(reset_future)).get();
+        REQUIRE(resync_mode == ClientResyncMode::Recover);
+        REQUIRE(!wait_for_download(*realm_1));
+        REQUIRE(!wait_for_upload(*realm_1));
+        wait_for_advance(*realm_1);
+
+        // Verify the data was downloaded/updated (only the employee records)
+        verify_records(realm_1, params.num_emps, 0, 0);
+
+        client_reset_state.transition_with([&](ClientResetTestState) {
+            // Verify that the client reset and role change both occurred
+            REQUIRE((role_change_error || skip_role_change_check));
+            REQUIRE(client_reset_error);
+            REQUIRE(client_reset_count > 0);
+            return std::nullopt;
+        });
     }
     SECTION("teardown") {
         harness.reset();

@@ -68,6 +68,71 @@ bool SyncError::is_client_reset_requested() const
     return false;
 }
 
+std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
+{
+    switch (mode) {
+        case ClientResyncMode::Manual:
+            return os << "Manual";
+        case ClientResyncMode::DiscardLocal:
+            return os << "DiscardLocal";
+        case ClientResyncMode::Recover:
+            return os << "Recover";
+        case ClientResyncMode::RecoverOrDiscard:
+            return os << "RecoverOrDiscard";
+    }
+    REALM_TERMINATE("Invalid ClientResyncMode value");
+}
+
+std::ostream& operator<<(std::ostream& os, const SyncClientHookEvent& event)
+{
+    switch (event) {
+        case SyncClientHookEvent::DownloadMessageReceived:
+            return os << "DownloadMessageReceived";
+        case SyncClientHookEvent::DownloadMessageIntegrated:
+            return os << "DownloadMessageIntegrated";
+        case SyncClientHookEvent::BootstrapMessageProcessed:
+            return os << "BootstrapMessageProcessed";
+        case SyncClientHookEvent::BootstrapProcessed:
+            return os << "BootstrapProcessed";
+        case SyncClientHookEvent::ErrorMessageReceived:
+            return os << "ErrorMessageReceived";
+        case SyncClientHookEvent::SessionActivating:
+            return os << "SessionActivating";
+        case SyncClientHookEvent::SessionSuspended:
+            return os << "SessionSuspended";
+        case SyncClientHookEvent::SessionConnected:
+            return os << "SessionConnected";
+        case SyncClientHookEvent::SessionResumed:
+            return os << "SessionResumed";
+        case SyncClientHookEvent::BindMessageSent:
+            return os << "BindMessageSent";
+        case SyncClientHookEvent::IdentMessageSent:
+            return os << "IdentMessageSent";
+        case SyncClientHookEvent::ClientResetMergeComplete:
+            return os << "ClientResetMergeComplete";
+        case SyncClientHookEvent::BootstrapBatchAboutToProcess:
+            return os << "BootstrapBatchAboutToProcess";
+        case SyncClientHookEvent::UploadMessageSent:
+            return os << "UploadMessageSent";
+    }
+    REALM_TERMINATE("Invalid SyncClientHookEvent value");
+}
+
+std::ostream& operator<<(std::ostream& os, const SyncClientHookAction& action)
+{
+    switch (action) {
+        case SyncClientHookAction::NoAction:
+            return os << "NoAction";
+        case SyncClientHookAction::EarlyReturn:
+            return os << "EarlyReturn";
+        case SyncClientHookAction::SuspendWithRetryableError:
+            return os << "SuspendWithRetryableError";
+        case SyncClientHookAction::TriggerReconnect:
+            return os << "TriggerReconnect";
+    }
+    REALM_TERMINATE("Invalid SyncClientHookAction value");
+}
+
 SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition)
     : user(std::move(user))
     , partition_value(partition.to_string())
