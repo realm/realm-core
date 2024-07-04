@@ -847,6 +847,10 @@ private:
     /// Returns the schema version the synchronization session connects with to the server.
     uint64_t get_schema_version() noexcept;
 
+    // Returns false if this session is not allowed to send UPLOAD messages to the server to
+    // update the cursor info, such as during a client reset fresh realm download
+    bool upload_messages_allowed() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
@@ -949,10 +953,11 @@ private:
     SyncSocketProvider::SyncTimer m_try_again_activation_timer;
     ErrorBackoffState<sync::ProtocolError, RandomEngine> m_try_again_delay_info;
 
-    // Set to true when download completion is reached. Set to false after a
-    // slow reconnect, such that the upload process will become suspended until
-    // download completion is reached again.
-    bool m_allow_upload = false;
+    // Set to false when download completion is reached. Set to true after a
+    // slow reconnect, such that UPLOAD and QUERY messages will not be sent until
+    // download completion is reached again. This feature can be disabled (always
+    // false) if ClientConfig::disable_upload_activation_delay is true.
+    bool m_delay_uploads = true;
 
     bool m_is_flx_sync_session = false;
 
@@ -979,9 +984,6 @@ private:
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
-
-    // True while this session is in the process of performing a client reset.
-    bool m_performing_client_reset = false;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in
@@ -1317,7 +1319,7 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
         // Since the deactivation process has not been initiated, the UNBIND
         // message cannot have been sent unless the session was suspended due to
         // an error.
-        REALM_ASSERT(m_suspended || !m_unbind_message_sent);
+        REALM_ASSERT_3(m_suspended, ||, !m_unbind_message_sent);
         if (m_ident_message_sent && !m_suspended)
             ensure_enlisted_to_send(); // Throws
     }
@@ -1353,7 +1355,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
-        m_allow_upload = true;
+        m_delay_uploads = false;
 }
 
 inline bool ClientImpl::Session::do_recognize_sync_version(version_type version) noexcept
@@ -1382,10 +1384,10 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
     if (!fast_reconnect && !get_client().m_disable_upload_activation_delay) {
         // Disallow immediate activation of the upload process, even if download
         // completion was reached during an earlier period of connectivity.
-        m_allow_upload = false;
+        m_delay_uploads = true;
     }
 
-    if (!m_allow_upload) {
+    if (m_delay_uploads) {
         // Request download completion notification
         ++m_target_download_mark;
     }
@@ -1427,6 +1429,14 @@ inline void ClientImpl::Session::message_sent()
 
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_send_complete);
+
+    // If the client reset config structure is populated, then try to perform
+    // the client reset diff once the BIND message has been sent successfully
+    if (m_bind_message_sent && m_state == Active && get_client_reset_config()) {
+        client_reset_if_needed();
+        // Ready to send the IDENT message
+        ensure_enlisted_to_send(); // Throws
+    }
 
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);

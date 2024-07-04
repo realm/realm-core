@@ -169,6 +169,10 @@ private:
 
     const SessionReason m_session_reason;
 
+    // If false, QUERY and MARK messages are allowed but UPLOAD messages will not
+    // be sent to the server.
+    const bool m_allow_upload_messages;
+
     const uint64_t m_schema_version;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
@@ -716,6 +720,13 @@ uint64_t SessionImpl::get_schema_version() noexcept
     return m_wrapper.m_schema_version;
 }
 
+bool SessionImpl::upload_messages_allowed() noexcept
+{
+    // Can only be called if the session is active or being activated
+    REALM_ASSERT_EX(m_state == State::Active || m_state == State::Unactivated, m_state);
+    return m_wrapper.m_allow_upload_messages;
+}
+
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const SyncProgress& progress, const ReceivedChangesets& changesets)
 {
@@ -1121,7 +1132,9 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_progress_handler(std::move(config.progress_handler))
     , m_connection_state_change_listener(std::move(config.connection_state_change_listener))
     , m_debug_hook(std::move(config.on_sync_client_event_hook))
-    , m_session_reason(m_client_reset_config ? SessionReason::ClientReset : config.session_reason)
+    , m_session_reason(m_client_reset_config || config.fresh_realm_download ? SessionReason::ClientReset
+                                                                            : SessionReason::Sync)
+    , m_allow_upload_messages(!config.fresh_realm_download)
     , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))
