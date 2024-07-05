@@ -455,10 +455,7 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
     if (m_needles.empty()) {
-        if (m_interned_string)
-            return m_leaf->find_first(m_string_value, start, end, m_interned_string);
-        else
-            return m_leaf->find_first(m_string_value, start, end);
+        return m_leaf->find_first(m_string_value, start, end);
     }
     else {
         if (end == npos)
@@ -519,7 +516,6 @@ StringNodeFulltext::StringNodeFulltext(StringData v, ColKey column, std::unique_
 
 void StringNodeFulltext::table_changed()
 {
-    StringNodeEqualBase::table_changed();
     m_link_map->set_base_table(m_table);
 }
 

@@ -377,6 +377,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::
             if (id) {
                 return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
             }
+            break;
         }
         default:
             break;

@@ -1591,9 +1591,7 @@ public:
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
         m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
-        if (m_string_interner) {
-            m_interned_string = m_string_interner->lookup(m_value);
-        }
+        m_interned_string = m_string_interner->lookup(m_value);
     }
 
     void cluster_changed() override

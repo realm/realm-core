@@ -1765,36 +1765,6 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
 
-    // there might be an interner for this column key. In case there is, and the string is compressed,
-    // we can extract the string id and use it while we scan the leaf values (the ids are just integers,
-    // so searching should be faster)
-    std::optional<StringID> string_id;
-    if constexpr (std::is_same_v<T, StringData>) {
-        if (const auto string_interner = get_string_interner(col_key); string_interner != nullptr) {
-            string_id = string_interner->lookup(value);
-
-            auto f = [&key, &col_key, &value, &leaf, &string_id](const Cluster* cluster) {
-                cluster->init_leaf(col_key, &leaf);
-
-                size_t row;
-                if (string_id)
-                    row = leaf.find_first(value, 0, cluster->node_size(), string_id);
-                else
-                    row = leaf.find_first(value, 0, cluster->node_size());
-
-                if (row != realm::npos) {
-                    key = cluster->get_real_key(row);
-                    return IteratorControl::Stop;
-                }
-                return IteratorControl::AdvanceToNext;
-            };
-
-            traverse_clusters(f);
-
-            return key;
-        }
-    }
-
     auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
@@ -3560,8 +3530,8 @@ void Table::typed_print(std::string prefix, ref_type ref) const
 
 StringInterner* Table::get_string_interner(ColKey::Idx idx) const
 {
-    const auto index = idx.val;
-    if (index < m_string_interners.size())
-        return m_string_interners[index].get();
-    return nullptr;
+    REALM_ASSERT(idx.val < m_string_interners.size());
+    auto interner = m_string_interners[idx.val].get();
+    REALM_ASSERT(interner);
+    return interner;
 }
