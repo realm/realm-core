@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 14.10.3 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * "Next launch" metadata file actions are now performed in a multi-process safe manner ([#7576](https://github.com/realm/realm-core/pull/7576)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed a change of mode from Strong to All when removing links from an embedded object that links to a tombstone. This affects sync apps that use embedded objects which have a `Lst<Mixed>` that contains a link to another top level object which has been deleted by another sync client (creating a tombstone locally). In this particular case, the switch would cause any remaining link removals to recursively delete the destination object if there were no other links to it. ([#7828](https://github.com/realm/realm-core/issues/7828), since 14.0.0-beta.0)
 * Fixed removing backlinks from the wrong objects if the link came from a nested list, nested dictionary, top-level dictionary, or list of mixed, and the source table had more than 256 objects. This could manifest as `array_backlink.cpp:112: Assertion failed: int64_t(value >> 1) == key.value` when removing an object. ([#7594](https://github.com/realm/realm-core/issues/7594), since v11 for dictionaries)
 * Fixed the collapse/rejoin of clusters which contained nested collections with links. This could manifest as `array.cpp:319: Array::move() Assertion failed: begin <= end [2, 1]` when removing an object. ([#7839](https://github.com/realm/realm-core/issues/7839), since the introduction of nested collections in v14.0.0-beta.0)
