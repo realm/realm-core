@@ -440,6 +440,9 @@ records:
       schema_mode:
         type: SchemaMode
         default: SchemaMode::Automatic
+      flexible_schema:
+        type: bool
+        default: false
       disable_format_upgrade:
         type: bool
         default: false
