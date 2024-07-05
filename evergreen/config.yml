@@ -430,7 +430,7 @@ functions:
       script: |-
         if ls crash-*> /dev/null 2>&1; then
           echo "Found crash file"
-          #Rename the crash file and the realm file. 
+          #Rename the crash file and the realm file.
           #If there is a crash, this will signal that something needs to be uploaded.
           mv crash-* realm-fuzzer-crash.txt
           mv fuzz-realm.realm fuzzer_realm.realm
@@ -459,7 +459,7 @@ functions:
       bucket: mciuploads
       permissions: public-read
       content_type: application/x-binary
-      display_name: Realm File 
+      display_name: Realm File
       optional: true
 
   - command: shell.exec
@@ -515,7 +515,7 @@ functions:
         set -o verbose
 
         TOP_DIR=$(pwd)
-        
+
         HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
         REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
 
@@ -1166,7 +1166,7 @@ tasks:
             ./build/test/${cmake_build_type|Debug}-iphonesimulator/realm-combined-tests.app \
             'io.realm.CombinedTests' \
             $TEST_RESULTS_FILE
- 
+
 - name: generate-sync-corpus
   tags: [ "for_nightly_tests" ]
   exec_timeout_secs: 1800
@@ -1393,6 +1393,19 @@ buildvariants:
   - name: compile_test
   - name: lint
 
+- name: ubuntu-cpp20
+  display_name: "Ubuntu C++20"
+  run_on: ubuntu2404-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    clang_format: "/opt/clang+llvm/bin/clang-format"
+    extra_flags: -DCMAKE_CXX_STANDARD=20
+  tasks:
+  - name: compile_test
+  - name: lint
+
 - name: ubuntu-no-session-multiplexing
   display_name: "Ubuntu (Sync Multiplexing Disabled)"
   run_on: ubuntu2204-arm64-large
@@ -1469,7 +1482,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    run_with_encryption: 1 
+    run_with_encryption: 1
     enable_asan: On
     cmake_build_type: RelWithDebInfo
   tasks:
@@ -1492,7 +1505,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
-  - name: compile_test_and_package 
+  - name: compile_test_and_package
   - name: benchmarks
   - name: generate-sync-corpus
 
@@ -1979,5 +1992,3 @@ buildvariants:
 #     no_tests: On
 #   tasks:
 #   - name: compile_only
-
-
