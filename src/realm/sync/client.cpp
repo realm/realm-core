@@ -149,12 +149,15 @@ private:
         uint64_t uploadable;
         uint64_t downloaded;
         uint64_t downloadable;
+        int64_t query_version;
+        double download_estimate;
 
         // Does not check snapshot
         bool operator==(const ReportedProgress& p) const noexcept
         {
             return uploaded == p.uploaded && uploadable == p.uploadable && downloaded == p.downloaded &&
-                   downloadable == p.downloadable;
+                   downloadable == p.downloadable && query_version == p.query_version &&
+                   download_estimate == p.download_estimate;
         }
     };
     std::optional<ReportedProgress> m_reported_progress;
@@ -801,7 +804,8 @@ void SessionImpl::update_subscription_version_info()
 }
 
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
-                                                int64_t query_version, const ReceivedChangesets& received_changesets)
+                                                int64_t query_version, DownloadableProgress download_progress,
+                                                const ReceivedChangesets& received_changesets)
 {
     // Ignore the call if the session is not active
     if (m_state != State::Active) {
@@ -820,7 +824,8 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
 
     bool new_batch = false;
     try {
-        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+        bootstrap_store->add_batch(query_version, std::move(maybe_progress), download_progress, received_changesets,
+                                   &new_batch);
     }
     catch (const LogicError& ex) {
         if (ex.code() == ErrorCodes::LimitExceeded) {
@@ -904,7 +909,6 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         auto batch_state =
             pending_batch.remaining_changesets > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
-        uint64_t downloadable_bytes = 0;
         query_version = pending_batch.query_version;
         bool simulate_integration_error =
             (m_wrapper.m_simulate_integration_error && !pending_batch.changesets.empty());
@@ -916,8 +920,8 @@ void SessionImpl::process_pending_flx_bootstrap()
                         batch_state, pending_batch.changesets.size());
 
         history.integrate_server_changesets(
-            *pending_batch.progress, downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
-            transact, [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
+            *pending_batch.progress, 1.0, pending_batch.changesets, new_version, batch_state, logger, transact,
+            [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
                 REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, changesets_applied.size());
             });
@@ -1647,6 +1651,7 @@ void SessionWrapper::check_progress()
     DownloadableProgress downloadable;
     ClientHistory::get_upload_download_state(*m_db, p.downloaded, downloadable, p.uploaded, p.uploadable, p.snapshot,
                                              uploaded_version);
+    p.query_version = m_flx_last_seen_version;
 
     report_progress(p, downloadable);
     report_upload_completion(uploaded_version);
@@ -1701,20 +1706,20 @@ void SessionWrapper::report_progress(ReportedProgress& p, DownloadableProgress d
         upload_estimate = calculate_progress(p.uploaded, p.uploadable, m_final_uploaded);
 
     bool download_completed = p.downloaded == 0;
-    double download_estimate = 1.00;
+    p.download_estimate = 1.00;
     if (m_flx_pending_bootstrap_store) {
         if (m_flx_pending_bootstrap_store->has_pending()) {
-            download_estimate = downloadable.as_estimate();
+            p.download_estimate = downloadable.as_estimate();
             p.downloaded += m_flx_pending_bootstrap_store->pending_stats().pending_changeset_bytes;
         }
-        download_completed = download_estimate >= 1.0;
+        download_completed = p.download_estimate >= 1.0;
 
         // for flx with download estimate these bytes are not known
         // provide some sensible value for non-streaming version of object-store callbacks
         // until these field are completely removed from the api after pbs deprecation
         p.downloadable = p.downloaded;
-        if (download_estimate > 0 && download_estimate < 1.0 && p.downloaded > m_final_downloaded)
-            p.downloadable = m_final_downloaded + uint64_t((p.downloaded - m_final_downloaded) / download_estimate);
+        if (p.download_estimate > 0 && p.download_estimate < 1.0 && p.downloaded > m_final_downloaded)
+            p.downloadable = m_final_downloaded + uint64_t((p.downloaded - m_final_downloaded) / p.download_estimate);
     }
     else {
         // uploadable_bytes is uploaded + remaining to upload, while downloadable_bytes
@@ -1722,7 +1727,7 @@ void SessionWrapper::report_progress(ReportedProgress& p, DownloadableProgress d
         // the same units.
         p.downloadable = downloadable.as_bytes() + p.downloaded;
         if (!download_completed)
-            download_estimate = calculate_progress(p.downloaded, p.downloadable, m_final_downloaded);
+            p.download_estimate = calculate_progress(p.downloaded, p.downloadable, m_final_downloaded);
     }
 
     if (download_completed)
@@ -1745,12 +1750,12 @@ void SessionWrapper::report_progress(ReportedProgress& p, DownloadableProgress d
         m_sess->logger.debug(
             "Progress handler called, downloaded = %1, downloadable = %2, estimate = %3, "
             "uploaded = %4, uploadable = %5, estimate = %6, snapshot version = %7, query_version = %8",
-            p.downloaded, p.downloadable, to_str(download_estimate), p.uploaded, p.uploadable,
-            to_str(upload_estimate), p.snapshot, m_flx_active_version);
+            p.downloaded, p.downloadable, to_str(p.download_estimate), p.uploaded, p.uploadable,
+            to_str(upload_estimate), p.snapshot, p.query_version);
     }
 
-    m_progress_handler(p.downloaded, p.downloadable, p.uploaded, p.uploadable, p.snapshot, download_estimate,
-                       upload_estimate, m_flx_last_seen_version);
+    m_progress_handler(p.downloaded, p.downloadable, p.uploaded, p.uploadable, p.snapshot, p.download_estimate,
+                       upload_estimate, p.query_version);
 }
 
 util::Future<std::string> SessionWrapper::send_test_command(std::string body)

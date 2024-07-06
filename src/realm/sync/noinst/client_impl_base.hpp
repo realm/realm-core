@@ -921,7 +921,8 @@ private:
     // message then this is a noop and will return false. Otherwise this will return true
     // and no further processing of the download message should take place.
     bool process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
-                                       int64_t query_version, const ReceivedChangesets& received_changesets);
+                                       int64_t query_version, DownloadableProgress download_progress,
+                                       const ReceivedChangesets& received_changesets);
 
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
