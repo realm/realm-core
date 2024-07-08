@@ -91,7 +91,7 @@ private:
     static constexpr size_t s_names_ndx = 1;
     static constexpr size_t s_attributes_ndx = 2;
     static constexpr size_t s_vacant_1 = 3;
-    static constexpr size_t s_enum_keys_ndx = 4;
+    // static constexpr size_t s_enum_keys_ndx = 4;
     static constexpr size_t s_col_keys_ndx = 5;
     static constexpr size_t s_spec_max_size = 6;
 
@@ -100,7 +100,7 @@ private:
     ArrayStringShort m_names; // 2nd slot in m_top
     Array m_attr;             // 3rd slot in m_top
                               // 4th slot in m_top not cached
-    Array m_enumkeys;         // 5th slot in m_top
+                              // 5th slot in m_top
     Array m_keys;             // 6th slot in m_top
     size_t m_num_public_columns = 0;
 
@@ -150,13 +150,11 @@ inline Spec::Spec(Allocator& alloc) noexcept
     , m_types(alloc)
     , m_names(alloc)
     , m_attr(alloc)
-    , m_enumkeys(alloc)
     , m_keys(alloc)
 {
     m_types.set_parent(&m_top, s_types_ndx);
     m_names.set_parent(&m_top, s_names_ndx);
     m_attr.set_parent(&m_top, s_attributes_ndx);
-    m_enumkeys.set_parent(&m_top, s_enum_keys_ndx);
     m_keys.set_parent(&m_top, s_col_keys_ndx);
 }
 

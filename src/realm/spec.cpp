@@ -51,14 +51,6 @@ void Spec::init(MemRef mem) noexcept
         m_top.add(0);
     }
 
-    // Enumkeys array is only there when there are StringEnum columns
-    if (auto ref = m_top.get_as_ref(s_enum_keys_ndx)) {
-        m_enumkeys.init_from_ref(ref);
-    }
-    else {
-        m_enumkeys.detach();
-    }
-
     if (m_top.get_as_ref(s_col_keys_ndx) == 0) {
         // This is an upgrade - create column key array
         MemRef mem_ref = Array::create_empty_array(Array::type_Normal, false, m_top.get_alloc()); // Throws
@@ -96,14 +88,6 @@ void Spec::update_from_parent() noexcept
     m_types.update_from_parent();
     m_names.update_from_parent();
     m_attr.update_from_parent();
-
-    if (m_top.get_as_ref(s_enum_keys_ndx) != 0) {
-        m_enumkeys.update_from_parent();
-    }
-    else {
-        m_enumkeys.detach();
-    }
-
     m_keys.update_from_parent();
 
     update_internals();
@@ -115,36 +99,25 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
     Array spec_set(alloc);
-    _impl::DeepArrayDestroyGuard dg(&spec_set);
     spec_set.create(Array::type_HasRefs); // Throws
 
-    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
     {
         // One type for each column
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int_fast64_t v(from_ref(mem.get_ref()));
-        spec_set.add(v); // Throws
-        dg_2.release();
+        spec_set.add(from_ref(mem.get_ref()));                                           // Throws
     }
     {
         size_t size = 0;
         // One name for each column
         MemRef mem = ArrayStringShort::create_array(size, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int_fast64_t v = from_ref(mem.get_ref());
-        spec_set.add(v); // Throws
-        dg_2.release();
+        spec_set.add(from_ref(mem.get_ref()));                    // Throws
     }
     {
         // One attrib set for each column
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int_fast64_t v = from_ref(mem.get_ref());
-        spec_set.add(v); // Throws
-        dg_2.release();
+        spec_set.add(from_ref(mem.get_ref()));                                           // Throws
     }
     spec_set.add(0); // Nested collections array
     spec_set.add(0); // Enumkeys array
@@ -152,13 +125,9 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         // One key for each column
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int_fast64_t v = from_ref(mem.get_ref());
-        spec_set.add(v); // Throws
-        dg_2.release();
+        spec_set.add(from_ref(mem.get_ref()));                                           // Throws
     }
 
-    dg.release();
     return spec_set.get_mem();
 }
 
@@ -204,10 +173,6 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     m_attr.insert(column_ndx, attr);       // Throws
     m_keys.insert(column_ndx, col_key.value);
 
-    if (m_enumkeys.is_attached() && type != col_type_BackLink) {
-        m_enumkeys.insert(column_ndx, 0);
-    }
-
     update_internals();
 }
 
@@ -216,21 +181,6 @@ void Spec::erase_column(size_t column_ndx)
     REALM_ASSERT(column_ndx < m_types.size());
 
     if (ColumnType(int(m_types.get(column_ndx))) != col_type_BackLink) {
-        // Remove this column from the enum keys lookup and clean it up if it's now empty
-        if (m_enumkeys.is_attached()) {
-            m_enumkeys.erase(column_ndx); // Throws
-            bool all_empty = true;
-            for (size_t i = 0; i < m_enumkeys.size(); i++) {
-                if (m_enumkeys.get(i) != 0) {
-                    all_empty = false;
-                    break;
-                }
-            }
-            if (all_empty) {
-                m_enumkeys.destroy_deep();
-                m_top.set(4, 0);
-            }
-        }
         m_num_public_columns--;
         m_names.erase(column_ndx); // Throws
     }
