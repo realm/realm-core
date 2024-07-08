@@ -70,8 +70,6 @@ private:
 
     static void get_chunk_packed(const Array& arr, size_t ndx, int64_t res[8]);
     static void get_chunk_flex(const Array& arr, size_t ndx, int64_t res[8]);
-    static void set_packed(Array& arr, size_t ndx, int64_t val);
-    static void set_flex(Array& arr, size_t ndx, int64_t val);
     // query interface
     template <class Cond>
     static bool find_packed(const Array& arr, int64_t val, size_t begin, size_t end, size_t base_index,

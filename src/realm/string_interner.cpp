@@ -590,6 +590,7 @@ CompressedStringView& StringInterner::get_compressed(StringID id)
     auto index = id - 1; // 0 represents null
     auto hi = index >> 8;
     auto lo = index & 0xFFUL;
+
     DataLeaf& leaf = m_compressed_leafs[hi];
     load_leaf_if_needed(leaf);
     REALM_ASSERT_DEBUG(lo < leaf.m_compressed.size());
@@ -636,7 +637,7 @@ int StringInterner::compare(StringID A, StringID B)
 int StringInterner::compare(StringData s, StringID A)
 {
     std::lock_guard lock(m_mutex);
-    REALM_ASSERT_DEBUG((A - 1) < m_decompressed_strings.size());
+    REALM_ASSERT_DEBUG(A <= m_decompressed_strings.size());
     // comparisons against null
     if (s.data() == nullptr && A == 0)
         return 0;

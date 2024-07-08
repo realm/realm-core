@@ -181,6 +181,47 @@ enum class DownloadBatchState {
     SteadyState,
 };
 
+/// Download progress information comes from the server either in the form of
+/// remaining bytes to download (for PBS) or an estimate of how much has been
+/// downloaded ranging from 0.0 to 1.0 (for FLX). Both of these need to be
+/// stored in an integer array in the client history, which for the download
+/// progress we do by converting to a fixed point integer. We always know from
+/// context how to interpret this value, so there is no need to store a tag
+/// indicating which it is.
+class DownloadableProgress {
+public:
+    DownloadableProgress() = default;
+    DownloadableProgress(double p)
+        : m_value(uint64_t(p * 10000))
+    {
+        REALM_ASSERT(p >= 0 && p <= 1);
+    }
+    DownloadableProgress(uint64_t p)
+        : m_value(p)
+    {
+    }
+    DownloadableProgress(int p)
+        : m_value(uint64_t(p))
+    {
+        REALM_ASSERT(p >= 0);
+    }
+
+    /// Read the stored value as a FLX progress estimate
+    double as_estimate() const noexcept
+    {
+        return double(m_value) / 10000.0;
+    }
+    /// Read the stored value as a number of bytes waiting to be downloaded
+    uint64_t as_bytes() const noexcept
+    {
+        return m_value;
+    }
+
+private:
+    uint64_t m_value;
+};
+static_assert(std::is_trivial_v<DownloadableProgress>);
+
 /// Checks that `dc.last_integrated_client_version` is zero if
 /// `dc.server_version` is zero.
 bool is_consistent(DownloadCursor dc) noexcept;

@@ -658,9 +658,8 @@ TEST(Shared_EncryptedRemap)
 TEST(Shared_Initial)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::vector<char> key;
 
-    CHECK_NOT(DB::needs_file_format_upgrade(path, key)); // File not created yet
+    CHECK_NOT(DB::needs_file_format_upgrade(path, {})); // File not created yet
 
     auto key_str = crypt_key();
     {
@@ -673,10 +672,7 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
     }
-    if (key_str) {
-        key.insert(key.end(), key_str, key_str + strlen(key_str));
-    }
-    CHECK_NOT(DB::needs_file_format_upgrade(path, key));
+    CHECK_NOT(DB::needs_file_format_upgrade(path, Span(key_str, 64)));
 }
 
 
@@ -2286,6 +2282,50 @@ TEST(Shared_EncryptionPageReadFailure)
     }
 }
 
+TEST(Shared_KeyWithNulBytes)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::array<char, 64> key;
+    for (size_t i = 0; i < key.size(); ++i)
+        key[i] = char(i % 2);
+
+    { // Create a file
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        WriteTransaction wt(db);
+        wt.add_table("table");
+        wt.commit();
+    }
+
+    { // Reopen the file then compact it with the key obtained from the DB
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        {
+            ReadTransaction rt(db);
+            CHECK(rt.get_table("table"));
+        }
+        db->compact();
+        {
+            ReadTransaction rt(db);
+            CHECK(rt.get_table("table"));
+        }
+    }
+
+    { // Compact with a different explicitly passed-in key
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        {
+            ReadTransaction rt(db);
+            CHECK(rt.get_table("table"));
+        }
+        key[1]++;
+        db->compact(false, key.data());
+    }
+
+    { // Verify that the new key was used
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        ReadTransaction rt(db);
+        CHECK(rt.get_table("table"));
+    }
+}
+
 #endif // REALM_ENABLE_ENCRYPTION
 
 TEST(Shared_MaxStrings)
@@ -3813,34 +3853,6 @@ TEST(Shared_GetCommitSize)
         CHECK_LESS(size_after - size_before, commit_size);
     }
 }
-
-/*
-#include <valgrind/callgrind.h>
-TEST(Shared_TimestampQuery)
-{
-    Table table;
-    auto col_date = table.add_column(type_Timestamp, "date", true);
-
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-
-    for (int i = 0; i < 10000; i++) {
-        auto ndx = table.add_empty_row();
-        int seconds = random.draw_int_max(3600 * 24 * 10);
-        table.set_timestamp(col_date, ndx, Timestamp(seconds, 0));
-    }
-
-    Query q = table.column<Timestamp>(col_date) > Timestamp(3600 * 24 * 5, 3);
-    auto start = std::chrono::steady_clock::now();
-    CALLGRIND_START_INSTRUMENTATION;
-    auto cnt = q.count();
-    CALLGRIND_STOP_INSTRUMENTATION;
-    auto end = std::chrono::steady_clock::now();
-
-    std::cout << "Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us"
-              << std::endl;
-    CHECK_GREATER(cnt, 50000);
-}
-*/
 
 TEST_IF(Shared_LargeFile, TEST_DURATION > 0 && !REALM_ANDROID)
 {
