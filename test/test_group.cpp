@@ -2587,5 +2587,97 @@ TEST(Group_ArrayCompression_Strings)
 #endif
 }
 
+TEST(Test_Commit_Compression_Strings)
+{
+    auto generate_random_str_len = []() {
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_int_distribution<> distribution(1, 100);
+        return distribution(generator);
+    };
+
+    auto generate_random_string = [](size_t length) {
+        const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv"
+                                     "wxyz0123456789";
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_int_distribution<> distribution(0, (int)alphabet.size() - 1);
+
+        std::string random_str;
+        for (size_t i = 0; i < length; ++i)
+            random_str += alphabet[distribution(generator)];
+
+        return random_str;
+    };
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+    ColKey col_key_string, col_key_list_string, col_key_set_string, col_key_dict_string;
+    ObjKey obj_key;
+    TableKey table_key;
+
+    auto rt = db->start_read();
+    {
+        WriteTransaction wt(db);
+        auto table = wt.add_table("test");
+        table_key = table->get_key();
+        col_key_string = table->add_column(type_String, "string");
+        col_key_list_string = table->add_column_list(type_String, "list_strings");
+        col_key_set_string = table->add_column_set(type_String, "set_strings");
+        col_key_dict_string = table->add_column_dictionary(type_String, "dict_strings");
+        Obj obj = table->create_object();
+        obj_key = obj.get_key();
+        wt.commit();
+    }
+    // check verify that columns have been created
+    rt->advance_read();
+    rt->verify();
+
+    // commit random strings in all the string based columns and verify interner updates
+
+    for (size_t i = 0; i < 50; ++i) {
+
+        // some string
+        const auto str = generate_random_string(generate_random_str_len());
+
+        rt = db->start_read();
+        {
+            WriteTransaction wt(db);
+            auto table = wt.get_table(table_key);
+            auto obj = table->get_object(obj_key);
+
+            obj.set_any(col_key_string, {str});
+            auto list_s = obj.get_list<String>(col_key_list_string);
+            auto set_s = obj.get_set<String>(col_key_set_string);
+            auto dictionary_s = obj.get_dictionary(col_key_dict_string);
+
+            list_s.add({str});
+            set_s.insert({str});
+            dictionary_s.insert({str}, {str});
+
+            wt.commit();
+        }
+        rt->advance_read();
+        rt->verify();
+
+        auto table = rt->get_table(table_key);
+        auto obj = table->get_object(obj_key);
+        const auto current_str = obj.get_any(col_key_string).get_string();
+        CHECK_EQUAL(current_str, str);
+
+        auto list_s = obj.get_list<String>(col_key_list_string);
+        auto set_s = obj.get_set<String>(col_key_set_string);
+        auto dictionary_s = obj.get_dictionary(col_key_dict_string);
+
+        CHECK_EQUAL(list_s.size(), i + 1);
+        CHECK_EQUAL(set_s.size(), i + 1);
+        CHECK_EQUAL(dictionary_s.size(), i + 1);
+
+        CHECK_EQUAL(list_s.get_any(i), str);
+        CHECK_NOT_EQUAL(set_s.find_any(str), not_found);
+        CHECK_NOT_EQUAL(dictionary_s.find_any(str), not_found);
+    }
+}
 
 #endif // TEST_GROUP

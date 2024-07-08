@@ -133,10 +133,7 @@ TEST(StringInterner_VerifyLongString)
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
 
     const auto N = 7000000; // a lot of characters for triggering long string handling.
-
-    std::string long_string = "";
-    for (size_t i = 0; i < N; ++i)
-        long_string += 'a';
+    std::string long_string(N, 'a');
 
     const auto id = interner.intern(StringData(long_string));
     CHECK_EQUAL(id, 1);
@@ -165,9 +162,7 @@ TEST(StringInterner_VerifyExpansionFromSmallStringToLongString)
     CHECK(interner.compare(StringData(small_string), *stored_id) == 0);
 
     const auto N = 7000000; // a lot of characters for triggering long string handling.
-    std::string long_string = "";
-    for (size_t i = 0; i < N; ++i)
-        long_string += 'b';
+    std::string long_string(N, 'b');
     id = interner.intern(StringData(long_string));
     CHECK_EQUAL(id, 2);
     stored_id = interner.lookup(StringData(long_string));
