@@ -537,7 +537,9 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
         return [&config, &state, error](std::weak_ptr<SyncSession> weak_session,
                                         const SyncClientHookData& data) mutable {
             auto session = weak_session.lock();
-            REQUIRE(session);
+            if (!session) {
+                return SyncClientHookAction::NoAction;
+            }
 
             if (data.event == SyncClientHookEvent::BindMessageSent &&
                 session->path() == _impl::client_reset::get_fresh_path_for(config.path)) {

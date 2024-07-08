@@ -374,7 +374,7 @@ _mul_64x64 (uint64_t left,                 /* IN */
  * Returns:
  *    The lowercased character.
  */
-char
+static char
 _dec128_tolower (char c)
 {
    if (isupper (c)) {
@@ -395,7 +395,7 @@ _dec128_tolower (char c)
  * Returns:
  *    true if the strings are equal, false otherwise.
  */
-bool
+static bool
 _dec128_istreq (const char *a, /* IN */
                 const char *b /* IN */)
 {
