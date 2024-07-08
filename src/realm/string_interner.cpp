@@ -223,7 +223,7 @@ static std::vector<uint32_t> hash_to_id(Array& node, uint32_t hash, uint8_t hash
     if (!node.has_refs()) {
         // it's a leaf - default is a list, search starts from index 0.
         HashMapIter it(node, hash, hash_size);
-        if (node.size() > hash_node_min_size) {
+        if (node.size() >= hash_node_min_size) {
             // it is a hash table, so use hash to select index to start searching
             // table size must be power of two!
             size_t index = hash & (node.size() - 1);
@@ -590,6 +590,7 @@ CompressedStringView& StringInterner::get_compressed(StringID id)
     auto index = id - 1; // 0 represents null
     auto hi = index >> 8;
     auto lo = index & 0xFFUL;
+
     DataLeaf& leaf = m_compressed_leafs[hi];
     load_leaf_if_needed(leaf);
     REALM_ASSERT_DEBUG(lo < leaf.m_compressed.size());
@@ -618,8 +619,9 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
 int StringInterner::compare(StringID A, StringID B)
 {
     std::lock_guard lock(m_mutex);
-    REALM_ASSERT_DEBUG(A < m_decompressed_strings.size());
-    REALM_ASSERT_DEBUG(B < m_decompressed_strings.size());
+    // 0 is null, the first index starts from 1.
+    REALM_ASSERT_DEBUG(A <= m_decompressed_strings.size());
+    REALM_ASSERT_DEBUG(B <= m_decompressed_strings.size());
     // comparisons against null
     if (A == B && A == 0)
         return 0;
@@ -635,7 +637,7 @@ int StringInterner::compare(StringID A, StringID B)
 int StringInterner::compare(StringData s, StringID A)
 {
     std::lock_guard lock(m_mutex);
-    REALM_ASSERT_DEBUG(A < m_decompressed_strings.size());
+    REALM_ASSERT_DEBUG(A <= m_decompressed_strings.size());
     // comparisons against null
     if (s.data() == nullptr && A == 0)
         return 0;
