@@ -129,6 +129,9 @@ if(MSVC)
     # We use these in our AtomicSharedPtr implementation and it can't move
     # to atomic<shared_ptr<T>> because NotificationToken relies on movability.
     add_compile_options(/D_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING)
+
+    # Enable __cplusplus macro
+    add_compile_options(/Zc:__cplusplus)
 else()
     add_compile_options(-Wall -Wextra -Wempty-body -Wparentheses -Wunknown-pragmas -Wunreachable-code -Wunused-parameter -Wno-missing-field-initializers)
     # TODO: Remove this when fixed
