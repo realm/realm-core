@@ -960,48 +960,6 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out) const
     }
     return dest.write(out);
 }
-void Group::table_typed_print(std::string prefix, ref_type ref) const
-{
-    REALM_ASSERT(m_top.get_as_ref(1) == ref);
-    Array a(m_alloc);
-    a.init_from_ref(ref);
-    REALM_ASSERT(a.has_refs());
-    for (unsigned j = 0; j < a.size(); ++j) {
-        auto pref = prefix + "  " + to_string(j) + ":\t";
-        RefOrTagged rot = a.get_as_ref_or_tagged(j);
-        if (rot.is_tagged() || rot.get_as_ref() == 0)
-            continue;
-        auto table_accessor = do_get_table(j);
-        REALM_ASSERT(table_accessor);
-        table_accessor->typed_print(pref, rot.get_as_ref());
-    }
-}
-void Group::typed_print(std::string prefix) const
-{
-    std::cout << "Group top array" << std::endl;
-    for (unsigned j = 0; j < m_top.size(); ++j) {
-        auto pref = prefix + "  " + to_string(j) + ":\t";
-        RefOrTagged rot = m_top.get_as_ref_or_tagged(j);
-        if (rot.is_ref() && rot.get_as_ref()) {
-            if (j == 1) {
-                // Tables
-                std::cout << pref << "All Tables" << std::endl;
-                table_typed_print(pref, rot.get_as_ref());
-            }
-            else {
-                Array a(m_alloc);
-                a.init_from_ref(rot.get_as_ref());
-                std::cout << pref;
-                a.typed_print(pref);
-            }
-        }
-        else {
-            std::cout << pref << rot.get_as_int() << std::endl;
-        }
-    }
-    std::cout << "}" << std::endl;
-}
-
 
 ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 {

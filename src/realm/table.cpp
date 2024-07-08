@@ -3381,29 +3381,3 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
     }
     return dest.write(out);
 }
-
-void Table::typed_print(std::string prefix, ref_type ref) const
-{
-    REALM_ASSERT(ref == m_top.get_mem().get_ref());
-    std::cout << prefix << "Table with key = " << m_key << " " << NodeHeader::header_to_string(m_top.get_header())
-              << " {" << std::endl;
-    for (unsigned j = 0; j < m_top.size(); ++j) {
-        auto pref = prefix + "  " + to_string(j) + ":\t";
-        auto rot = m_top.get_as_ref_or_tagged(j);
-        if (rot.is_ref() && rot.get_as_ref()) {
-            if (j == 0) {
-                m_spec.typed_print(pref);
-            }
-            else if (j == 2) {
-                m_clusters.typed_print(pref);
-            }
-            else {
-                Array a(m_alloc);
-                a.init_from_ref(rot.get_as_ref());
-                std::cout << pref;
-                a.typed_print(pref);
-            }
-        }
-    }
-    std::cout << prefix << "}" << std::endl;
-}
