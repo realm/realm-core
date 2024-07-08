@@ -38,6 +38,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
 
 #include <realm/util/future.hpp>
 #include <realm/util/logger.hpp>
@@ -863,9 +864,9 @@ TEST_CASE("flx: role changes during client resets complete successfully",
 
     // 150 emps, 25 mgrs, 10 dirs
     // 10 objects before flush
-    // 1536 download soft max bytes
+    // 512 download soft max bytes
     TestParams params{};
-    params.max_download_bytes = 1536;
+    params.max_download_bytes = 512;
     // size_t total_num = params.num_emps + params.num_mgrs + params.num_dirs;
     if (!harness) {
         harness = setup_harness("flx_role_change_during_cr", params);
@@ -904,13 +905,12 @@ TEST_CASE("flx: role changes during client resets complete successfully",
             // download messages and bootstraps
             config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> session_ptr,
                                                                 const SyncClientHookData& data) {
-                ClientResyncMode mode = ClientResyncMode::DiscardLocal; // Start with an unused value
+                bool is_fresh_path;
                 if (auto session = session_ptr.lock()) {
-                    mode = session->config().client_resync_mode; // The client reset session uses Manual
-                    // logger->info("sync_client_event_hook(%1) - mode: %2", data.event, mode);
+                    is_fresh_path =
+                        _impl::client_reset::is_fresh_path(session->path()); // The client reset session uses Manual
                 }
                 else {
-                    // logger->info("sync_client_event_hook(%1) - session not valid", data.event);
                     //  Session is not valid anymore... exit now
                     return SyncClientHookAction::NoAction;
                 }
@@ -931,12 +931,14 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 REQUIRE(data.error_info->server_requests_action ==
                                         sync::ProtocolErrorInfo::Action::ClientReset);
                                 REQUIRE(data.error_info->is_fatal);
+                                logger->debug("ROLE CHANGE: client reset error received");
                                 client_reset_error = true;
                             }
                             else if (data.error_info->raw_error_code == 200) {
                                 REQUIRE(data.error_info->server_requests_action ==
                                         sync::ProtocolErrorInfo::Action::Transient);
                                 REQUIRE_FALSE(data.error_info->is_fatal);
+                                logger->debug("ROLE CHANGE: role change error received");
                                 role_change_error = true;
                             }
                         }
@@ -959,7 +961,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 break;
                             case Event::ClientResetMergeComplete:
                                 REQUIRE(cur_state == ClientResetTestState::bind_after_cr_session);
-                                REQUIRE(mode != ClientResyncMode::Manual);
+                                REQUIRE_FALSE(is_fresh_path);
                                 REQUIRE(client_reset_error);
                                 new_state = ClientResetTestState::merged_after_cr_session;
                                 break;
@@ -969,11 +971,11 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                     break;
                                 // Wait for the ident after the client reset error
                                 if (cur_state == ClientResetTestState::bind_before_cr_session) {
-                                    REQUIRE(mode == ClientResyncMode::Manual);
+                                    REQUIRE(is_fresh_path);
                                     new_state = ClientResetTestState::cr_session_ident;
                                 }
                                 else if (cur_state == ClientResetTestState::merged_after_cr_session) {
-                                    REQUIRE(mode != ClientResyncMode::Manual);
+                                    REQUIRE_FALSE(is_fresh_path);
                                     new_state = ClientResetTestState::ident_after_cr_session;
                                 }
                                 break;
@@ -1029,7 +1031,8 @@ TEST_CASE("flx: role changes during client resets complete successfully",
 
             config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
                 // Only expecting a client reset error to be reported
-                REQUIRE(error.status == ErrorCodes::SyncClientResetRequired);
+                if (error.status != ErrorCodes::SyncClientResetRequired)
+                    FAIL(util::format("Unexpected error received by error handler: %1", error.status));
             };
         };
 
@@ -1044,6 +1047,14 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         config_1.sync_config->client_resync_mode = ClientResyncMode::Recover;
         setup_config_callbacks(config_1);
 
+        auto wait_for_update = [](SharedRealm realm) {
+            bool success = !wait_for_download(*realm);
+            success = success && !wait_for_upload(*realm);
+            if (!success)
+                FAIL("Failed to update realm");
+            wait_for_advance(*realm);
+        };
+
         auto realm_1 = Realm::get_shared_realm(config_1);
         {
             // Set up a new bootstrap while offline
@@ -1053,9 +1064,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
             new_subs.insert_or_assign(Query(table));
             auto subs = new_subs.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            REQUIRE(!wait_for_download(*realm_1));
-            REQUIRE(!wait_for_upload(*realm_1));
-            wait_for_advance(*realm_1);
+            wait_for_update(realm_1);
             verify_records(realm_1, 0, params.num_mgrs, params.num_dirs);
         }
         // The test will update the rule to change access from only manager and director records
@@ -1113,16 +1122,14 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         // Client reset will happen when session tries to reconnect
         realm_1->sync_session()->restart_session();
         auto resync_mode = wait_for_future(std::move(reset_future)).get();
-        REQUIRE(resync_mode == ClientResyncMode::Recover);
-        REQUIRE(!wait_for_download(*realm_1));
-        REQUIRE(!wait_for_upload(*realm_1));
-        wait_for_advance(*realm_1);
+        wait_for_update(realm_1);
 
         // Verify the data was downloaded/updated (only the employee records)
         verify_records(realm_1, params.num_emps, 0, 0);
 
         client_reset_state.transition_with([&](ClientResetTestState) {
             // Verify that the client reset and role change both occurred
+            REQUIRE(resync_mode == ClientResyncMode::Recover);
             REQUIRE((role_change_error || skip_role_change_check));
             REQUIRE(client_reset_error);
             REQUIRE(client_reset_count > 0);
