@@ -516,6 +516,8 @@ public:
     }
 #endif
     ref_type typed_write_tables(_impl::ArrayWriterBase& out) const;
+    void table_typed_print(std::string prefix, ref_type ref) const;
+    void typed_print(std::string prefix) const;
 
 protected:
     static constexpr size_t s_table_name_ndx = 0;
@@ -1127,6 +1129,10 @@ public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
+    void typed_print(std::string prefix)
+    {
+        m_group->typed_print(prefix);
+    }
 
     virtual ~TableWriter() noexcept {}
 

@@ -263,6 +263,11 @@ public:
         }
     }
 
+    void typed_print(int) const
+    {
+        std::cout << "Generic Node ERROR\n";
+    }
+
 protected:
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).

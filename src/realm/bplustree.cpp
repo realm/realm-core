@@ -867,6 +867,37 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
     return written_node.write(out);
 }
 
+void BPlusTreeBase::typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)
+{
+    char* header = alloc.translate(root);
+    Array a(alloc);
+    a.init_from_ref(root);
+    if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+        std::cout << "{" << std::endl;
+        REALM_ASSERT(a.has_refs());
+        for (unsigned j = 0; j < a.size(); ++j) {
+            auto pref = prefix + "  " + std::to_string(j) + ":\t";
+            RefOrTagged rot = a.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    std::cout << pref << "BPTree offsets as ArrayUnsigned as ";
+                    Array a(alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    a.typed_print(prefix);
+                }
+                else {
+                    std::cout << pref << "Subtree beeing ";
+                    BPlusTreeBase::typed_print(pref, alloc, rot.get_as_ref(), col_type);
+                }
+            }
+        }
+    }
+    else {
+        std::cout << "BPTree Leaf[" << col_type << "] as ";
+        a.typed_print(prefix);
+    }
+}
+
 size_t BPlusTreeBase::size_from_header(const char* header)
 {
     auto node_size = Array::get_size_from_header(header);

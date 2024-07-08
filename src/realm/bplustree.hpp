@@ -219,6 +219,8 @@ public:
     }
 
     static ref_type typed_write(ref_type, _impl::ArrayWriterBase&, Allocator&, TypedWriteFunc);
+    static void typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
+
 
 protected:
     template <class U>
