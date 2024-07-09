@@ -1863,19 +1863,18 @@ buildvariants:
   - name: finalize_coverage_data
 
 - name: macos-array-compression
-  display_name: "MacOS 11 arm64 (Compress Arrays)"
-  run_on: macos-1100-arm64
+  display_name: "MacOS 14 arm64 (Compress Arrays)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     compress: On
     cmake_build_type: Debug
-    coveralls_flag_name: "macos-arm64"
   tasks:
   - name: compile_test
 
