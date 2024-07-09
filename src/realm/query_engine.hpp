@@ -1591,7 +1591,6 @@ public:
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
         m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
-        m_interned_string_id = m_string_interner->lookup(m_value);
     }
 
     void cluster_changed() override
@@ -1609,6 +1608,8 @@ public:
         m_end_s = 0;
         m_leaf_start = 0;
         m_leaf_end = 0;
+        if (m_string_interner)
+            m_interned_string_id = m_string_interner->lookup(m_value);
     }
 
     virtual void clear_leaf_state()
