@@ -907,8 +907,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                                                 const SyncClientHookData& data) {
                 bool is_fresh_path;
                 if (auto session = session_ptr.lock()) {
-                    is_fresh_path =
-                        _impl::client_reset::is_fresh_path(session->path()); // The client reset session uses Manual
+                    is_fresh_path = _impl::client_reset::is_fresh_path(session->path());
                 }
                 else {
                     //  Session is not valid anymore... exit now
