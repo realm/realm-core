@@ -151,6 +151,8 @@ public:
     {
         m_dD = 100.0;
 
+        if (m_condition_column_key)
+            m_table->check_column(m_condition_column_key);
         if (m_child)
             m_child->init(will_query_ranges);
     }

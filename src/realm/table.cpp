@@ -1768,8 +1768,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     // In case of a string column we can try to look up the StringID of the search string,
     // and search for that in case the leaf is compressed.
     std::optional<StringID> string_id;
-    if constexpr (std::is_same_v<T, StringData>)
-    {
+    if constexpr (std::is_same_v<T, StringData>) {
         auto string_interner = get_string_interner(col_key);
         REALM_ASSERT(string_interner != nullptr);
         string_id = string_interner->lookup(value);
