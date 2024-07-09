@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix a thread sanitizer failure in the "unregister connection change listener during callback" test ([PR #7871](https://github.com/realm/realm-core/pull/7871)).
 
 ----------------------------------------------
 
