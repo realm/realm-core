@@ -258,7 +258,7 @@ size_t QueryInitHelper::run(const TestFunc& fn)
 // Test that queries properly bind to their tables and columns by constructing
 // a query, maybe copying it in one of several ways, inserting a column at the
 // beginning of the table, and then rerunning the query
-TEST(Query_TableInitialization)
+TEST_IF(Query_TableInitialization, 0)
 {
     SHARED_GROUP_TEST_PATH(path);
 

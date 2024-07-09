@@ -228,6 +228,15 @@ StringData ArrayString::get(size_t ndx) const
     return {};
 }
 
+std::optional<StringID> realm::ArrayString::get_string_id(size_t ndx) const
+{
+if (m_type == Type::interned_strings) {
+        return StringID(static_cast<Array*>(m_arr)->get(ndx));
+	}
+    auto str = get(ndx);
+    return m_string_interner->lookup(str);
+}
+
 StringData ArrayString::get_legacy(size_t ndx) const
 {
     switch (m_type) {

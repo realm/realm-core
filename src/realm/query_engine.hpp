@@ -1620,6 +1620,8 @@ public:
         : ParentNode(from)
         , m_value(from.m_value)
         , m_string_value(m_value)
+        , m_string_interner(from.m_string_interner)
+        , m_interned_string(from.m_interned_string)
         , m_is_string_enum(from.m_is_string_enum)
     {
     }
@@ -1685,25 +1687,31 @@ public:
 
         for (size_t s = start; s < end; ++s) {
 
-            StringData t = get_string(s);
 
             if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
                 if (m_interned_string) {
-                    const auto id = m_string_interner->lookup(get_string(s));
+                    const auto id = m_leaf->get_string_id(s);
                     if (id && m_string_interner->compare(*m_interned_string, *id))
+                        return s;
+                }
+                else {
+                    if (cond(get_string(s), m_string_value))
+						return s;
+				}
+            }
+            else {
+                StringData t = get_string(s);
+                if constexpr (case_sensitive_comparison) {
+                    // case insensitive not implemented for: >, >=, <, <=
+                    if (cond(t, m_string_value))
+                        return s;
+                }
+                else {
+                    if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
                         return s;
                 }
             }
 
-            if constexpr (case_sensitive_comparison) {
-                // case insensitive not implemented for: >, >=, <, <=
-                if (cond(t, m_string_value))
-                    return s;
-            }
-            else {
-                if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
-                    return s;
-            }
         }
         return not_found;
     }
