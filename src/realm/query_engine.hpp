@@ -1620,6 +1620,8 @@ public:
         : ParentNode(from)
         , m_value(from.m_value)
         , m_string_value(m_value)
+        , m_string_interner(from.m_string_interner)
+        , m_interned_string(from.m_interned_string)
         , m_is_string_enum(from.m_is_string_enum)
     {
     }
@@ -1655,7 +1657,7 @@ template <class TConditionFunction>
 class StringNode : public StringNodeBase {
 public:
     constexpr static bool case_sensitive_comparison =
-        is_any_v<TConditionFunction, Greater, GreaterEqual, Less, LessEqual>;
+        is_any_v<TConditionFunction, NotEqual, Greater, GreaterEqual, Less, LessEqual>;
     StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
     {
@@ -1684,17 +1686,20 @@ public:
         TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
-
-            StringData t = get_string(s);
-
             if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
-                if (m_interned_string) {
-                    const auto id = m_string_interner->lookup(get_string(s));
-                    if (id && m_string_interner->compare(*m_interned_string, *id))
+                if (m_leaf->is_compressed()) {
+                    if (!m_interned_string) {
+                        // The search string has not been interned, so there is no match
                         return s;
+                    }
+                    // The search string has been interned, so we can compare the string IDs directly
+                    const auto id = m_leaf->get_string_id(s);
+                    if (m_string_interner->compare(*m_interned_string, *id) != 0)
+                        return s;
+                    continue;
                 }
             }
-
+            StringData t = get_string(s);
             if constexpr (case_sensitive_comparison) {
                 // case insensitive not implemented for: >, >=, <, <=
                 if (cond(t, m_string_value))
