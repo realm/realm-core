@@ -1092,7 +1092,9 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         }
         SECTION("Client reset session downloading") {
             logger->debug("ROLE CHANGE: Role change while client reset session downloading");
-            set_expected_role_state(ClientResetTestState::cr_session_downloading);
+            // skip the role change error check since it may not be received before the fresh
+            // realm download is complete
+            set_expected_role_state(ClientResetTestState::cr_session_downloading, true);
         }
         SECTION("Client reset session downloaded") {
             logger->debug("ROLE CHANGE: Role change after client reset session donwloaded");
