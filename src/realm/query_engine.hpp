@@ -1591,7 +1591,7 @@ public:
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
         m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
-        m_interned_string = m_string_interner->lookup(m_value);
+        m_interned_string_id = m_string_interner->lookup(m_value);
     }
 
     void cluster_changed() override
@@ -1621,7 +1621,7 @@ public:
         , m_value(from.m_value)
         , m_string_value(m_value)
         , m_string_interner(from.m_string_interner)
-        , m_interned_string(from.m_interned_string)
+        , m_interned_string_id(from.m_interned_string_id)
         , m_is_string_enum(from.m_is_string_enum)
     {
     }
@@ -1638,7 +1638,7 @@ protected:
     std::optional<ArrayString> m_leaf;
     StringData m_string_value;
     StringInterner* m_string_interner = nullptr;
-    std::optional<StringID> m_interned_string;
+    std::optional<StringID> m_interned_string_id;
 
     bool m_is_string_enum = false;
 
@@ -1688,15 +1688,16 @@ public:
         for (size_t s = start; s < end; ++s) {
             if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
                 if (m_leaf->is_compressed()) {
-                    if (!m_interned_string) {
-                        // The search string has not been interned, so there is no match
-                        return s;
+                    if (m_interned_string_id) {
+                        // The search string has been interned, so there might be a match
+                        // We can compare the string IDs directly
+                        const auto id = m_leaf->get_string_id(s);
+                        if (m_string_interner->compare(*m_interned_string_id, *id) == 0) {
+                            // The value matched, so we continue to the next value
+                            continue;
+                        }
                     }
-                    // The search string has been interned, so we can compare the string IDs directly
-                    const auto id = m_leaf->get_string_id(s);
-                    if (m_string_interner->compare(*m_interned_string, *id) != 0)
-                        return s;
-                    continue;
+                    return s;
                 }
             }
             StringData t = get_string(s);

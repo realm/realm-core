@@ -233,8 +233,7 @@ std::optional<StringID> realm::ArrayString::get_string_id(size_t ndx) const
     if (m_type == Type::interned_strings) {
         return StringID(static_cast<Array*>(m_arr)->get(ndx));
     }
-    auto str = get(ndx);
-    return m_string_interner->lookup(str);
+    return m_string_interner->lookup(get(ndx));
 }
 
 StringData ArrayString::get_legacy(size_t ndx) const
