@@ -926,6 +926,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                         // Record that the error occurred
                         if (data.event == Event::ErrorMessageReceived) {
                             REQUIRE(data.error_info);
+                            // Client reset error
                             if (data.error_info->raw_error_code == 208) {
                                 REQUIRE(data.error_info->should_client_reset);
                                 REQUIRE(data.error_info->server_requests_action ==
@@ -934,6 +935,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 logger->debug("ROLE CHANGE: client reset error received");
                                 client_reset_error = true;
                             }
+                            // Role change error
                             else if (data.error_info->raw_error_code == 200) {
                                 REQUIRE(data.error_info->server_requests_action ==
                                         sync::ProtocolErrorInfo::Action::Transient);
@@ -1047,6 +1049,8 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         config_1.sync_config->client_resync_mode = ClientResyncMode::Recover;
         setup_config_callbacks(config_1);
 
+        // Wait for download, upload and advance - uses a bool flag instead of REQUIRE()
+        // to address TSAN failures around the catch2 library.
         auto wait_for_update = [](SharedRealm realm) {
             bool success = !wait_for_download(*realm);
             success = success && !wait_for_upload(*realm);
@@ -1070,13 +1074,17 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         // The test will update the rule to change access from only manager and director records
         // to only the employee records while a client reset is in progress.
         update_role(default_rule, {{"role", "employee"}});
-        // Invalidate the file idents so a client reset will happen upon reconnect
+        // Force a client reset to occur the next time the session connects
         reset_utils::trigger_client_reset(app_session, realm_1);
         bool skip_role_change_check = false;
 
+        // Set the state where the role change will be triggered
         auto set_expected_role_state = [&](ClientResetTestState state, bool skip_role_check = false) {
             client_reset_state.transition_with([&](ClientResetTestState) {
                 update_role_state = state;
+                // If the role change check is skipped, the test will not look for the role change error
+                // Depending on when the role change error is received (e.g. session deactivating), it
+                // may not be successfully or reliably captured with the event hook.
                 skip_role_change_check = skip_role_check;
                 return ClientResetTestState::start;
             });
@@ -1130,7 +1138,8 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         verify_records(realm_1, params.num_emps, 0, 0);
 
         client_reset_state.transition_with([&](ClientResetTestState) {
-            // Verify that the client reset and role change both occurred
+            // Verify that the client reset occurred
+            // Unless skip_role_change_check is set, verify role change error occurred as well
             REQUIRE(resync_mode == ClientResyncMode::Recover);
             REQUIRE((role_change_error || skip_role_change_check));
             REQUIRE(client_reset_error);
