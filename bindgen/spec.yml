@@ -47,8 +47,7 @@ primitives:
   - ObjectId
   - Decimal128
   - UUID
-  - EncryptionKey # vector<char> in C++, but should have API of OwnedBinaryData in SDK
-                  # TODO consider changing type in realm-core.
+  - EncryptionKey # should have API of OwnedBinaryData in SDK
   - AppError
   - std::exception_ptr
   - std::error_code
@@ -424,9 +423,7 @@ records:
         type: bool
         default: false
       # realm_data: BinaryData
-      encryption_key:
-        type: EncryptionKey
-        default: {}
+      encryption_key: std::optional<util::EncryptionKey>
       fifo_files_fallback_path:
         type: std::string
         default: ""
@@ -682,7 +679,7 @@ records:
       metadata_mode:
         type: MetadataMode
         default: MetadataMode::Encryption
-      custom_encryption_key: std::optional<EncryptionKey>
+      custom_encryption_key: std::optional<util::EncryptionKey>
       security_access_group:
         type: std::string
         default: ""
