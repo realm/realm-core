@@ -5023,6 +5023,44 @@ TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
     CHECK(nested_list.get_any(1) == "foo");
 }
 
+TEST_CASE("flx: no upload during bootstraps", "[sync][flx][bootstrap][baas]") {
+    FLXSyncTestHarness harness("flx_bootstrap_no_upload", {g_large_array_schema, {"queryable_int_field"}});
+    fill_large_array_schema(harness);
+    bool should_send_upload = true;
+
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_session,
+                                                        const SyncClientHookData& data) {
+        if (data.query_version == 0) {
+            return SyncClientHookAction::NoAction;
+        }
+        auto session = weak_session.lock();
+        if (!session) {
+            return SyncClientHookAction::NoAction;
+        }
+        // Check no upload messages are sent during bootstrap.
+        if (data.event == SyncClientHookEvent::BootstrapMessageProcessed) {
+            should_send_upload = false;
+        }
+        else if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
+                 data.batch_state == sync::DownloadBatchState::LastInBatch) {
+            should_send_upload = true;
+        }
+        else if (data.event == SyncClientHookEvent::UploadMessageSent) {
+            CHECK(should_send_upload);
+        }
+
+        return SyncClientHookAction::NoAction;
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    new_subs.insert_or_assign(Query(table));
+    auto subs = new_subs.commit();
+    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
