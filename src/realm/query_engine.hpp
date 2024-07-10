@@ -1610,8 +1610,7 @@ public:
         m_end_s = 0;
         m_leaf_start = 0;
         m_leaf_end = 0;
-        if (m_string_interner)
-            m_interned_string_id = m_string_interner->lookup(m_value);
+        m_interned_string_id = m_string_interner->lookup(m_value);
     }
 
     virtual void clear_leaf_state()
@@ -2031,17 +2030,22 @@ private:
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
-class StringNodeFulltext : public StringNodeEqualBase {
+class StringNodeFulltext : public ParentNode {
 public:
     StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm = {});
 
     void table_changed() override;
 
-    void _search_index_init() override;
+    void init(bool will_query_ranges) override;
 
     bool has_search_index() const override
     {
         return true; // it's a required precondition for fulltext queries
+    }
+
+    const IndexEvaluator* index_based_keys() override
+    {
+        return &m_index_evaluator;
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -2055,13 +2059,16 @@ public:
     }
 
 private:
-    std::vector<ObjKey> m_index_matches;
+    std::string m_value;
+    ColKey m_col;
     std::unique_ptr<LinkMap> m_link_map;
+    IndexEvaluator m_index_evaluator;
+    std::vector<ObjKey> m_index_matches;
     StringNodeFulltext(const StringNodeFulltext&);
 
-    size_t _find_first_local(size_t, size_t) override
+    size_t find_first_local(size_t start, size_t end) override
     {
-        REALM_UNREACHABLE();
+        return m_index_evaluator.do_search_index(m_cluster, start, end);
     }
 };
 

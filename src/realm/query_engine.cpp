@@ -507,7 +507,8 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
 }
 
 StringNodeFulltext::StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm)
-    : StringNodeEqualBase(v, column)
+    : m_value(v)
+    , m_col(column)
     , m_link_map(std::move(lm))
 {
     if (!m_link_map)
@@ -520,17 +521,21 @@ void StringNodeFulltext::table_changed()
 }
 
 StringNodeFulltext::StringNodeFulltext(const StringNodeFulltext& other)
-    : StringNodeEqualBase(other)
+    : ParentNode(other)
+    , m_value(other.m_value)
+    , m_col(other.m_col)
+    , m_link_map(std::make_unique<LinkMap>(*other.m_link_map))
 {
-    m_link_map = std::make_unique<LinkMap>(*other.m_link_map);
 }
 
-void StringNodeFulltext::_search_index_init()
+void StringNodeFulltext::init(bool will_query_ranges)
 {
-    StringIndex* index = m_link_map->get_target_table()->get_string_index(ParentNode::m_condition_column_key);
+    ParentNode::init(will_query_ranges);
+
+    StringIndex* index = m_link_map->get_target_table()->get_string_index(m_col);
     REALM_ASSERT(index && index->is_fulltext_index());
     m_index_matches.clear();
-    index->find_all_fulltext(m_index_matches, StringNodeBase::m_string_value);
+    index->find_all_fulltext(m_index_matches, m_value);
 
     // If links exists, use backlinks to find the original objects
     if (m_link_map->links_exist()) {
@@ -543,7 +548,7 @@ void StringNodeFulltext::_search_index_init()
     }
 
     m_index_evaluator = IndexEvaluator{};
-    m_index_evaluator->init(&m_index_matches);
+    m_index_evaluator.init(&m_index_matches);
 }
 
 std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_for_column(Allocator& alloc,
