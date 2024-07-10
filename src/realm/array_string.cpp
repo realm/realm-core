@@ -192,6 +192,14 @@ StringData ArrayString::get(size_t ndx) const
     return {};
 }
 
+std::optional<StringID> realm::ArrayString::get_string_id(size_t ndx) const
+{
+    if (m_type == Type::interned_strings) {
+        return StringID(static_cast<Array*>(m_arr)->get(ndx));
+    }
+    return m_string_interner->lookup(get(ndx));
+}
+
 Mixed ArrayString::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
@@ -275,6 +283,16 @@ void ArrayString::clear()
 
 size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const noexcept
 {
+    // This should only be called if we don't have a string id for this particular array (aka no string interner)
+    std::optional<StringID> id;
+    if (m_type == Type::interned_strings)
+        id = m_string_interner->lookup(value);
+
+    return find_first(value, begin, end, id);
+}
+
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::optional<StringID> id) const noexcept
+{
     switch (m_type) {
         case Type::small_strings:
             return static_cast<ArrayStringShort*>(m_arr)->find_first(value, begin, end);
@@ -289,14 +307,13 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
             break;
         }
         case Type::interned_strings: {
-            // we need a way to avoid this lookup for each leaf array. The lookup must appear
-            // higher up the call stack and passed down.
-            auto id = m_string_interner->lookup(value);
             if (id) {
                 return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
             }
             break;
         }
+        default:
+            break;
     }
     return not_found;
 }

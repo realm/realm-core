@@ -22,6 +22,7 @@
 #include <realm/array_string_short.hpp>
 #include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
+#include <realm/string_interner.hpp>
 
 namespace realm {
 
@@ -74,6 +75,10 @@ public:
     {
         m_string_interner = string_interner;
     }
+    bool is_compressed() const
+    {
+        return m_type == Type::interned_strings;
+    }
 
     void update_parent()
     {
@@ -99,6 +104,7 @@ public:
     }
     void insert(size_t ndx, StringData value);
     StringData get(size_t ndx) const;
+    std::optional<StringID> get_string_id(size_t ndx) const;
     Mixed get_any(size_t ndx) const override;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
@@ -106,6 +112,9 @@ public:
     void clear();
 
     size_t find_first(StringData value, size_t begin, size_t end) const noexcept;
+
+    /// Special version for searching in an array or compressed strings.
+    size_t find_first(StringData value, size_t begin, size_t end, std::optional<StringID>) const noexcept;
 
     size_t lower_bound(StringData value);
 

@@ -1735,9 +1735,25 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
 
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+    // In case of a string column we can try to look up the StringID of the search string,
+    // and search for that in case the leaf is compressed.
+    std::optional<StringID> string_id;
+    if constexpr (std::is_same_v<T, StringData>) {
+        auto string_interner = get_string_interner(col_key);
+        REALM_ASSERT(string_interner != nullptr);
+        string_id = string_interner->lookup(value);
+    }
+
+    auto f = [&](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
-        size_t row = leaf.find_first(value, 0, cluster->node_size());
+        size_t row;
+        if constexpr (std::is_same_v<T, StringData>) {
+            row = leaf.find_first(value, 0, cluster->node_size(), string_id);
+        }
+        else {
+            row = leaf.find_first(value, 0, cluster->node_size());
+        }
+
         if (row != realm::npos) {
             key = cluster->get_real_key(row);
             return IteratorControl::Stop;
