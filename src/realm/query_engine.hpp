@@ -1647,11 +1647,6 @@ public:
         m_dT = 10.0;
     }
 
-    void table_changed() override
-    {
-        m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
-    }
-
     void cluster_changed() override
     {
         m_leaf.emplace(m_table.unchecked_ptr()->get_alloc());
@@ -1678,7 +1673,6 @@ public:
         : ParentNode(from)
         , m_value(from.m_value)
         , m_string_value(m_value)
-        , m_is_string_enum(from.m_is_string_enum)
     {
     }
 
@@ -1693,8 +1687,6 @@ protected:
     std::optional<std::string> m_value;
     std::optional<ArrayString> m_leaf;
     StringData m_string_value;
-
-    bool m_is_string_enum = false;
 
     size_t m_end_s = 0;
     size_t m_leaf_start = 0;

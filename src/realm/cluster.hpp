@@ -321,7 +321,6 @@ public:
     size_t get_ndx(RowKey key, size_t ndx) const noexcept override;
     size_t erase(RowKey k, CascadeState& state) override;
     void nullify_incoming_links(RowKey key, CascadeState& state) override;
-    void upgrade_string_to_enum(ColKey col, ArrayString& keys);
 
     void init_leaf(ColKey col, ArrayPayload* leaf) const;
     void add_leaf(ColKey col, ref_type ref);

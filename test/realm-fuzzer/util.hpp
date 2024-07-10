@@ -52,8 +52,7 @@ enum Instruction {
     Create_Table_View = 20,
     Compact = 21,
     Is_Null = 22,
-    Enumerate_Column = 23,
-    Count = 24
+    Count = 23
 };
 
 

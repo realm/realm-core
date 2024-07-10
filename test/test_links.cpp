@@ -752,17 +752,6 @@ TEST(ListList_Clear)
     CHECK_EQUAL(links2->size(), 0);
 }
 
-TEST(Links_AddBacklinkToTableWithEnumColumns)
-{
-    Group g;
-    auto table = g.add_table("fshno");
-    auto col = table->add_column(type_String, "strings", false);
-    table->create_object();
-    table->add_column(*table, "link1");
-    table->enumerate_string_column(col);
-    table->add_column(*table, "link2");
-}
-
 TEST(Links_LinkList_Inserts)
 {
     Group group;

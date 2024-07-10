@@ -324,20 +324,6 @@ void FuzzObject::remove_recursive(Group& group, FuzzLog& log, State& s)
     }
 }
 
-void FuzzObject::enumerate_column(Group& group, FuzzLog& log, State& s)
-{
-    log << "FuzzObject::enumerate_column();\n";
-    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
-    TableRef t = group.get_table(table_key);
-    auto all_col_keys = t->get_column_keys();
-    if (!all_col_keys.empty()) {
-        size_t ndx = get_next_token(s) % all_col_keys.size();
-        ColKey col = all_col_keys[ndx];
-        log << "group.get_table(" << table_key << ")->enumerate_string_column(" << col << ");\n";
-        group.get_table(table_key)->enumerate_string_column(col);
-    }
-}
-
 void FuzzObject::get_all_column_names(Group& group, FuzzLog& log)
 {
     log << "FuzzObject::get_all_column_names();\n";
