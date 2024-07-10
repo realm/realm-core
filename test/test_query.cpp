@@ -330,10 +330,13 @@ columns or queries involved
 */
 
 
-TEST(Query_NextGen_StringConditions)
+TEST_TYPES(Query_NextGen_StringConditions, std::true_type, std::false_type)
 {
-    Group group;
-    TableRef table1 = group.add_table("table1");
+    SHARED_GROUP_TEST_PATH(path);
+
+    auto db = DB::create(make_in_realm_history(), path);
+    auto wt = db->start_write();
+    TableRef table1 = wt->add_table("table1");
     auto col_str1 = table1->add_column(type_String, "str1");
     auto col_str2 = table1->add_column(type_String, "str2");
 
@@ -341,6 +344,11 @@ TEST(Query_NextGen_StringConditions)
     ObjKey key_1_0 = table1->create_object().set_all("foo", "F").get_key();
     table1->create_object().set_all("!", "x").get_key();
     ObjKey key_1_2 = table1->create_object().set_all("bar", "r").get_key();
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     ObjKey m;
     // Equal
@@ -433,7 +441,7 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, null_key);
 
     // Test various compare operations with null
-    TableRef table2 = group.add_table("table2");
+    TableRef table2 = wt->add_table("table2");
     auto col_str3 = table2->add_column(type_String, "str3", true);
 
     ObjKey key_2_0 = table2->create_object().set(col_str3, "foo").get_key();
@@ -441,6 +449,11 @@ TEST(Query_NextGen_StringConditions)
     ObjKey key_2_2 = table2->create_object().get_key(); // null
     ObjKey key_2_3 = table2->create_object().set(col_str3, "bar").get_key();
     ObjKey key_2_4 = table2->create_object().set(col_str3, "").get_key();
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     size_t cnt;
     cnt = table2->column<String>(col_str3).contains(StringData("")).count();
@@ -522,6 +535,12 @@ TEST(Query_NextGen_StringConditions)
         }
     };
 
+    // not equal
+    check_results((table2->column<String>(col_str3) != StringData("")), {StringData(), "foo", "bar", "!"});
+    check_results((table2->column<String>(col_str3) != StringData()), {"", "foo", "bar", "!"});
+    check_results((table2->column<String>(col_str3) != StringData("foo")), {StringData(), "", "bar", "!"});
+    check_results((table2->column<String>(col_str3) != StringData("barr")), {StringData(), "", "foo", "bar", "!"});
+
     // greater
     check_results((table2->column<String>(col_str3) > StringData("")), {"foo", "bar", "!"});
     check_results((table2->column<String>(col_str3) > StringData("b")), {"foo", "bar"});
@@ -553,7 +572,7 @@ TEST(Query_NextGen_StringConditions)
     check_results((table2->column<String>(col_str3) <= StringData("barrrr")), {"bar", "", "!", StringData()});
     check_results((table2->column<String>(col_str3) <= StringData("z")), {"foo", "bar", "", "!", StringData()});
 
-    TableRef table3 = group.add_table(StringData("table3"));
+    TableRef table3 = wt->add_table(StringData("table3"));
     auto col_link1 = table3->add_column(*table2, "link1");
 
     table3->create_object().set(col_link1, key_2_0);
@@ -561,6 +580,11 @@ TEST(Query_NextGen_StringConditions)
     table3->create_object().set(col_link1, key_2_2);
     table3->create_object().set(col_link1, key_2_3);
     table3->create_object().set(col_link1, key_2_4);
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     cnt = table3->link(col_link1).column<String>(col_str3).contains(StringData("")).count();
     CHECK_EQUAL(cnt, 4);
@@ -638,7 +662,13 @@ TEST(Query_NextGen_StringConditions)
                             "This is a long search string that does not contain the word being searched for!, "
                             "This is a long search string that does not contain the word being searched for!, "
                             "needle";
+
     table2->create_object().set(col_str3, long_string).get_key();
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     cnt = table2->column<String>(col_str3).contains(search_1, false).count();
     CHECK_EQUAL(cnt, 1);

@@ -151,6 +151,8 @@ public:
     {
         m_dD = 100.0;
 
+        if (m_condition_column_key)
+            m_table->check_column(m_condition_column_key);
         if (m_child)
             m_child->init(will_query_ranges);
     }
@@ -1651,7 +1653,6 @@ public:
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
         m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
-        m_interned_string = m_string_interner->lookup(m_value);
     }
 
     void cluster_changed() override
@@ -1669,6 +1670,7 @@ public:
         m_end_s = 0;
         m_leaf_start = 0;
         m_leaf_end = 0;
+        m_interned_string_id = m_string_interner->lookup(m_value);
     }
 
     virtual void clear_leaf_state()
@@ -1680,6 +1682,8 @@ public:
         : ParentNode(from)
         , m_value(from.m_value)
         , m_string_value(m_value)
+        , m_string_interner(from.m_string_interner)
+        , m_interned_string_id(from.m_interned_string_id)
         , m_is_string_enum(from.m_is_string_enum)
     {
     }
@@ -1696,7 +1700,7 @@ protected:
     std::optional<ArrayString> m_leaf;
     StringData m_string_value;
     StringInterner* m_string_interner = nullptr;
-    std::optional<StringID> m_interned_string;
+    std::optional<StringID> m_interned_string_id;
 
     bool m_is_string_enum = false;
 
@@ -1715,7 +1719,7 @@ template <class TConditionFunction>
 class StringNode : public StringNodeBase {
 public:
     constexpr static bool case_sensitive_comparison =
-        is_any_v<TConditionFunction, Greater, GreaterEqual, Less, LessEqual>;
+        is_any_v<TConditionFunction, NotEqual, Greater, GreaterEqual, Less, LessEqual>;
     StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
     {
@@ -1744,17 +1748,21 @@ public:
         TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
-
-            StringData t = get_string(s);
-
             if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
-                if (m_interned_string) {
-                    const auto id = m_string_interner->lookup(get_string(s));
-                    if (id && m_string_interner->compare(*m_interned_string, *id))
-                        return s;
+                if (m_leaf->is_compressed()) {
+                    if (m_interned_string_id) {
+                        // The search string has been interned, so there might be a match
+                        // We can compare the string IDs directly
+                        const auto id = m_leaf->get_string_id(s);
+                        if (m_string_interner->compare(*m_interned_string_id, *id) == 0) {
+                            // The value matched, so we continue to the next value
+                            continue;
+                        }
+                    }
+                    return s;
                 }
             }
-
+            StringData t = get_string(s);
             if constexpr (case_sensitive_comparison) {
                 // case insensitive not implemented for: >, >=, <, <=
                 if (cond(t, m_string_value))
@@ -2082,17 +2090,22 @@ private:
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
-class StringNodeFulltext : public StringNodeEqualBase {
+class StringNodeFulltext : public ParentNode {
 public:
     StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm = {});
 
     void table_changed() override;
 
-    void _search_index_init() override;
+    void init(bool will_query_ranges) override;
 
     bool has_search_index() const override
     {
         return true; // it's a required precondition for fulltext queries
+    }
+
+    const IndexEvaluator* index_based_keys() override
+    {
+        return &m_index_evaluator;
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -2106,13 +2119,16 @@ public:
     }
 
 private:
-    std::vector<ObjKey> m_index_matches;
+    std::string m_value;
+    ColKey m_col;
     std::unique_ptr<LinkMap> m_link_map;
+    IndexEvaluator m_index_evaluator;
+    std::vector<ObjKey> m_index_matches;
     StringNodeFulltext(const StringNodeFulltext&);
 
-    size_t _find_first_local(size_t, size_t) override
+    size_t find_first_local(size_t start, size_t end) override
     {
-        REALM_UNREACHABLE();
+        return m_index_evaluator.do_search_index(m_cluster, start, end);
     }
 };
 
