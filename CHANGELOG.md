@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Sync client can crash if a session is resumed before UNBIND message finishes sending. ([#7860](https://github.com/realm/realm-core/issues/7860), since v12.0.0)
 
 ### Breaking changes
 * None.
