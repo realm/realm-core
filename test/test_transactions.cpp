@@ -544,41 +544,4 @@ TEST(Transactions_Continuous_SerialWrites)
     }
 }
 
-
-// Check that enumeration is gone after
-// rolling back the insertion of a string enum column
-TEST(LangBindHelper_RollbackStringEnumInsert)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history());
-    auto sg_w = DB::create(*hist_w, path);
-    auto g = sg_w->start_write();
-    auto t = g->add_table("t1");
-    auto col = t->add_column(type_String, "t1_col0_string");
-
-    auto populate_with_string_enum = [&]() {
-        t->create_object().set_all("simple_string");
-        t->create_object().set_all("duplicate");
-        t->create_object().set_all("duplicate");
-        t->enumerate_string_column(col); // upgrade to internal string enum column type
-        CHECK(t->is_enumerated(col));
-        CHECK_EQUAL(t->get_num_unique_values(col), 2);
-    };
-
-    g->commit_and_continue_as_read();
-    g->promote_to_write();
-
-    populate_with_string_enum();
-
-    g->rollback_and_continue_as_read();
-    g->promote_to_write();
-    CHECK(!t->is_enumerated(col));
-    populate_with_string_enum();
-
-    t->begin()->set(col, "duplicate");
-
-    g->commit_and_continue_as_read();
-    CHECK(t->is_enumerated(col));
-}
-
 #endif // TEST_TRANSACTIONS

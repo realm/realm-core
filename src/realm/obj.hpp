@@ -391,8 +391,6 @@ private:
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key) &&;
     template <class T>
-    inline void set_spec(T&, ColKey);
-    template <class T>
     inline void set_string_interner(T&, ColKey);
     template <class ValueType>
     inline void nullify_single_link(ColKey col, ValueType target);

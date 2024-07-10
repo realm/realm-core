@@ -54,24 +54,9 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
         else {
             auto arr = new (&m_storage) Array(m_alloc);
             arr->init_from_mem(mem);
-            // The context flag is used to indicate interned strings vs old enum strings
-            // (in conjunction with has_refs() == false)
-            if (arr->get_context_flag_from_header(arr->get_header())) {
-                // init for new interned strings (replacing old enum strings)
-                m_type = Type::interned_strings;
-                // consider if we want this invariant: REALM_ASSERT_DEBUG(m_string_interner);
-            }
-            else {
-                // init for old enum strings
-                m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
-                ArrayParent* p;
-                REALM_ASSERT(m_spec != nullptr);
-                REALM_ASSERT(m_col_ndx != realm::npos);
-                ref_type r = m_spec->get_enumkeys_ref(m_col_ndx, p);
-                m_string_enum_values->init_from_ref(r);
-                m_string_enum_values->set_parent(p, m_col_ndx);
-                m_type = Type::enum_strings;
-            }
+            // init for new interned strings
+            m_type = Type::interned_strings;
+            // consider if we want this invariant: REALM_ASSERT_DEBUG(m_string_interner);
         }
     }
     else {
@@ -122,7 +107,6 @@ size_t ArrayString::size() const
             return static_cast<ArraySmallBlobs*>(m_arr)->size();
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->size();
-        case Type::enum_strings:
         case Type::interned_strings:
             return static_cast<Array*>(m_arr)->size();
     }
@@ -141,7 +125,6 @@ void ArrayString::add(StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->add_string(value);
             break;
-        case Type::enum_strings:
         case Type::interned_strings: {
             auto a = static_cast<Array*>(m_arr);
             size_t ndx = a->size();
@@ -169,16 +152,6 @@ void ArrayString::set(size_t ndx, StringData value)
             static_cast<Array*>(m_arr)->set(ndx, id);
             break;
         }
-        case Type::enum_strings: {
-            size_t sz = m_string_enum_values->size();
-            size_t res = m_string_enum_values->find_first(value, 0, sz);
-            if (res == realm::not_found) {
-                m_string_enum_values->add(value);
-                res = sz;
-            }
-            static_cast<Array*>(m_arr)->set(ndx, res);
-            break;
-        }
     }
 }
 
@@ -194,11 +167,6 @@ void ArrayString::insert(size_t ndx, StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->insert_string(ndx, value);
             break;
-        case Type::enum_strings: {
-            static_cast<Array*>(m_arr)->insert(ndx, 0);
-            set(ndx, value);
-            break;
-        }
         case Type::interned_strings: {
             static_cast<Array*>(m_arr)->insert(ndx, 0);
             set(ndx, value);
@@ -216,10 +184,6 @@ StringData ArrayString::get(size_t ndx) const
             return static_cast<ArraySmallBlobs*>(m_arr)->get_string(ndx);
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
-        case Type::enum_strings: {
-            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_enum_values->get(index);
-        }
         case Type::interned_strings: {
             size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
             return m_string_interner->get(id);
@@ -236,27 +200,6 @@ std::optional<StringID> realm::ArrayString::get_string_id(size_t ndx) const
     return m_string_interner->lookup(get(ndx));
 }
 
-StringData ArrayString::get_legacy(size_t ndx) const
-{
-    switch (m_type) {
-        case Type::small_strings:
-            return static_cast<ArrayStringShort*>(m_arr)->get(ndx);
-        case Type::medium_strings:
-            return static_cast<ArraySmallBlobs*>(m_arr)->get_string_legacy(ndx);
-        case Type::big_strings:
-            return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
-        case Type::enum_strings: {
-            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_enum_values->get(index);
-        }
-        case Type::interned_strings: {
-            size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_interner->get(id);
-        }
-    }
-    return {};
-}
-
 Mixed ArrayString::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
@@ -271,10 +214,6 @@ bool ArrayString::is_null(size_t ndx) const
             return static_cast<ArraySmallBlobs*>(m_arr)->is_null(ndx);
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
-        case Type::enum_strings: {
-            size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_enum_values->is_null(id);
-        }
         case Type::interned_strings: {
             size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
             return id == 0;
@@ -296,7 +235,6 @@ void ArrayString::erase(size_t ndx)
             static_cast<ArrayBigBlobs*>(m_arr)->erase(ndx);
             break;
         case Type::interned_strings:
-        case Type::enum_strings:
             static_cast<Array*>(m_arr)->erase(ndx);
             break;
     }
@@ -319,10 +257,6 @@ void ArrayString::move(ArrayString& dst, size_t ndx)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->truncate(ndx);
             break;
-        case Type::enum_strings:
-            // this operation will never be called for enumerated columns
-            REALM_UNREACHABLE();
-            break;
         case Type::interned_strings:
             m_arr->truncate(ndx);
             break;
@@ -341,7 +275,6 @@ void ArrayString::clear()
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->clear();
             break;
-        case Type::enum_strings:
         case Type::interned_strings:
             static_cast<Array*>(m_arr)->clear();
             break;
@@ -371,14 +304,6 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::
         case Type::big_strings: {
             BinaryData as_binary(value.data(), value.size());
             return static_cast<ArrayBigBlobs*>(m_arr)->find_first(as_binary, true, begin, end);
-            break;
-        }
-        case Type::enum_strings: {
-            size_t sz = m_string_enum_values->size();
-            size_t res = m_string_enum_values->find_first(value, 0, sz);
-            if (res != realm::not_found) {
-                return static_cast<Array*>(m_arr)->find_first(res, begin, end);
-            }
             break;
         }
         case Type::interned_strings: {
@@ -437,8 +362,6 @@ size_t ArrayString::lower_bound(StringData value)
             return lower_bound_string(static_cast<ArraySmallBlobs*>(m_arr), value);
         case Type::big_strings:
             return lower_bound_string(static_cast<ArrayBigBlobs*>(m_arr), value);
-        case Type::enum_strings:
-            break;
         case Type::interned_strings:
             REALM_UNREACHABLE();
             break;
@@ -450,9 +373,6 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
 {
     if (m_type == Type::big_strings)
         return Type::big_strings;
-
-    if (m_type == Type::enum_strings)
-        return Type::enum_strings;
 
     if (m_type == Type::interned_strings)
         return Type::interned_strings;
@@ -546,7 +466,6 @@ void ArrayString::verify() const
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->verify();
             break;
-        case Type::enum_strings:
         case Type::interned_strings:
             static_cast<Array*>(m_arr)->verify();
             break;
@@ -584,7 +503,6 @@ ref_type ArrayString::typed_write(ref_type ref, _impl::ArrayWriterBase& out, All
             leaf.destroy_deep(true);
     }
     else {
-        // whether it's the old enum strings or the new interned strings,
         // just write out the array using integer leaf compression
         ret_val = leaf.write(out, false, out.only_modified, out.compress);
     }

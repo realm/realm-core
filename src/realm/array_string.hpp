@@ -79,15 +79,6 @@ public:
     {
         return m_type == Type::interned_strings;
     }
-    bool need_spec() const override
-    {
-        return true;
-    }
-    void set_spec(Spec* spec, size_t col_ndx) const override
-    {
-        m_spec = spec;
-        m_col_ndx = col_ndx;
-    }
 
     void update_parent()
     {
@@ -114,7 +105,6 @@ public:
     void insert(size_t ndx, StringData value);
     StringData get(size_t ndx) const;
     std::optional<StringID> get_string_id(size_t ndx) const;
-    StringData get_legacy(size_t ndx) const;
     Mixed get_any(size_t ndx) const override;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
@@ -146,7 +136,7 @@ private:
     static constexpr size_t storage_size =
         std::max({sizeof(ArrayStringShort), sizeof(ArraySmallBlobs), sizeof(ArrayBigBlobs), sizeof(Array)});
 
-    enum class Type { small_strings, medium_strings, big_strings, enum_strings, interned_strings };
+    enum class Type { small_strings, medium_strings, big_strings, interned_strings };
 
     Type m_type = Type::small_strings;
 
@@ -154,8 +144,6 @@ private:
     alignas(storage_alignment) std::byte m_storage[storage_size];
     Array* m_arr;
     bool m_nullable = true;
-    mutable Spec* m_spec = nullptr;
-    mutable size_t m_col_ndx = realm::npos;
     std::unique_ptr<ArrayString> m_string_enum_values;
     mutable StringInterner* m_string_interner = nullptr;
 

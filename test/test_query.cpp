@@ -2154,15 +2154,12 @@ TEST_TYPES(Query_ListOfPrimitives_MinMax, int64_t, float, double, Decimal128, Ti
         validate_aggregate_results<T>(test_context, table, col, value, max);
 }
 
-TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
+TEST(Query_StringIndexCommonPrefix)
 {
     Group group;
     TableRef table = group.add_table("test");
     auto col_str = table->add_column(type_String, "first");
     table->add_search_index(col_str);
-    if (TEST_TYPE::value == true) {
-        table->enumerate_string_column(col_str);
-    }
 
     auto test_prefix_find = [&](std::string prefix) {
         std::string prefix_b = prefix + "b";
@@ -2852,8 +2849,6 @@ TEST(Query_Huge)
         for (size_t t = 0; t < 4; t++) {
 
             if (t == 1) {
-                tt.enumerate_string_column(col_str0);
-                tt.enumerate_string_column(col_str1);
             }
             else if (t == 2) {
                 tt.add_search_index(col_str0);
@@ -3037,8 +3032,6 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_key(t));
 
-        ttt.enumerate_string_column(col_str);
-
         // Linear scan over enum, plus linear integer column scan
         v = ttt.where().equal(col_str, "AA").equal(col_int, 0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
@@ -3089,34 +3082,6 @@ TEST(Query_StrIndex2)
     CHECK_EQUAL(0, s);
 }
 
-TEST(Query_StrEnum)
-{
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    Table ttt;
-    ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
-
-    int aa;
-    int64_t s;
-
-    for (int i = 0; i < 100; ++i) {
-        ttt.clear();
-        aa = 0;
-        for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE * 2; ++t) {
-            if (random.chance(1, 3)) {
-                ttt.create_object().set_all(1, "AA");
-                ++aa;
-            }
-            else {
-                ttt.create_object().set_all(1, "BB");
-            }
-        }
-        ttt.enumerate_string_column(col_str);
-        s = ttt.where().equal(col_str, "AA").count();
-        CHECK_EQUAL(aa, s);
-    }
-}
-
 TEST(Query_StrIndex)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -3148,10 +3113,6 @@ TEST(Query_StrIndex)
             }
         }
 
-        s = ttt.where().equal(str_col, "AA").count();
-        CHECK_EQUAL(aa, s);
-
-        ttt.enumerate_string_column(str_col);
         s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
 
@@ -3240,49 +3201,6 @@ TEST(Query_StrIndexUpdating)
     tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
     CHECK_EQUAL(tv_ins.size(), 0);
-}
-
-TEST(Query_GA_Crash)
-{
-    GROUP_TEST_PATH(path);
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    {
-        Group g;
-        TableRef t = g.add_table("firstevents");
-        auto col_str0 = t->add_column(type_String, "1");
-        auto col_str1 = t->add_column(type_String, "2");
-        auto col_str2 = t->add_column(type_String, "3");
-        t->add_column(type_Int, "4");
-        t->add_column(type_Int, "5");
-
-        for (size_t i = 0; i < 100; ++i) {
-            int64_t r1 = random.draw_int_mod(100);
-            int64_t r2 = random.draw_int_mod(100);
-
-            t->create_object().set_all("10", "US", "1.0", r1, r2);
-        }
-        t->enumerate_string_column(col_str0);
-        t->enumerate_string_column(col_str1);
-        t->enumerate_string_column(col_str2);
-        g.write(path);
-    }
-
-    Group g(path);
-    TableRef t = g.get_table("firstevents");
-    auto col_str1 = t->get_column_key("2");
-
-    Query q = t->where().equal(col_str1, "US");
-
-    size_t c1 = 0;
-    for (size_t i = 0; i < 100; ++i)
-        c1 += t->count_string(col_str1, "US");
-
-    size_t c2 = 0;
-    for (size_t i = 0; i < 100; ++i)
-        c2 += q.count();
-
-    CHECK_EQUAL(c1, t->size() * 100);
-    CHECK_EQUAL(c1, c2);
 }
 
 TEST(Query_Float3)
@@ -3593,7 +3511,7 @@ TEST(Query_DoubleCoordinates)
 }
 
 
-TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
+TEST(Query_StrIndexed)
 {
     Table ttt;
     auto col_int = ttt.add_column(type_Int, "1");
@@ -3606,10 +3524,6 @@ TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
         ttt.create_object().set_all(10, "a");
         ttt.create_object().set_all(1, "b");
         ttt.create_object().set_all(4, "c");
-    }
-
-    if (TEST_TYPE::value == true) {
-        ttt.enumerate_string_column(col_str);
     }
 
     ttt.add_search_index(col_str);

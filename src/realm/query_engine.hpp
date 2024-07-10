@@ -1651,7 +1651,6 @@ public:
 
     void table_changed() override
     {
-        m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
         m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
     }
 
@@ -1684,7 +1683,6 @@ public:
         , m_string_value(m_value)
         , m_string_interner(from.m_string_interner)
         , m_interned_string_id(from.m_interned_string_id)
-        , m_is_string_enum(from.m_is_string_enum)
     {
     }
 
@@ -1701,8 +1699,6 @@ protected:
     StringData m_string_value;
     StringInterner* m_string_interner = nullptr;
     std::optional<StringID> m_interned_string_id;
-
-    bool m_is_string_enum = false;
 
     size_t m_end_s = 0;
     size_t m_leaf_start = 0;

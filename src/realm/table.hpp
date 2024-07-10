@@ -248,17 +248,9 @@ public:
     }
     void remove_search_index(ColKey col_key);
 
-    void enumerate_string_column(ColKey col_key);
-    bool is_enumerated(ColKey col_key) const noexcept;
     bool contains_unique_values(ColKey col_key) const;
 
     //@}
-
-    /// If the specified column is optimized to store only unique values, then
-    /// this function returns the number of unique values currently
-    /// stored. Otherwise it returns zero. This function is mainly intended for
-    /// debugging purposes.
-    size_t get_num_unique_values(ColKey col_key) const;
 
     template <class T>
     Columns<T> column(ColKey col_key, util::Optional<ExpressionComparisonType> = util::none) const;

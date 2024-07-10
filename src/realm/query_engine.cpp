@@ -272,10 +272,7 @@ void StringNodeEqualBase::init(bool will_query_ranges)
     StringNodeBase::init(will_query_ranges);
 
     const bool uses_index = has_search_index();
-    if (m_is_string_enum) {
-        m_dT = 1.0;
-    }
-    else if (uses_index) {
+    if (uses_index) {
         m_dT = 0.0;
     }
     else {
