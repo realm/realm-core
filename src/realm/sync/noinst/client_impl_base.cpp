@@ -1738,7 +1738,6 @@ void Session::initiate_deactivation()
     logger.debug("Initiating deactivation"); // Throws
 
     m_state = Deactivating;
-    call_debug_hook(SyncClientHookEvent::SessionDeactivated);
 
     if (!m_suspended)
         m_conn.one_less_active_unsuspended_session(); // Throws

@@ -2020,7 +2020,6 @@ TEST_CASE("sync: fast reconnect during client reset session suspend", "[sync][pb
 
         FAIL(util::format("got error from server: %1", err.status));
     };
-    SharedRealm realm;
     auto create_obj = [&](SharedRealm& realm, int64_t value) {
         auto obj_id = ObjectId::gen();
         realm->begin_transaction();
@@ -2036,8 +2035,7 @@ TEST_CASE("sync: fast reconnect during client reset session suspend", "[sync][pb
     TestingStateMachine<TestState> test_machine(TestState::not_started);
     realm_config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> session_ptr,
                                                               const SyncClientHookData& data) {
-        if (data.event == SyncClientHookEvent::SessionDeactivated ||
-            data.event == SyncClientHookEvent::SessionSuspended) {
+        if (data.event == SyncClientHookEvent::SessionSuspended) {
             test_machine.transition_with([&](const TestState cur_state) -> std::optional<TestState> {
                 if (cur_state == TestState::client_reset) {
                     if (auto session = session_ptr.lock()) {
@@ -2051,12 +2049,12 @@ TEST_CASE("sync: fast reconnect during client reset session suspend", "[sync][pb
         return SyncClientHookAction::NoAction;
     };
 
-    realm = Realm::get_shared_realm(realm_config);
+    auto realm = Realm::get_shared_realm(realm_config);
     {
         create_obj(realm, 5);
         wait_for_upload(*realm);
     }
-    wait_for_download(*realm, std::chrono::minutes(10));
+    wait_for_download(*realm);
     realm->sync_session()->shutdown_and_wait();
 
     reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
@@ -2065,7 +2063,7 @@ TEST_CASE("sync: fast reconnect during client reset session suspend", "[sync][pb
     realm->sync_session()->resume();
     test_machine.wait_for(TestState::suspend);
     create_obj(realm, 64);
-    wait_for_download(*realm, std::chrono::minutes(10));
+    wait_for_download(*realm);
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
