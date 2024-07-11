@@ -69,7 +69,7 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
 
         auto token1 = session->register_connection_change_callback(
             [&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
-                listener1_call_cnt = listener1_call_cnt + 1;
+                ++listener1_call_cnt;
             });
         session->unregister_connection_change_callback(token1);
         // One call may have been in progress when unregistered
@@ -87,16 +87,18 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
     }
 
     SECTION("unregister connection change listener during callback") {
-        uint64_t token1;
-        std::atomic<int> listener1_call_cnt(0);
-        std::atomic<bool> listener2_called(false);
+        int listener1_call_cnt = 0;
         auto session = sync_session(
             user, "/connection-state-changes-3", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
-        token1 = session->register_connection_change_callback(
+        std::mutex mutex;
+        std::unique_lock lock(mutex);
+        uint64_t token1 = session->register_connection_change_callback(
             [&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
-                listener1_call_cnt = listener1_call_cnt + 1;
+                std::lock_guard lock(mutex);
+                ++listener1_call_cnt;
                 session->unregister_connection_change_callback(token1);
             });
+        lock.unlock();
 
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
@@ -105,6 +107,7 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
             return sessions_are_connected(*session);
         });
 
+        bool listener2_called = false;
         session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
             listener2_called = true;
         });
