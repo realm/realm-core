@@ -5,8 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* When a public name is defined on a property, calling `realm::Results::sort()` or `realm::Results::distinct()` with the internal name could throw an error like `Cannot sort on key path 'NAME': property 'PersonObject.NAME' does not exist`. ([realm/realm-js#6779](https://github.com/realm/realm-js/issues/6779), since v12.12.0)
 
 ### Breaking changes
 * None.
@@ -17,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix a thread sanitizer failure in the "unregister connection change listener during callback" test ([PR #7871](https://github.com/realm/realm-core/pull/7871)).
 
 ----------------------------------------------
 
