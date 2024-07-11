@@ -100,6 +100,81 @@ TEST(StringInterner_TestLookup)
     parent.destroy_deep();
 }
 
+TEST(StringInterner_VerifyComparison)
+{
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    auto null_id = interner.intern({});
+    auto test_lower_case_id = interner.intern({"test"});
+    auto test_upper_case_id = interner.intern({"TEST"});
+
+    // check NULL vs empty string
+    auto res = interner.compare("", null_id);
+    CHECK_GREATER(StringData(""), StringData());
+    CHECK_EQUAL(res, 1);
+
+    // check that NULL filtering actually works
+    res = interner.compare(test_lower_case_id, null_id);
+    CHECK_GREATER(interner.get(test_lower_case_id), StringData());
+    CHECK_EQUAL(res, 1);
+
+    res = interner.compare(null_id, test_lower_case_id);
+    CHECK_LESS(StringData(), interner.get(test_lower_case_id));
+    CHECK_EQUAL(res, -1);
+
+    //"aaa" < "test"
+    res = interner.compare({"aaa"}, test_lower_case_id);
+    CHECK_LESS(StringData("aaa"), interner.get(test_lower_case_id));
+    CHECK_EQUAL(res, -1);
+
+    //"zzz" > "test"
+    res = interner.compare({"zzz"}, test_lower_case_id);
+    CHECK_GREATER(StringData("zzz"), interner.get(test_lower_case_id));
+    CHECK_EQUAL(res, 1);
+
+    //"AAA" < "test"
+    res = interner.compare({"AAA"}, test_lower_case_id);
+    CHECK_LESS(StringData("AAA"), interner.get(test_lower_case_id));
+    CHECK_EQUAL(res, -1);
+
+    //"ZZZ" < "test"
+    res = interner.compare({"ZZZ"}, test_lower_case_id);
+    CHECK_LESS(StringData("ZZZ"), interner.get(test_lower_case_id));
+    CHECK_EQUAL(res, -1);
+
+    //"aaa" > "TEST"
+    res = interner.compare({"aaa"}, test_upper_case_id);
+    CHECK_GREATER(StringData("aaa"), interner.get(test_upper_case_id));
+    CHECK_EQUAL(res, 1);
+
+    //"zzz" > "TEST"
+    res = interner.compare({"zzz"}, test_upper_case_id);
+    CHECK_GREATER(StringData("zzz"), interner.get(test_upper_case_id));
+    CHECK_EQUAL(res, 1);
+
+    //"AAA" < "TEST"
+    res = interner.compare({"AAA"}, test_upper_case_id);
+    CHECK_LESS(StringData("AAA"), interner.get(test_upper_case_id));
+    CHECK_EQUAL(res, -1);
+
+    //"ZZZ" > "TEST"
+    res = interner.compare({"ZZZ"}, test_upper_case_id);
+    CHECK_GREATER(StringData("ZZZ"), interner.get(test_upper_case_id));
+    CHECK_EQUAL(res, 1);
+
+    // test > TEST
+    res = interner.compare(test_lower_case_id, test_upper_case_id);
+    CHECK_GREATER(interner.get(test_lower_case_id), interner.get(test_upper_case_id));
+    CHECK_EQUAL(res, 1);
+
+    // TEST < test
+    res = interner.compare(test_upper_case_id, test_lower_case_id);
+    CHECK_LESS(interner.get(test_upper_case_id), interner.get(test_lower_case_id));
+    CHECK_EQUAL(res, -1);
+}
+
 TEST(StringInterner_VerifyInterningNull)
 {
     Array parent(Allocator::get_default());
@@ -115,13 +190,17 @@ TEST(StringInterner_VerifyInterningNull)
     // interned string id vs null id
     auto str_id = interner.intern(StringData("test"));
     CHECK_EQUAL(interner.compare(str_id, null_id), 1);
+    CHECK_GREATER(interner.get(str_id), interner.get(null_id)); // compare via StringData
     // null id vs interned string id
     CHECK_EQUAL(interner.compare(null_id, str_id), -1);
+    CHECK_LESS(interner.get(null_id), interner.get(str_id));
 
     // comparison String vs StringID
     CHECK_EQUAL(interner.compare(StringData{}, null_id), 0);
-    CHECK_EQUAL(interner.compare(StringData{}, str_id), 1);
-    CHECK_EQUAL(interner.compare(StringData{"test"}, null_id), -1);
+    CHECK_EQUAL(interner.compare(StringData{}, str_id), -1);
+    CHECK_LESS(StringData{}, interner.get(str_id)); // compare via StringData
+    CHECK_EQUAL(interner.compare(StringData{"test"}, null_id), 1);
+    CHECK_GREATER(StringData{"test"}, interner.get(null_id));
 
     parent.destroy_deep();
 }
