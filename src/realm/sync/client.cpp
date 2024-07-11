@@ -803,29 +803,31 @@ void SessionImpl::update_subscription_version_info()
     }
 }
 
-bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
-                                                int64_t query_version, DownloadableProgress download_progress,
-                                                const ReceivedChangesets& received_changesets)
+bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
 {
-    // Ignore the call if the session is not active
-    if (m_state != State::Active) {
+    // Not a bootstrap message if this isn't a FLX download
+    if (!message.last_in_batch || !message.query_version) {
         return false;
     }
 
-    if (is_steady_state_download_message(batch_state, query_version)) {
+    REALM_ASSERT(m_is_flx_sync_session);
+
+    // Not a bootstrap message if it's for the already active query version
+    if (*message.last_in_batch && *message.query_version == m_wrapper.m_flx_active_version) {
         return false;
     }
 
+    auto batch_state = *message.last_in_batch ? DownloadBatchState::LastInBatch : DownloadBatchState::MoreToCome;
     auto bootstrap_store = m_wrapper.get_flx_pending_bootstrap_store();
     std::optional<SyncProgress> maybe_progress;
     if (batch_state == DownloadBatchState::LastInBatch) {
-        maybe_progress = progress;
+        maybe_progress = message.progress;
     }
 
     bool new_batch = false;
     try {
-        bootstrap_store->add_batch(query_version, std::move(maybe_progress), download_progress, received_changesets,
-                                   &new_batch);
+        bootstrap_store->add_batch(*message.query_version, std::move(maybe_progress), message.downloadable,
+                                   message.changesets, &new_batch);
     }
     catch (const LogicError& ex) {
         if (ex.code() == ErrorCodes::LimitExceeded) {
@@ -841,11 +843,11 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
     // bootstrapping.
     if (new_batch && batch_state == DownloadBatchState::MoreToCome) {
-        on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
+        on_flx_sync_progress(*message.query_version, DownloadBatchState::MoreToCome);
     }
 
-    auto hook_action = call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version,
-                                       batch_state, received_changesets.size());
+    auto hook_action = call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, message.progress,
+                                       *message.query_version, batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return true;
     }
