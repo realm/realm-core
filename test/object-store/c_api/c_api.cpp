@@ -2603,6 +2603,12 @@ TEST_CASE("C API - properties", "[c_api]") {
                     CHECK(strings.get() != list2.get());
                 }
 
+                SECTION("get_by_name") {
+                    auto list2 = cptr_checked(realm_get_list_by_name(obj2.get(), "strings"));
+                    CHECK(realm_equals(strings.get(), list2.get()));
+                    CHECK(strings.get() != list2.get());
+                }
+
                 SECTION("insert, then get") {
                     write([&]() {
                         CHECK(checked(realm_list_insert(strings.get(), 0, a)));
@@ -3708,6 +3714,12 @@ TEST_CASE("C API - properties", "[c_api]") {
 
                 SECTION("realm_clone()") {
                     auto dict2 = clone_cptr(strings.get());
+                    CHECK(realm_equals(strings.get(), dict2.get()));
+                    CHECK(strings.get() != dict2.get());
+                }
+
+                SECTION("get by name") {
+                    auto dict2 = cptr_checked(realm_get_dictionary_by_name(obj1.get(), "nullable_string_dict"));
                     CHECK(realm_equals(strings.get(), dict2.get()));
                     CHECK(strings.get() != dict2.get());
                 }
@@ -5874,6 +5886,9 @@ TEST_CASE("C API: flexible schema", "[c_api]") {
         CHECK(checked(realm_get_value_by_name(obj1.get(), "scores", &value)));
         CHECK(value.type == RLM_TYPE_LIST);
 
+        auto list1 = cptr_checked(realm_get_list_by_name(obj1.get(), "scores"));
+        REQUIRE(list1);
+
         realm_commit(realm);
     }
 
@@ -5890,6 +5905,9 @@ TEST_CASE("C API: flexible schema", "[c_api]") {
         realm_value_t value;
         CHECK(checked(realm_get_value_by_name(obj1.get(), "properties", &value)));
         CHECK(value.type == RLM_TYPE_DICTIONARY);
+
+        auto dict1 = cptr_checked(realm_get_dictionary_by_name(obj1.get(), "properties"));
+        REQUIRE(dict1);
 
         realm_commit(realm);
     }

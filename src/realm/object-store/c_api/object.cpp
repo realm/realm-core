@@ -503,6 +503,20 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
     });
 }
 
+RLM_API realm_list_t* realm_get_list_by_name(realm_object_t* object, const char* prop_name)
+{
+    return wrap_err([&]() -> realm_list_t* {
+        object->verify_attached();
+
+        const auto& obj = object->get_obj();
+        auto collection = obj.get_collection_ptr(StringData(prop_name));
+        if (collection->get_collection_type() == CollectionType::List) {
+            return new realm_list_t{List{object->get_realm(), std::move(collection)}};
+        }
+        return nullptr;
+    });
+}
+
 RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t key)
 {
     return wrap_err([&]() {
@@ -537,6 +551,20 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
         }
 
         return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), std::move(obj), col_key}};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_get_dictionary_by_name(realm_object_t* object, const char* prop_name)
+{
+    return wrap_err([&]() -> realm_dictionary_t* {
+        object->verify_attached();
+
+        const auto& obj = object->get_obj();
+        auto collection = obj.get_collection_ptr(StringData(prop_name));
+        if (collection->get_collection_type() == CollectionType::Dictionary) {
+            return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), std::move(collection)}};
+        }
+        return nullptr;
     });
 }
 

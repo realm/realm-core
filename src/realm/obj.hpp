@@ -312,6 +312,7 @@ public:
     LnkSet get_linkset(StringData col_name) const;
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
+
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
@@ -327,8 +328,8 @@ public:
 
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
-    CollectionPtr get_collection_ptr(const Path& path) const;
-    CollectionPtr get_collection_by_stable_path(const StablePath& path) const;
+    CollectionBasePtr get_collection_ptr(const Path& path) const;
+    CollectionBasePtr get_collection_by_stable_path(const StablePath& path) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
 
     void assign_pk_and_backlinks(Obj& other);

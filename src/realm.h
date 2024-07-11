@@ -1798,6 +1798,15 @@ RLM_API bool realm_set_values(realm_object_t*, size_t num_values, const realm_pr
 RLM_API realm_list_t* realm_get_list(realm_object_t*, realm_property_key_t);
 
 /**
+ * Get a list instance for the property of an object by name.
+ *
+ * Note: It is up to the caller to call `realm_release()` on the returned list.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_list_t* realm_get_list_by_name(realm_object_t*, const char*);
+
+/**
  * Create a `realm_list_t` from a pointer to a `realm::List`, copy-constructing
  * the internal representation.
  *
@@ -2301,6 +2310,15 @@ RLM_API realm_set_t* realm_set_from_thread_safe_reference(const realm_t*, realm_
  * @return A non-null pointer if no exception occurred.
  */
 RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t*, realm_property_key_t);
+
+/**
+ * Get a dictionary instance for the property of an object by name.
+ *
+ * Note: It is up to the caller to call `realm_release()` on the returned dictionary.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_dictionary_t* realm_get_dictionary_by_name(realm_object_t*, const char*);
 
 /**
  * Create a `realm_dictionary_t` from a pointer to a `realm::object_store::Dictionary`,

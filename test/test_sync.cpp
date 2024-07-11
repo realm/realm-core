@@ -6230,7 +6230,7 @@ TEST(Sync_AdditionalProperties)
         foo.set_any(col_any, "FooBar");
         foo.set<Int>("age", 10);
         foo.set_collection("scores", CollectionType::List);
-        auto list = foo.get_list_ptr<Mixed>({"scores"});
+        auto list = foo.get_list_ptr<Mixed>("scores");
         list->add(4.6);
     });
 
@@ -6250,7 +6250,7 @@ TEST(Sync_AdditionalProperties)
         CHECK_EQUAL(props.size(), 2);
         CHECK_EQUAL(obj.get<Int>("age"), 10);
         CHECK_EQUAL(obj.get_any("any"), Mixed("FooBar"));
-        auto list = obj.get_list_ptr<Mixed>({"scores"});
+        auto list = obj.get_list_ptr<Mixed>("scores");
         CHECK_EQUAL(list->get(0), Mixed(4.6));
         CHECK_THROW_ANY(obj.get_any("some"));
         CHECK_THROW_ANY(obj.erase_prop("any"));

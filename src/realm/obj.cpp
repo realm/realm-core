@@ -2096,7 +2096,7 @@ Dictionary Obj::get_dictionary(StringData col_name) const
     return get_dictionary(get_column_key(col_name));
 }
 
-CollectionPtr Obj::get_collection_ptr(const Path& path) const
+CollectionBasePtr Obj::get_collection_ptr(const Path& path) const
 {
     REALM_ASSERT(path.size() > 0);
     // First element in path must be column name
@@ -2148,7 +2148,7 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
     return collection;
 }
 
-CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
+CollectionBasePtr Obj::get_collection_by_stable_path(const StablePath& path) const
 {
     // First element in path is phony column key
     ColKey col_key = m_table->get_column_key(path[0]);
@@ -2212,7 +2212,7 @@ CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 
 CollectionBasePtr Obj::get_collection_ptr(StringData col_name) const
 {
-    return get_collection_ptr(get_column_key(col_name));
+    return get_collection_ptr(Path{{col_name}});
 }
 
 LinkCollectionPtr Obj::get_linkcollection_ptr(ColKey col_key) const
