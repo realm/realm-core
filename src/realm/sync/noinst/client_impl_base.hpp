@@ -588,7 +588,8 @@ private:
     Session* find_and_validate_session(session_ident_type session_ident, std::string_view message) noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
-    static std::shared_ptr<util::Logger> make_logger(mpark::variant<connection_ident_type, std::string> ident,
+    static std::shared_ptr<util::Logger> make_logger(connection_ident_type ident,
+                                                     std::optional<std::string_view> coid,
                                                      std::shared_ptr<util::Logger> base_logger);
 
     void report_connection_state_change(ConnectionState, util::Optional<SessionErrorInfo> error_info = util::none);
