@@ -871,6 +871,9 @@ static std::vector<ExtendedColumnKey> parse_keypath(StringData keypath, Schema c
         begin = sep + (sep != end);
 
         auto prop = object_schema->property_for_public_name(key);
+        if (!prop) {
+            prop = object_schema->property_for_name(key);
+        }
         check(prop, "property '%1.%2' does not exist", object_schema->name, key);
         if (is_dictionary(prop->type)) {
             check(index.length(), "missing dictionary key");
