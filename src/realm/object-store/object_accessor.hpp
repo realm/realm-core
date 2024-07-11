@@ -42,9 +42,13 @@ namespace realm {
 template <typename ValueType, typename ContextType>
 void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueType value, CreatePolicy policy)
 {
-    auto& property = property_for_name(prop_name);
-    validate_property_for_setter(property);
-    set_property_value_impl(ctx, property, value, policy, false);
+    if (auto prop = m_object_schema->property_for_name(prop_name)) {
+        validate_property_for_setter(*prop);
+        set_property_value_impl(ctx, *prop, value, policy, false);
+    }
+    else {
+        set_property_value_impl(ctx, prop_name, value, policy, false);
+    }
 }
 
 template <typename ValueType, typename ContextType>
@@ -62,7 +66,12 @@ ValueType Object::get_property_value(ContextType& ctx, const Property& property)
 template <typename ValueType, typename ContextType>
 ValueType Object::get_property_value(ContextType& ctx, StringData prop_name) const
 {
-    return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
+    if (auto prop = m_object_schema->property_for_name(prop_name)) {
+        return get_property_value_impl<ValueType>(ctx, *prop);
+    }
+    else {
+        return get_property_value_impl<ValueType>(ctx, prop_name);
+    }
 }
 
 namespace {
@@ -206,6 +215,28 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
 }
 
 template <typename ValueType, typename ContextType>
+void Object::set_property_value_impl(ContextType& ctx, StringData prop_name, ValueType value, CreatePolicy policy,
+                                     bool is_default)
+{
+    Mixed new_val = ctx.template unbox<Mixed>(value, policy);
+    if (new_val.is_type(type_Dictionary)) {
+        m_obj.set_collection(prop_name, CollectionType::Dictionary);
+        object_store::Dictionary dict(m_realm, m_obj.get_collection_ptr(prop_name));
+        dict.assign(ctx, value, policy);
+        ctx.did_change();
+        return;
+    }
+    if (new_val.is_type(type_List)) {
+        m_obj.set_collection(prop_name, CollectionType::List);
+        List list(m_realm, m_obj.get_collection_ptr(prop_name));
+        list.assign(ctx, value, policy);
+        ctx.did_change();
+        return;
+    }
+    m_obj.set_any(prop_name, new_val, is_default);
+}
+
+template <typename ValueType, typename ContextType>
 ValueType Object::get_property_value_impl(ContextType& ctx, const Property& property) const
 {
     verify_attached();
@@ -267,6 +298,20 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         default:
             REALM_UNREACHABLE();
     }
+}
+
+template <typename ValueType, typename ContextType>
+ValueType Object::get_property_value_impl(ContextType& ctx, StringData prop_name) const
+{
+    verify_attached();
+    auto value = m_obj.get_any(prop_name);
+    if (value.is_type(type_Dictionary)) {
+        return ctx.box(object_store::Dictionary(m_realm, m_obj.get_collection_ptr(prop_name)));
+    }
+    if (value.is_type(type_List)) {
+        return ctx.box(List(m_realm, m_obj.get_collection_ptr(prop_name)));
+    }
+    return ctx.box(value);
 }
 
 template <typename ValueType, typename ContextType>

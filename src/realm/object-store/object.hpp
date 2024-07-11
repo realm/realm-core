@@ -206,7 +206,12 @@ private:
     void set_property_value_impl(ContextType& ctx, const Property& property, ValueType value, CreatePolicy policy,
                                  bool is_default);
     template <typename ValueType, typename ContextType>
+    void set_property_value_impl(ContextType& ctx, StringData prop_name, ValueType value, CreatePolicy policy,
+                                 bool is_default);
+    template <typename ValueType, typename ContextType>
     ValueType get_property_value_impl(ContextType& ctx, const Property& property) const;
+    template <typename ValueType, typename ContextType>
+    ValueType get_property_value_impl(ContextType& ctx, StringData prop_name) const;
 
     template <typename ValueType, typename ContextType>
     static ObjKey get_for_primary_key_in_migration(ContextType& ctx, Table const& table, const Property& primary_prop,

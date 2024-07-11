@@ -711,7 +711,8 @@ Mixed Obj::get_additional_prop(StringData prop_name) const
             return *val;
         }
     }
-    throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
+    throw InvalidArgument(ErrorCodes::InvalidProperty,
+                          util::format("Property '%1.%2' does not exist", m_table->get_class_name(), prop_name));
     return {};
 }
 
@@ -1289,7 +1290,8 @@ Obj& Obj::set_additional_prop(StringData prop_name, const Mixed& value)
         dict.insert(prop_name, value);
     }
     else {
-        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
+        throw InvalidArgument(ErrorCodes::InvalidProperty,
+                              util::format("Property '%1.%2' does not exist", m_table->get_class_name(), prop_name));
     }
     return *this;
 }
@@ -2048,13 +2050,15 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
 
 Obj& Obj::set_collection(ColKey col_key, CollectionType type)
 {
-    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     if ((col_key.is_dictionary() && type == CollectionType::Dictionary) ||
         (col_key.is_list() && type == CollectionType::List)) {
         return *this;
     }
     if (type == CollectionType::Set) {
         throw IllegalOperation("Set nested in Mixed is not supported");
+    }
+    if (col_key.get_type() != col_type_Mixed) {
+        throw IllegalOperation("Collection can only be nested in Mixed");
     }
     set(col_key, Mixed(0, type));
 
