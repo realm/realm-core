@@ -1381,9 +1381,10 @@ TEST_CASE("sync progress: flx download progress", "[sync][baas][progress]") {
         });
         task->start().get();
 
-        // Since we set the soft byte limit to one byte, we should have received
-        // a DOWNLOAD message for each object. We also happen to get an empty
-        // DOWNLOAD at the end, but we don't want to require that.
+        // Since our objects are larger than the server's soft limit for batching
+        // (1 MB), we expect to receive a separate DOWNLOAD message for each
+        // object. We also happen to get an empty DOWNLOAD at the end, but we
+        // don't want to require that.
         REQUIRE(estimates.size() >= 5);
         REQUIRE_THAT(estimates, EstimatesAreValid());
     }
