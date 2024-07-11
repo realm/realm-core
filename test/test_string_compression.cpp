@@ -173,6 +173,8 @@ TEST(StringInterner_VerifyComparison)
     res = interner.compare(test_upper_case_id, test_lower_case_id);
     CHECK_LESS(interner.get(test_upper_case_id), interner.get(test_lower_case_id));
     CHECK_EQUAL(res, -1);
+
+    parent.destroy_deep();
 }
 
 TEST(StringInterner_VerifyInterningNull)
