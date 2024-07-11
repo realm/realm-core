@@ -997,7 +997,6 @@ TEST(Util_Network_SSL_Certificate_CN_SAN)
     ssl_context_1.use_certificate_chain_file(ca_dir + "dns-chain.crt.pem");
     ssl_context_1.use_private_key_file(ca_dir + "dns-checked-server.key.pem");
     ssl_context_2.use_verify_file(ca_dir + "crt.pem");
-    ssl_context_2.use_default_verify();
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
