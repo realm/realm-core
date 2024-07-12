@@ -1710,8 +1710,8 @@ void SessionWrapper::report_progress(ReportedProgress& p, DownloadableProgress d
     bool download_completed = p.downloaded == 0;
     p.download_estimate = 1.00;
     if (m_flx_pending_bootstrap_store) {
+        p.download_estimate = downloadable.as_estimate();
         if (m_flx_pending_bootstrap_store->has_pending()) {
-            p.download_estimate = downloadable.as_estimate();
             p.downloaded += m_flx_pending_bootstrap_store->pending_stats().pending_changeset_bytes;
         }
         download_completed = p.download_estimate >= 1.0;
