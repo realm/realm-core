@@ -68,13 +68,11 @@ RLM_API uint64_t realm_get_persisted_schema_version(const realm_config_t* config
         conf.force_sync_history = true;
     }
 
-    return wrap_err([&]() {
-        auto realm = new shared_realm{Realm::get_shared_realm(conf)};
-        uint64_t version = ObjectStore::get_schema_version(realm->get()->read_group());
-        delete realm;
+    auto realm = new shared_realm{Realm::get_shared_realm(conf)};
+    uint64_t version = ObjectStore::get_schema_version(realm->get()->read_group());
+    delete realm;
 
-        return version;
-    });
+    return version;
 }
 
 RLM_API bool realm_schema_validate(const realm_schema_t* schema, uint64_t validation_mode)

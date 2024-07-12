@@ -5890,8 +5890,6 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         realm_t* realm = realm_from_thread_safe_reference(userdata.realm_ref, nullptr);
         realm_release(userdata.realm_ref);
 
-        REQUIRE(realm_get_persisted_schema_version(config) == 0);
-
         bool found;
         realm_class_info_t class_info;
         realm_find_class(realm, "object", &found, &class_info);

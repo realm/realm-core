@@ -1243,8 +1243,6 @@ RLM_API uint64_t realm_get_schema_version(const realm_t* realm);
 
 /**
  * Get the schema version for this realm at the path.
- *
- * This function cannot fail.
  */
 RLM_API uint64_t realm_get_persisted_schema_version(const realm_config_t* config);
 
