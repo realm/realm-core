@@ -244,8 +244,7 @@ RLM_API void realm_config_set_automatic_backlink_handling(realm_config_t* realm_
     realm_config->automatically_handle_backlinks_in_migrations = enable_automatic_handling;
 }
 
-RLM_API void realm_config_set_flexible_schema(realm_config_t* realm_config,
-                                             bool flexible_schema) noexcept
+RLM_API void realm_config_set_flexible_schema(realm_config_t* realm_config, bool flexible_schema) noexcept
 {
     realm_config->flexible_schema = flexible_schema;
 }
