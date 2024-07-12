@@ -5026,28 +5026,30 @@ TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
 TEST_CASE("flx: no upload during bootstraps", "[sync][flx][bootstrap][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_no_upload", {g_large_array_schema, {"queryable_int_field"}});
     fill_large_array_schema(harness);
-    bool should_send_upload = true;
-
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_session,
-                                                        const SyncClientHookData& data) {
+    auto config = harness.make_test_file();
+    enum class TestState { Start, BootstrapInProgress, BootstrapProcessed, BootstrapAck };
+    TestingStateMachine<TestState> state(TestState::Start);
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
         if (data.query_version == 0) {
-            return SyncClientHookAction::NoAction;
-        }
-        auto session = weak_session.lock();
-        if (!session) {
             return SyncClientHookAction::NoAction;
         }
         // Check no upload messages are sent during bootstrap.
         if (data.event == SyncClientHookEvent::BootstrapMessageProcessed) {
-            should_send_upload = false;
+            CHECK((state.get() == TestState::Start || state.get() == TestState::BootstrapInProgress));
+            state.transition_to(TestState::BootstrapInProgress);
         }
         else if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
                  data.batch_state == sync::DownloadBatchState::LastInBatch) {
-            should_send_upload = true;
+            CHECK(state.get() == TestState::BootstrapInProgress);
+            state.transition_to(TestState::BootstrapProcessed);
         }
         else if (data.event == SyncClientHookEvent::UploadMessageSent) {
-            CHECK(should_send_upload);
+            // Uploads are allowed before a bootstrap starts.
+            if (state.get() == TestState::Start) {
+                return SyncClientHookAction::NoAction;
+            }
+            CHECK(state.get() == TestState::BootstrapProcessed);
+            state.transition_to(TestState::BootstrapAck);
         }
 
         return SyncClientHookAction::NoAction;
@@ -5057,8 +5059,13 @@ TEST_CASE("flx: no upload during bootstraps", "[sync][flx][bootstrap][baas]") {
     auto table = realm->read_group().get_table("class_TopLevel");
     auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
     new_subs.insert_or_assign(Query(table));
-    auto subs = new_subs.commit();
-    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    new_subs.commit();
+    state.wait_for(TestState::BootstrapAck);
+
+    // Commiting an empty changeset does not upload a message.
+    realm->begin_transaction();
+    realm->commit_transaction();
+    wait_for_upload(*realm);
 }
 
 } // namespace realm::app
