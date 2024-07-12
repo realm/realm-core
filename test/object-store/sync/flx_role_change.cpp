@@ -942,6 +942,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 logger->debug("ROLE CHANGE: role change error received");
                                 role_change_error = true;
                             }
+                            return std::nullopt;
                         }
                         std::optional<ClientResetTestState> new_state = std::nullopt;
                         if (!update_role_state) {
