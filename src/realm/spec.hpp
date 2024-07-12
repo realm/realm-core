@@ -78,11 +78,6 @@ public:
     void set_ndx_in_parent(size_t) noexcept;
 
     void verify() const;
-    void typed_print(std::string prefix) const
-    {
-        std::cout << prefix << "Spec as ";
-        m_top.typed_print(prefix);
-    }
 
 private:
     // Underlying array structure.
