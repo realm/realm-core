@@ -165,43 +165,6 @@ public:
         return written_node.write(out);
     }
 
-    virtual void typed_print(std::string prefix) const override
-    {
-        REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
-        REALM_ASSERT(has_refs());
-        std::cout << "ClusterNodeInner " << header_to_string(get_header()) << std::endl;
-        for (unsigned j = 0; j < size(); ++j) {
-            RefOrTagged rot = get_as_ref_or_tagged(j);
-            auto pref = prefix + "  " + std::to_string(j) + ":\t";
-            if (rot.is_ref() && rot.get_as_ref()) {
-                if (j == 0) {
-                    std::cout << pref << "Keys as ArrayUnsigned as ";
-                    Array a(m_alloc);
-                    a.init_from_ref(rot.get_as_ref());
-                    a.typed_print(pref);
-                }
-                else {
-                    auto header = m_alloc.translate(rot.get_as_ref());
-                    MemRef m(header, rot.get_as_ref(), m_alloc);
-                    if (get_is_inner_bptree_node_from_header(header)) {
-                        ClusterNodeInner a(m_alloc, m_tree_top);
-                        a.init(m);
-                        std::cout << pref;
-                        a.typed_print(pref);
-                    }
-                    else {
-                        Cluster a(j, m_alloc, m_tree_top);
-                        a.init(m);
-                        std::cout << pref;
-                        a.typed_print(pref);
-                    }
-                }
-            }
-            // just ignore entries, which are not refs.
-        }
-        Array::typed_print(prefix);
-    }
-
 private:
     static constexpr size_t s_key_ref_index = 0;
     static constexpr size_t s_sub_tree_depth_index = 1;
