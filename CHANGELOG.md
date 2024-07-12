@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Sync client can crash if a session is resumed while the session is being suspended. ([#7860](https://github.com/realm/realm-core/issues/7860), since v12.0.0)
 
 ### Breaking changes
 * None.
@@ -27,7 +27,6 @@
 
 ### Fixed
 * When a public name is defined on a property, calling `realm::Results::sort()` or `realm::Results::distinct()` with the internal name could throw an error like `Cannot sort on key path 'NAME': property 'PersonObject.NAME' does not exist`. ([realm/realm-js#6779](https://github.com/realm/realm-js/issues/6779), since v12.12.0)
-* Sync client can crash if a session is resumed before UNBIND message finishes sending. ([#7860](https://github.com/realm/realm-core/issues/7860), since v12.0.0)
 
 ### Breaking changes
 * None.
