@@ -633,7 +633,7 @@ BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
 
 bool Obj::has_property(StringData prop_name) const
 {
-    if  (m_table->get_column_key(prop_name))
+    if (m_table->get_column_key(prop_name))
         return true;
     if (auto ck = m_table->m_additional_prop_col) {
         Dictionary dict(*this, ck);

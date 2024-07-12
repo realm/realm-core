@@ -6223,8 +6223,6 @@ TEST(Sync_AdditionalProperties)
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
 
-    Timestamp now{std::chrono::system_clock::now()};
-
     write_transaction(db_1, [&](WriteTransaction& tr) {
         auto& g = tr.get_group();
         auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");

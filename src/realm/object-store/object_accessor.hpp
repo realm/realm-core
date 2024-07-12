@@ -47,7 +47,7 @@ void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueTyp
         set_property_value_impl(ctx, *prop, value, policy, false);
     }
     else {
-        set_property_value_impl(ctx, prop_name, value, policy, false);
+        set_additional_property_value_impl(ctx, prop_name, value, policy);
     }
 }
 
@@ -70,7 +70,7 @@ ValueType Object::get_property_value(ContextType& ctx, StringData prop_name) con
         return get_property_value_impl<ValueType>(ctx, *prop);
     }
     else {
-        return get_property_value_impl<ValueType>(ctx, prop_name);
+        return get_additional_property_value_impl<ValueType>(ctx, prop_name);
     }
 }
 
@@ -215,25 +215,25 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
 }
 
 template <typename ValueType, typename ContextType>
-void Object::set_property_value_impl(ContextType& ctx, StringData prop_name, ValueType value, CreatePolicy policy,
-                                     bool is_default)
+void Object::set_additional_property_value_impl(ContextType& ctx, StringData prop_name, ValueType value,
+                                                CreatePolicy policy)
 {
     Mixed new_val = ctx.template unbox<Mixed>(value, policy);
     if (new_val.is_type(type_Dictionary)) {
-        m_obj.set_collection(prop_name, CollectionType::Dictionary);
+        m_obj.set_additional_collection(prop_name, CollectionType::Dictionary);
         object_store::Dictionary dict(m_realm, m_obj.get_collection_ptr(prop_name));
         dict.assign(ctx, value, policy);
         ctx.did_change();
         return;
     }
     if (new_val.is_type(type_List)) {
-        m_obj.set_collection(prop_name, CollectionType::List);
+        m_obj.set_additional_collection(prop_name, CollectionType::List);
         List list(m_realm, m_obj.get_collection_ptr(prop_name));
         list.assign(ctx, value, policy);
         ctx.did_change();
         return;
     }
-    m_obj.set_any(prop_name, new_val, is_default);
+    m_obj.set_additional_prop(prop_name, new_val);
 }
 
 template <typename ValueType, typename ContextType>
@@ -301,10 +301,10 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
 }
 
 template <typename ValueType, typename ContextType>
-ValueType Object::get_property_value_impl(ContextType& ctx, StringData prop_name) const
+ValueType Object::get_additional_property_value_impl(ContextType& ctx, StringData prop_name) const
 {
     verify_attached();
-    auto value = m_obj.get_any(prop_name);
+    auto value = m_obj.get_additional_prop(prop_name);
     if (value.is_type(type_Dictionary)) {
         return ctx.box(object_store::Dictionary(m_realm, m_obj.get_collection_ptr(prop_name)));
     }
