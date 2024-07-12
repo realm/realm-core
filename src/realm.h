@@ -1720,7 +1720,7 @@ RLM_API void realm_get_additional_properties(realm_object_t*, const char** out_p
  * @param property_name The name of the property.
  * @return True if the property was removed.
  */
-RLM_API bool realm_erase_property(realm_object_t*, const char* property_name);
+RLM_API bool realm_erase_additional_property(realm_object_t*, const char* property_name);
 
 /**
  * Assign a JSON formatted string to a Mixed property. Underlying structures will be created as needed

@@ -5866,7 +5866,7 @@ TEST_CASE("C API: flexible schema", "[c_api]") {
         CHECK(value.type == RLM_TYPE_INT);
         CHECK(value.integer == 23);
 
-        checked(realm_erase_property(obj1.get(), "age"));
+        checked(realm_erase_additional_property(obj1.get(), "age"));
         realm_get_additional_properties(obj1.get(), nullptr, 0, &actual);
         REQUIRE(actual == 0);
         realm_commit(realm);

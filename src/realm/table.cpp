@@ -262,7 +262,7 @@ using namespace realm;
 using namespace realm::util;
 
 Replication* Table::g_dummy_replication = nullptr;
-static const StringData additional_properties_colum_name{"__additional__"};
+static const StringData additional_properties_colum_name{"__additional"};
 
 bool TableVersions::operator==(const TableVersions& other) const
 {

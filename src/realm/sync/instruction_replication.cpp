@@ -765,9 +765,10 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     if (path[0].is_col_key()) {
         auto ck = path[0].get_col_key();
         if (table.is_additional_props_col(ck)) {
+            // We are modifyint a collection nested in an additional property
             REALM_ASSERT(path.size() > 1);
             field_name = path[1].get_key();
-            // Erase the "__additional__" part of the path
+            // Erase the "__additional" part of the path
             path.erase(path.begin());
         }
         else {
@@ -775,6 +776,8 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         }
     }
     else {
+        // In the case of an additional property directly on an object,
+        // the first element is a string.
         field_name = path[0].get_key();
     }
 

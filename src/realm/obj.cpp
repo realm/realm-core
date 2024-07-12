@@ -1270,7 +1270,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     return *this;
 }
 
-Obj& Obj::erase_prop(StringData prop_name)
+Obj& Obj::erase_additional_prop(StringData prop_name)
 {
     bool erased = false;
     if (auto ck = m_table->m_additional_prop_col) {

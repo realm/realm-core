@@ -6253,8 +6253,8 @@ TEST(Sync_AdditionalProperties)
         auto list = obj.get_list_ptr<Mixed>("scores");
         CHECK_EQUAL(list->get(0), Mixed(4.6));
         CHECK_THROW_ANY(obj.get_any("some"));
-        CHECK_THROW_ANY(obj.erase_prop("any"));
-        obj.erase_prop("age");
+        CHECK_THROW_ANY(obj.erase_additional_prop("any"));
+        obj.erase_additional_prop("age");
     });
 
     session_2.wait_for_upload_complete_or_client_stopped();

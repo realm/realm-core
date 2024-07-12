@@ -200,7 +200,7 @@ public:
     // new object and link it. (To Be Implemented)
     Obj clear_linked_object(ColKey col_key);
 
-    Obj& erase_prop(StringData prop_name);
+    Obj& erase_additional_prop(StringData prop_name);
     Obj& set_any(ColKey col_key, Mixed value, bool is_default = false);
     Obj& set_any(StringData col_name, Mixed value, bool is_default = false)
     {
