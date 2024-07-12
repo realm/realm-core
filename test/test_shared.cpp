@@ -95,34 +95,32 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#if 0
+
 // Sorting benchmark
-ONLY(Query_QuickSort2)
+TEST(Query_QuickSort2)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     // Triggers QuickSort because range > len
     Table ttt;
-    auto ints = ttt.add_column(type_Int, "1");
+    // auto ints = ttt.add_column(type_Int, "1");
     auto strings = ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 10000; t++) {
         Obj o = ttt.create_object();
-        //        o.set<int64_t>(ints, random.draw_int_mod(1100));
+        // o.set<int64_t>(ints, random.draw_int_mod(1100));
         o.set<StringData>(strings, "a");
     }
 
     Query q = ttt.where();
 
-    std::cerr << "GO";
-
     for (size_t t = 0; t < 1000; t++) {
         TableView tv = q.find_all();
         tv.sort(strings);
-        //        tv.ints(strings);
+        // tv.ints(strings);
     }
 }
-#endif
+
 
 #if REALM_WINDOWS
 namespace {
@@ -660,9 +658,8 @@ TEST(Shared_EncryptedRemap)
 TEST(Shared_Initial)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::vector<char> key;
 
-    CHECK_NOT(DB::needs_file_format_upgrade(path, key)); // File not created yet
+    CHECK_NOT(DB::needs_file_format_upgrade(path, {})); // File not created yet
 
     auto key_str = crypt_key();
     {
@@ -675,10 +672,7 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
     }
-    if (key_str) {
-        key.insert(key.end(), key_str, key_str + strlen(key_str));
-    }
-    CHECK_NOT(DB::needs_file_format_upgrade(path, key));
+    CHECK_NOT(DB::needs_file_format_upgrade(path, Span(key_str, 64)));
 }
 
 
@@ -2285,6 +2279,50 @@ TEST(Shared_EncryptionPageReadFailure)
             did_throw = true;
         }
         CHECK(did_throw);
+    }
+}
+
+TEST(Shared_KeyWithNulBytes)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::array<char, 64> key;
+    for (size_t i = 0; i < key.size(); ++i)
+        key[i] = char(i % 2);
+
+    { // Create a file
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        WriteTransaction wt(db);
+        wt.add_table("table");
+        wt.commit();
+    }
+
+    { // Reopen the file then compact it with the key obtained from the DB
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        {
+            ReadTransaction rt(db);
+            CHECK(rt.get_table("table"));
+        }
+        db->compact();
+        {
+            ReadTransaction rt(db);
+            CHECK(rt.get_table("table"));
+        }
+    }
+
+    { // Compact with a different explicitly passed-in key
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        {
+            ReadTransaction rt(db);
+            CHECK(rt.get_table("table"));
+        }
+        key[1]++;
+        db->compact(false, key.data());
+    }
+
+    { // Verify that the new key was used
+        DBRef db = DB::create(path, DBOptions(key.data()));
+        ReadTransaction rt(db);
+        CHECK(rt.get_table("table"));
     }
 }
 

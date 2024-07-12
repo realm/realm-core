@@ -167,7 +167,7 @@ public:
 
     bool is_attached() const noexcept;
 
-    static bool needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key);
+    static bool needs_file_format_upgrade(const std::string& file, util::Span<const char> encryption_key);
 
     Allocator& get_alloc()
     {
@@ -432,6 +432,7 @@ public:
     /// Mark this DB as the sync agent for the file.
     /// \throw MultipleSyncAgents if another DB is already the sync agent.
     void claim_sync_agent();
+    bool try_claim_sync_agent();
     void release_sync_agent();
 
     /// Returns true if there are threads waiting to acquire the write lock, false otherwise.

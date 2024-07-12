@@ -46,7 +46,7 @@ using namespace std::chrono;
 #include "test_types_helper.hpp"
 
 // #include <valgrind/callgrind.h>
-// #define PERFORMACE_TESTING
+// #define PERFORMANCE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -2954,9 +2954,122 @@ NONCONCURRENT_TEST(Table_QuickSort2)
     std::cout << "    time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/rep" << std::endl;
 }
 
+NONCONCURRENT_TEST(Table_object_timestamp)
+{
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
+    int nb_rows = 10'000'000;
+    int num_runs = 100;
+#else
+    int nb_rows = 100'000;
+    int num_runs = 1;
+#endif
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    ColKey c0;
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    std::cout << nb_rows << " rows - timestamps" << std::endl;
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("test");
+
+        c0 = table->add_column(type_Timestamp, "ts");
+
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            Timestamp t(i, i);
+            table->create_object(ObjKey(i)).set_all(t);
+        }
+
+        auto t2 = steady_clock::now();
+        std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+
+        CHECK_EQUAL(table->size(), nb_rows);
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+        Timestamp t(nb_rows / 2, nb_rows / 2);
+        for (int j = 0; j < num_runs; ++j) {
+            auto result = table->where().equal(c0, t).find_all();
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   find all    : " << duration_cast<milliseconds>(t2 - t1).count() / num_runs << " ms"
+                  << std::endl;
+    }
+}
+
+NONCONCURRENT_TEST(Table_object_search)
+{
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
+    int nb_rows = 10'000'000;
+    int num_runs = 100;
+#else
+    int nb_rows = 100'000;
+    int num_runs = 1;
+#endif
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    ColKey c0;
+    ColKey c1;
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    std::cout << nb_rows << " rows - sequential" << std::endl;
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("test");
+
+        c0 = table->add_column(type_Int, "int1");
+        c1 = table->add_column(type_Int, "int2", true);
+
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            table->create_object(ObjKey(i)).set_all(i << 1, i << 2);
+        }
+
+        auto t2 = steady_clock::now();
+        std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+
+        CHECK_EQUAL(table->size(), nb_rows);
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            auto result = table->find_all_int(c0, nb_rows / 2);
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   find all    : " << duration_cast<milliseconds>(t2 - t1).count() / num_runs << " ms"
+                  << std::endl;
+    }
+}
+
 NONCONCURRENT_TEST(Table_object_sequential)
 {
-#ifdef PERFORMACE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
@@ -3106,7 +3219,7 @@ NONCONCURRENT_TEST(Table_object_sequential)
 
 NONCONCURRENT_TEST(Table_object_seq_rnd)
 {
-#ifdef PERFORMACE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     size_t rows = 1'000'000;
     int runs = 100; // runs for building scenario
 #else
@@ -3149,7 +3262,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
     }
     // scenario established!
     int nb_rows = int(key_values.size());
-#ifdef PERFORMACE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int num_runs = 10; // runs for timing access
 #else
     int num_runs = 1; // runs for timing access
@@ -3221,7 +3334,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 
 NONCONCURRENT_TEST(Table_object_random)
 {
-#ifdef PERFORMACE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 1'000'000;
     int num_runs = 10;
 #else

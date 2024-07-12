@@ -137,8 +137,16 @@ functions:
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
 
+          if [[ -n "${compress|}" ]]; then
+              set_cmake_var realm_vars REALM_COMPRESS PATH "${cmake_toolchain_file}"
+          fi
+
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL "${build_command_line_tools|On}"
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL "${enable_realm_encryption|On}"
+          if [[ -n "${compress|}" ]]; then
+              set_cmake_var realm_vars REALM_COMPRESS PATH "${cmake_toolchain_file}"
+          fi
+
 
           if [[ -n "${fetch_missing_dependencies|}" ]]; then
               set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
@@ -430,7 +438,7 @@ functions:
       script: |-
         if ls crash-*> /dev/null 2>&1; then
           echo "Found crash file"
-          #Rename the crash file and the realm file. 
+          #Rename the crash file and the realm file.
           #If there is a crash, this will signal that something needs to be uploaded.
           mv crash-* realm-fuzzer-crash.txt
           mv fuzz-realm.realm fuzzer_realm.realm
@@ -459,7 +467,7 @@ functions:
       bucket: mciuploads
       permissions: public-read
       content_type: application/x-binary
-      display_name: Realm File 
+      display_name: Realm File
       optional: true
 
   - command: shell.exec
@@ -515,7 +523,7 @@ functions:
         set -o verbose
 
         TOP_DIR=$(pwd)
-        
+
         HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
         REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
 
@@ -1166,7 +1174,7 @@ tasks:
             ./build/test/${cmake_build_type|Debug}-iphonesimulator/realm-combined-tests.app \
             'io.realm.CombinedTests' \
             $TEST_RESULTS_FILE
- 
+
 - name: generate-sync-corpus
   tags: [ "for_nightly_tests" ]
   exec_timeout_secs: 1800
@@ -1393,6 +1401,19 @@ buildvariants:
   - name: compile_test
   - name: lint
 
+- name: ubuntu-cpp20
+  display_name: "Ubuntu C++20"
+  run_on: ubuntu2404-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    clang_format: "/opt/clang+llvm/bin/clang-format"
+    extra_flags: -DCMAKE_CXX_STANDARD=20
+  tasks:
+  - name: compile_test
+  - name: lint
+
 - name: ubuntu-no-session-multiplexing
   display_name: "Ubuntu (Sync Multiplexing Disabled)"
   run_on: ubuntu2204-arm64-large
@@ -1440,6 +1461,15 @@ buildvariants:
   tasks:
   - name: compile_local_tests
 
+- name: ubuntu-2404-GCC
+  display_name: "Ubuntu 24.04 arm64 (native GCC)"
+  run_on: ubuntu2404-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
+
 - name: ubuntu-encryption-tsan
   display_name: "Ubuntu (Encryption Enabled w/TSAN)"
   run_on: ubuntu2204-arm64-small
@@ -1460,7 +1490,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    run_with_encryption: 1 
+    run_with_encryption: 1
     enable_asan: On
     cmake_build_type: RelWithDebInfo
   tasks:
@@ -1483,12 +1513,12 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
-  - name: compile_test_and_package 
+  - name: compile_test_and_package
   - name: benchmarks
   - name: generate-sync-corpus
 
 - name: ubuntu2004-arm64
-  display_name: "Ubuntu 20.04 ARM64 (Clang 11 release benchmarks)"
+  display_name: "Ubuntu 20.04 ARM64 (GCC 9 release benchmarks)"
   run_on: ubuntu2004-arm64-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
@@ -1832,6 +1862,22 @@ buildvariants:
   - name: compile_test_coverage
   - name: finalize_coverage_data
 
+- name: macos-array-compression
+  display_name: "MacOS 14 arm64 (Compress Arrays)"
+  run_on: macos-14-arm64
+  expansions:
+    cmake_bindir: "/opt/homebrew/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+    compress: On
+    cmake_build_type: Debug
+  tasks:
+  - name: compile_test
+
 - name: ubuntu-no-app-services
   display_name: "Ubuntu (AppServices Disabled)"
   run_on: ubuntu2204-arm64-large
@@ -1970,5 +2016,3 @@ buildvariants:
 #     no_tests: On
 #   tasks:
 #   - name: compile_only
-
-

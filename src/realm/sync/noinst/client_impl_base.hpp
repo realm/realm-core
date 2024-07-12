@@ -727,49 +727,6 @@ public:
     /// or after initiation of deactivation.
     void recognize_sync_version(version_type);
 
-    /// \brief Request notification when all changesets in the local history
-    /// have been uploaded to the server.
-    ///
-    /// When uploading completes, on_upload_completion() will be called by the
-    /// thread that processes the event loop (as long as such a thread exists).
-    ///
-    /// IMPORTANT: on_upload_completion() may get called before
-    /// request_upload_completion_notification() returns (reentrant callback).
-    ///
-    /// If request_upload_completion_notification() is called while a previously
-    /// requested completion notification has not yet occurred, the previous
-    /// request is canceled and the corresponding notification will never
-    /// occur. This ensure that there is no ambiguity about the meaning of each
-    /// completion notification.
-    ///
-    /// The application must be prepared for "spurious" invocations of
-    /// on_upload_completion() before the client's first invocation of
-    /// request_upload_completion_notification(), or after a previous invocation
-    /// of on_upload_completion(), as long as it is before the subsequent
-    /// invocation by the client of
-    /// request_upload_completion_notification(). This is possible because the
-    /// client reserves the right to request upload completion notifications
-    /// internally.
-    ///
-    /// Upload is considered complete when all changesets in the history, that
-    /// are supposed to be uploaded, and that precede `current_client_version`,
-    /// have been uploaded and acknowledged by the
-    /// server. `current_client_version` is generally the version that refers to
-    /// the last changeset in the history, but more precisely, it may be any
-    /// version between the last version reported by the application through
-    /// recognize_sync_version() and the version referring to the last history
-    /// entry (both ends inclusive).
-    ///
-    /// If new changesets are added to the history while a previously requested
-    /// completion notification has not yet occurred, it is unspecified whether
-    /// the addition of those changesets will cause `current_client_version` to
-    /// be bumped or stay fixed, regardless of whether they are advertised via
-    /// recognize_sync_version().
-    ///
-    /// It is an error to call this function before activation of the session,
-    /// or after initiation of deactivation.
-    void request_upload_completion_notification();
-
     /// \brief Request notification when all changesets currently avaialble on
     /// the server have been downloaded.
     ///
@@ -829,18 +786,10 @@ public:
     void integrate_changesets(const SyncProgress&, std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
                               VersionInfo&, DownloadBatchState last_in_batch);
 
-    /// To be used in connection with implementations of
-    /// initiate_integrate_changesets().
-    ///
-    /// If \a success is true, the value of \a error does not matter. If \a
-    /// success is false, the values of \a client_version and \a
-    /// download_progress do not matter.
-    ///
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(version_type client_version, const SyncProgress& progress,
-                                  bool changesets_integrated);
+    void on_changesets_integrated(version_type client_version, const SyncProgress& progress);
 
     void on_integration_failure(const IntegrationException& e);
 
@@ -898,6 +847,10 @@ private:
     /// Returns the schema version the synchronization session connects with to the server.
     uint64_t get_schema_version() noexcept;
 
+    // Returns false if this session is not allowed to send UPLOAD messages to the server to
+    // update the cursor info, such as during a client reset fresh realm download
+    bool upload_messages_allowed() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
@@ -940,9 +893,6 @@ private:
     /// not after initiation of deactivation.
     void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                        const SyncProgress& progress, const ReceivedChangesets&);
-
-    /// See request_upload_completion_notification().
-    void on_upload_completion();
 
     /// See request_download_completion_notification().
     void on_download_completion();
@@ -1003,12 +953,11 @@ private:
     SyncSocketProvider::SyncTimer m_try_again_activation_timer;
     ErrorBackoffState<sync::ProtocolError, RandomEngine> m_try_again_delay_info;
 
-    // Set to true when download completion is reached. Set to false after a
-    // slow reconnect, such that the upload process will become suspended until
-    // download completion is reached again.
-    bool m_allow_upload = false;
-
-    bool m_upload_completion_notification_requested = false;
+    // Set to false when download completion is reached. Set to true after a
+    // slow reconnect, such that UPLOAD and QUERY messages will not be sent until
+    // download completion is reached again. This feature can be disabled (always
+    // false) if ClientConfig::disable_upload_activation_delay is true.
+    bool m_delay_uploads = true;
 
     bool m_is_flx_sync_session = false;
 
@@ -1035,9 +984,6 @@ private:
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
-
-    // True while this session is in the process of performing a client reset.
-    bool m_performing_client_reset = false;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in
@@ -1075,15 +1021,6 @@ private:
     //
     // INVARIANT: m_progress.upload.client_version <= m_upload_progress.client_version
     UploadCursor m_upload_progress = {0, 0};
-
-    // Set to `m_progress.upload.client_version` at session activation time and
-    // whenever the connection to the server is lost. Otherwise it is the
-    // version of the latest changeset that has been selected for upload while
-    // scanning the history.
-    //
-    // INVARIANT: m_progress.upload.client_version <= m_last_version_selected_for_upload
-    // INVARIANT: m_last_version_selected_for_upload <= m_upload_progress.client_version
-    version_type m_last_version_selected_for_upload = 0;
 
     // Same as `m_progress.download` but is updated only as the progress gets
     // persisted.
@@ -1174,7 +1111,6 @@ private:
     void ensure_enlisted_to_send();
     void enlist_to_send();
     Status check_received_sync_progress(const SyncProgress&) noexcept;
-    void check_for_upload_completion();
     void check_for_download_completion();
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
@@ -1187,7 +1123,6 @@ private:
 
     void init_progress_handler();
     void enable_progress_notifications();
-    void notify_sync_progress();
 
     friend class Connection;
 };
@@ -1387,18 +1322,10 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
         // Since the deactivation process has not been initiated, the UNBIND
         // message cannot have been sent unless the session was suspended due to
         // an error.
-        REALM_ASSERT(m_suspended || !m_unbind_message_sent);
+        REALM_ASSERT_3(m_suspended, ||, !m_unbind_message_sent);
         if (m_ident_message_sent && !m_suspended)
             ensure_enlisted_to_send(); // Throws
     }
-}
-
-inline void ClientImpl::Session::request_upload_completion_notification()
-{
-    REALM_ASSERT(m_state == Active);
-
-    m_upload_completion_notification_requested = true;
-    check_for_upload_completion(); // Throws
 }
 
 inline void ClientImpl::Session::request_download_completion_notification()
@@ -1431,7 +1358,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
-        m_allow_upload = true;
+        m_delay_uploads = false;
 }
 
 inline bool ClientImpl::Session::do_recognize_sync_version(version_type version) noexcept
@@ -1460,10 +1387,10 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
     if (!fast_reconnect && !get_client().m_disable_upload_activation_delay) {
         // Disallow immediate activation of the upload process, even if download
         // completion was reached during an earlier period of connectivity.
-        m_allow_upload = false;
+        m_delay_uploads = true;
     }
 
-    if (!m_allow_upload) {
+    if (m_delay_uploads) {
         // Request download completion notification
         ++m_target_download_mark;
     }
@@ -1501,6 +1428,14 @@ inline void ClientImpl::Session::message_sent()
 
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_send_complete);
+
+    // If the client reset config structure is populated, then try to perform
+    // the client reset diff once the BIND message has been sent successfully
+    if (m_bind_message_sent && m_state == Active && get_client_reset_config()) {
+        client_reset_if_needed();
+        // Ready to send the IDENT message
+        ensure_enlisted_to_send(); // Throws
+    }
 
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);
@@ -1544,10 +1479,9 @@ inline void ClientImpl::Session::initiate_rebind()
 
 inline void ClientImpl::Session::reset_protocol_state() noexcept
 {
-    // clang-format off
-    m_enlisted_to_send                    = false;
-    m_bind_message_sent                   = false;
-    m_error_to_send                       = false;
+    m_enlisted_to_send = false;
+    m_bind_message_sent = false;
+    m_error_to_send = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_send_complete = false;
@@ -1556,9 +1490,7 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_client_error = util::none;
 
     m_upload_progress = m_progress.upload;
-    m_last_version_selected_for_upload = m_upload_progress.client_version;
-    m_last_download_mark_sent          = m_last_download_mark_received;
-    // clang-format on
+    m_last_download_mark_sent = m_last_download_mark_received;
 }
 
 inline void ClientImpl::Session::ensure_enlisted_to_send()

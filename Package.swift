@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "14.10.1"
+let versionStr = "14.10.3"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -52,6 +52,7 @@ let notSyncServerSources: [String] = [
     "realm/array_blobs_small.cpp",
     "realm/array_decimal128.cpp",
     "realm/array_fixed_bytes.cpp",
+    "realm/array_aggregate_optimizations.cpp",
     "realm/array_integer.cpp",
     "realm/array_key.cpp",
     "realm/array_mixed.cpp",
@@ -78,6 +79,9 @@ let notSyncServerSources: [String] = [
     "realm/group.cpp",
     "realm/group_writer.cpp",
     "realm/history.cpp",
+    "realm/integer_compressor.cpp",
+    "realm/integer_flex_compressor.cpp",
+    "realm/integer_packed_compressor.cpp",
     "realm/impl",
     "realm/index_string.cpp",
     "realm/link_translator.cpp",

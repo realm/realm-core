@@ -83,11 +83,11 @@ public:
     }
     MemRef ensure_writeable(ObjKey k)
     {
-        return m_root->ensure_writeable(k);
+        return m_root->ensure_writeable(ClusterNode::RowKey(k));
     }
     void update_ref_in_parent(ObjKey k, ref_type ref)
     {
-        m_root->update_ref_in_parent(k, ref);
+        m_root->update_ref_in_parent(ClusterNode::RowKey(k), ref);
     }
     Array& get_fields_accessor(Array& fallback, MemRef mem) const
     {
@@ -189,6 +189,12 @@ public:
         m_root->dump_objects(0, "");
     }
     void verify() const;
+
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
+    {
+        REALM_ASSERT_DEBUG(m_root);
+        return m_root->typed_write(ref, out);
+    }
 
 protected:
     friend class Obj;

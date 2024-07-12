@@ -823,10 +823,12 @@ size_t Dictionary::find_first(Mixed value) const
 
 void Dictionary::clear()
 {
-    if (size() > 0) {
-        if (Replication* repl = get_replication()) {
-            repl->dictionary_clear(*this);
-        }
+    auto sz = size();
+    Replication* repl = Base::get_replication();
+    if (repl && (sz > 0 || !m_col_key.is_collection() || m_level > 1)) {
+        repl->dictionary_clear(*this);
+    }
+    if (sz > 0) {
         CascadeState cascade_state(CascadeState::Mode::Strong);
         bool recurse = remove_backlinks(cascade_state);
 
@@ -1210,6 +1212,36 @@ LinkCollectionPtr Dictionary::clone_as_obj_list() const
         return std::make_unique<DictionaryLinkValues>(*this);
     }
     return nullptr;
+}
+
+ref_type Dictionary::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+{
+    if (out.only_modified && alloc.is_read_only(ref))
+        return ref;
+
+    ArrayRef dict_top(alloc);
+    dict_top.init_from_ref(ref);
+    REALM_ASSERT_DEBUG(dict_top.size() == 2);
+    TempArray written_dict_top(2);
+
+    // We have to find out what kind of keys we are using - strings or ints
+    // Btw - ints is only used in tests. Can probably be removed at some point
+    auto key_ref = dict_top.get(0);
+    auto header = alloc.translate(key_ref);
+    if (!NodeHeader::get_hasrefs_from_header(header) &&
+        NodeHeader::get_wtype_from_header(header) != Array::wtype_Multiply) {
+        // Key type int.
+        REALM_ASSERT(!NodeHeader::get_is_inner_bptree_node_from_header(header));
+        written_dict_top.set_as_ref(0, BPlusTree<int64_t>::typed_write(key_ref, out, alloc));
+    }
+    else {
+        written_dict_top.set_as_ref(0, BPlusTree<StringData>::typed_write(key_ref, out, alloc));
+    }
+
+    auto values_ref = dict_top.get_as_ref(1);
+    written_dict_top.set_as_ref(1, BPlusTree<Mixed>::typed_write(values_ref, out, alloc));
+
+    return written_dict_top.write(out);
 }
 
 /************************* DictionaryLinkValues *************************/

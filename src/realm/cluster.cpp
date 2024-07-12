@@ -89,7 +89,7 @@ const Table* ClusterNode::get_owning_table() const noexcept
 
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
-    if (!k || !try_get(k, state)) {
+    if (!k || !try_get(RowKey(k), state)) {
         throw KeyNotFound(util::format("No object with key '%1' in '%2'", k.value, get_owning_table()->get_name()));
     }
 }
@@ -225,7 +225,7 @@ void Cluster::update_from_parent() noexcept
     }
 }
 
-MemRef Cluster::ensure_writeable(ObjKey)
+MemRef Cluster::ensure_writeable(RowKey)
 {
     // By specifying the minimum size, we ensure that the array has a capacity
     // to hold m_size 64 bit refs.
@@ -234,7 +234,7 @@ MemRef Cluster::ensure_writeable(ObjKey)
     return get_mem();
 }
 
-void Cluster::update_ref_in_parent(ObjKey, ref_type)
+void Cluster::update_ref_in_parent(RowKey, ref_type)
 {
     REALM_UNREACHABLE();
 }
@@ -343,13 +343,13 @@ inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, 
     }
 }
 
-void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
+void Cluster::insert_row(size_t ndx, RowKey row_key, const FieldValues& init_values)
 {
     // Ensure the cluster array is big enough to hold 64 bit values.
     copy_on_write(m_size * 8);
 
     if (m_keys.is_attached()) {
-        m_keys.insert(ndx, k.value);
+        m_keys.insert(ndx, row_key.value);
     }
     else {
         Array::set(s_key_ref_or_size_index, Array::get(s_key_ref_or_size_index) + 2); // Increments size by 1
@@ -377,6 +377,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
         }
 
         bool nullable = attr.test(col_attr_Nullable);
+        ObjKey obj_key(int64_t(row_key.value + get_offset()));
         switch (type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
@@ -402,7 +403,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 do_insert_row<ArrayBinary>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Mixed: {
-                do_insert_mixed(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
+                do_insert_mixed(ndx, col_key, init_value, obj_key);
                 break;
             }
             case col_type_Timestamp:
@@ -418,10 +419,10 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 do_insert_row<ArrayUUIDNull>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Link:
-                do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
+                do_insert_key(ndx, col_key, init_value, obj_key);
                 break;
             case col_type_TypedLink:
-                do_insert_link(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
+                do_insert_link(ndx, col_key, init_value, obj_key);
                 break;
             case col_type_BackLink: {
                 ArrayBacklink arr(m_alloc);
@@ -664,7 +665,7 @@ void Cluster::remove_column(ColKey col_key)
         Array::set(idx, 0);
 }
 
-ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::State& state)
+ref_type Cluster::insert(RowKey row_key, const FieldValues& init_values, ClusterNode::State& state)
 {
     int64_t current_key_value = -1;
     size_t sz;
@@ -673,34 +674,34 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
 
     auto on_error = [&] {
         throw KeyAlreadyUsed(
-            util::format("When inserting key '%1' in '%2'", k.value, get_owning_table()->get_name()));
+            util::format("When inserting key '%1' in '%2'", row_key.value, get_owning_table()->get_name()));
     };
 
     if (m_keys.is_attached()) {
         sz = m_keys.size();
-        ndx = m_keys.lower_bound(uint64_t(k.value));
+        ndx = m_keys.lower_bound(row_key.value);
         if (ndx < sz) {
             current_key_value = m_keys.get(ndx);
-            if (k.value == current_key_value) {
+            if (row_key.value == uint64_t(current_key_value)) {
                 on_error();
             }
         }
     }
     else {
         sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
-        if (uint64_t(k.value) < sz) {
+        if (row_key.value < sz) {
             on_error();
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
-        if (uint64_t(k.value) > sz && sz < cluster_node_size) {
+        if (row_key.value > sz && sz < cluster_node_size) {
             ensure_general_form();
         }
     }
 
     REALM_ASSERT_DEBUG(sz <= cluster_node_size);
     if (REALM_LIKELY(sz < cluster_node_size)) {
-        insert_row(ndx, k, init_values); // Throws
+        insert_row(ndx, row_key, init_values); // Throws
         state.mem = get_mem();
         state.index = ndx;
     }
@@ -709,8 +710,8 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
         Cluster new_leaf(0, m_alloc, m_tree_top);
         new_leaf.create();
         if (ndx == sz) {
-            new_leaf.insert_row(0, ObjKey(0), init_values); // Throws
-            state.split_key = k.value;
+            new_leaf.insert_row(0, RowKey(0), init_values); // Throws
+            state.split_key = int64_t(row_key.value);
             state.mem = new_leaf.get_mem();
             state.index = 0;
         }
@@ -719,7 +720,7 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
             REALM_ASSERT_DEBUG(m_keys.is_attached());
             new_leaf.ensure_general_form();
             move(ndx, &new_leaf, current_key_value);
-            insert_row(ndx, k, init_values); // Throws
+            insert_row(ndx, row_key, init_values); // Throws
             state.mem = get_mem();
             state.split_key = current_key_value;
             state.index = ndx;
@@ -730,15 +731,15 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     return ret;
 }
 
-bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const noexcept
+bool Cluster::try_get(RowKey k, ClusterNode::State& state) const noexcept
 {
     state.mem = get_mem();
     if (m_keys.is_attached()) {
-        state.index = m_keys.lower_bound(uint64_t(k.value));
-        return state.index != m_keys.size() && m_keys.get(state.index) == uint64_t(k.value);
+        state.index = m_keys.lower_bound(k.value);
+        return state.index != m_keys.size() && m_keys.get(state.index) == k.value;
     }
     else {
-        if (uint64_t(k.value) < uint64_t(Array::get(s_key_ref_or_size_index) >> 1)) {
+        if (k.value < uint64_t(Array::get(s_key_ref_or_size_index) >> 1)) {
             state.index = size_t(k.value);
             return true;
         }
@@ -776,7 +777,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     values.erase(ndx);
 }
 
-inline void Cluster::do_erase_mixed(size_t ndx, ColKey col_key, ObjKey key, CascadeState& state)
+inline void Cluster::do_erase_mixed(size_t ndx, ColKey col_key, CascadeState& state)
 {
     const Table* origin_table = m_tree_top.get_owning_table();
     auto col_ndx = col_key.get_index();
@@ -788,19 +789,16 @@ inline void Cluster::do_erase_mixed(size_t ndx, ColKey col_key, ObjKey key, Casc
     Mixed value = values.get(ndx);
     if (value.is_type(type_TypedLink)) {
         ObjLink link = value.get<ObjLink>();
-        auto target_obj = origin_table->get_parent_group()->get_object(link);
-
-        ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-        REALM_ASSERT(backlink_col_key);
-        target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
+        Obj obj(origin_table->m_own_ref, get_mem(), get_real_key(ndx), ndx);
+        obj.remove_backlink(col_key, link, state);
     }
     if (value.is_type(type_List)) {
-        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+        Obj obj(origin_table->m_own_ref, get_mem(), get_real_key(ndx), ndx);
         Lst<Mixed> list(obj, col_key);
         list.remove_backlinks(state);
     }
     if (value.is_type(type_Dictionary)) {
-        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+        Obj obj(origin_table->m_own_ref, get_mem(), get_real_key(ndx), ndx);
         Dictionary dict(obj, col_key);
         dict.remove_backlinks(state);
     }
@@ -821,12 +819,12 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
     values.erase(ndx);
 }
 
-size_t Cluster::get_ndx(ObjKey k, size_t ndx) const noexcept
+size_t Cluster::get_ndx(RowKey k, size_t ndx) const noexcept
 {
     size_t index;
     if (m_keys.is_attached()) {
-        index = m_keys.lower_bound(uint64_t(k.value));
-        if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
+        index = m_keys.lower_bound(k.value);
+        if (index == m_keys.size() || m_keys.get(index) != k.value) {
             return realm::npos;
         }
     }
@@ -839,11 +837,14 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const noexcept
     return index + ndx;
 }
 
-size_t Cluster::erase(ObjKey key, CascadeState& state)
+size_t Cluster::erase(RowKey row_key, CascadeState& state)
 {
-    size_t ndx = get_ndx(key, 0);
+    size_t ndx = get_ndx(row_key, 0);
     if (ndx == realm::npos)
-        throw KeyNotFound(util::format("When erasing key '%1' in '%2'", key.value, get_owning_table()->get_name()));
+        throw KeyNotFound(util::format("When erasing key '%1' (offset '%2') in '%3'", row_key.value, m_offset,
+                                       get_owning_table()->get_name()));
+
+    ObjKey real_key = get_real_key(ndx);
     std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -860,7 +861,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 const Table* origin_table = m_tree_top.get_owning_table();
                 if (attr.test(col_attr_Dictionary)) {
                     if (col_type == col_type_Mixed || col_type == col_type_Link) {
-                        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+                        Obj obj(origin_table->m_own_ref, get_mem(), real_key, ndx);
                         Dictionary dict(obj, col_key);
                         dict.remove_backlinks(state);
                     }
@@ -869,7 +870,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
-                        do_remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
+                        do_remove_backlinks(real_key, col_key, links.get_all(), state);
                     }
                 }
                 else if (col_type == col_type_TypedLink) {
@@ -880,11 +881,11 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                         auto target_obj = origin_table->get_parent_group()->get_object(link);
                         ColKey backlink_col_key =
                             target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-                        target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));
+                        target_obj.remove_one_backlink(backlink_col_key, real_key);
                     }
                 }
                 else if (col_type == col_type_Mixed) {
-                    Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+                    Obj obj(origin_table->m_own_ref, get_mem(), real_key, ndx);
                     Lst<Mixed> list(obj, col_key);
                     list.remove_backlinks(state);
                 }
@@ -921,7 +922,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 do_erase<ArrayBinary>(ndx, col_key);
                 break;
             case col_type_Mixed:
-                do_erase_mixed(ndx, col_key, key, state);
+                do_erase_mixed(ndx, col_key, state);
                 break;
             case col_type_Timestamp:
                 do_erase<ArrayTimestamp>(ndx, col_key);
@@ -983,7 +984,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     return node_size();
 }
 
-void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
+void Cluster::nullify_incoming_links(RowKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
     if (ndx == realm::npos)
@@ -1541,7 +1542,7 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
             bool last_removed = target_obj.remove_one_backlink(backlink_col_key, origin_key); // Throws
             if (is_unres) {
                 if (last_removed) {
-                    // Check is there are more backlinks
+                    // Check if there are more backlinks
                     if (!target_obj.has_backlinks(false)) {
                         // Tombstones can be erased right away - there is no cascading effect
                         target_table->m_tombstones->erase(link.get_obj_key(), state);
@@ -1555,4 +1556,161 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
     }
 }
 
+namespace {
+
+template <typename Fn>
+static void switch_on_type(ColKey ck, Fn&& fn)
+{
+    bool is_optional = ck.is_nullable();
+    auto type = ck.get_type();
+    switch (type) {
+        case col_type_Int:
+            return is_optional ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
+        case col_type_Bool:
+            return is_optional ? fn((util::Optional<bool>*)0) : fn((bool*)0);
+        case col_type_Float:
+            return is_optional ? fn((util::Optional<float>*)0) : fn((float*)0);
+        case col_type_Double:
+            return is_optional ? fn((util::Optional<double>*)0) : fn((double*)0);
+        case col_type_String:
+            return fn((StringData*)0);
+        case col_type_Binary:
+            return fn((BinaryData*)0);
+        case col_type_Timestamp:
+            return fn((Timestamp*)0);
+        case col_type_Link:
+            return fn((ObjKey*)0);
+        case col_type_ObjectId:
+            return is_optional ? fn((util::Optional<ObjectId>*)0) : fn((ObjectId*)0);
+        case col_type_Decimal:
+            return fn((Decimal128*)0);
+        case col_type_UUID:
+            return is_optional ? fn((util::Optional<UUID>*)0) : fn((UUID*)0);
+        case col_type_Mixed:
+            return fn((Mixed*)0);
+        default:
+            REALM_COMPILER_HINT_UNREACHABLE();
+    }
+}
+
+} // namespace
+
+ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
+{
+    REALM_ASSERT_DEBUG(ref == get_mem().get_ref());
+    bool only_modified = out.only_modified;
+    if (only_modified && m_alloc.is_read_only(ref))
+        return ref;
+    REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
+    REALM_ASSERT_DEBUG(!get_context_flag_from_header(get_header()));
+    TempArray written_cluster(size());
+    for (size_t j = 0; j < size(); ++j) {
+        RefOrTagged leaf_rot = get_as_ref_or_tagged(j);
+        // Handle nulls
+        if (!leaf_rot.is_ref() || !leaf_rot.get_as_ref()) {
+            written_cluster.set(j, leaf_rot);
+            continue;
+        }
+        // prune subtrees which should not be written:
+        if (only_modified && m_alloc.is_read_only(leaf_rot.get_as_ref())) {
+            written_cluster.set(j, leaf_rot);
+            continue;
+        }
+        // from here: this leaf exists and needs to be written.
+        ref = leaf_rot.get_as_ref();
+        ref_type new_ref = ref;
+        if (j == 0) {
+            // Keys  (ArrayUnsigned me thinks, so don't compress)
+            Array leaf(m_alloc);
+            leaf.init_from_ref(ref);
+            new_ref = leaf.write(out, false, only_modified, false);
+        }
+        else {
+            // Columns
+            auto col_key = out.table->m_leaf_ndx2colkey[j - 1];
+            auto col_type = col_key.get_type();
+            if (col_key.is_collection()) {
+                ArrayRef arr_ref(m_alloc);
+                arr_ref.init_from_ref(ref);
+                auto sz = arr_ref.size();
+                TempArray written_ref_leaf(sz);
+
+                for (size_t k = 0; k < sz; k++) {
+                    ref_type new_sub_ref = 0;
+                    // Now we have to find out if the nested collection is a
+                    // dictionary or a list. If the top array has a size of 2
+                    // and it is not a BplusTree inner node, then it is a dictionary
+                    if (auto sub_ref = arr_ref.get(k)) {
+                        if (col_key.is_dictionary()) {
+                            new_sub_ref = Dictionary::typed_write(sub_ref, out, m_alloc);
+                        }
+                        else {
+                            // List or set - Can be handled the same way
+                            // For some reason, switch_on_type() would not compile on Windows
+                            // switch_on_type(col_key, [&](auto t) {
+                            //     using U = std::decay_t<decltype(*t)>;
+                            //     new_sub_ref = BPlusTree<U>::typed_write(sub_ref, out, m_alloc);
+                            // });
+                            switch (col_type) {
+                                case col_type_Int:
+                                    new_sub_ref = BPlusTree<int64_t>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Bool:
+                                    new_sub_ref = BPlusTree<bool>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Float:
+                                    new_sub_ref = BPlusTree<float>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Double:
+                                    new_sub_ref = BPlusTree<double>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_String:
+                                    new_sub_ref = BPlusTree<StringData>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Binary:
+                                    new_sub_ref = BPlusTree<BinaryData>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Timestamp:
+                                    new_sub_ref = BPlusTree<Timestamp>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Link:
+                                    new_sub_ref = BPlusTree<ObjKey>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_ObjectId:
+                                    new_sub_ref = BPlusTree<ObjectId>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Decimal:
+                                    new_sub_ref = BPlusTree<Decimal128>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_UUID:
+                                    new_sub_ref = BPlusTree<UUID>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Mixed:
+                                    new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                default:
+                                    REALM_COMPILER_HINT_UNREACHABLE();
+                            }
+                        }
+                    }
+                    written_ref_leaf.set_as_ref(k, new_sub_ref);
+                }
+                new_ref = written_ref_leaf.write(out);
+            }
+            else if (col_type == col_type_BackLink) {
+                Array leaf(m_alloc);
+                leaf.init_from_ref(ref);
+                new_ref = leaf.write(out, true, only_modified, false);
+            }
+            else {
+                switch_on_type(col_key, [&](auto t) {
+                    using U = std::decay_t<decltype(*t)>;
+                    new_ref = ColumnTypeTraits<U>::cluster_leaf_type::typed_write(ref, out, m_alloc);
+                });
+            }
+        }
+        written_cluster.set_as_ref(j, new_ref);
+    }
+    return written_cluster.write(out);
+}
 } // namespace realm

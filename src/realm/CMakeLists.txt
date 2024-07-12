@@ -13,6 +13,7 @@ set(REALM_SOURCES
     array_blobs_big.cpp
     array_decimal128.cpp
     array_fixed_bytes.cpp
+    array_aggregate_optimizations.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
@@ -36,6 +37,9 @@ set(REALM_SOURCES
     db.cpp
     group_writer.cpp
     history.cpp
+    integer_compressor.cpp
+    integer_flex_compressor.cpp
+    integer_packed_compressor.cpp
     impl/copy_replication.cpp
     impl/output_stream.cpp
     impl/simulated_failure.cpp
@@ -163,6 +167,9 @@ set(REALM_INSTALL_HEADERS
     handover_defs.hpp
     history.hpp
     index_string.hpp
+    integer_compressor.hpp
+    integer_flex_compressor.hpp
+    integer_packed_compressor.hpp
     keys.hpp
     list.hpp
     mixed.hpp

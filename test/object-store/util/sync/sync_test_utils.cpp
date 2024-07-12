@@ -434,7 +434,6 @@ struct FakeLocalClientReset : public TestClientReset {
             }
             remote_realm->commit_transaction();
 
-            sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto logger = util::Logger::get_default_logger();
             sync::ClientReset reset_config{m_mode,
@@ -442,7 +441,7 @@ struct FakeLocalClientReset : public TestClientReset {
                                            {ErrorCodes::SyncClientResetRequired, "Bad client file ident"}};
 
             using _impl::client_reset::perform_client_reset_diff;
-            perform_client_reset_diff(*local_db, reset_config, fake_ident, *logger, nullptr, [](int64_t) {});
+            perform_client_reset_diff(*local_db, reset_config, *logger, nullptr, [](int64_t) {});
 
             remote_realm->close();
             if (m_on_post_reset) {
@@ -745,7 +744,7 @@ struct BaasFLXClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
-        wait_for_upload(*realm);
+        wait_for_download(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }

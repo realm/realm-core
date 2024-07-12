@@ -129,6 +129,9 @@ if(MSVC)
     # We use these in our AtomicSharedPtr implementation and it can't move
     # to atomic<shared_ptr<T>> because NotificationToken relies on movability.
     add_compile_options(/D_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING)
+
+    # Enable __cplusplus macro
+    add_compile_options(/Zc:__cplusplus)
 else()
     add_compile_options(-Wall -Wextra -Wempty-body -Wparentheses -Wunknown-pragmas -Wunreachable-code -Wunused-parameter -Wno-missing-field-initializers)
     # TODO: Remove this when fixed
@@ -263,12 +266,13 @@ option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 if(NOT EMSCRIPTEN)
     option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 endif()
-option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
-option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
-option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default" ON)
+option(REALM_ENABLE_MEMDEBUG "Add additional memory checks." OFF)
+option(REALM_VALGRIND "Tell the test suite we are running with valgrind." OFF)
+option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default." ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 option(REALM_APP_SERVICES "Enable the default app services implementation." ON)
+option(REALM_COMPRESS "Compress all the arrays by default in flex format." OFF)
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)

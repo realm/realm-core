@@ -22,10 +22,14 @@
 #include <realm/alloc.hpp>
 
 namespace realm {
+class Table;
 namespace _impl {
 
 class ArrayWriterBase {
 public:
+    bool only_modified = true;
+    bool compress = true;
+    const Table* table;
     virtual ~ArrayWriterBase() {}
 
     /// Write the specified array data and its checksum into free
@@ -33,7 +37,7 @@ public:
     ///
     /// Returns the ref (position in the target stream) of the written copy of
     /// the specified array data.
-    virtual ref_type write_array(const char* data, size_t size, uint32_t checksum) = 0;
+    virtual ref_type write_array(const char* data, size_t size, uint32_t checksum, uint32_t checksum_bytes) = 0;
 };
 
 } // namespace _impl

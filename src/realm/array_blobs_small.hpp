@@ -176,7 +176,8 @@ inline BinaryData ArraySmallBlobs::get(size_t ndx) const noexcept
     }
     else {
         size_t begin = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-        size_t end = to_size_t(m_offsets.get(ndx));
+        auto offset = m_offsets.get(ndx);
+        size_t end = to_size_t(offset);
 
         BinaryData bd = BinaryData(m_blob.get(begin), end - begin);
         // Old database file (non-nullable column should never return null)

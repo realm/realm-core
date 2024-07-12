@@ -27,8 +27,9 @@ namespace realm {
 template <class cond>
 bool ArrayInteger::find(value_type value, size_t start, size_t end, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find<cond>(value, start, end, 0, state);
+    return Array::find<cond>(value, start, end, 0, state);
 }
+
 
 inline bool ArrayIntNull::find_impl(int cond, value_type value, size_t start, size_t end, QueryStateBase* state) const
 {
@@ -74,9 +75,7 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
                 value = *opt_value;
             }
         }
-
-        // Fall back to plain Array find.
-        return ArrayWithFind(*this).find<cond>(value, start2, end2, baseindex2, state);
+        return Array::find<cond>(value, start2, end2, baseindex2, state);
     }
     else {
         cond c;

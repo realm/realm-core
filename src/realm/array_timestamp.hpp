@@ -109,6 +109,7 @@ public:
     size_t find_first_in_range(Timestamp from, Timestamp to, size_t start, size_t end) const;
 
     void verify() const;
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
 
 private:
     ArrayIntNull m_seconds;
