@@ -1989,7 +1989,7 @@ TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baa
     after_callback_called.future.get();
 }
 
-TEST_CASE("sync: fast reconnect during client reset session suspend", "[sync][pbs][baas]") {
+TEST_CASE("sync: fast reconnect during client reset session suspend", "[sync][pbs][baas][client reset]") {
     // This test is for validating a fix where the flx migration tests were failing due to
     // 'handle_reconnect()' being called while the current session was being suspended as
     // a result of receiving an error to perform a client reset.
