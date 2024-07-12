@@ -30,9 +30,7 @@ public:
     bool only_modified = true;
     bool compress = true;
     const Table* table;
-    virtual ~ArrayWriterBase()
-    {
-    }
+    virtual ~ArrayWriterBase() {}
 
     /// Write the specified array data and its checksum into free
     /// space.

@@ -104,6 +104,7 @@ struct RealmConfig {
     std::string fifo_files_fallback_path;
 
     bool in_memory = false;
+    bool flexible_schema = false;
     SchemaMode schema_mode = SchemaMode::Automatic;
     SchemaSubsetMode schema_subset_mode = SchemaSubsetMode::Strict;
 

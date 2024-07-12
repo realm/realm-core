@@ -117,7 +117,8 @@ public:
     /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    explicit Group(const std::string& file, const char* encryption_key = nullptr);
+    explicit Group(const std::string& file, const char* encryption_key = nullptr,
+                   bool allow_additional_properties = false);
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -599,6 +600,7 @@ private:
     mutable int m_num_tables = 0;
     bool m_attached = false;
     bool m_is_writable = true;
+    bool m_allow_additional_properties = false;
     static std::optional<int> fake_target_file_format;
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;

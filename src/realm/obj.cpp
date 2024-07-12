@@ -631,6 +631,30 @@ BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
     return ArrayBinary::get(alloc.translate(ref), m_row_ndx, alloc);
 }
 
+bool Obj::has_property(StringData prop_name) const
+{
+    if (m_table->get_column_key(prop_name))
+        return true;
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        return dict.contains(prop_name);
+    }
+    return false;
+}
+
+std::vector<StringData> Obj::get_additional_properties() const
+{
+    std::vector<StringData> ret;
+
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        dict.for_all_keys<StringData>([&ret](StringData key) {
+            ret.push_back(key);
+        });
+    }
+    return ret;
+}
+
 Mixed Obj::get_any(ColKey col_key) const
 {
     m_table->check_column(col_key);
@@ -673,6 +697,19 @@ Mixed Obj::get_any(ColKey col_key) const
             REALM_UNREACHABLE();
             break;
     }
+    return {};
+}
+
+Mixed Obj::get_additional_prop(StringData prop_name) const
+{
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        if (auto val = dict.try_get(prop_name)) {
+            return *val;
+        }
+    }
+    throw InvalidArgument(ErrorCodes::InvalidProperty,
+                          util::format("Property '%1.%2' does not exist", m_table->get_class_name(), prop_name));
     return {};
 }
 
@@ -1107,7 +1144,8 @@ StablePath Obj::get_stable_path() const noexcept
 void Obj::add_index(Path& path, const CollectionParent::Index& index) const
 {
     if (path.empty()) {
-        path.emplace_back(get_table()->get_column_key(index));
+        auto ck = m_table->get_column_key(index);
+        path.emplace_back(ck);
     }
     else {
         StringData col_name = get_table()->get_column_name(index);
@@ -1226,6 +1264,32 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     if (recurse)
         const_cast<Table*>(m_table.unchecked_ptr())->remove_recursive(state);
 
+    return *this;
+}
+
+Obj& Obj::erase_additional_prop(StringData prop_name)
+{
+    bool erased = false;
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        erased = dict.try_erase(prop_name);
+    }
+    if (!erased) {
+        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Could not erase property: %1", prop_name));
+    }
+    return *this;
+}
+
+Obj& Obj::set_additional_prop(StringData prop_name, const Mixed& value)
+{
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        dict.insert(prop_name, value);
+    }
+    else {
+        throw InvalidArgument(ErrorCodes::InvalidProperty,
+                              util::format("Property '%1.%2' does not exist", m_table->get_class_name(), prop_name));
+    }
     return *this;
 }
 
@@ -1983,7 +2047,6 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
 
 Obj& Obj::set_collection(ColKey col_key, CollectionType type)
 {
-    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     if ((col_key.is_dictionary() && type == CollectionType::Dictionary) ||
         (col_key.is_list() && type == CollectionType::List)) {
         return *this;
@@ -1991,8 +2054,31 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
     if (type == CollectionType::Set) {
         throw IllegalOperation("Set nested in Mixed is not supported");
     }
+    if (col_key.get_type() != col_type_Mixed) {
+        throw IllegalOperation("Collection can only be nested in Mixed");
+    }
     set(col_key, Mixed(0, type));
 
+    return *this;
+}
+
+Obj& Obj::set_collection(StringData prop_name, CollectionType type)
+{
+    if (auto ck = get_column_key(prop_name)) {
+        return set_collection(ck, type);
+    }
+    return set_additional_collection(prop_name, type);
+}
+
+Obj& Obj::set_additional_collection(StringData prop_name, CollectionType type)
+{
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        dict.insert_collection(prop_name, type);
+    }
+    else {
+        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
+    }
     return *this;
 }
 
@@ -2011,14 +2097,33 @@ Dictionary Obj::get_dictionary(StringData col_name) const
     return get_dictionary(get_column_key(col_name));
 }
 
-CollectionPtr Obj::get_collection_ptr(const Path& path) const
+CollectionBasePtr Obj::get_collection_ptr(const Path& path) const
 {
     REALM_ASSERT(path.size() > 0);
     // First element in path must be column name
     auto col_key = path[0].is_col_key() ? path[0].get_col_key() : m_table->get_column_key(path[0].get_key());
-    REALM_ASSERT(col_key);
+
+    CollectionBasePtr collection;
     size_t level = 1;
-    CollectionBasePtr collection = get_collection_ptr(col_key);
+    if (col_key) {
+        collection = get_collection_ptr(col_key);
+    }
+    else {
+        if (auto ck = m_table->m_additional_prop_col) {
+            auto prop_name = path[0].get_key();
+            Dictionary dict(*this, ck);
+            auto ref = dict.get(prop_name);
+            if (ref.is_type(type_List)) {
+                collection = dict.get_list(prop_name);
+            }
+            else if (ref.is_type(type_Dictionary)) {
+                collection = dict.get_dictionary(prop_name);
+            }
+            else {
+                throw InvalidArgument("Wrong path");
+            }
+        }
+    }
 
     while (level < path.size()) {
         auto& path_elem = path[level];
@@ -2044,7 +2149,7 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
     return collection;
 }
 
-CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
+CollectionBasePtr Obj::get_collection_by_stable_path(const StablePath& path) const
 {
     // First element in path is phony column key
     ColKey col_key = m_table->get_column_key(path[0]);
@@ -2108,7 +2213,7 @@ CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 
 CollectionBasePtr Obj::get_collection_ptr(StringData col_name) const
 {
-    return get_collection_ptr(get_column_key(col_name));
+    return get_collection_ptr(Path{{col_name}});
 }
 
 LinkCollectionPtr Obj::get_linkcollection_ptr(ColKey col_key) const
