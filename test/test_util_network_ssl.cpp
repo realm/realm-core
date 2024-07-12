@@ -1241,7 +1241,7 @@ TEST_IF(Util_Network_SSL_Certificate_From_Windows_Cert_Store, IsDebuggerPresent(
     PCCERT_CONTEXT cert_context;
     HCERTSTORE store = CertOpenSystemStoreA(NULL, "ROOT");
     CertAddEncodedCertificateToStore(store, X509_ASN_ENCODING, reinterpret_cast<const BYTE*>(buffer->data),
-                                     buffer->length, CERT_STORE_ADD_USE_EXISTING, &cert_context);
+                                     static_cast<DWORD>(buffer->length), CERT_STORE_ADD_USE_EXISTING, &cert_context);
     BIO_free(mem);
 
     network::Service service_1, service_2;
