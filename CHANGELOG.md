@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Storage of integers changed so that they take up less space in the file. This can cause commits and some queries to take a bit longer (PR [#7668](https://github.com/realm/realm-core/pull/7668))
+* We now allow synchronizing, getting and setting properties that are not defined in the object schema (PR [#7886](https://github.com/realm/realm-core/pull/7886))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
