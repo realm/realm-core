@@ -99,7 +99,7 @@ public:
     // Find category from fully qualified name. Will throw if
     // name does not match a category
     static LogCategory& get_category(std::string_view name);
-    static std::vector<const char*> get_category_names();
+    static std::vector<std::string_view> get_category_names();
 
 private:
     friend class Logger;
