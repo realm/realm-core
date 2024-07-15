@@ -41,7 +41,28 @@ using namespace realm;
 using namespace _impl;
 using namespace sync;
 
-namespace realm::_impl::client_reset {
+namespace realm {
+
+std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
+{
+    switch (mode) {
+        case ClientResyncMode::Manual:
+            os << "Manual";
+            break;
+        case ClientResyncMode::DiscardLocal:
+            os << "DiscardLocal";
+            break;
+        case ClientResyncMode::Recover:
+            os << "Recover";
+            break;
+        case ClientResyncMode::RecoverOrDiscard:
+            os << "RecoverOrDiscard";
+            break;
+    }
+    return os;
+}
+
+namespace _impl::client_reset {
 
 static inline bool should_skip_table(const Transaction& group, TableKey key)
 {
@@ -540,4 +561,5 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, ut
     return recover_local_changes;
 }
 
-} // namespace realm::_impl::client_reset
+} // namespace _impl::client_reset
+} // namespace realm

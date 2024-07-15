@@ -27,6 +27,9 @@
 #include <optional>
 
 namespace realm {
+
+std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
+
 namespace sync {
 class SubscriptionStore;
 

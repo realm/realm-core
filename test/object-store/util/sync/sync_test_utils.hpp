@@ -47,6 +47,26 @@
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
+#if REALM_ENABLE_SYNC
+CATCH_REGISTER_ENUM(realm::SyncClientHookEvent, realm::SyncClientHookEvent::DownloadMessageReceived,
+                    realm::SyncClientHookEvent::DownloadMessageIntegrated,
+                    realm::SyncClientHookEvent::BootstrapMessageProcessed,
+                    realm::SyncClientHookEvent::BootstrapProcessed, realm::SyncClientHookEvent::ErrorMessageReceived,
+                    realm::SyncClientHookEvent::SessionActivating, realm::SyncClientHookEvent::SessionSuspended,
+                    realm::SyncClientHookEvent::SessionConnected, realm::SyncClientHookEvent::SessionResumed,
+                    realm::SyncClientHookEvent::BindMessageSent, realm::SyncClientHookEvent::IdentMessageSent,
+                    realm::SyncClientHookEvent::ClientResetMergeComplete,
+                    realm::SyncClientHookEvent::BootstrapBatchAboutToProcess,
+                    realm::SyncClientHookEvent::UploadMessageSent)
+
+namespace realm {
+inline std::ostream& operator<<(std::ostream& os, const realm::SyncClientHookEvent& event)
+{
+    return os << Catch::StringMaker<realm::SyncClientHookEvent>::convert(event);
+}
+} // namespace realm
+#endif
+
 namespace realm {
 
 void timed_wait_for(util::FunctionRef<bool()> condition,

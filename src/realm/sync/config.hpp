@@ -123,6 +123,7 @@ enum class ClientResyncMode : unsigned char {
     RecoverOrDiscard,
 };
 
+// Also update sync_test_utils.hpp when adding new values
 enum class SyncClientHookEvent {
     DownloadMessageReceived,
     DownloadMessageIntegrated,
@@ -147,9 +148,20 @@ enum class SyncClientHookAction {
     TriggerReconnect,
 };
 
-std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
-std::ostream& operator<<(std::ostream& os, const SyncClientHookEvent& event);
-std::ostream& operator<<(std::ostream& os, const SyncClientHookAction& action);
+inline std::ostream& operator<<(std::ostream& os, SyncClientHookAction action)
+{
+    switch (action) {
+        case SyncClientHookAction::NoAction:
+            return os << "NoAction";
+        case SyncClientHookAction::EarlyReturn:
+            return os << "EarlyReturn";
+        case SyncClientHookAction::SuspendWithRetryableError:
+            return os << "SuspendWithRetryableError";
+        case SyncClientHookAction::TriggerReconnect:
+            return os << "TriggerReconnect";
+    }
+    REALM_TERMINATE("Invalid SyncClientHookAction value");
+}
 
 struct SyncClientHookData {
     SyncClientHookEvent event;

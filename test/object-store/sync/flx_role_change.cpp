@@ -71,7 +71,7 @@ auto fill_person_schema = [](SharedRealm realm, std::string role, size_t count) 
     }
 };
 
-struct TestParams {
+struct HarnessParams {
     size_t num_emps = 150;
     size_t num_mgrs = 25;
     size_t num_dirs = 10;
@@ -80,7 +80,7 @@ struct TestParams {
     std::optional<size_t> sleep_millis;
 };
 
-std::unique_ptr<FLXSyncTestHarness> setup_harness(std::string app_name, TestParams params)
+std::unique_ptr<FLXSyncTestHarness> setup_harness(std::string app_name, HarnessParams params)
 {
     auto harness = std::make_unique<FLXSyncTestHarness>(
         app_name, FLXSyncTestHarness::ServerSchema{g_person_schema, {"role", "name"}});
@@ -147,20 +147,33 @@ void verify_records(SharedRealm& check_realm, size_t emps, size_t mgrs, size_t d
     auto role_col = table->get_column_key("role");
     auto table_query = Query(table).equal(role_col, "employee");
     auto results = Results(check_realm, table_query);
-    CHECK(results.size() == emps);
+    REQUIRE(results.size() == emps);
     table_query = Query(table).equal(role_col, "manager");
     results = Results(check_realm, table_query);
-    CHECK(results.size() == mgrs);
+    REQUIRE(results.size() == mgrs);
     table_query = Query(table).equal(role_col, "director");
     results = Results(check_realm, table_query);
-    CHECK(results.size() == dirs);
+    REQUIRE(results.size() == dirs);
+}
+
+// Helper lambda to wait for realm download/upload/advance and then validate the record
+// counts in the local realm.
+void wait_and_verify(SharedRealm realm, size_t emps, size_t mgrs, size_t dirs)
+{
+    // Using a bool to check the wait results, since REQUIRE was causing TSAN errors
+    // with the REQUIRE calls in the event hook
+    bool success = !wait_for_download(*realm);
+    success = success && !wait_for_upload(*realm);
+    if (!success)
+        FAIL("Failed to update realm");
+    wait_for_advance(*realm);
+    verify_records(realm, emps, mgrs, dirs);
 }
 
 } // namespace
 
 TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstrap]") {
     auto logger = util::Logger::get_default_logger();
-    static std::unique_ptr<FLXSyncTestHarness> harness;
 
     auto pause_download_builder = [](std::weak_ptr<SyncSession> weak_session, bool pause) {
         if (auto session = weak_session.lock()) {
@@ -340,8 +353,8 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         // Assuming the session disconnects and reconnects, the server initiated role change
         // bootstrap download will take place when the session is re-established and will
         // complete before the server sends the initial MARK response.
-        REQUIRE(!wait_for_download(*check_realm));
-        REQUIRE(!wait_for_upload(*check_realm));
+        // Validate the expected number of entries for each role type after the role change
+        wait_and_verify(check_realm, expected.emps, expected.mgrs, expected.dirs);
 
         // Now that the server initiated bootstrap should be complete, verify the operation
         // performed matched what was expected.
@@ -380,10 +393,6 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
             return std::nullopt; // Don't transition
         });
 
-        // Validate the expected number of entries for each role type after the role change
-        wait_for_advance(*check_realm);
-        verify_records(check_realm, expected.emps, expected.mgrs, expected.dirs);
-
         // Reset the state machine to "not ready" before leaving
         state_machina.transition_to(TestState::not_ready);
     };
@@ -412,11 +421,13 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
     // 150 emps, 25 mgrs, 10 dirs
     // 10 objects before flush
     // 4096 download soft max bytes
-    TestParams params{};
+    HarnessParams params{};
+
+    // Only create the harness one time for all the sections under this test case
+    static std::unique_ptr<FLXSyncTestHarness> harness;
     if (!harness) {
         harness = setup_harness("flx_role_change_bootstraps", params);
     }
-    REQUIRE(harness);
 
     size_t num_total = params.num_emps + params.num_mgrs + params.num_dirs;
     auto realm_1 = setup_test(*harness, {}, num_total);
@@ -461,10 +472,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
             // Add the initial rule and verify the data in realm 1 and 2 (both should just have the employees)
             update_perms_and_verify(*harness, realm_1, test_rules,
                                     {BootstrapMode::AnyBootstrap, params.num_emps, 0, 0});
-            REQUIRE(!wait_for_download(*new_realm));
-            REQUIRE(!wait_for_upload(*new_realm));
-            wait_for_advance(*new_realm);
-            verify_records(new_realm, params.num_emps, 0, 0);
+            wait_and_verify(new_realm, params.num_emps, 0, 0);
         });
         {
             // Create another user and a new realm config for that user
@@ -623,17 +631,18 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
 
 TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][flx][baas][role change][bootstrap]") {
     auto logger = util::Logger::get_default_logger();
-    static std::unique_ptr<FLXSyncTestHarness> harness;
 
     // 150 emps, 25 mgrs, 10 dirs
     // 10 objects before flush
     // 1536 download soft max bytes
-    TestParams params{};
-    params.max_download_bytes = 1536;
+    HarnessParams params{};
+    params.max_download_bytes = 1536; // 1.5 KB
+
+    // Only create the harness one time for all the sections under this test case
+    static std::unique_ptr<FLXSyncTestHarness> harness;
     if (!harness) {
         harness = setup_harness("flx_role_change_during_bs", params);
     }
-    REQUIRE(harness);
 
     // Get the current rules so it can be updated during the test
     auto& app_session = harness->session().app_session();
@@ -745,13 +754,14 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
         };
     };
 
-    auto set_role_change_state = [&](BootstrapTestState change_state, int msg_count = -1) {
+    auto setup_test_params = [&](BootstrapTestState change_state, int msg_count = -1) {
+        // Use the state machine mutex to protect the variables shared with the event hook
         bootstrap_state.transition_with([&](BootstrapTestState) {
-            bootstrap_count = 0;
-            bootstrap_msg_count = 0;
-            update_role_state = change_state;
-            update_msg_count = msg_count;
-            return BootstrapTestState::start;
+            bootstrap_count = 0;              // Reset the bootstrap count
+            bootstrap_msg_count = 0;          // Reset the bootstrap msg count
+            update_role_state = change_state; // State where the role change should be sent
+            update_msg_count = msg_count;     // Wait for this many download messages
+            return BootstrapTestState::start; // Update to start to begin tracking state
         });
     };
 
@@ -760,15 +770,19 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
     setup_config_callbacks(config);
 
     SECTION("Role change during initial schema bootstrap") {
-        set_role_change_state(BootstrapTestState::ident_sent); // Only one download message
+        // Trigger the role change after the IDENT message is sent so the role change
+        // bootstrap will occur while the new realm is receiving the schema bootstrap
+        setup_test_params(BootstrapTestState::ident_sent);
         auto realm_1 = Realm::get_shared_realm(config);
         REQUIRE(!wait_for_download(*realm_1));
         REQUIRE(!wait_for_upload(*realm_1));
+        // Use the state machine mutex to protect the variables shared with the event hook
         bootstrap_state.transition_with([&](BootstrapTestState) {
             // Only the initial schema bootstrap with 1 download message should take place
             // without restarting the session
             REQUIRE(bootstrap_count == 1);
             REQUIRE(bootstrap_msg_count == 1);
+            // Bootstrap was not triggered, since it's a new file ident
             REQUIRE_FALSE(session_restarted);
             return std::nullopt;
         });
@@ -787,12 +801,9 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
 
             // Wait for subscription bootstrap to and sync to complete
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            REQUIRE(!wait_for_download(*realm_1));
-            REQUIRE(!wait_for_upload(*realm_1));
-            wait_for_advance(*realm_1);
 
             // Verify the data was downloaded and only includes managers and directors
-            verify_records(realm_1, 0, params.num_mgrs, params.num_dirs);
+            wait_and_verify(realm_1, 0, params.num_mgrs, params.num_dirs);
         }
 
         // The test will update the rule to change access from all records to only the employee
@@ -802,57 +813,64 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
         // Set up a new bootstrap while offline
         realm_1->sync_session()->shutdown_and_wait();
         {
+            // Set up a subscription for the Person table
             auto table = realm_1->read_group().get_table("class_Person");
             auto new_subs = realm_1->get_latest_subscription_set().make_mutable_copy();
             new_subs.clear();
             new_subs.insert_or_assign(Query(table));
             auto subs = new_subs.commit();
+            // Each one of these sections runs the role change bootstrap test with different
+            // settings for the `update_role_state` which indicates at which stage during
+            // the bootstrap where the role change will occur.
             SECTION("During bootstrap download") {
                 logger->debug("ROLE CHANGE: Role change during %1 query bootstrap download",
                               initial_subscription ? "second" : "first");
                 // Wait for the downloading state and 3 messages have been downloaded
-                set_role_change_state(BootstrapTestState::downloading, 3);
+                setup_test_params(BootstrapTestState::downloading, 3);
             }
             SECTION("After bootstrap downloaded") {
                 logger->debug("ROLE CHANGE: Role change after %1 query bootstrap download",
                               initial_subscription ? "second" : "first");
                 // Wait for the downloaded state
-                set_role_change_state(BootstrapTestState::downloaded);
+                setup_test_params(BootstrapTestState::downloaded);
             }
             SECTION("During bootstrap integration") {
                 logger->debug("ROLE CHANGE: Role change during %1 query bootstrap integration",
                               initial_subscription ? "second" : "first");
                 // Wait for bootstrap messages to be integrated
-                set_role_change_state(BootstrapTestState::integrating);
+                setup_test_params(BootstrapTestState::integrating);
             }
             SECTION("After bootstrap integration") {
                 logger->debug("ROLE CHANGE: Role change after %1 query bootstrap integration",
                               initial_subscription ? "second" : "first");
                 // Wait for the end of the bootstrap integration
-                set_role_change_state(BootstrapTestState::integration_complete);
+                setup_test_params(BootstrapTestState::integration_complete);
             }
 
             // Resume the session an wait for subscription bootstrap to and sync to complete
             realm_1->sync_session()->resume();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            REQUIRE(!wait_for_download(*realm_1));
-            REQUIRE(!wait_for_upload(*realm_1));
-            wait_for_advance(*realm_1);
 
+            // Verify the data was downloaded/updated (only the employee records)
+            wait_and_verify(realm_1, params.num_emps, 0, 0);
+
+            // Use the state machine mutex to protect the variables shared with the event hook
             bootstrap_state.transition_with([&](BootstrapTestState) {
-                // Two bootstraps occurred (role change and subscription)
+                // Expecting two bootstraps have occurred (role change and subscription)
                 // and the session was restarted with 200 error.
                 REQUIRE(session_restarted);
                 REQUIRE(bootstrap_count == 2);
                 REQUIRE(bootstrap_msg_count > 1);
                 return std::nullopt;
             });
-
-            // Verify the data was downloaded/updated (only the employee records)
-            verify_records(realm_1, params.num_emps, 0, 0);
         }
     }
+    // ----------------------------------------------------------------
+    // Add new sections before this one
+    // ----------------------------------------------------------------
     SECTION("teardown") {
+        // Since the harness is reused for each of the role change clietn reset tests, this
+        // section will run last to destroy the harness once the tests are complete.
         harness.reset();
     }
 }
@@ -860,18 +878,19 @@ TEST_CASE("flx: role changes during bootstrap complete successfully", "[sync][fl
 TEST_CASE("flx: role changes during client resets complete successfully",
           "[sync][flx][baas][role change][client reset]") {
     auto logger = util::Logger::get_default_logger();
-    static std::unique_ptr<FLXSyncTestHarness> harness;
 
-    // 150 emps, 25 mgrs, 10 dirs
+    // 150 emps, 25 mgrs, 25 dirs
     // 10 objects before flush
     // 512 download soft max bytes
-    TestParams params{};
+    HarnessParams params{};
+    params.num_dirs = 25;
     params.max_download_bytes = 512;
-    // size_t total_num = params.num_emps + params.num_mgrs + params.num_dirs;
+
+    // Only create the harness one time for all the sections under this test case
+    static std::unique_ptr<FLXSyncTestHarness> harness;
     if (!harness) {
         harness = setup_harness("flx_role_change_during_cr", params);
     }
-    REQUIRE(harness);
 
     SECTION("Role change during client reset") {
         // Get the current rules so it can be updated during the test
@@ -881,24 +900,41 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         enum ClientResetTestState {
             not_ready,
             start,
+            // Primary sync session states before client reset
             bind_before_cr_session,
+            // Fresh realm download sync session states
             cr_session_ident,
             cr_session_downloading,
             cr_session_downloaded,
             cr_session_integrating,
             cr_session_integrated,
+            // Primary sync session states after fresh realm download
             bind_after_cr_session,
             merged_after_cr_session,
             ident_after_cr_session,
         };
 
-        // int update_msg_count = -1;
-        // int bootstrap_count = 0;
         bool client_reset_error = false;
         bool role_change_error = false;
-        std::optional<ClientResetTestState> update_role_state = std::nullopt;
+        ClientResetTestState update_role_state = ClientResetTestState::not_ready;
         int client_reset_count = 0;
+        bool skip_role_change_check = false;
         TestingStateMachine<ClientResetTestState> client_reset_state(ClientResetTestState::not_ready);
+
+        // Set the state where the role change will be triggered
+        auto setup_test_params = [&](ClientResetTestState change_state, bool skip_role_check = false) {
+            client_reset_state.transition_with([&](ClientResetTestState) {
+                client_reset_error = false;       // Reset the client reset error tracking
+                role_change_error = false;        // Reset the role change error tracking
+                client_reset_count = 0;           // Reset the client reset error count
+                update_role_state = change_state; // State where the role change should be sent
+                // If the role change check is skipped, the test will not look for the role change error
+                // Depending on when the role change error is received (e.g. session deactivating), it
+                // may not be successfully or reliably captured with the event hook.
+                skip_role_change_check = skip_role_check;
+                return ClientResetTestState::start; // Update to start to begin tracking state
+            });
+        };
 
         auto setup_config_callbacks = [&](SyncTestFile& config) {
             // Use the sync client event hook to check for the error received and for tracking
@@ -919,13 +955,15 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                         using BatchState = sync::DownloadBatchState;
                         using Event = SyncClientHookEvent;
 
+                        // Exit early if the test/state tracking hasn't started
                         if (cur_state == ClientResetTestState::not_ready)
                             return std::nullopt;
 
-                        // Record that the error occurred
+                        // If an error occurred, check to see if it is a client reset error or the
+                        // session restart (due to the role change).
                         if (data.event == Event::ErrorMessageReceived) {
                             REQUIRE(data.error_info);
-                            // Client reset error
+                            // Client reset error occurred
                             if (data.error_info->raw_error_code == 208) {
                                 REQUIRE(data.error_info->should_client_reset);
                                 REQUIRE(data.error_info->server_requests_action ==
@@ -934,7 +972,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 logger->debug("ROLE CHANGE: client reset error received");
                                 client_reset_error = true;
                             }
-                            // Role change error
+                            // 200 error is received to start role change bootstrap
                             else if (data.error_info->raw_error_code == 200) {
                                 REQUIRE(data.error_info->server_requests_action ==
                                         sync::ProtocolErrorInfo::Action::Transient);
@@ -942,26 +980,43 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 logger->debug("ROLE CHANGE: role change error received");
                                 role_change_error = true;
                             }
+                            // Other errors are not expected
+                            else {
+                                FAIL(util::format("Unexpected %1 error occurred during role change test: [%2] %3",
+                                                  data.error_info->is_fatal ? "fatal" : "non-fatal",
+                                                  data.error_info->raw_error_code, data.error_info->message));
+                            }
                             return std::nullopt;
                         }
                         std::optional<ClientResetTestState> new_state = std::nullopt;
-                        if (!update_role_state) {
-                            // If update_role_state is cleared, then no longer need to track the state
+                        // Once the client reset progresses to the state that matches the `update_role_state`
+                        // value, the role change will occur and `update_role_state` will be cleared.
+                        if (update_role_state == ClientResetTestState::not_ready) {
+                            // Once update_role_state is cleared, tracking the state is no longer necessary
                             return std::nullopt;
                         }
+                        // Track the state of the client reset progress, from receiving the client reset error,
+                        // to downloading the fresh realm, to the client reset diff when the primary session
+                        // restarts. The state is used to kick off the role change when the client reset state
+                        // reaches the state specified by `update_role_state`. Once the role change has been
+                        // initiated, `update_role_state` will be cleared and the state will no longer be
+                        // tracked for the rest of the test (other than looking for the errors above).
                         switch (data.event) {
                             case Event::BindMessageSent:
-                                // Capture the bind message prior to the client reset error
+                                // "bind_before_cr_session" - BIND msg sent prior to receiving client reset error
                                 if (cur_state == ClientResetTestState::start) {
                                     REQUIRE_FALSE(client_reset_error);
                                     new_state = ClientResetTestState::bind_before_cr_session;
                                 }
+                                // "bind_after_cr_session" - BIND msg sent after fresh realm download session is
+                                // complete
                                 else if (cur_state == ClientResetTestState::cr_session_integrated) {
                                     REQUIRE(client_reset_error);
                                     new_state = ClientResetTestState::bind_after_cr_session;
                                 }
                                 break;
                             case Event::ClientResetMergeComplete:
+                                // "merged_after_cr_session" - client reset diff is complete
                                 REQUIRE(cur_state == ClientResetTestState::bind_after_cr_session);
                                 REQUIRE_FALSE(is_fresh_path);
                                 REQUIRE(client_reset_error);
@@ -971,11 +1026,12 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 // Skip the IDENT message if the client reset error hasn't occurred
                                 if (!client_reset_error)
                                     break;
-                                // Wait for the ident after the client reset error
+                                // "cr_session_ident" - IDENT msg sent for the fresh realm download session
                                 if (cur_state == ClientResetTestState::bind_before_cr_session) {
                                     REQUIRE(is_fresh_path);
                                     new_state = ClientResetTestState::cr_session_ident;
                                 }
+                                // "ident_after_cr_session" - IDENT msg sent after client reset diff is complete
                                 else if (cur_state == ClientResetTestState::merged_after_cr_session) {
                                     REQUIRE_FALSE(is_fresh_path);
                                     new_state = ClientResetTestState::ident_after_cr_session;
@@ -983,12 +1039,13 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                 break;
                             // A bootstrap message was processed by the client reset session
                             case Event::BootstrapMessageProcessed:
+                                // "cr_session_downloaded" - last DOWNLOAD message received of fresh realm bootstrap
                                 if (!client_reset_error || data.batch_state == BatchState::SteadyState)
                                     break;
                                 if (data.batch_state == BatchState::LastInBatch) {
                                     new_state = ClientResetTestState::cr_session_downloaded;
                                 }
-                                // Wait for a couple of messages before changing state
+                                // "cr_session_downloading" - first DOWNLOAD message received of fresh realm bootstrap
                                 else if (data.batch_state == BatchState::MoreToCome) {
                                     new_state = ClientResetTestState::cr_session_downloading;
                                 }
@@ -996,33 +1053,35 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                             case Event::DownloadMessageIntegrated:
                                 if (!client_reset_error)
                                     break;
+                                // "cr_session_integrating" - fresh realm bootstrap is being integrated
                                 new_state = ClientResetTestState::cr_session_integrating;
                                 break;
                             // The client reset session has processed the bootstrap
                             case Event::BootstrapProcessed:
                                 if (!client_reset_error)
                                     break;
+                                // "cr_session_integrating" - fresh realm bootstrap integration is complete
                                 new_state = ClientResetTestState::cr_session_integrated;
                                 break;
                             default:
                                 break;
                         }
 
-
-                        // If the state is changing and a role change is requested for that state, then
-                        // update the role now.
-                        if (new_state && update_role_state && *new_state == *update_role_state) {
+                        // If a new state is specified, check to see if it matches the value of `update_role_state`
+                        // and perform the role change if the two match. Once the role change has been sent, clear
+                        // `update_role_state` since the state doesn't need to be tracked anymore.
+                        if (new_state && update_role_state && *new_state == update_role_state) {
                             logger->debug("ROLE CHANGE: Updating rule definitions: %1", default_rule);
                             REQUIRE(
                                 app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule));
-                            update_role_state = std::nullopt; // Bootstrap tracking is complete
+                            update_role_state = ClientResetTestState::not_ready; // Bootstrap tracking is complete
                         }
                         return new_state;
                     });
                 return SyncClientHookAction::NoAction;
             };
 
-            // Add client reset callback to verify a client reset occurred
+            // Add client reset callback to count the number of times a client reset occurred (should be 1)
             config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
                 client_reset_state.transition_with([&](ClientResetTestState) {
                     // Save that a client reset took place
@@ -1038,7 +1097,7 @@ TEST_CASE("flx: role changes during client resets complete successfully",
             };
         };
 
-        // Make sure the rules are reset back to the original value (only manager & director records)
+        // Start with the role/rules set to allow only manager & director records
         update_role(default_rule, {{"role", {{"$in", {"manager", "director"}}}}});
         logger->debug("ROLE CHANGE: Initial rule definitions: %1", default_rule);
         REQUIRE(app_session.admin_api.update_default_rule(app_session.server_app_id, default_rule));
@@ -1049,105 +1108,108 @@ TEST_CASE("flx: role changes during client resets complete successfully",
         config_1.sync_config->client_resync_mode = ClientResyncMode::Recover;
         setup_config_callbacks(config_1);
 
-        // Wait for download, upload and advance - uses a bool flag instead of REQUIRE()
-        // to address TSAN failures around the catch2 library.
-        auto wait_for_update = [](SharedRealm realm) {
-            bool success = !wait_for_download(*realm);
-            success = success && !wait_for_upload(*realm);
-            if (!success)
-                FAIL("Failed to update realm");
-            wait_for_advance(*realm);
-        };
-
         auto realm_1 = Realm::get_shared_realm(config_1);
         {
-            // Set up a new bootstrap while offline
+            // Set up a default subscription for all records of the Person class
             auto table = realm_1->read_group().get_table("class_Person");
             auto new_subs = realm_1->get_latest_subscription_set().make_mutable_copy();
             new_subs.clear();
             new_subs.insert_or_assign(Query(table));
             auto subs = new_subs.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            wait_for_update(realm_1);
-            verify_records(realm_1, 0, params.num_mgrs, params.num_dirs);
+            wait_and_verify(realm_1, 0, params.num_mgrs, params.num_dirs);
         }
         // The test will update the rule to change access from only manager and director records
         // to only the employee records while a client reset is in progress.
         update_role(default_rule, {{"role", "employee"}});
         // Force a client reset to occur the next time the session connects
         reset_utils::trigger_client_reset(app_session, realm_1);
-        bool skip_role_change_check = false;
 
-        // Set the state where the role change will be triggered
-        auto set_expected_role_state = [&](ClientResetTestState state, bool skip_role_check = false) {
-            client_reset_state.transition_with([&](ClientResetTestState) {
-                update_role_state = state;
-                // If the role change check is skipped, the test will not look for the role change error
-                // Depending on when the role change error is received (e.g. session deactivating), it
-                // may not be successfully or reliably captured with the event hook.
-                skip_role_change_check = skip_role_check;
-                return ClientResetTestState::start;
-            });
-        };
-
+        // Each one of these sections runs the role change client reset test with the different
+        // setting for the `update_role_state` which indicates which stage during the client reset
+        // where the role change will occur.
         SECTION("Bind before client reset") {
             logger->debug("ROLE CHANGE: Role change after BIND before client reset");
-            set_expected_role_state(ClientResetTestState::bind_before_cr_session, true);
+            // Trigger the role change just after the BIND message is sent prior to receiving
+            // the client reset error - don't check for the role change (200) error, since it
+            // is unreliable to catch before the restart to perform the client reset.
+            setup_test_params(ClientResetTestState::bind_before_cr_session, true);
         }
         SECTION("Client reset session ident") {
             logger->debug("ROLE CHANGE: Role change after client reset session IDENT");
-            set_expected_role_state(ClientResetTestState::cr_session_ident);
+            // Trigger the role change just after the IDENT message is sent for the fresh realm
+            // download session.
+            setup_test_params(ClientResetTestState::cr_session_ident);
         }
         SECTION("Client reset session downloading") {
             logger->debug("ROLE CHANGE: Role change while client reset session downloading");
-            // skip the role change error check since it may not be received before the fresh
-            // realm download is complete
-            set_expected_role_state(ClientResetTestState::cr_session_downloading, true);
+            // Trigger the role chane while the fresh realm boostrap is downloading - don't
+            // check for the role change (200) error, since it is unreliable to catch before the restart to perform
+            // the client reset.
+            setup_test_params(ClientResetTestState::cr_session_downloading);
         }
         SECTION("Client reset session downloaded") {
             logger->debug("ROLE CHANGE: Role change after client reset session donwloaded");
-            set_expected_role_state(ClientResetTestState::cr_session_downloaded);
+            // Trigger the role change once the fresh realm bootstrap download
+            // for the fresh realm sync session is complete
+            setup_test_params(ClientResetTestState::cr_session_downloaded);
         }
         SECTION("Client reset session integrating") {
             logger->debug("ROLE CHANGE: Role change after client reset session integrating");
-            set_expected_role_state(ClientResetTestState::cr_session_integrating);
+            // Trigger the role change while the subscription bootstrap changeset
+            // integration for the fresh realm sync session is in progress
+            setup_test_params(ClientResetTestState::cr_session_integrating);
         }
         SECTION("Client reset session integrated") {
             logger->debug("ROLE CHANGE: Role change after client reset session integrated");
-            set_expected_role_state(ClientResetTestState::cr_session_integrated);
+            // Trigger the role change once the subscription bootstrap changeset
+            // integration for the fresh realm sync session is complete
+            setup_test_params(ClientResetTestState::cr_session_integrated);
         }
         SECTION("BIND after client reset session") {
             logger->debug("ROLE CHANGE: Role change after BIND after client reset session");
-            set_expected_role_state(ClientResetTestState::bind_after_cr_session, true);
+            // Trigger the role change after the BIND message is sent by the primary sync
+            // session prior to performing the client reset diff between the locla realm
+            // and the fresh realm
+            setup_test_params(ClientResetTestState::bind_after_cr_session, true);
         }
         SECTION("Merged after client reset session") {
             logger->debug("ROLE CHANGE: Role change after merge after client reset session");
-            set_expected_role_state(ClientResetTestState::merged_after_cr_session, true);
+            // Trigger the role change as soon as the client reset diff has completed
+            setup_test_params(ClientResetTestState::merged_after_cr_session, true);
         }
         SECTION("Merged after client reset session") {
             logger->debug("ROLE CHANGE: Role change after IDENT after client reset session");
-            set_expected_role_state(ClientResetTestState::ident_after_cr_session);
+            // Trigger the role change after the IDENT message is sent after the client reset
+            // and before the MARK response is received from the server to close out the
+            // client reset.
+            setup_test_params(ClientResetTestState::ident_after_cr_session);
         }
 
         // Client reset will happen when session tries to reconnect
         realm_1->sync_session()->restart_session();
         auto resync_mode = wait_for_future(std::move(reset_future)).get();
-        wait_for_update(realm_1);
 
         // Verify the data was downloaded/updated (only the employee records)
-        verify_records(realm_1, params.num_emps, 0, 0);
+        wait_and_verify(realm_1, params.num_emps, 0, 0);
 
         client_reset_state.transition_with([&](ClientResetTestState) {
+            // Using the state machine mutex to protect the event hook shared variables
             // Verify that the client reset occurred
-            // Unless skip_role_change_check is set, verify role change error occurred as well
             REQUIRE(resync_mode == ClientResyncMode::Recover);
-            REQUIRE((role_change_error || skip_role_change_check));
             REQUIRE(client_reset_error);
-            REQUIRE(client_reset_count > 0);
+            REQUIRE(client_reset_count == 1);
+            // Unless skip_role_change_check is set, verify role change error occurred as well
+            REQUIRE((role_change_error || skip_role_change_check));
             return std::nullopt;
         });
     }
+    // ----------------------------------------------------------------
+    // Add new sections before this one
+    // ----------------------------------------------------------------
     SECTION("teardown") {
+        // Since the harness is reused for each of the role change clietn reset tests, this
+        // section will run last to destroy the harness once the tests are complete.
         harness.reset();
     }
 }
