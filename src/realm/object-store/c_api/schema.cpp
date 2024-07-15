@@ -68,7 +68,7 @@ RLM_API uint64_t realm_get_persisted_schema_version(const realm_config_t* config
     }
 
     auto realm = Realm::get_shared_realm(conf);
-    uint64_t version = ObjectStore::get_schema_version(realm->get()->read_group());
+    uint64_t version = ObjectStore::get_schema_version(realm->read_group());
     return version;
 }
 
