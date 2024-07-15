@@ -434,6 +434,10 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 const auto& obj = m_columns[t].table->get_object(key_i);
                 const auto& col_key = m_columns[t].col_key;
 
+                // TODO: here we need to extrac the compressed view if
+                // the column is a string or mixed, maybe pass the string view
+                // as ref and return a boolean, because we don't need to read the value if the underneath array is
+                // compressed
                 cache_i.value = col_key.get_value(obj);
                 cache_i.key = key_i;
             }

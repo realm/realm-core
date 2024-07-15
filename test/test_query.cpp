@@ -4108,6 +4108,31 @@ TEST(Query_LinkChainSortErrors)
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), ErrorCodes::InvalidSortDescriptor);
 }
 
+ONLY(Query_SortingStrings)
+{
+    // TODO: fix the internal handling for using CompressedStringViews
+    Group g;
+    TableRef t = g.add_table("t");
+
+    auto t_string_col = t->add_column(type_String, "t1_string");
+
+    t->create_object().set(t_string_col, "Z");
+    t->create_object().set(t_string_col, "B");
+    t->create_object().set(t_string_col, "A");
+    t->create_object().set(t_string_col, "C");
+
+    std::vector<std::string_view> results = {"A", "B", "C", "Z"}; // original order
+
+    {
+        TableView tv = t->where().find_all();
+        const bool ascending = true;
+        tv.sort(SortDescriptor({{t_string_col}}, {ascending}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<StringData>(t_string_col), results[i]);
+        }
+    }
+}
+
 
 TEST(Query_EmptyDescriptors)
 {
