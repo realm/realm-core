@@ -1766,9 +1766,9 @@ public:
                     return s;
             }
             else {
-                StringData t = get_string(s);
-                if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
+                if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t)) {
                     return s;
+                }
             }
         }
         return not_found;
