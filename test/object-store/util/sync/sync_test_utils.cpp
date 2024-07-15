@@ -176,7 +176,7 @@ std::string unquote_string(std::string_view possibly_quoted_string)
 
 #if REALM_ENABLE_SYNC
 
-void subscribe_to_all_and_bootstrap(Realm& realm)
+sync::SubscriptionSet subscribe_to_all(Realm& realm)
 {
     auto mut_subs = realm.get_latest_subscription_set().make_mutable_copy();
     auto& group = realm.read_group();
@@ -188,7 +188,12 @@ void subscribe_to_all_and_bootstrap(Realm& realm)
             }
         }
     }
-    auto subs = std::move(mut_subs).commit();
+    return std::move(mut_subs).commit();
+}
+
+void subscribe_to_all_and_bootstrap(Realm& realm)
+{
+    auto subs = subscribe_to_all(realm);
     subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     wait_for_download(realm);
 }
@@ -294,21 +299,7 @@ void wait_for_advance(Realm& realm)
 StatusWith<std::shared_ptr<Realm>> async_open_realm(const Realm::Config& config)
 {
     auto task = Realm::get_synchronized_realm(config);
-    auto pf = util::make_promise_future<ThreadSafeReference>();
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-        if (e) {
-            try {
-                std::rethrow_exception(e);
-            }
-            catch (...) {
-                pf.promise.set_error(exception_to_status());
-            }
-        }
-        else {
-            pf.promise.emplace_value(std::move(ref));
-        }
-    });
-    auto sw = std::move(pf.future).get_no_throw();
+    auto sw = task->start().get_no_throw();
     if (sw.is_ok())
         return Realm::get_shared_realm(std::move(sw.get_value()));
     return sw.get_status();

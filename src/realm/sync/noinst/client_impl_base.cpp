@@ -2474,7 +2474,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    if (process_flx_bootstrap_message(progress, message.batch_state, query_version, message.changesets)) {
+    if (process_flx_bootstrap_message(message)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
