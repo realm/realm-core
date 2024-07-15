@@ -4648,20 +4648,8 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
     };
 
     auto realm_task = Realm::get_synchronized_realm(realm_config);
-    auto realm_pf = util::make_promise_future<SharedRealm>();
-    realm_task->start([&](ThreadSafeReference ref, std::exception_ptr ex) {
-        auto& promise = realm_pf.promise;
-        try {
-            if (ex) {
-                std::rethrow_exception(ex);
-            }
-            promise.emplace_value(Realm::get_shared_realm(std::move(ref), util::Scheduler::make_dummy()));
-        }
-        catch (...) {
-            promise.set_error(exception_to_status());
-        }
-    });
-    auto realm = realm_pf.future.get();
+    auto realm_future = realm_task->start();
+    auto realm = Realm::get_shared_realm(std::move(realm_future).get(), util::Scheduler::make_dummy());
     before_callback_called.future.get();
     after_callback_called.future.get();
     REQUIRE(subscription_invoked.load());

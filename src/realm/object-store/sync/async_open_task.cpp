@@ -65,6 +65,25 @@ void AsyncOpenTask::start(AsyncOpenCallback callback)
     session->revive_if_needed();
 }
 
+util::Future<ThreadSafeReference> AsyncOpenTask::start()
+{
+    auto pf = util::make_promise_future<ThreadSafeReference>();
+    start([promise = std::move(pf.promise)](ThreadSafeReference&& ref, std::exception_ptr e) mutable {
+        if (e) {
+            try {
+                std::rethrow_exception(e);
+            }
+            catch (...) {
+                promise.set_error(exception_to_status());
+            }
+        }
+        else {
+            promise.emplace_value(std::move(ref));
+        }
+    });
+    return std::move(pf.future);
+}
+
 void AsyncOpenTask::cancel()
 {
     std::shared_ptr<SyncSession> session;

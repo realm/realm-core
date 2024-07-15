@@ -159,6 +159,7 @@ const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shar
 
 std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
+sync::SubscriptionSet subscribe_to_all(Realm& realm);
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
 #if REALM_APP_SERVICES
