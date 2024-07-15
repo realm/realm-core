@@ -307,12 +307,12 @@ int StringCompressor::compare(CompressedStringView& A, CompressedStringView& B)
             return 1;
     }
     // The compressed strings are identical or one is the prefix of the other
-    return A.size - B.size;
+    return static_cast<int>(A.size - B.size);
     // ^ a faster way of producing same positive / negative / zero as:
     // if (A.size() < B.size())
-    //     return 1;
-    // if (A.size() > B.size())
     //     return -1;
+    // if (A.size() > B.size())
+    //     return 1;
     // return 0;
 }
 

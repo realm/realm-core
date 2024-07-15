@@ -1748,30 +1748,10 @@ public:
             // special handling for !=, <, <= , >, >= if the leaf is compressed and we have got a compressed string
             // id.
             if constexpr (realm::is_any_v<TConditionFunction, NotEqual, Greater, Less, GreaterEqual, LessEqual>) {
-
-                auto cmp = [](auto v) {
-                    if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
-                        return v != 0;
-                    }
-                    if constexpr (std::is_same_v<TConditionFunction, Less>) {
-                        return v < 0;
-                    }
-                    if constexpr (std::is_same_v<TConditionFunction, LessEqual>) {
-                        return v <= 0;
-                    }
-                    if constexpr (std::is_same_v<TConditionFunction, Greater>) {
-                        return v > 0;
-                    }
-                    if constexpr (std::is_same_v<TConditionFunction, GreaterEqual>) {
-                        return v >= 0;
-                    }
-                    REALM_UNREACHABLE();
-                };
-
                 if (m_leaf->is_compressed()) {
                     if (m_interned_string_id) {
                         const auto id = m_leaf->get_string_id(s);
-                        if (cmp(m_string_interner->compare(*id, *m_interned_string_id)))
+                        if (cond(m_string_interner->compare(*id, *m_interned_string_id), 0))
                             return s;
                         else
                             continue;
