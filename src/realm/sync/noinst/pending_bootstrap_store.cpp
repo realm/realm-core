@@ -25,6 +25,7 @@
 #include "realm/list.hpp"
 #include "realm/query.hpp"
 #include "realm/sync/changeset_parser.hpp"
+#include "realm/sync/noinst/client_history_impl.hpp"
 #include "realm/sync/noinst/protocol_codec.hpp"
 #include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/sync/protocol.hpp"
@@ -127,6 +128,7 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
 }
 
 void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
+                                      DownloadableProgress download_progress,
                                       const _impl::ClientProtocol::ReceivedChangesets& changesets,
                                       bool* created_new_batch_out)
 {
@@ -175,6 +177,8 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
         BinaryData compressed_data(compressed_changesets[idx].data(), compressed_changesets[idx].size());
         cur_changeset.set(m_changeset_data, compressed_data);
     }
+
+    ClientHistory::set_download_progress(*tr, download_progress);
 
     tr->commit();
 
