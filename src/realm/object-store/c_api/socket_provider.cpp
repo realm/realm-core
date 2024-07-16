@@ -322,4 +322,10 @@ RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t
     config->socket_provider = *sync_socket;
 }
 
+RLM_API void realm_app_config_set_sc_sync_socket(realm_app_config_t* app_config,
+                                                 realm_sync_socket_t* sync_socket) noexcept
+{
+    app_config->sync_client_config.socket_provider = *sync_socket;
+}
+
 } // namespace realm::c_api

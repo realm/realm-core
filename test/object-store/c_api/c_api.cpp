@@ -837,11 +837,36 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_metadata_mode(app_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
         realm_app_config_set_security_access_group(app_config.get(), "");
 
-        auto sync_client_config = cptr(realm_sync_client_config_new());
-        realm_sync_client_config_set_connect_timeout(sync_client_config.get(), 9876543); // some bogus value
-        realm_app_config_set_sync_client_config(app_config.get(), sync_client_config.get());
-        // Make sure app_config's sync_client_config has the value we set
-        CHECK(app_config->sync_client_config.timeouts.connect_timeout == 9876543);
+        realm_app_config_set_sc_reconnect_mode(app_config.get(), RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
+        CHECK(app_config->sync_client_config.reconnect_mode ==
+              static_cast<ReconnectMode>(RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING));
+        realm_app_config_set_sc_multiplex_sessions(app_config.get(), true);
+        CHECK(app_config->sync_client_config.multiplex_sessions);
+        realm_app_config_set_sc_multiplex_sessions(app_config.get(), false);
+        CHECK_FALSE(app_config->sync_client_config.multiplex_sessions);
+        realm_app_config_set_sc_user_agent_binding_info(app_config.get(), "some user agent stg");
+        CHECK(app_config->sync_client_config.user_agent_binding_info == "some user agent stg");
+        realm_app_config_set_sc_user_agent_application_info(app_config.get(), "some application");
+        CHECK(app_config->sync_client_config.user_agent_application_info == "some application");
+        realm_app_config_set_sc_connect_timeout(app_config.get(), 666);
+        CHECK(app_config->sync_client_config.timeouts.connect_timeout == 666);
+        realm_app_config_set_sc_connection_linger_time(app_config.get(), 999);
+        CHECK(app_config->sync_client_config.timeouts.connection_linger_time == 999);
+        realm_app_config_set_sc_ping_keepalive_period(app_config.get(), 555);
+        CHECK(app_config->sync_client_config.timeouts.ping_keepalive_period == 555);
+        realm_app_config_set_sc_pong_keepalive_timeout(app_config.get(), 100000);
+        CHECK(app_config->sync_client_config.timeouts.pong_keepalive_timeout == 100000);
+        realm_app_config_set_sc_fast_reconnect_limit(app_config.get(), 1099);
+        CHECK(app_config->sync_client_config.timeouts.fast_reconnect_limit == 1099);
+        realm_app_config_set_sc_resumption_delay_interval(app_config.get(), 1024);
+        CHECK(app_config->sync_client_config.timeouts.reconnect_backoff_info.resumption_delay_interval.count() ==
+              1024);
+        realm_app_config_set_sc_max_resumption_delay_interval(app_config.get(), 600024);
+        CHECK(app_config->sync_client_config.timeouts.reconnect_backoff_info.max_resumption_delay_interval.count() ==
+              600024);
+        realm_app_config_set_sc_resumption_delay_backoff_multiplier(app_config.get(), 1010);
+        CHECK(app_config->sync_client_config.timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier ==
+              1010);
 
         auto test_app = cptr(realm_app_create(app_config.get()));
         realm_user_t* sync_user;
