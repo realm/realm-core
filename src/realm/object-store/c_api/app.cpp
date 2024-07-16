@@ -279,6 +279,12 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
     });
 }
 
+RLM_API void realm_app_config_set_sync_client_config(realm_app_config_t* app_config,
+                                                     realm_sync_client_config_t* sc_config) noexcept
+{
+    app_config->sync_client_config = *sc_config;
+}
+
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config)
 {
     return wrap_err([&] {
