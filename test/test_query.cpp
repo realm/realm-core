@@ -4108,7 +4108,7 @@ TEST(Query_LinkChainSortErrors)
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), ErrorCodes::InvalidSortDescriptor);
 }
 
-ONLY(Query_SortingStrings)
+TEST(Query_SortingStrings)
 {
     // TODO: fix the internal handling for using CompressedStringViews
     Group g;

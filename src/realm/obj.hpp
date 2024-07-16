@@ -117,6 +117,12 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
+    using StringID = size_t;
+    std::optional<StringID> get_compressed_string(ColKey) const;
+    std::optional<StringID> get_compressed_string(StringData col_name) const
+    {
+        return get_compressed_string(get_column_key(col_name));
+    }
     Mixed get_any(ColKey col_key) const;
     Mixed get_any(StringData col_name) const
     {

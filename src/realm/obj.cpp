@@ -629,6 +629,30 @@ BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
     return ArrayBinary::get(alloc.translate(ref), m_row_ndx, alloc);
 }
 
+std::optional<StringID> Obj::get_compressed_string(ColKey col_key) const
+{
+    // only strings and mixed can have an interner
+    if (col_key.get_type() != col_type_String && col_key.get_type() != col_type_Mixed)
+        return {};
+
+    m_table->check_column(col_key);
+    const auto col_ndx = col_key.get_index();
+
+    auto& alloc = _get_alloc();
+    auto current_version = alloc.get_storage_version();
+    if (current_version != m_storage_version) {
+        update();
+    }
+
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    ArrayString values(get_alloc());
+    const auto interner = m_table->get_string_interner(col_key);
+    values.set_string_interner(interner);
+    values.init_from_ref(ref);
+    return values.get_string_id(m_row_ndx);
+}
+
+
 Mixed Obj::get_any(ColKey col_key) const
 {
     m_table->check_column(col_key);

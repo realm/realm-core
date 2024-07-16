@@ -519,6 +519,7 @@ void TableView::apply_descriptors(const DescriptorOrdering& ordering)
         // (handling detached refs is not required in linkviews)
         for (size_t t = 0; t < sz; t++) {
             ObjKey key = get_key(t);
+            // TODO: add the stirng id here???
             if (m_table->is_valid(key)) {
                 index_pairs.emplace_back(key, t);
             }

@@ -23,6 +23,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/list.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/string_compressor.hpp>
 
 using namespace realm;
 
@@ -83,6 +84,11 @@ Mixed ExtendedColumnKey::get_value(const Obj& obj) const
         }
     }
     return {};
+}
+
+std::optional<size_t> ExtendedColumnKey::get_compressed_string_id(const Obj& obj) const
+{
+    return obj.get_compressed_string(m_colkey);
 }
 
 LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
@@ -421,7 +427,30 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
         int c;
 
         if (t == 0) {
-            c = i.cached_value.compare(j.cached_value);
+            const auto& col_key = m_columns[t].col_key.operator ColKey();
+            const auto has_interner = col_key.get_type() == col_type_Mixed || col_key.get_type() == col_type_String;
+            if (has_interner && (i.cached_compressed_string_id || j.cached_compressed_string_id)) {
+
+                const auto table = m_columns[t].table;
+                const auto interner = table->get_string_interner(col_key);
+                REALM_ASSERT(interner); // we must have an interner at this point
+
+                if (i.cached_compressed_string_id && j.cached_compressed_string_id) {
+                    // compare string ids via the string compressed views
+                    c = interner->compare(*i.cached_compressed_string_id, *j.cached_compressed_string_id);
+                }
+                else if (i.cached_compressed_string_id) {
+                    // we have a string id for the i and not for j
+                    c = interner->compare(j.cached_value.get_string(), *i.cached_compressed_string_id);
+                }
+                else {
+                    // we have a string id for j and not for i
+                    c = interner->compare(i.cached_value.get_string(), *j.cached_compressed_string_id);
+                }
+            }
+            else {
+                c = i.cached_value.compare(j.cached_value);
+            }
         }
         else {
             if (m_cache[t - 1].empty()) {
@@ -434,24 +463,49 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 const auto& obj = m_columns[t].table->get_object(key_i);
                 const auto& col_key = m_columns[t].col_key;
 
-                // TODO: here we need to extrac the compressed view if
-                // the column is a string or mixed, maybe pass the string view
-                // as ref and return a boolean, because we don't need to read the value if the underneath array is
-                // compressed
-                cache_i.value = col_key.get_value(obj);
+                // if we have got a compressed view available for the current col key (only if mixed or string),
+                //  use that instead of fetching the value (which would entail a string decompression).
+                cache_i.compressed_id = col_key.get_compressed_string_id(obj);
+                if (!cache_i.compressed_id) {
+                    cache_i.value = col_key.get_value(obj);
+                }
                 cache_i.key = key_i;
             }
-            Mixed val_i = cache_i.value;
 
             if (cache_j.key != key_j) {
                 const auto& obj = m_columns[t].table->get_object(key_j);
                 const auto& col_key = m_columns[t].col_key;
 
-                cache_j.value = col_key.get_value(obj);
+                cache_j.compressed_id = col_key.get_compressed_string_id(obj);
+                if (!cache_j.compressed_id) {
+                    cache_j.value = col_key.get_value(obj);
+                }
                 cache_j.key = key_j;
             }
 
-            c = val_i.compare(cache_j.value);
+            if (cache_i.compressed_id || cache_j.compressed_id) {
+                // we have at least one compressed string
+                const auto table = m_columns[t].table;
+                const auto& col_key = m_columns[t].col_key.operator ColKey();
+                const auto interner = table->get_string_interner(col_key);
+                REALM_ASSERT(interner); // we must have an interner at this point
+                if (cache_i.compressed_id && cache_j.compressed_id) {
+                    // compare string ids via the string compressed views
+                    c = interner->compare(*cache_i.compressed_id, *cache_j.compressed_id);
+                }
+                else if (cache_i.compressed_id) {
+                    // we have a string id for the i and not for j
+                    c = interner->compare(cache_j.value.get_string(), *cache_i.compressed_id);
+                }
+                else {
+                    // we have a string id for j and not for i
+                    c = interner->compare(cache_i.value.get_string(), *cache_j.compressed_id);
+                }
+            }
+            else {
+                const auto mixed = cache_i.value;
+                c = mixed.compare(cache_j.value);
+            }
         }
         // if c is negative i comes before j
         if (c) {
@@ -482,7 +536,15 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         }
 
         const auto obj = col.table->get_object(key);
-        index.cached_value = ck.get_value(obj);
+        const auto string_id = ck.get_compressed_string_id(obj);
+        // avoid to decompress the whole string if the col_key is String or Mixed type and the underline string is
+        // compressed.
+        if (string_id) {
+            index.cached_compressed_string_id = *string_id;
+        }
+        else {
+            index.cached_value = ck.get_value(obj);
+        }
     }
 }
 

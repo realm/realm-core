@@ -69,6 +69,7 @@ public:
         ObjKey key_for_object;
         size_t index_in_view;
         Mixed cached_value;
+        std::optional<size_t> cached_compressed_string_id;
     };
     class IndexPairs : public std::vector<BaseDescriptor::IndexPair> {
     public:
@@ -115,6 +116,7 @@ public:
         struct ObjCache {
             ObjKey key;
             Mixed value;
+            std::optional<size_t> compressed_id;
         };
         using TableCache = std::vector<ObjCache>;
         mutable std::vector<TableCache> m_cache;
