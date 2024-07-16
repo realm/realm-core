@@ -329,7 +329,6 @@ See TEST(StringData_Substrings) for more unit tests for null, isolated to using 
 columns or queries involved
 */
 
-
 TEST_TYPES(Query_NextGen_StringConditions, std::true_type, std::false_type)
 {
     SHARED_GROUP_TEST_PATH(path);

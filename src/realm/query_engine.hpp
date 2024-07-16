@@ -1744,20 +1744,21 @@ public:
         TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
-            if constexpr (std::is_same_v<TConditionFunction, NotEqual>) {
+
+            // special handling for !=, <, <= , >, >= if the leaf is compressed and we have got a compressed string
+            // id.
+            if constexpr (realm::is_any_v<TConditionFunction, NotEqual, Greater, Less, GreaterEqual, LessEqual>) {
                 if (m_leaf->is_compressed()) {
                     if (m_interned_string_id) {
-                        // The search string has been interned, so there might be a match
-                        // We can compare the string IDs directly
                         const auto id = m_leaf->get_string_id(s);
-                        if (m_string_interner->compare(*m_interned_string_id, *id) == 0) {
-                            // The value matched, so we continue to the next value
+                        if (cond(m_string_interner->compare(*id, *m_interned_string_id), 0))
+                            return s;
+                        else
                             continue;
-                        }
                     }
-                    return s;
                 }
             }
+
             StringData t = get_string(s);
             if constexpr (case_sensitive_comparison) {
                 // case insensitive not implemented for: >, >=, <, <=
@@ -1765,8 +1766,9 @@ public:
                     return s;
             }
             else {
-                if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
+                if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t)) {
                     return s;
+                }
             }
         }
         return not_found;

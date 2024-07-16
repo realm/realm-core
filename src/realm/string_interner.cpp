@@ -642,9 +642,9 @@ int StringInterner::compare(StringData s, StringID A)
     if (s.data() == nullptr && A == 0)
         return 0;
     if (s.data() == nullptr)
-        return 1;
-    if (A == 0)
         return -1;
+    if (A == 0)
+        return 1;
     // ok, no nulls
     REALM_ASSERT(m_compressor);
     return m_compressor->compare(s, get_compressed(A));
