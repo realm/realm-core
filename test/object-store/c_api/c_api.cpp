@@ -570,7 +570,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         };
         verify_sync_client_config(test_sync_client_config.get());
 
-        // Make a dummy app config and make sure the values are updated after set
+#if REALM_APP_SERVICES
+        // Make a dummy app config and make sure the sync_client_config is updated
         const uint64_t request_timeout = 2500;
         auto transport = std::make_shared<UnitTestTransport>(request_timeout);
         auto http_transport = realm_http_transport(transport);
@@ -578,6 +579,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_sync_client_config(app_config.get(), test_sync_client_config.get());
         // Make sure app_config's sync_client_config has the values set above
         verify_sync_client_config(&app_config->sync_client_config);
+#endif
     }
 
 #if !REALM_APP_SERVICES

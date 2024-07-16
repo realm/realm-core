@@ -4,6 +4,7 @@
 * On Windows devices Device Sync will additionally look up SSL certificates in the Windows Trusted Root Certification Authorities certificate store when establishing a connection. (PR [#7882](https://github.com/realm/realm-core/pull/7882))
 * Updated the return type of `LogCategory::get_category_names()` from `std::vector<const char*>` to `std::vector<std::string_view>`. ([PR #7879](https://github.com/realm/realm-core/pull/7879))
 * Added `realm_get_persisted_schema_version` for reading the version of the schema currently stored locally. (PR [#7873](https://github.com/realm/realm-core/pull/7873))
+* Added `realm_app_config_set_sync_client_config()` function to the C_API to set the sync_client_config value in `realm_app_config_t`. ([PR #7891](https://github.com/realm/realm-core/pull/7891))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
