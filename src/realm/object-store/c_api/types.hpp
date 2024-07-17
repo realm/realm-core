@@ -618,9 +618,11 @@ struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::G
 };
 
 #if REALM_APP_SERVICES
-// This class doesn't support realm_release since it isn't meant to be deleted
-// Do not add any extra functions or member variables to this class to keep
-// it compatible with the realm::SyncClientConfig class
+// This class doesn't support realm_release() since it is only meant to be used
+// as a CAPI-compatible reference to the SyncClientConfig member variable that
+// is part of AppConfig.
+// To avoid data misalignment or other conflicts with the original SyncClientConfig,
+// do not add any additional functions or member variables to this class.
 struct realm_sync_client_config final : realm::SyncClientConfig {
     using SyncClientConfig::SyncClientConfig;
 };

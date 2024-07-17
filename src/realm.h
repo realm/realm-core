@@ -3745,9 +3745,17 @@ typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdat
 typedef void (*realm_async_open_task_init_subscription_func_t)(realm_thread_safe_reference_t* realm,
                                                                realm_userdata_t userdata);
 #if REALM_APP_SERVICES
-// If using App Services, the sync client config is part of
+// If using App Services, the realm_sync_client_config_t instance is part of the
+// realm_app_config_t structure and this function returns a pointer to that
+// member property. The realm_sync_client_config_t reference returned by this
+// function should not be freed using realm_release.
 RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t*) RLM_API_NOEXCEPT;
 #else
+// If not using App Services, the realm_app_config_t structure is not defined, and
+// the real_sync_client_config_t structure returned by this function is meant to be
+// used with realm_sync_manager_create() to create a separate Sync Manager instance.
+// The realm_sync_client_config_t instance returned by this function will need to be
+// manually freed using realm_release.
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 #endif // REALM_APP_SERVICES
 
