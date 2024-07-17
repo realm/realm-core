@@ -4168,6 +4168,20 @@ TEST_CASE("app: custom user data integration tests", "[sync][app][user][function
 TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][function][baas]") {
     TestAppSession session;
     auto app = session.app();
+
+    bool first_log_in = true;
+    auto token = app->subscribe([&first_log_in, &app](auto&) {
+        if (first_log_in) {
+            // Read the current user to verify that doing so does not deadlock
+            auto user = app->current_user();
+            auto metadata = user->user_profile();
+            auto custom_data = *user->custom_data();
+            CHECK(custom_data["name"] == "Not Foo Bar");
+            CHECK(metadata["name"] == "Foo Bar");
+            first_log_in = false;
+        }
+    });
+
     auto jwt = create_jwt(session.app()->app_id());
 
     SECTION("jwt happy path") {
