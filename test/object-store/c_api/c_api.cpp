@@ -44,6 +44,7 @@
 #include "../util/test_path.hpp"
 #include "../util/unit_test_transport.hpp"
 
+#include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/sync/client_base.hpp>
@@ -537,24 +538,34 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
 #if REALM_ENABLE_SYNC
     SECTION("sync_client_config_t") {
+#if REALM_APP_SERVICES
+        // Make a dummy app config and make sure the sync_client_config is updated
+        const uint64_t request_timeout = 2500;
+        auto transport = std::make_shared<UnitTestTransport>(request_timeout);
+        auto http_transport = realm_http_transport(transport);
+        auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
+        auto sync_client_config = realm_app_config_get_sync_client_config(app_config.get());
+#else
         auto test_sync_client_config = cptr(realm_sync_client_config_new());
-        realm_sync_client_config_set_reconnect_mode(test_sync_client_config.get(),
-                                                    RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
-        CHECK(test_sync_client_config->reconnect_mode ==
+        auto sync_client_config = test_sync_client_config.get();
+#endif // REALM_APP_SERVICES
+
+        realm_sync_client_config_set_reconnect_mode(sync_client_config, RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
+        CHECK(sync_client_config->reconnect_mode ==
               static_cast<ReconnectMode>(RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING));
-        realm_sync_client_config_set_multiplex_sessions(test_sync_client_config.get(), true);
-        CHECK(test_sync_client_config->multiplex_sessions);
-        realm_sync_client_config_set_multiplex_sessions(test_sync_client_config.get(), false);
-        realm_sync_client_config_set_user_agent_binding_info(test_sync_client_config.get(), "some user agent stg");
-        realm_sync_client_config_set_user_agent_application_info(test_sync_client_config.get(), "some application");
-        realm_sync_client_config_set_connect_timeout(test_sync_client_config.get(), 666);
-        realm_sync_client_config_set_connection_linger_time(test_sync_client_config.get(), 999);
-        realm_sync_client_config_set_ping_keepalive_period(test_sync_client_config.get(), 555);
-        realm_sync_client_config_set_pong_keepalive_timeout(test_sync_client_config.get(), 100000);
-        realm_sync_client_config_set_fast_reconnect_limit(test_sync_client_config.get(), 1099);
-        realm_sync_client_config_set_resumption_delay_interval(test_sync_client_config.get(), 1024);
-        realm_sync_client_config_set_max_resumption_delay_interval(test_sync_client_config.get(), 600024);
-        realm_sync_client_config_set_resumption_delay_backoff_multiplier(test_sync_client_config.get(), 1010);
+        realm_sync_client_config_set_multiplex_sessions(sync_client_config, true);
+        CHECK(sync_client_config->multiplex_sessions);
+        realm_sync_client_config_set_multiplex_sessions(sync_client_config, false);
+        realm_sync_client_config_set_user_agent_binding_info(sync_client_config, "some user agent stg");
+        realm_sync_client_config_set_user_agent_application_info(sync_client_config, "some application");
+        realm_sync_client_config_set_connect_timeout(sync_client_config, 666);
+        realm_sync_client_config_set_connection_linger_time(sync_client_config, 999);
+        realm_sync_client_config_set_ping_keepalive_period(sync_client_config, 555);
+        realm_sync_client_config_set_pong_keepalive_timeout(sync_client_config, 100000);
+        realm_sync_client_config_set_fast_reconnect_limit(sync_client_config, 1099);
+        realm_sync_client_config_set_resumption_delay_interval(sync_client_config, 1024);
+        realm_sync_client_config_set_max_resumption_delay_interval(sync_client_config, 600024);
+        realm_sync_client_config_set_resumption_delay_backoff_multiplier(sync_client_config, 1010);
         auto verify_sync_client_config = [](SyncClientConfig* config) {
             CHECK_FALSE(config->multiplex_sessions);
             CHECK(config->user_agent_binding_info == "some user agent stg");
@@ -568,18 +579,10 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(config->timeouts.reconnect_backoff_info.max_resumption_delay_interval.count() == 600024);
             CHECK(config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier == 1010);
         };
-        verify_sync_client_config(test_sync_client_config.get());
-
+        verify_sync_client_config(sync_client_config);
 #if REALM_APP_SERVICES
-        // Make a dummy app config and make sure the sync_client_config is updated
-        const uint64_t request_timeout = 2500;
-        auto transport = std::make_shared<UnitTestTransport>(request_timeout);
-        auto http_transport = realm_http_transport(transport);
-        auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
-        realm_app_config_set_sync_client_config(app_config.get(), test_sync_client_config.get());
-        // Make sure app_config's sync_client_config has the values set above
         verify_sync_client_config(&app_config->sync_client_config);
-#endif
+#endif // REALM_APP_SERVICES
     }
 
 #if !REALM_APP_SERVICES
@@ -837,36 +840,10 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_metadata_mode(app_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
         realm_app_config_set_security_access_group(app_config.get(), "");
 
-        realm_app_config_set_sc_reconnect_mode(app_config.get(), RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
-        CHECK(app_config->sync_client_config.reconnect_mode ==
-              static_cast<ReconnectMode>(RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING));
-        realm_app_config_set_sc_multiplex_sessions(app_config.get(), true);
-        CHECK(app_config->sync_client_config.multiplex_sessions);
-        realm_app_config_set_sc_multiplex_sessions(app_config.get(), false);
-        CHECK_FALSE(app_config->sync_client_config.multiplex_sessions);
-        realm_app_config_set_sc_user_agent_binding_info(app_config.get(), "some user agent stg");
-        CHECK(app_config->sync_client_config.user_agent_binding_info == "some user agent stg");
-        realm_app_config_set_sc_user_agent_application_info(app_config.get(), "some application");
-        CHECK(app_config->sync_client_config.user_agent_application_info == "some application");
-        realm_app_config_set_sc_connect_timeout(app_config.get(), 666);
-        CHECK(app_config->sync_client_config.timeouts.connect_timeout == 666);
-        realm_app_config_set_sc_connection_linger_time(app_config.get(), 999);
-        CHECK(app_config->sync_client_config.timeouts.connection_linger_time == 999);
-        realm_app_config_set_sc_ping_keepalive_period(app_config.get(), 555);
-        CHECK(app_config->sync_client_config.timeouts.ping_keepalive_period == 555);
-        realm_app_config_set_sc_pong_keepalive_timeout(app_config.get(), 100000);
-        CHECK(app_config->sync_client_config.timeouts.pong_keepalive_timeout == 100000);
-        realm_app_config_set_sc_fast_reconnect_limit(app_config.get(), 1099);
-        CHECK(app_config->sync_client_config.timeouts.fast_reconnect_limit == 1099);
-        realm_app_config_set_sc_resumption_delay_interval(app_config.get(), 1024);
-        CHECK(app_config->sync_client_config.timeouts.reconnect_backoff_info.resumption_delay_interval.count() ==
-              1024);
-        realm_app_config_set_sc_max_resumption_delay_interval(app_config.get(), 600024);
-        CHECK(app_config->sync_client_config.timeouts.reconnect_backoff_info.max_resumption_delay_interval.count() ==
-              600024);
-        realm_app_config_set_sc_resumption_delay_backoff_multiplier(app_config.get(), 1010);
-        CHECK(app_config->sync_client_config.timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier ==
-              1010);
+        auto sync_client_config = realm_app_config_get_sync_client_config(app_config.get());
+        realm_sync_client_config_set_connect_timeout(sync_client_config, 9876543); // some bogus value
+        // Make sure app_config's sync_client_config has the value we set
+        CHECK(app_config->sync_client_config.timeouts.connect_timeout == 9876543);
 
         auto test_app = cptr(realm_app_create(app_config.get()));
         realm_user_t* sync_user;
@@ -6040,9 +6017,15 @@ TEST_CASE("C API - binding callback thread observer", "[sync][c_api]") {
     };
 
     {
-        auto config = cptr(realm_sync_client_config_new());
+#if REALM_APP_SERVICES
+        struct realm_sync_client_config config_struct {};
+        auto config = &config_struct;
+#else
+        auto config_ptr = cptr(realm_sync_client_config_new());
+        auto config = config_ptr.get();
+#endif // REALM_APP_SERVICES
         realm_sync_client_config_set_default_binding_thread_observer(
-            config.get(), bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error,
+            config, bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error,
             static_cast<realm_userdata_t>(&bcto_user_data), bcto_free_userdata);
         REQUIRE(config->default_socket_provider_thread_observer);
         auto observer_ptr =
@@ -6073,8 +6056,14 @@ TEST_CASE("C API - binding callback thread observer", "[sync][c_api]") {
     REQUIRE(bcto_user_data.bcto_deleted == true);
 
     {
-        auto config = cptr(realm_sync_client_config_new());
-        realm_sync_client_config_set_default_binding_thread_observer(config.get(), nullptr, nullptr, nullptr, nullptr,
+#if REALM_APP_SERVICES
+        struct realm_sync_client_config config_struct {};
+        auto config = &config_struct;
+#else
+        auto config_ptr = cptr(realm_sync_client_config_new());
+        auto config = config_ptr.get();
+#endif // REALM_APP_SERVICES
+        realm_sync_client_config_set_default_binding_thread_observer(config, nullptr, nullptr, nullptr, nullptr,
                                                                      nullptr);
         auto no_handle_error_ptr =
             static_cast<CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());

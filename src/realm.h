@@ -3744,8 +3744,13 @@ typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdat
 // callback runs.
 typedef void (*realm_async_open_task_init_subscription_func_t)(realm_thread_safe_reference_t* realm,
                                                                realm_userdata_t userdata);
-
+#if REALM_APP_SERVICES
+// If using App Services, the sync client config is part of
+RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t*) RLM_API_NOEXCEPT;
+#else
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
+#endif // REALM_APP_SERVICES
+
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
                                                          realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_multiplex_sessions(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;
@@ -3774,40 +3779,6 @@ RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
     realm_sync_client_config_t* config, realm_on_object_store_thread_callback_t on_thread_create,
     realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
     realm_userdata_t user_data, realm_free_userdata_func_t free_userdata);
-
-#if REALM_APP_SERVICES
-// NOTE: realm_app_config_set_sync_client_config() can be used to set the entire
-//       sync_client_config structure in the realm_app_config_t or the individual
-//       realm_app_config_set_sc_* functions can be used to set the individual
-//       components of the sync_client_config, one at a time.
-
-// This function does not take ownership of the realm_sync_client_config_t pointer,
-// so this will need to be released manually after calling this function.
-RLM_API void realm_app_config_set_sync_client_config(realm_app_config_t*,
-                                                     realm_sync_client_config_t*) RLM_API_NOEXCEPT;
-
-// Functions to set/modify the realm_sync_client_config_t structure that is
-// included in the realm_app_config_t structure
-RLM_API void realm_app_config_set_sc_reconnect_mode(realm_app_config_t*,
-                                                    realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_multiplex_sessions(realm_app_config_t*, bool) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_user_agent_binding_info(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_user_agent_application_info(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_connect_timeout(realm_app_config_t*, uint64_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_connection_linger_time(realm_app_config_t*, uint64_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_ping_keepalive_period(realm_app_config_t*, uint64_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_pong_keepalive_timeout(realm_app_config_t*, uint64_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_fast_reconnect_limit(realm_app_config_t*, uint64_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_resumption_delay_interval(realm_app_config_t*, uint64_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_max_resumption_delay_interval(realm_app_config_t*, uint64_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_resumption_delay_backoff_multiplier(realm_app_config_t*, int) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_sync_socket(realm_app_config_t*, realm_sync_socket_t*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_sc_default_binding_thread_observer(
-    realm_app_config_t*, realm_on_object_store_thread_callback_t on_thread_create,
-    realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
-    realm_userdata_t user_data, realm_free_userdata_func_t free_userdata);
-
-#endif // REALM_APP_SERVICES
 
 RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const char* partition_value) RLM_API_NOEXCEPT;
 RLM_API realm_sync_config_t* realm_flx_sync_config_new(const realm_user_t*) RLM_API_NOEXCEPT;

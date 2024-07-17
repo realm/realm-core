@@ -279,87 +279,9 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
     });
 }
 
-RLM_API void realm_app_config_set_sync_client_config(realm_app_config_t* app_config,
-                                                     realm_sync_client_config_t* sc_config) noexcept
+RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t* app_config) noexcept
 {
-    app_config->sync_client_config = *sc_config;
-}
-
-RLM_API void realm_app_config_set_sc_reconnect_mode(realm_app_config_t* app_config,
-                                                    realm_sync_client_reconnect_mode_e mode) noexcept
-{
-    app_config->sync_client_config.reconnect_mode = ReconnectMode(mode);
-}
-
-RLM_API void realm_app_config_set_sc_multiplex_sessions(realm_app_config_t* app_config, bool multiplex) noexcept
-{
-    app_config->sync_client_config.multiplex_sessions = multiplex;
-}
-
-RLM_API void realm_app_config_set_sc_user_agent_binding_info(realm_app_config_t* app_config,
-                                                             const char* info) noexcept
-{
-    app_config->sync_client_config.user_agent_binding_info = info;
-}
-
-RLM_API void realm_app_config_set_sc_user_agent_application_info(realm_app_config_t* app_config,
-                                                                 const char* info) noexcept
-{
-    app_config->sync_client_config.user_agent_application_info = info;
-}
-
-RLM_API void realm_app_config_set_sc_connect_timeout(realm_app_config_t* app_config, uint64_t timeout) noexcept
-{
-    app_config->sync_client_config.timeouts.connect_timeout = timeout;
-}
-
-RLM_API void realm_app_config_set_sc_connection_linger_time(realm_app_config_t* app_config, uint64_t time) noexcept
-{
-    app_config->sync_client_config.timeouts.connection_linger_time = time;
-}
-
-RLM_API void realm_app_config_set_sc_ping_keepalive_period(realm_app_config_t* app_config, uint64_t period) noexcept
-{
-    app_config->sync_client_config.timeouts.ping_keepalive_period = period;
-}
-
-RLM_API void realm_app_config_set_sc_pong_keepalive_timeout(realm_app_config_t* app_config, uint64_t timeout) noexcept
-{
-    app_config->sync_client_config.timeouts.pong_keepalive_timeout = timeout;
-}
-
-RLM_API void realm_app_config_set_sc_fast_reconnect_limit(realm_app_config_t* app_config, uint64_t limit) noexcept
-{
-    app_config->sync_client_config.timeouts.fast_reconnect_limit = limit;
-}
-
-RLM_API void realm_app_config_set_sc_resumption_delay_interval(realm_app_config_t* app_config,
-                                                               uint64_t interval) noexcept
-{
-    app_config->sync_client_config.timeouts.reconnect_backoff_info.resumption_delay_interval =
-        std::chrono::milliseconds{interval};
-}
-
-RLM_API void realm_app_config_set_sc_max_resumption_delay_interval(realm_app_config_t* app_config,
-                                                                   uint64_t interval) noexcept
-{
-    app_config->sync_client_config.timeouts.reconnect_backoff_info.max_resumption_delay_interval =
-        std::chrono::milliseconds{interval};
-}
-
-RLM_API void realm_app_config_set_sc_resumption_delay_backoff_multiplier(realm_app_config_t* app_config,
-                                                                         int multiplier) noexcept
-{
-    app_config->sync_client_config.timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier = multiplier;
-}
-
-RLM_API void realm_app_config_set_sc_default_binding_thread_observer(
-    realm_app_config_t* app_config, realm_on_object_store_thread_callback_t on_thread_create,
-    realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
-    realm_userdata_t user_data, realm_free_userdata_func_t free_userdata)
-{
-    app_config->sync_client_config.default_socket_provider_thread_observer = std::make_shared<CBindingThreadObserver>(
-        on_thread_create, on_thread_destroy, on_error, user_data, free_userdata);
+    return reinterpret_cast<realm_sync_client_config_t*>(&app_config->sync_client_config);
 }
 
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config)
