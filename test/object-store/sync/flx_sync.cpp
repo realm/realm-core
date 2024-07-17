@@ -2306,8 +2306,11 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         realm->sync_session()->shutdown_and_wait();
     }
 
-    // Verify that the file was fully closed
-    REQUIRE(DB::call_with_lock(interrupted_realm_config.path, [](auto&) {}));
+    {
+        // Verify that the file was fully closed
+        auto empty = [](auto&) {};
+        REQUIRE(DB::call_with_lock(interrupted_realm_config.path, empty));
+    }
 
     {
         DBOptions options;
