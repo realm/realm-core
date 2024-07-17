@@ -58,13 +58,6 @@ CATCH_REGISTER_ENUM(realm::SyncClientHookEvent, realm::SyncClientHookEvent::Down
                     realm::SyncClientHookEvent::ClientResetMergeComplete,
                     realm::SyncClientHookEvent::BootstrapBatchAboutToProcess,
                     realm::SyncClientHookEvent::UploadMessageSent)
-
-namespace realm {
-inline std::ostream& operator<<(std::ostream& os, const realm::SyncClientHookEvent& event)
-{
-    return os << Catch::StringMaker<realm::SyncClientHookEvent>::convert(event);
-}
-} // namespace realm
 #endif
 
 namespace realm {
