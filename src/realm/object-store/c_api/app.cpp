@@ -281,7 +281,7 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
 
 RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t* app_config) noexcept
 {
-    return reinterpret_cast<realm_sync_client_config_t*>(&app_config->sync_client_config);
+    return static_cast<realm_sync_client_config_t*>(&app_config->sync_client_config);
 }
 
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config)
