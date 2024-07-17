@@ -1287,6 +1287,9 @@ TEST_CASE("C API - schema", "[c_api]") {
         realm_config_set_schema_version(config.get(), 0);
         realm_config_set_schema(config.get(), schema.get());
 
+        // no local schema version yet
+        REQUIRE(realm_get_persisted_schema_version(config.get()) == (uint64_t)-1);
+
         SECTION("error on open") {
             {
                 std::ofstream o(test_file_2.path.c_str());
@@ -1304,6 +1307,7 @@ TEST_CASE("C API - schema", "[c_api]") {
             realm_config_set_data_initialization_function(config.get(), initialize_data, &userdata, nullptr);
             auto realm = cptr_checked(realm_open(config.get()));
             CHECK(userdata.num_initializations == 1);
+            REQUIRE(realm_get_persisted_schema_version(config.get()) == 0);
         }
 
         SECTION("data initialization callback error") {
@@ -1323,6 +1327,7 @@ TEST_CASE("C API - schema", "[c_api]") {
             realm_config_set_migration_function(config.get(), migrate_schema, &userdata, nullptr);
             auto realm = cptr_checked(realm_open(config.get()));
             CHECK(userdata.num_migrations == 0);
+            REQUIRE(realm_get_persisted_schema_version(config.get()) == 0);
             realm.reset();
 
             auto config2 = cptr(realm_config_new());
@@ -1334,6 +1339,7 @@ TEST_CASE("C API - schema", "[c_api]") {
             realm_config_set_migration_function(config2.get(), migrate_schema, &userdata, nullptr);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
+            REQUIRE(realm_get_persisted_schema_version(config2.get()) == 999);
         }
 
         SECTION("migrate schema and delete old table") {
@@ -5869,6 +5875,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_sync_config(config, sync_config);
         realm_config_set_schema_version(config, 1);
+
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
         Userdata userdata;

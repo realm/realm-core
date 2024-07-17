@@ -255,7 +255,6 @@ TEST_CASE("flx: test commands work", "[sync][flx][test command][baas]") {
     });
 }
 
-
 static auto make_error_handler()
 {
     auto [error_promise, error_future] = util::make_promise_future<SyncError>();
@@ -265,17 +264,6 @@ static auto make_error_handler()
     };
     return std::make_pair(std::move(error_future), std::move(fn));
 }
-
-static auto make_client_reset_handler()
-{
-    auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
-    auto shared_promise = std::make_shared<decltype(reset_promise)>(std::move(reset_promise));
-    auto fn = [reset_promise = std::move(shared_promise)](SharedRealm, ThreadSafeReference, bool did_recover) {
-        reset_promise->emplace_value(did_recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal);
-    };
-    return std::make_pair(std::move(reset_future), std::move(fn));
-}
-
 
 TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
     static std::optional<FLXSyncTestHarness> harness{"error_handling"};
@@ -614,7 +602,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("Recover: offline writes and subscription (single subscription)") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         test_reset
@@ -709,7 +697,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         RealmConfig config_copy = config_local;
         config_copy.sync_config = std::make_shared<SyncConfig>(*config_copy.sync_config);
         config_copy.sync_config->error_handler = nullptr;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_copy.sync_config->notify_after_client_reset = reset_handler;
 
         // Attempt to open the realm again.
@@ -726,7 +714,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("Recover: offline writes and subscriptions (multiple subscriptions)") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         test_reset
@@ -767,7 +755,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("Recover: offline writes interleaved with subscriptions and empty writes") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         test_reset
@@ -832,7 +820,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("Recover: offline writes with associated subscriptions in the correct order") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         constexpr size_t num_objects_added = 20;
@@ -1023,7 +1011,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 ->run();
 
             RealmConfig config_copy = config_local;
-            auto&& [client_reset_future, reset_handler] = make_client_reset_handler();
+            auto&& [client_reset_future, reset_handler] = reset_utils::make_client_reset_handler();
             config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
                 REALM_ASSERT_EX(!err.is_fatal, err.status);
                 CHECK(err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
@@ -1042,7 +1030,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("DiscardLocal: offline writes and subscriptions are lost") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         test_reset
@@ -1089,7 +1077,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("DiscardLocal: an invalid subscription made while offline becomes superseded") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         std::unique_ptr<sync::SubscriptionSet> invalid_sub;
@@ -1160,7 +1148,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("DiscardLocal: completion callbacks fire after client reset even when there is no data to download") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         test_reset
@@ -1492,7 +1480,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("Recover: inserts in collections in mixed - collections cleared remotely") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
-        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
         test_reset
@@ -2318,8 +2306,11 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         realm->sync_session()->shutdown_and_wait();
     }
 
-    // Verify that the file was fully closed
-    REQUIRE(DB::call_with_lock(interrupted_realm_config.path, [](auto&) {}));
+    {
+        // Verify that the file was fully closed
+        auto empty = [](auto&) {};
+        REQUIRE(DB::call_with_lock(interrupted_realm_config.path, empty));
+    }
 
     {
         DBOptions options;
