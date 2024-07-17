@@ -128,10 +128,12 @@ static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrde
     return realm_query;
 }
 
+#if !REALM_APP_SERVICES
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
 {
     return new realm_sync_client_config_t;
 }
+#endif // !REALM_APP_SERVICES
 
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,
                                                          realm_sync_client_reconnect_mode_e mode) noexcept
