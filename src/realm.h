@@ -3776,13 +3776,18 @@ RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
     realm_userdata_t user_data, realm_free_userdata_func_t free_userdata);
 
 #if REALM_APP_SERVICES
+// NOTE: realm_app_config_set_sync_client_config() can be used to set the entire
+//       sync_client_config structure in the realm_app_config_t or the individual
+//       realm_app_config_set_sc_* functions can be used to set the individual
+//       components of the sync_client_config, one at a time.
+
 // This function does not take ownership of the realm_sync_client_config_t pointer,
 // so this will need to be released manually after calling this function.
 RLM_API void realm_app_config_set_sync_client_config(realm_app_config_t*,
                                                      realm_sync_client_config_t*) RLM_API_NOEXCEPT;
 
 // Functions to set/modify the realm_sync_client_config_t structure that is
-// part of the realm_app_config_t structure
+// included in the realm_app_config_t structure
 RLM_API void realm_app_config_set_sc_reconnect_mode(realm_app_config_t*,
                                                     realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sc_multiplex_sessions(realm_app_config_t*, bool) RLM_API_NOEXCEPT;
