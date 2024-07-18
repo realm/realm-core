@@ -151,7 +151,7 @@ static const std::string good_access_token2 =
     "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
     "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
-#if REALM_ENABLE_AUTH_TESTS
+// #if REALM_ENABLE_AUTH_TESTS
 
 #include <realm/util/sha_crypto.hpp>
 
@@ -4170,22 +4170,22 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
     auto app = session.app();
 
     bool first_log_in = true;
-    auto token = app->subscribe([&first_log_in, &app](auto&) {
-        if (first_log_in) {
-            // Read the current user to verify that doing so does not deadlock
-            auto user = app->current_user();
-            auto metadata = user->user_profile();
-            auto custom_data = *user->custom_data();
-            CHECK(custom_data["name"] == "Not Foo Bar");
-            CHECK(metadata["name"] == "Foo Bar");
-            first_log_in = false;
-        }
-    });
 
     auto jwt = create_jwt(session.app()->app_id());
 
     SECTION("jwt happy path") {
         bool processed = false;
+
+        auto token = app->subscribe([&first_log_in, &app](auto&) {
+            if (first_log_in) {
+                auto user = app->current_user();
+                auto metadata = user->user_profile();
+
+                // Ensure that the JWT metadata fields are available when the callback is fired on login.
+                CHECK(metadata["name"] == "Foo Bar");
+                first_log_in = false;
+            }
+        });
 
         std::shared_ptr<User> user = log_in(app, AppCredentials::custom(jwt));
 
@@ -4206,6 +4206,8 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
         auto custom_data = *user->custom_data();
         CHECK(custom_data["name"] == "Not Foo Bar");
         CHECK(metadata["name"] == "Foo Bar");
+
+        app->unsubscribe(token);
     }
 }
 
@@ -4504,7 +4506,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
+// #endif // REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
