@@ -2062,7 +2062,8 @@ void Session::send_upload_message()
                      "locked_server_version=%3, num_changesets=%4)",
                      progress_client_version, progress_server_version, locked_server_version,
                      uploadable_changesets.size()); // Throws
-        return;
+        // Other messages may be waiting to be sent
+        return enlist_to_send(); // Throws
     }
 
     logger.debug("Sending: UPLOAD(progress_client_version=%1, progress_server_version=%2, "
