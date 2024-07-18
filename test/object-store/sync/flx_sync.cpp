@@ -5067,7 +5067,8 @@ TEST_CASE("flx: no upload during bootstraps", "[sync][flx][bootstrap][baas]") {
     // Commiting an empty changeset does not upload a message.
     realm->begin_transaction();
     realm->commit_transaction();
-    wait_for_upload(*realm);
+    // Give the sync client the chance to send an upload after mark.
+    wait_for_download(*realm);
 }
 
 } // namespace realm::app
