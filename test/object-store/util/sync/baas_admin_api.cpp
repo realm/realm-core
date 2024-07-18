@@ -1175,10 +1175,16 @@ bool AdminAPISession::is_sync_terminated(const std::string& app_id) const
     return state_result["state"].get<std::string>().empty();
 }
 
-bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
+bool AdminAPISession::is_initial_sync_complete(const std::string& app_id, bool is_flx_sync) const
 {
     auto progress_endpoint = apps()[app_id]["sync"]["progress"];
     auto progress_result = progress_endpoint.get_json();
+    if (is_flx_sync) {
+        // accepting_clients key is only true in FLX after the first initial sync has completed
+        auto it = progress_result.find("accepting_clients");
+        return it != progress_result.end() && it->is_boolean() && it->get<bool>();
+    }
+
     if (auto it = progress_result.find("progress"); it != progress_result.end() && it->is_object() && !it->empty()) {
         for (auto& elem : *it) {
             auto is_complete = elem["complete"];
@@ -1659,7 +1665,7 @@ AppSession create_app(const AppCreateConfig& config)
         // Increasing timeout due to occasional slow startup of the translator on baasaas
         timed_sleeping_wait_for(
             [&] {
-                return session.is_initial_sync_complete(app_id);
+                return session.is_initial_sync_complete(app_id, config.flx_sync_config.has_value());
             },
             std::chrono::seconds(60), std::chrono::seconds(1));
     }

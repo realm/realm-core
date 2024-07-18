@@ -569,7 +569,7 @@ struct BaasClientReset : public TestClientReset {
         // state.
         timed_sleeping_wait_for(
             [&] {
-                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id, false);
             },
             std::chrono::seconds(30), std::chrono::seconds(1));
 
