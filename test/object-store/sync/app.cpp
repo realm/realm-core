@@ -4172,16 +4172,16 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
 
     SECTION("jwt happy path") {
         bool processed = false;
-        bool first_log_in = true;
+        bool first_login = true;
 
         auto token = app->subscribe([&first_log_in, &app](auto&) {
-            if (first_log_in) {
+            if (first_login) {
                 auto user = app->current_user();
                 auto metadata = user->user_profile();
 
                 // Ensure that the JWT metadata fields are available when the callback is fired on login.
                 CHECK(metadata["name"] == "Foo Bar");
-                first_log_in = false;
+                first_login = false;
             }
         });
 
