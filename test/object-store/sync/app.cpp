@@ -4506,7 +4506,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
 }
 
-#endif REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
