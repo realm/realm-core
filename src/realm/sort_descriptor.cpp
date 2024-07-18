@@ -397,6 +397,37 @@ void FilterDescriptor::execute(const Table& table, KeyValues& key_values, const 
     key_values = std::move(filtered);
 }
 
+template <typename T, typename U>
+inline int compare(const T& i, const T& j, const U& col)
+{
+    const ColKey col_key{col.col_key};
+    const auto table = col.table;
+    const auto has_interner = col_key.get_type() == col_type_Mixed || col_key.get_type() == col_type_String;
+
+    if (has_interner) {
+        const auto id_i = i.cached_string_id;
+        const auto id_j = j.cached_string_id;
+        if (id_i || id_j) {
+            const auto interner = table->get_string_interner(col_key);
+
+            if (id_i && id_j) {
+                return interner->compare(*id_i, *id_j);
+            }
+            else if (id_i) {
+                // we need to inverse the returned value, since we are comparing I vs J.
+                const auto ret = interner->compare(j.get_value().get_string(), *id_i);
+                if (ret == 0)
+                    return ret;          // strings are equal
+                return ret > 0 ? -1 : 1; // ret > 0 means that I is less than J
+            }
+            else {
+                return interner->compare(i.get_value().get_string(), *id_j);
+            }
+        }
+    }
+    return i.get_value().compare(j.get_value());
+}
+
 // This function must conform to 'is less' predicate - that is:
 // return true if i is strictly smaller than j
 bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ordering) const
@@ -425,33 +456,8 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
         }
 
         int c;
-        const ColKey col_key{m_columns[t].col_key};
-        const auto table = m_columns[t].table;
-        const auto has_interner = col_key.get_type() == col_type_Mixed || col_key.get_type() == col_type_String;
-
-        auto cmp = [&col_key, &has_interner]<typename T, typename U>(T i, U j, auto table) -> int {
-            if (has_interner) {
-                const auto id_i = i.cached_string_id;
-                const auto id_j = j.cached_string_id;
-                if (id_i || id_j) {
-                    const auto interner = table->get_string_interner(col_key);
-
-                    if (id_i && id_j) {
-                        return interner->compare(*id_i, *id_j);
-                    }
-                    else if (id_i) {
-                        return interner->compare(j.get_value().get_string(), *id_i);
-                    }
-                    else {
-                        return interner->compare(i.get_value().get_string(), *id_j);
-                    }
-                }
-            }
-            return i.get_value().compare(j.get_value());
-        };
-
         if (t == 0) {
-            c = cmp(i, j, table);
+            c = compare(i, j, m_columns[t]);
         }
         else {
             if (m_cache[t - 1].empty()) {
@@ -461,7 +467,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
             ObjCache& cache_j = m_cache[t - 1][key_j.value & 0xFF];
 
             if (cache_i.key != key_i) {
-                const auto& obj = table->get_object(key_i);
+                const auto& obj = m_columns[t].table->get_object(key_i);
                 const auto& col_key = m_columns[t].col_key;
 
                 // store stringID instead of the actual string if possible
@@ -476,7 +482,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
             }
 
             if (cache_j.key != key_j) {
-                const auto& obj = table->get_object(key_j);
+                const auto& obj = m_columns[t].table->get_object(key_j);
                 const auto& col_key = m_columns[t].col_key;
 
                 // store stringID instead of the actual string if possible
@@ -490,7 +496,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 cache_j.key = key_j;
             }
 
-            c = cmp(cache_i, cache_j, table);
+            c = compare(cache_i, cache_j, m_columns[t]);
         }
         // if c is negative i comes before j
         if (c) {
