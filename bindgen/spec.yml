@@ -788,6 +788,7 @@ classes:
       remove_object: '(key: ObjKey)'
       get_link_target: '(column: ColKey) -> TableRef'
       clear: ()
+      get_column_key: '(column: StringData) -> ColKey'
       get_primary_key_column: '() -> ColKey'
 
   Obj:
@@ -810,6 +811,8 @@ classes:
         - '(column: ColKey, value: Mixed)'
         - sig: '(column: ColKey, value: Mixed, is_default: bool)'
           suffix: with_default
+       - sig: '(column: StringData, value: Mixed)'
+          suffix: by_name
       set_collection: '(column: ColKey, type: CollectionType) -> Obj'
       add_int: '(column: ColKey, value: int64_t) -> Obj'
       get_linked_object: '(column: ColKey) const -> Nullable<Obj>'
@@ -817,6 +820,7 @@ classes:
       get_backlink_count: '() const -> count_t'
       get_backlink_view: '(src_table: TableRef, src_col_key: ColKey) -> TableView'
       create_and_set_linked_object: '(column: ColKey) -> Obj'
+      has_schema_property: '(column: StringData) -> bool'
 
   Transaction:
     sharedPtrWrapped: TransactionRef
