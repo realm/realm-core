@@ -123,6 +123,7 @@ enum class ClientResyncMode : unsigned char {
     RecoverOrDiscard,
 };
 
+// Also update sync_test_utils.hpp when adding new values
 enum class SyncClientHookEvent {
     DownloadMessageReceived,
     DownloadMessageIntegrated,
