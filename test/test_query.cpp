@@ -4107,28 +4107,43 @@ TEST(Query_LinkChainSortErrors)
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), ErrorCodes::InvalidSortDescriptor);
 }
 
-TEST(Query_SortingStrings)
+TEST_TYPES(Query_SortingCompressedStrings, std::true_type, std::false_type)
 {
-    // TODO: fix the internal handling for using CompressedStringViews
-    Group g;
-    TableRef t = g.add_table("t");
+    using type = typename TEST_TYPE::type;
 
-    auto t_string_col = t->add_column(type_String, "t1_string");
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
-    t->create_object().set(t_string_col, "Z");
-    t->create_object().set(t_string_col, "B");
-    t->create_object().set(t_string_col, "A");
-    t->create_object().set(t_string_col, "C");
-
-    std::vector<std::string_view> results = {"A", "B", "C", "Z"}; // original order
-
+    TransactionRef rt = sg->start_read();
+    CHECK_EQUAL(0, rt->size());
     {
-        TableView tv = t->where().find_all();
-        const bool ascending = true;
-        tv.sort(SortDescriptor({{t_string_col}}, {ascending}));
-        for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv[i].get<StringData>(t_string_col), results[i]);
-        }
+        WriteTransaction wt(sg);
+        TableRef t = wt.add_table("t");
+        auto t_string_col = t->add_column(type_String, "t_string");
+        t->create_object().set(t_string_col, "Z");
+        t->create_object().set(t_string_col, "B");
+        t->create_object().set(t_string_col, "A");
+        t->create_object().set(t_string_col, "C");
+        wt.commit();
+    }
+    rt->advance_read();
+    // the strings are now in compressed format (after a write transaction)
+    std::vector<std::string_view> results = {"A", "B", "C", "Z"};
+    TableRef t = rt->get_table("t");
+    const auto t_string_col = t->get_column_key("t_string");
+    TableView tv = t->where().find_all();
+    bool ascending;
+    if constexpr (type::value) {
+        ascending = true;
+    }
+    else {
+        ascending = false;
+        std::reverse(results.begin(), results.end());
+    }
+    tv.sort(SortDescriptor({{t_string_col}}, {ascending}));
+    for (size_t i = 0; i < results.size(); ++i) {
+        CHECK_EQUAL(tv[i].get<StringData>(t_string_col), results[i]);
     }
 }
 
