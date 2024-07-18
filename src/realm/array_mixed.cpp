@@ -118,6 +118,22 @@ void ArrayMixed::set_null(size_t ndx)
     }
 }
 
+std::optional<StringID> ArrayMixed::get_string_id(size_t ndx) const
+{
+    int64_t val = m_composite.get(ndx);
+    if (val) {
+        int64_t int_val = val >> s_data_shift;
+        size_t payload_ndx = size_t(int_val);
+        DataType type = DataType((val & s_data_type_mask) - 1);
+        if (type == type_String) {
+            ensure_string_array();
+            REALM_ASSERT(size_t(int_val) < m_strings.size());
+            return m_strings.get_string_id(payload_ndx);
+        }
+    }
+    return {};
+}
+
 Mixed ArrayMixed::get(size_t ndx) const
 {
     int64_t val = m_composite.get(ndx);

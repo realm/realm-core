@@ -86,9 +86,15 @@ Mixed ExtendedColumnKey::get_value(const Obj& obj) const
     return {};
 }
 
-std::optional<size_t> ExtendedColumnKey::get_compressed_string_id(const Obj& obj) const
+std::optional<StringID> ExtendedColumnKey::get_string_id(const Obj& obj) const
 {
-    return obj.get_compressed_string(m_colkey);
+    if (m_colkey.get_type() != col_type_String && m_colkey.get_type() != col_type_Mixed)
+        return {};
+
+    if (!has_index())
+        return obj.get_compressed_string(m_colkey);
+
+    return {};
 }
 
 LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
@@ -471,7 +477,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 const auto& col_key = m_columns[t].col_key;
 
                 // store stringID instead of the actual string if possible
-                cache_i.cached_string_id = col_key.get_compressed_string_id(obj);
+                cache_i.cached_string_id = col_key.get_string_id(obj);
                 if (cache_i.cached_string_id) {
                     cache_i.value = {};
                 }
@@ -486,7 +492,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 const auto& col_key = m_columns[t].col_key;
 
                 // store stringID instead of the actual string if possible
-                cache_j.cached_string_id = col_key.get_compressed_string_id(obj);
+                cache_j.cached_string_id = col_key.get_string_id(obj);
                 if (cache_j.cached_string_id) {
                     cache_j.value = {};
                 }
@@ -527,7 +533,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         }
 
         const auto obj = col.table->get_object(key);
-        const auto string_id = ck.get_compressed_string_id(obj);
+        const auto string_id = ck.get_string_id(obj);
         // avoid to decompress the whole string if the col_key is String or Mixed type and the underline string is
         // compressed.
         if (string_id) {

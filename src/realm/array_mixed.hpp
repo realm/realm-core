@@ -97,6 +97,7 @@ public:
     {
         return m_composite.get(ndx) == 0;
     }
+    std::optional<StringID> get_string_id(size_t ndx) const;
 
     void clear();
     void erase(size_t ndx);

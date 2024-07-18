@@ -198,8 +198,7 @@ std::optional<StringID> ArrayString::get_string_id(size_t ndx) const
     if (m_type == Type::interned_strings) {
         return StringID(static_cast<Array*>(m_arr)->get(ndx));
     }
-    return {};
-    // return m_string_interner->lookup(get(ndx));
+    return m_string_interner->lookup(get(ndx));
 }
 
 Mixed ArrayString::get_any(size_t ndx) const
