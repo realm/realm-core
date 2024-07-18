@@ -425,32 +425,33 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
         }
 
         int c;
+        const ColKey col_key{m_columns[t].col_key};
+        const auto table = m_columns[t].table;
+        const auto has_interner = col_key.get_type() == col_type_Mixed || col_key.get_type() == col_type_String;
+
+        auto cmp = [&col_key, &has_interner]<typename T, typename U>(T i, U j, auto table) -> int {
+            if (has_interner) {
+                const auto id_i = i.cached_string_id;
+                const auto id_j = j.cached_string_id;
+                if (id_i || id_j) {
+                    const auto interner = table->get_string_interner(col_key);
+
+                    if (id_i && id_j) {
+                        return interner->compare(*id_i, *id_j);
+                    }
+                    else if (id_i) {
+                        return interner->compare(j.get_value().get_string(), *id_i);
+                    }
+                    else {
+                        return interner->compare(i.get_value().get_string(), *id_j);
+                    }
+                }
+            }
+            return i.get_value().compare(j.get_value());
+        };
 
         if (t == 0) {
-            const auto& col_key = m_columns[t].col_key.operator ColKey();
-            const auto has_interner = col_key.get_type() == col_type_Mixed || col_key.get_type() == col_type_String;
-            if (has_interner && (i.cached_compressed_string_id || j.cached_compressed_string_id)) {
-
-                const auto table = m_columns[t].table;
-                const auto interner = table->get_string_interner(col_key);
-                REALM_ASSERT(interner); // we must have an interner at this point
-
-                if (i.cached_compressed_string_id && j.cached_compressed_string_id) {
-                    // compare string ids via the string compressed views
-                    c = interner->compare(*i.cached_compressed_string_id, *j.cached_compressed_string_id);
-                }
-                else if (i.cached_compressed_string_id) {
-                    // we have a string id for the i and not for j
-                    c = interner->compare(j.cached_value.get_string(), *i.cached_compressed_string_id);
-                }
-                else {
-                    // we have a string id for j and not for i
-                    c = interner->compare(i.cached_value.get_string(), *j.cached_compressed_string_id);
-                }
-            }
-            else {
-                c = i.cached_value.compare(j.cached_value);
-            }
+            c = cmp(i, j, table);
         }
         else {
             if (m_cache[t - 1].empty()) {
@@ -460,52 +461,36 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
             ObjCache& cache_j = m_cache[t - 1][key_j.value & 0xFF];
 
             if (cache_i.key != key_i) {
-                const auto& obj = m_columns[t].table->get_object(key_i);
+                const auto& obj = table->get_object(key_i);
                 const auto& col_key = m_columns[t].col_key;
 
-                // if we have got a compressed view available for the current col key (only if mixed or string),
-                //  use that instead of fetching the value (which would entail a string decompression).
-                cache_i.compressed_id = col_key.get_compressed_string_id(obj);
-                if (!cache_i.compressed_id) {
+                // store stringID instead of the actual string if possible
+                cache_i.cached_string_id = col_key.get_compressed_string_id(obj);
+                if (cache_i.cached_string_id) {
+                    cache_i.value = {};
+                }
+                else {
                     cache_i.value = col_key.get_value(obj);
                 }
                 cache_i.key = key_i;
             }
 
             if (cache_j.key != key_j) {
-                const auto& obj = m_columns[t].table->get_object(key_j);
+                const auto& obj = table->get_object(key_j);
                 const auto& col_key = m_columns[t].col_key;
 
-                cache_j.compressed_id = col_key.get_compressed_string_id(obj);
-                if (!cache_j.compressed_id) {
+                // store stringID instead of the actual string if possible
+                cache_j.cached_string_id = col_key.get_compressed_string_id(obj);
+                if (cache_j.cached_string_id) {
+                    cache_j.value = {};
+                }
+                else {
                     cache_j.value = col_key.get_value(obj);
                 }
                 cache_j.key = key_j;
             }
 
-            if (cache_i.compressed_id || cache_j.compressed_id) {
-                // we have at least one compressed string
-                const auto table = m_columns[t].table;
-                const auto& col_key = m_columns[t].col_key.operator ColKey();
-                const auto interner = table->get_string_interner(col_key);
-                REALM_ASSERT(interner); // we must have an interner at this point
-                if (cache_i.compressed_id && cache_j.compressed_id) {
-                    // compare string ids via the string compressed views
-                    c = interner->compare(*cache_i.compressed_id, *cache_j.compressed_id);
-                }
-                else if (cache_i.compressed_id) {
-                    // we have a string id for the i and not for j
-                    c = interner->compare(cache_j.value.get_string(), *cache_i.compressed_id);
-                }
-                else {
-                    // we have a string id for j and not for i
-                    c = interner->compare(cache_i.value.get_string(), *cache_j.compressed_id);
-                }
-            }
-            else {
-                const auto mixed = cache_i.value;
-                c = mixed.compare(cache_j.value);
-            }
+            c = cmp(cache_i, cache_j, table);
         }
         // if c is negative i comes before j
         if (c) {
@@ -540,7 +525,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         // avoid to decompress the whole string if the col_key is String or Mixed type and the underline string is
         // compressed.
         if (string_id) {
-            index.cached_compressed_string_id = *string_id;
+            index.cached_string_id = *string_id;
         }
         else {
             index.cached_value = ck.get_value(obj);

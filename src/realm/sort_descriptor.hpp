@@ -66,10 +66,17 @@ public:
         {
             return index_in_view < other.index_in_view;
         }
+        Mixed get_value() const
+        {
+            return cached_value;
+        }
         ObjKey key_for_object;
         size_t index_in_view;
         Mixed cached_value;
-        std::optional<size_t> cached_compressed_string_id;
+        // if the value is a string or mixed of string, we may want to store
+        // the compressed string id, instead of the whole string.
+        using StringID = size_t;
+        std::optional<StringID> cached_string_id;
     };
     class IndexPairs : public std::vector<BaseDescriptor::IndexPair> {
     public:
@@ -116,7 +123,14 @@ public:
         struct ObjCache {
             ObjKey key;
             Mixed value;
-            std::optional<size_t> compressed_id;
+
+            using StringID = size_t;
+            std::optional<StringID> cached_string_id;
+
+            Mixed get_value() const
+            {
+                return value;
+            }
         };
         using TableCache = std::vector<ObjCache>;
         mutable std::vector<TableCache> m_cache;
