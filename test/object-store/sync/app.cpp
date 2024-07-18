@@ -4174,7 +4174,7 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
         bool processed = false;
         bool first_login = true;
 
-        auto token = app->subscribe([&first_log_in, &app](auto&) {
+        auto token = app->subscribe([&first_login, &app](auto&) {
             if (first_login) {
                 auto user = app->current_user();
                 auto metadata = user->user_profile();
