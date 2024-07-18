@@ -48,16 +48,10 @@
 #endif
 
 #if REALM_ENABLE_SYNC
-CATCH_REGISTER_ENUM(realm::SyncClientHookEvent, realm::SyncClientHookEvent::DownloadMessageReceived,
-                    realm::SyncClientHookEvent::DownloadMessageIntegrated,
-                    realm::SyncClientHookEvent::BootstrapMessageProcessed,
-                    realm::SyncClientHookEvent::BootstrapProcessed, realm::SyncClientHookEvent::ErrorMessageReceived,
-                    realm::SyncClientHookEvent::SessionActivating, realm::SyncClientHookEvent::SessionSuspended,
-                    realm::SyncClientHookEvent::SessionConnected, realm::SyncClientHookEvent::SessionResumed,
-                    realm::SyncClientHookEvent::BindMessageSent, realm::SyncClientHookEvent::IdentMessageSent,
-                    realm::SyncClientHookEvent::ClientResetMergeComplete,
-                    realm::SyncClientHookEvent::BootstrapBatchAboutToProcess,
-                    realm::SyncClientHookEvent::UploadMessageSent)
+#define REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT(X) realm::SyncClientHookEvent::X
+CATCH_REGISTER_ENUM(realm::SyncClientHookEvent,
+                    REALM_FOR_EACH_SYNC_CLIENT_HOOK_EVENT(REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT))
+#undef REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT
 #endif
 
 namespace realm {

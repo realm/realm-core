@@ -1200,14 +1200,27 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     if (!has_flx_subscription_store()) {
         return;
     }
+
+    REALM_ASSERT(!m_finalized);
+    if (batch_state == DownloadBatchState::SteadyState) {
+        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
+                                   "Unexpected batch state of SteadyState while downloading bootstrap");
+    }
     // Is this a server-initiated bootstrap? Skip notifying the subscription store
     if (new_version == m_flx_active_version) {
         return;
     }
-    REALM_ASSERT(!m_finalized);
-    REALM_ASSERT(new_version >= m_flx_last_seen_version);
-    REALM_ASSERT(new_version >= m_flx_active_version);
-    REALM_ASSERT(batch_state != DownloadBatchState::SteadyState);
+    if (new_version < m_flx_active_version) {
+        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
+                                   util::format("Bootstrap query version %1 is less than active version %2",
+                                                new_version, m_flx_active_version));
+    }
+    if (new_version < m_flx_last_seen_version) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("Download message query version %1 is less than current bootstrap version %2", new_version,
+                         m_flx_last_seen_version));
+    }
 
     SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
@@ -1216,9 +1229,6 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             // Cannot be called with this value.
             REALM_UNREACHABLE();
         case DownloadBatchState::LastInBatch:
-            if (m_flx_active_version == new_version) {
-                return;
-            }
             on_flx_sync_version_complete(new_version);
             if (new_version == 0) {
                 new_state = SubscriptionSet::State::Complete;
