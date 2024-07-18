@@ -4175,14 +4175,13 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
         bool logged_in_once = false;
 
         auto token = app->subscribe([&logged_in_once, &app](auto&) {
-            if (!logged_in_once) {
-                auto user = app->current_user();
-                auto metadata = user->user_profile();
+            REQUIRE(!logged_in_once);
+            auto user = app->current_user();
+            auto metadata = user->user_profile();
 
-                // Ensure that the JWT metadata fields are available when the callback is fired on login.
-                CHECK(metadata["name"] == "Foo Bar");
-                logged_in_once = true;
-            }
+            // Ensure that the JWT metadata fields are available when the callback is fired on login.
+            CHECK(metadata["name"] == "Foo Bar");
+            logged_in_once = true;
         });
 
         std::shared_ptr<User> user = log_in(app, AppCredentials::custom(jwt));
