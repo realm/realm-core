@@ -4168,13 +4168,11 @@ TEST_CASE("app: custom user data integration tests", "[sync][app][user][function
 TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][function][baas]") {
     TestAppSession session;
     auto app = session.app();
-
-    bool first_log_in = true;
-
     auto jwt = create_jwt(session.app()->app_id());
 
     SECTION("jwt happy path") {
         bool processed = false;
+        bool first_log_in = true;
 
         auto token = app->subscribe([&first_log_in, &app](auto&) {
             if (first_log_in) {
