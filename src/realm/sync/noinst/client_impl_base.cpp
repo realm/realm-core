@@ -2058,7 +2058,7 @@ void Session::send_upload_message()
     version_type progress_server_version = m_upload_progress.last_integrated_server_version;
 
     if (!upload_messages_allowed()) {
-        logger.debug("UPLOAD not allowed: upload progress(progress_client_version=%1, progress_server_version=%2, "
+        logger.trace("UPLOAD not allowed (progress_client_version=%1, progress_server_version=%2, "
                      "locked_server_version=%3, num_changesets=%4)",
                      progress_client_version, progress_server_version, locked_server_version,
                      uploadable_changesets.size()); // Throws

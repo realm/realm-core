@@ -5033,25 +5033,27 @@ TEST_CASE("flx: no upload during bootstraps", "[sync][flx][bootstrap][baas]") {
         if (data.query_version == 0) {
             return SyncClientHookAction::NoAction;
         }
-        // Check no upload messages are sent during bootstrap.
-        if (data.event == SyncClientHookEvent::BootstrapMessageProcessed) {
-            CHECK((state.get() == TestState::Start || state.get() == TestState::BootstrapInProgress));
-            state.transition_to(TestState::BootstrapInProgress);
-        }
-        else if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
-                 data.batch_state == sync::DownloadBatchState::LastInBatch) {
-            CHECK(state.get() == TestState::BootstrapInProgress);
-            state.transition_to(TestState::BootstrapProcessed);
-        }
-        else if (data.event == SyncClientHookEvent::UploadMessageSent) {
-            // Uploads are allowed before a bootstrap starts.
-            if (state.get() == TestState::Start) {
-                return SyncClientHookAction::NoAction;
+        state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+            // Check no upload messages are sent during bootstrap.
+            if (data.event == SyncClientHookEvent::BootstrapMessageProcessed) {
+                CHECK((cur_state == TestState::Start || cur_state == TestState::BootstrapInProgress));
+                return TestState::BootstrapInProgress;
             }
-            CHECK(state.get() == TestState::BootstrapProcessed);
-            state.transition_to(TestState::BootstrapAck);
-        }
-
+            else if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
+                     data.batch_state == sync::DownloadBatchState::LastInBatch) {
+                CHECK(cur_state == TestState::BootstrapInProgress);
+                return TestState::BootstrapProcessed;
+            }
+            else if (data.event == SyncClientHookEvent::UploadMessageSent) {
+                // Uploads are allowed before a bootstrap starts.
+                if (cur_state == TestState::Start) {
+                    return std::nullopt; // Don't transition
+                }
+                CHECK(cur_state == TestState::BootstrapProcessed);
+                return TestState::BootstrapAck;
+            }
+            return std::nullopt;
+        });
         return SyncClientHookAction::NoAction;
     };
 
