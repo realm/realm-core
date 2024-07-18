@@ -151,7 +151,7 @@ static const std::string good_access_token2 =
     "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
     "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
-// #if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS
 
 #include <realm/util/sha_crypto.hpp>
 
@@ -4506,7 +4506,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
 }
 
-// #endif // REALM_ENABLE_AUTH_TESTS
+#endif REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
