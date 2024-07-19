@@ -421,13 +421,19 @@ inline int compare(const T& i, const T& j, const U& col)
             }
             else if (id_i) {
                 // we need to inverse the returned value, since we are comparing I vs J.
-                const auto ret = interner->compare(j.get_value().get_string(), *id_i);
-                if (ret == 0)
-                    return ret;          // strings are equal
-                return ret > 0 ? -1 : 1; // ret > 0 means that I is less than J
+                const auto str = j.get_value().template get_if<StringData>();
+                if (str) {
+                    return interner->compare(*str, *id_i);
+                    const auto ret = interner->compare(*str, *id_i);
+                    if (ret == 0)
+                        return ret;          // strings are equal
+                    return ret > 0 ? -1 : 1; // ret > 0 means that I is less than J
+                }
             }
             else {
-                return interner->compare(i.get_value().get_string(), *id_j);
+                const auto str = i.get_value().template get_if<StringData>();
+                if (str)
+                    return interner->compare(*str, *id_j);
             }
         }
     }
@@ -478,10 +484,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
 
                 // store stringID instead of the actual string if possible
                 cache_i.cached_string_id = col_key.get_string_id(obj);
-                if (cache_i.cached_string_id) {
-                    cache_i.value = {};
-                }
-                else {
+                if (!cache_i.cached_string_id) {
                     cache_i.value = col_key.get_value(obj);
                 }
                 cache_i.key = key_i;
@@ -493,10 +496,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
 
                 // store stringID instead of the actual string if possible
                 cache_j.cached_string_id = col_key.get_string_id(obj);
-                if (cache_j.cached_string_id) {
-                    cache_j.value = {};
-                }
-                else {
+                if (!cache_j.cached_string_id) {
                     cache_j.value = col_key.get_value(obj);
                 }
                 cache_j.key = key_j;
