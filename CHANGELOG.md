@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Improve sync bootstrap performance by reducing the number of table selections in the replication logs for embedded objects. ([#7945](https://github.com/realm/realm-core/issues/7945))
 
 ----------------------------------------------
 
