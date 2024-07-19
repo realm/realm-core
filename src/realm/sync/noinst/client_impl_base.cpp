@@ -2040,17 +2040,21 @@ void Session::send_upload_message()
         target_upload_version = m_pending_flx_sub_set->snapshot_version;
     }
 
+    bool server_version_to_ack =
+        m_upload_progress.last_integrated_server_version < m_download_progress.server_version;
+
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
     get_history().find_uploadable_changesets(m_upload_progress, target_upload_version, uploadable_changesets,
                                              locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
-        // Nothing more to upload right now
-        // If we need to limit upload up to some version other than the last client version available and there are no
-        // changes to upload, then there is no need to send an empty message.
-        if (m_pending_flx_sub_set) {
-            logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
+        // Nothing more to upload right now if:
+        //  1. We need to limit upload up to some version other than the last client version
+        //     available and there are no changes to upload
+        //  2. There are no changes to upload and no server version(s) to acknowledge
+        if (m_pending_flx_sub_set || !server_version_to_ack) {
+            logger.trace("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
                          m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
             // Other messages may be waiting to be sent
             return enlist_to_send(); // Throws
@@ -2066,11 +2070,12 @@ void Session::send_upload_message()
     version_type progress_server_version = m_upload_progress.last_integrated_server_version;
 
     if (!upload_messages_allowed()) {
-        logger.debug("UPLOAD not allowed: upload progress(progress_client_version=%1, progress_server_version=%2, "
+        logger.trace("UPLOAD not allowed (progress_client_version=%1, progress_server_version=%2, "
                      "locked_server_version=%3, num_changesets=%4)",
                      progress_client_version, progress_server_version, locked_server_version,
                      uploadable_changesets.size()); // Throws
-        return;
+        // Other messages may be waiting to be sent
+        return enlist_to_send(); // Throws
     }
 
     logger.debug("Sending: UPLOAD(progress_client_version=%1, progress_server_version=%2, "

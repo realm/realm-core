@@ -4972,6 +4972,54 @@ TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
     CHECK(nested_list.get_any(1) == "foo");
 }
 
+TEST_CASE("flx: no upload during bootstraps", "[sync][flx][bootstrap][baas]") {
+    FLXSyncTestHarness harness("flx_bootstrap_no_upload", {g_large_array_schema, {"queryable_int_field"}});
+    fill_large_array_schema(harness);
+    auto config = harness.make_test_file();
+    enum class TestState { Start, BootstrapInProgress, BootstrapProcessed, BootstrapAck };
+    TestingStateMachine<TestState> state(TestState::Start);
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
+        if (data.query_version == 0) {
+            return SyncClientHookAction::NoAction;
+        }
+        state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+            // Check no upload messages are sent during bootstrap.
+            if (data.event == SyncClientHookEvent::BootstrapMessageProcessed) {
+                CHECK((cur_state == TestState::Start || cur_state == TestState::BootstrapInProgress));
+                return TestState::BootstrapInProgress;
+            }
+            else if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
+                     data.batch_state == sync::DownloadBatchState::LastInBatch) {
+                CHECK(cur_state == TestState::BootstrapInProgress);
+                return TestState::BootstrapProcessed;
+            }
+            else if (data.event == SyncClientHookEvent::UploadMessageSent) {
+                // Uploads are allowed before a bootstrap starts.
+                if (cur_state == TestState::Start) {
+                    return std::nullopt; // Don't transition
+                }
+                CHECK(cur_state == TestState::BootstrapProcessed);
+                return TestState::BootstrapAck;
+            }
+            return std::nullopt;
+        });
+        return SyncClientHookAction::NoAction;
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    new_subs.insert_or_assign(Query(table));
+    new_subs.commit();
+    state.wait_for(TestState::BootstrapAck);
+
+    // Commiting an empty changeset does not upload a message.
+    realm->begin_transaction();
+    realm->commit_transaction();
+    // Give the sync client the chance to send an upload after mark.
+    wait_for_download(*realm);
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
