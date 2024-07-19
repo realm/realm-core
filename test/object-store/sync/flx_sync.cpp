@@ -53,8 +53,6 @@
 #include <realm/util/future.hpp>
 #include <realm/util/logger.hpp>
 
-#include <catch2/catch_all.hpp>
-
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -1623,18 +1621,9 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                            {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
                        }}};
 
-        AppCreateConfig::ServiceRole role;
-        role.name = "compensating_write_perms";
+        AppCreateConfig::ServiceRole role{"compensating_write_perms"};
+        role.document_filters.write = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
 
-        AppCreateConfig::ServiceRoleDocumentFilters doc_filters;
-        doc_filters.read = true;
-        doc_filters.write = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
-        role.document_filters = doc_filters;
-
-        role.insert_filter = true;
-        role.delete_filter = true;
-        role.read = true;
-        role.write = true;
         FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}, {role}};
         harness.emplace("flx_bad_query", server_schema);
     }
@@ -2637,7 +2626,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
 TEST_CASE("flx: verify websocket protocol number and prefixes", "[sync][protocol]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
-    REQUIRE(13 == sync::get_current_protocol_version());
+    REQUIRE(14 == sync::get_current_protocol_version());
     // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
@@ -3585,18 +3574,8 @@ TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
 }
 
 TEST_CASE("flx: data ingest - write not allowed", "[sync][flx][data ingest][baas]") {
-    AppCreateConfig::ServiceRole role;
-    role.name = "asymmetric_write_perms";
-
-    AppCreateConfig::ServiceRoleDocumentFilters doc_filters;
-    doc_filters.read = true;
-    doc_filters.write = false;
-    role.document_filters = doc_filters;
-
-    role.insert_filter = true;
-    role.delete_filter = true;
-    role.read = true;
-    role.write = true;
+    AppCreateConfig::ServiceRole role{"asymmetric_write_perms"};
+    role.document_filters.write = false;
 
     Schema schema({
         {"Asymmetric",
@@ -4074,19 +4053,10 @@ TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][baas]") {
 }
 
 TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][compensating write][baas]") {
-    AppCreateConfig::ServiceRole role;
-    role.name = "compensating_write_perms";
+    AppCreateConfig::ServiceRole role{"compensating_write_perms"};
+    role.document_filters.write = {
+        {"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
 
-    AppCreateConfig::ServiceRoleDocumentFilters doc_filters;
-    doc_filters.read = true;
-    doc_filters.write =
-        nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
-    role.document_filters = doc_filters;
-
-    role.insert_filter = true;
-    role.delete_filter = true;
-    role.read = true;
-    role.write = true;
     FLXSyncTestHarness::ServerSchema server_schema{
         g_simple_embedded_obj_schema, {"queryable_str_field", "queryable_int_field"}, {role}};
     FLXSyncTestHarness::Config harness_config("flx_bad_query", server_schema);

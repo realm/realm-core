@@ -60,14 +60,17 @@ namespace sync {
 //   13 Support for syncing collections (lists and dictionaries) in Mixed columns and
 //      collections of Mixed
 //
+//   14 Support for server initiated bootstraps, including bootstraps for role/
+//      permissions changes instead of performing a client reset when changed.
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    // Also update the current protocol version test in flx_sync.cpp when
-    // updating this value
-    return 13;
+    // Also update the "flx: verify websocket protocol number and prefixes" test
+    // in flx_sync.cpp when updating this value
+    return 14;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
@@ -176,9 +179,9 @@ struct DownloadCursor {
 };
 
 enum class DownloadBatchState {
-    MoreToCome,
-    LastInBatch,
-    SteadyState,
+    MoreToCome = 0,
+    LastInBatch = 1,
+    SteadyState = 2,
 };
 
 /// Download progress information comes from the server either in the form of
@@ -503,6 +506,19 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "MigrateSchema";
     }
     return o << "Invalid error action: " << int64_t(action);
+}
+
+inline std::ostream& operator<<(std::ostream& o, DownloadBatchState batch_state)
+{
+    switch (batch_state) {
+        case DownloadBatchState::MoreToCome:
+            return o << "MoreToCome";
+        case DownloadBatchState::LastInBatch:
+            return o << "LastInBatch";
+        case DownloadBatchState::SteadyState:
+            return o << "SteadyState";
+    }
+    return o << "Invalid batch state: " << int(batch_state);
 }
 
 } // namespace sync

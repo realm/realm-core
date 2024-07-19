@@ -47,6 +47,13 @@
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
+#if REALM_ENABLE_SYNC
+#define REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT(X) realm::SyncClientHookEvent::X
+CATCH_REGISTER_ENUM(realm::SyncClientHookEvent,
+                    REALM_FOR_EACH_SYNC_CLIENT_HOOK_EVENT(REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT))
+#undef REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT
+#endif
+
 namespace realm {
 
 void timed_wait_for(util::FunctionRef<bool()> condition,

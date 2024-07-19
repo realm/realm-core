@@ -274,6 +274,10 @@ void wait_for_advance(Realm& realm)
             , target_version(*realm.latest_snapshot_version())
             , done(done)
         {
+            // Are we already there...
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
         }
 
         void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override

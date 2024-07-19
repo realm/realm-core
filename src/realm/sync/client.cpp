@@ -805,22 +805,16 @@ void SessionImpl::update_subscription_version_info()
 
 bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
 {
-    // Not a bootstrap message if this isn't a FLX download
-    if (!message.last_in_batch || !message.query_version) {
+    // Ignore the message if the session is not active or a steady state message
+    if (m_state != State::Active || message.batch_state == DownloadBatchState::SteadyState) {
         return false;
     }
 
     REALM_ASSERT(m_is_flx_sync_session);
 
-    // Not a bootstrap message if it's for the already active query version
-    if (*message.last_in_batch && *message.query_version == m_wrapper.m_flx_active_version) {
-        return false;
-    }
-
-    auto batch_state = *message.last_in_batch ? DownloadBatchState::LastInBatch : DownloadBatchState::MoreToCome;
     auto bootstrap_store = m_wrapper.get_flx_pending_bootstrap_store();
     std::optional<SyncProgress> maybe_progress;
-    if (batch_state == DownloadBatchState::LastInBatch) {
+    if (message.batch_state == DownloadBatchState::LastInBatch) {
         maybe_progress = message.progress;
     }
 
@@ -842,23 +836,23 @@ bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
 
     // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
     // bootstrapping.
-    if (new_batch && batch_state == DownloadBatchState::MoreToCome) {
+    if (new_batch && message.batch_state == DownloadBatchState::MoreToCome) {
         on_flx_sync_progress(*message.query_version, DownloadBatchState::MoreToCome);
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, message.progress,
-                                       *message.query_version, batch_state, message.changesets.size());
+                                       *message.query_version, message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return true;
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    if (batch_state == DownloadBatchState::MoreToCome) {
+    if (message.batch_state == DownloadBatchState::MoreToCome) {
         return true;
     }
 
     try {
-        process_pending_flx_bootstrap();
+        process_pending_flx_bootstrap(); // throws
     }
     catch (const IntegrationException& e) {
         on_integration_failure(e);
@@ -877,8 +871,6 @@ void SessionImpl::process_pending_flx_bootstrap()
     if (!m_is_flx_sync_session || m_state != State::Active) {
         return;
     }
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == SessionImpl::Active, m_state);
     auto bootstrap_store = m_wrapper.get_flx_pending_bootstrap_store();
     if (!bootstrap_store->has_pending()) {
         return;
@@ -902,7 +894,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
-            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
+            // Close the write transaction before clearing the bootstrap store to avoid a deadlock because the
             // bootstrap store requires a write transaction itself.
             transact->close();
             bootstrap_store->clear();
@@ -1044,7 +1036,7 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     return call_debug_hook(data);
 }
 
-SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo& error_info)
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* error_info)
 {
     if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
         return SyncClientHookAction::NoAction;
@@ -1058,35 +1050,10 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     data.batch_state = DownloadBatchState::SteadyState;
     data.progress = m_progress;
     data.num_changesets = 0;
-    data.query_version = 0;
-    data.error_info = &error_info;
+    data.query_version = m_last_sent_flx_query_version;
+    data.error_info = error_info;
 
     return call_debug_hook(data);
-}
-
-SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event)
-{
-    return call_debug_hook(event, m_progress, m_last_sent_flx_query_version, DownloadBatchState::SteadyState, 0);
-}
-
-bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
-{
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == State::Active, m_state);
-    if (batch_state == DownloadBatchState::SteadyState) {
-        return true;
-    }
-
-    if (!m_is_flx_sync_session) {
-        return true;
-    }
-
-    // If this is a steady state DOWNLOAD, no need for special handling.
-    if (batch_state == DownloadBatchState::LastInBatch && query_version == m_wrapper.m_flx_active_version) {
-        return true;
-    }
-
-    return false;
 }
 
 void SessionImpl::init_progress_handler()
@@ -1233,10 +1200,27 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     if (!has_flx_subscription_store()) {
         return;
     }
+
     REALM_ASSERT(!m_finalized);
-    REALM_ASSERT(new_version >= m_flx_last_seen_version);
-    REALM_ASSERT(new_version >= m_flx_active_version);
-    REALM_ASSERT(batch_state != DownloadBatchState::SteadyState);
+    if (batch_state == DownloadBatchState::SteadyState) {
+        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
+                                   "Unexpected batch state of SteadyState while downloading bootstrap");
+    }
+    // Is this a server-initiated bootstrap? Skip notifying the subscription store
+    if (new_version == m_flx_active_version) {
+        return;
+    }
+    if (new_version < m_flx_active_version) {
+        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
+                                   util::format("Bootstrap query version %1 is less than active version %2",
+                                                new_version, m_flx_active_version));
+    }
+    if (new_version < m_flx_last_seen_version) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("Download message query version %1 is less than current bootstrap version %2", new_version,
+                         m_flx_last_seen_version));
+    }
 
     SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
@@ -1245,9 +1229,6 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             // Cannot be called with this value.
             REALM_UNREACHABLE();
         case DownloadBatchState::LastInBatch:
-            if (m_flx_active_version == new_version) {
-                return;
-            }
             on_flx_sync_version_complete(new_version);
             if (new_version == 0) {
                 new_state = SubscriptionSet::State::Complete;
