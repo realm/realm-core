@@ -88,12 +88,11 @@ Mixed ExtendedColumnKey::get_value(const Obj& obj) const
 
 std::optional<StringID> ExtendedColumnKey::get_string_id(const Obj& obj) const
 {
-    if (m_colkey.get_type() != col_type_String)
+    const auto type = m_colkey.get_type();
+    if (type != col_type_String && type != col_type_Mixed)
         return {};
-
     if (!has_index())
         return obj.get_string_id(m_colkey);
-
     return {};
 }
 
@@ -406,31 +405,43 @@ void FilterDescriptor::execute(const Table& table, KeyValues& key_values, const 
 template <typename T, typename U>
 inline int compare(const T& i, const T& j, const U& col)
 {
-    const ColKey col_key{col.col_key};
-    const auto table = col.table;
-    const auto has_interner = col_key.get_type() == col_type_String;
+    const auto id_i = i.cached_string_id;
+    const auto id_j = j.cached_string_id;
 
-    if (has_interner) {
-        const auto id_i = i.cached_string_id;
-        const auto id_j = j.cached_string_id;
-        const auto interner = table->get_string_interner(col_key);
+    const ColKey ck{col.col_key};
+    const auto has_interner = ck.get_type() == col_type_String || ck.get_type() == col_type_Mixed;
+
+    if (!id_i && !id_j) {
+        // straight mixed comparison
+        return i.get_value().compare(j.get_value());
+    }
+    if (has_interner && (id_i || id_j)) {
+
+        const auto table = col.table;
+        const auto interner = table->get_string_interner(ck);
+
         if (id_i && id_j) {
+            // compare string vs string and use ids if in compressed format
             return interner->compare(*id_i, *id_j);
         }
-        else if (id_j) {
-            const auto str = i.get_value().template get_if<StringData>();
-            if (str)
-                return interner->compare(*str, *id_j);
-        }
-        else if (id_i) {
-            const auto str = j.get_value().template get_if<StringData>();
-            if (str)
-                // reverse result. EG -1 means that J is < than I (then I > J), thus return 1, since we are comparing
-                // I vs J.
-                return -interner->compare(*str, *id_i);
+
+        auto& index = id_i ? i : j;
+        const auto sign = id_i ? -1 : 1;
+
+        const auto str = index.get_value().template get_if<StringData>();
+        if (str) {
+            const auto ret = interner->compare(*str, *id_i);
+            return sign == -1 ? -ret : ret;
         }
     }
-    return i.get_value().compare(j.get_value());
+    // we are comparing 2 mixed with different types in it. And one is a string.
+    // we need to extract the string (decompress)
+    auto& index = id_i ? i : j;
+    const auto& key = index.get_key();
+    const auto& obj = col.table->get_object(key);
+    const auto& col_key = col.col_key;
+    const auto val = col_key.get_value(obj);
+    return id_i ? val.compare(j.get_value()) : i.get_value().compare(val);
 }
 
 // This function must conform to 'is less' predicate - that is:
@@ -528,12 +539,9 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         }
 
         const auto obj = col.table->get_object(key);
-        const auto col_type = ColKey{ck}.get_type();
-        const auto can_be_compressed = col_type == col_type_String;
-
-        if (const auto string_id = ck.get_string_id(obj); can_be_compressed && string_id) {
+        if (const auto string_id = ck.get_string_id(obj); string_id) {
             index.cached_string_id = *string_id;
-            index.cached_value = {};
+            index.cached_value = Mixed();
         }
         else {
             index.cached_value = ck.get_value(obj);

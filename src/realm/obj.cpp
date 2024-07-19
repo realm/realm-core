@@ -631,13 +631,14 @@ BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
 
 std::optional<StringID> Obj::get_string_id(ColKey col_key) const
 {
-    // we may hit this only if the property is a string or mixed.
-    m_table->check_column(col_key);
+    // we return a string id only if the property is string or mixed.
+    // And it got compressed.
 
     // only strings and mixed can have an interner
-    if (col_key.get_type() != col_type_Mixed && col_key.get_type() != col_type_String)
+    if (col_key.get_type() != col_type_String && col_key.get_type() != col_type_Mixed)
         return {};
 
+    m_table->check_column(col_key);
     _update_if_needed();
 
     const auto col_ndx = col_key.get_index();

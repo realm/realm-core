@@ -66,6 +66,10 @@ public:
         {
             return index_in_view < other.index_in_view;
         }
+        ObjKey get_key() const
+        {
+            return key_for_object;
+        }
         Mixed get_value() const
         {
             return cached_value;
@@ -127,6 +131,10 @@ public:
             using StringID = size_t;
             std::optional<StringID> cached_string_id;
 
+            ObjKey get_key() const
+            {
+                return key;
+            }
             Mixed get_value() const
             {
                 return value;
