@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Added CMake toolchain files for cross-compiling to Linux using the musl libc (PR [#7904](https://github.com/realm/realm-core/pull/7904)).
 
 ----------------------------------------------
 
