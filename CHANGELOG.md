@@ -12,6 +12,7 @@
 * FLX download progress was only updated when bootstraps completed, making it always be 0 before the first completion and then forever 1. ([PR #7869](https://github.com/realm/realm-core/issues/7869), since v14.10.2)
 * Sync client can crash if a session is resumed while the session is being suspended. ([#7860](https://github.com/realm/realm-core/issues/7860), since v12.0.0)
 * If a sync session is interrupted by a disconnect or restart while downloading a bootstrap, stale data from the previous bootstrap may be included when the session reconnects and downloads the bootstrap. This can lead to objects stored in the database that do not match the actual state of the server and potentially leading to compensating writes. ([#7827](https://github.com/realm/realm-core/issues/7827), since v12.0.0)
+* Fixed unnecessary server roundtrips when there is no download to acknowledge ([#2129](https://jira.mongodb.org/browse/RCORE-2129), since v14.8.0).
 
 ### Breaking changes
 * None.
@@ -33,7 +34,6 @@
 
 ### Fixed
 * When a public name is defined on a property, calling `realm::Results::sort()` or `realm::Results::distinct()` with the internal name could throw an error like `Cannot sort on key path 'NAME': property 'PersonObject.NAME' does not exist`. ([realm/realm-js#6779](https://github.com/realm/realm-js/issues/6779), since v12.12.0)
-* Fixed unnecessary server roundtrips when there is no download to acknowledge ([#2129](https://jira.mongodb.org/browse/RCORE-2129), since v14.8.0).
 
 ### Breaking changes
 * None.
