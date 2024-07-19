@@ -1455,16 +1455,12 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         (void)setup_reset_handlers_for_schema_validation(config_local, changed_schema);
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
-        auto realm = successfully_async_open_realm(config_local);
-        // make changes to the new property
-        realm->begin_transaction();
-        auto table = realm->read_group().get_table("class_TopLevel");
-        ColKey new_col = table->get_column_key("added_oid_field");
-        REQUIRE(new_col);
-        for (auto it = table->begin(); it != table->end(); ++it) {
-            it->set(new_col, ObjectId::gen());
+        auto status = async_open_realm(config_local);
+        if (!status.is_ok()) {
+            // error may be triggered before the async open returns
+            REQUIRE_THAT(status.get_status().reason(), Catch::Matchers::ContainsSubstring("Invalid schema change"));
         }
-        realm->commit_transaction();
+
         auto err = error_future.get();
         std::string property_err = "Invalid schema change (UPLOAD): non-breaking schema change: adding "
                                    "\"ObjectID\" column at field \"added_oid_field\" in schema \"TopLevel\", "
