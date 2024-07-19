@@ -17,7 +17,9 @@
 -----------
 
 ### Internals
-* None.
+* Added second optional `scheduler` parameter to `EventLoopDispatcher`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
+* (bindgen) Added second optional `scheduler` parameter to `schedulerWrapBlockingFunction`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
+* (bindgen) Exposing optional `scheduler` property on `RealmConfig`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
 
 ----------------------------------------------
 
