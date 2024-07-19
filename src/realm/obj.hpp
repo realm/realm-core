@@ -118,10 +118,10 @@ public:
     U get(ColKey col_key) const;
 
     using StringID = size_t;
-    std::optional<StringID> get_compressed_string(ColKey) const;
-    std::optional<StringID> get_compressed_string(StringData col_name) const
+    std::optional<StringID> get_string_id(ColKey) const;
+    std::optional<StringID> get_string_id(StringData col_name) const
     {
-        return get_compressed_string(get_column_key(col_name));
+        return get_string_id(get_column_key(col_name));
     }
     Mixed get_any(ColKey col_key) const;
     Mixed get_any(StringData col_name) const

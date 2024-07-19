@@ -88,11 +88,11 @@ Mixed ExtendedColumnKey::get_value(const Obj& obj) const
 
 std::optional<StringID> ExtendedColumnKey::get_string_id(const Obj& obj) const
 {
-    if (m_colkey.get_type() != col_type_String && m_colkey.get_type() != col_type_Mixed)
+    if (m_colkey.get_type() != col_type_String)
         return {};
 
     if (!has_index())
-        return obj.get_compressed_string(m_colkey);
+        return obj.get_string_id(m_colkey);
 
     return {};
 }
@@ -408,14 +408,26 @@ inline int compare(const T& i, const T& j, const U& col)
 {
     const ColKey col_key{col.col_key};
     const auto table = col.table;
-    const auto has_interner = col_key.get_type() == col_type_Mixed || col_key.get_type() == col_type_String;
+    const auto has_interner = col_key.get_type() == col_type_String;
 
     if (has_interner) {
         const auto id_i = i.cached_string_id;
         const auto id_j = j.cached_string_id;
+        const auto interner = table->get_string_interner(col_key);
         if (id_i && id_j) {
-            const auto interner = table->get_string_interner(col_key);
             return interner->compare(*id_i, *id_j);
+        }
+        else if (id_j) {
+            const auto str = i.get_value().template get_if<StringData>();
+            if (str)
+                return interner->compare(*str, *id_j);
+        }
+        else if (id_i) {
+            const auto str = j.get_value().template get_if<StringData>();
+            if (str)
+                // reverse result. EG -1 means that J is < than I (then I > J), thus return 1, since we are comparing
+                // I vs J.
+                return -interner->compare(*str, *id_i);
         }
     }
     return i.get_value().compare(j.get_value());
@@ -464,11 +476,12 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 const auto& col_key = m_columns[t].col_key;
 
                 // store stringID instead of the actual string if possible
-                cache_i.cached_string_id = col_key.get_string_id(obj);
-                if (!cache_i.cached_string_id) {
-                    cache_i.value = col_key.get_value(obj);
-                }
                 cache_i.key = key_i;
+                cache_i.cached_string_id = col_key.get_string_id(obj);
+                if (!cache_i.cached_string_id)
+                    cache_i.value = col_key.get_value(obj);
+                else
+                    cache_j.value = {};
             }
 
             if (cache_j.key != key_j) {
@@ -476,11 +489,12 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 const auto& col_key = m_columns[t].col_key;
 
                 // store stringID instead of the actual string if possible
-                cache_j.cached_string_id = col_key.get_string_id(obj);
-                if (!cache_j.cached_string_id) {
-                    cache_j.value = col_key.get_value(obj);
-                }
                 cache_j.key = key_j;
+                cache_j.cached_string_id = col_key.get_string_id(obj);
+                if (!cache_j.cached_string_id)
+                    cache_j.value = col_key.get_value(obj);
+                else
+                    cache_j.value = {};
             }
 
             c = compare(cache_i, cache_j, m_columns[t]);
@@ -514,11 +528,12 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         }
 
         const auto obj = col.table->get_object(key);
-        const auto string_id = ck.get_string_id(obj);
-        // avoid to decompress the whole string if the col_key is String or Mixed type and the underline string is
-        // compressed.
-        if (string_id) {
+        const auto col_type = ColKey{ck}.get_type();
+        const auto can_be_compressed = col_type == col_type_String;
+
+        if (const auto string_id = ck.get_string_id(obj); can_be_compressed && string_id) {
             index.cached_string_id = *string_id;
+            index.cached_value = {};
         }
         else {
             index.cached_value = ck.get_value(obj);
