@@ -413,28 +413,9 @@ inline int compare(const T& i, const T& j, const U& col)
     if (has_interner) {
         const auto id_i = i.cached_string_id;
         const auto id_j = j.cached_string_id;
-        if (id_i || id_j) {
+        if (id_i && id_j) {
             const auto interner = table->get_string_interner(col_key);
-
-            if (id_i && id_j) {
-                return interner->compare(*id_i, *id_j);
-            }
-            else if (id_i) {
-                // we need to inverse the returned value, since we are comparing I vs J.
-                const auto str = j.get_value().template get_if<StringData>();
-                if (str) {
-                    return interner->compare(*str, *id_i);
-                    const auto ret = interner->compare(*str, *id_i);
-                    if (ret == 0)
-                        return ret;          // strings are equal
-                    return ret > 0 ? -1 : 1; // ret > 0 means that I is less than J
-                }
-            }
-            else {
-                const auto str = i.get_value().template get_if<StringData>();
-                if (str)
-                    return interner->compare(*str, *id_j);
-            }
+            return interner->compare(*id_i, *id_j);
         }
     }
     return i.get_value().compare(j.get_value());
