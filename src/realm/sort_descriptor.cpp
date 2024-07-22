@@ -408,35 +408,34 @@ inline int compare(const T& i, const T& j, const U& col)
     const auto id_i = i.cached_string_id;
     const auto id_j = j.cached_string_id;
 
-    const ColKey ck{col.col_key};
-    const auto has_interner = ck.get_type() == col_type_String || ck.get_type() == col_type_Mixed;
-
-    if (!id_i && !id_j) {
-        // straight mixed comparison
+    if (!id_i && !id_j)
+        // any other comparison that has nothing to do with strings
         return i.get_value().compare(j.get_value());
-    }
-    if (has_interner && (id_i || id_j)) {
 
+    if (id_i || id_j) {
+        // at least one is a compressed string.
         const auto table = col.table;
-        const auto interner = table->get_string_interner(ck);
+        const auto interner = table->get_string_interner(ColKey{col.col_key});
 
-        if (id_i && id_j) {
-            // compare string vs string and use ids if in compressed format
+        // two interned strings
+        if (id_i && id_j)
             return interner->compare(*id_i, *id_j);
-        }
 
-        auto& index = id_i ? i : j;
-        const auto sign = id_i ? -1 : 1;
-
+        // one compressed string and the other one could potentially be uncompressed.
+        const auto& index = id_i ? j : i;
+        const auto& other = id_i ? id_i : id_j;
         const auto str = index.get_value().template get_if<StringData>();
         if (str) {
-            const auto ret = interner->compare(*str, *id_i);
-            return sign == -1 ? -ret : ret;
+            // compressed string vs uncompressed string
+            const auto ret = interner->compare(*str, *other);
+            // if i is a compressed string, than reverse cmp result, since
+            // we always compare i vs j and not j vs i.
+            return id_i ? -ret : ret;
         }
     }
-    // we are comparing 2 mixed with different types in it. And one is a string.
-    // we need to extract the string (decompress)
-    auto& index = id_i ? i : j;
+
+    // mixed str vs mixed (any other value)
+    const auto& index = id_i ? i : j;
     const auto& key = index.get_key();
     const auto& obj = col.table->get_object(key);
     const auto& col_key = col.col_key;
@@ -489,10 +488,13 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 // store stringID instead of the actual string if possible
                 cache_i.key = key_i;
                 cache_i.cached_string_id = col_key.get_string_id(obj);
-                if (!cache_i.cached_string_id)
+                if (cache_i.cached_string_id) {
+                    cache_i.value = {};
+                }
+                else {
                     cache_i.value = col_key.get_value(obj);
-                else
-                    cache_j.value = {};
+                    cache_i.cached_string_id = {};
+                }
             }
 
             if (cache_j.key != key_j) {
@@ -502,10 +504,13 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 // store stringID instead of the actual string if possible
                 cache_j.key = key_j;
                 cache_j.cached_string_id = col_key.get_string_id(obj);
-                if (!cache_j.cached_string_id)
-                    cache_j.value = col_key.get_value(obj);
-                else
+                if (cache_j.cached_string_id) {
                     cache_j.value = {};
+                }
+                else {
+                    cache_j.value = col_key.get_value(obj);
+                    cache_j.cached_string_id = {};
+                }
             }
 
             c = compare(cache_i, cache_j, m_columns[t]);
@@ -539,12 +544,13 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         }
 
         const auto obj = col.table->get_object(key);
-        if (const auto string_id = ck.get_string_id(obj); string_id) {
-            index.cached_string_id = *string_id;
+        index.cached_string_id = ck.get_string_id(obj);
+        if (index.cached_string_id) {
             index.cached_value = Mixed();
         }
         else {
             index.cached_value = ck.get_value(obj);
+            // index.cached_string_id = {};
         }
     }
 }

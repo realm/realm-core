@@ -80,7 +80,7 @@ public:
         // if the value is a string or mixed of string, we may want to store
         // the compressed string id, instead of the whole string.
         using StringID = size_t;
-        std::optional<StringID> cached_string_id;
+        std::optional<StringID> cached_string_id = {};
     };
     class IndexPairs : public std::vector<BaseDescriptor::IndexPair> {
     public:
