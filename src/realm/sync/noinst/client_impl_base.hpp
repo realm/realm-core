@@ -784,7 +784,7 @@ public:
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
     void integrate_changesets(const SyncProgress&, std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
-                              VersionInfo&, DownloadBatchState last_in_batch);
+                              VersionInfo&, DownloadBatchState batch_state);
 
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
@@ -920,8 +920,7 @@ private:
     // Processes an FLX download message, if it's a bootstrap message. If it's not a bootstrap
     // message then this is a noop and will return false. Otherwise this will return true
     // and no further processing of the download message should take place.
-    bool process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
-                                       int64_t query_version, const ReceivedChangesets& received_changesets);
+    bool process_flx_bootstrap_message(const DownloadMessage& message);
 
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
@@ -1115,11 +1114,8 @@ private:
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
-    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* = nullptr);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
-    SyncClientHookAction call_debug_hook(SyncClientHookEvent event);
-
-    bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
     void init_progress_handler();
     void enable_progress_notifications();
@@ -1319,11 +1315,10 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
 
     bool resume_upload = do_recognize_sync_version(version);
     if (REALM_LIKELY(resume_upload)) {
-        // Since the deactivation process has not been initiated, the UNBIND
-        // message cannot have been sent unless the session was suspended due to
-        // an error.
-        REALM_ASSERT_3(m_suspended, ||, !m_unbind_message_sent);
-        if (m_ident_message_sent && !m_suspended)
+        // Don't attempt to send any updates before the IDENT message has been
+        // sent or after the UNBIND message has been sent or an error message
+        // was received.
+        if (m_ident_message_sent && !m_error_message_received && !m_unbind_message_sent)
             ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1394,6 +1389,10 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
         // Request download completion notification
         ++m_target_download_mark;
     }
+
+    // Notify the debug hook of the SessionConnected event before sending
+    // the bind messsage
+    call_debug_hook(SyncClientHookEvent::SessionConnected);
 
     if (!m_suspended) {
         // Ready to send BIND message
@@ -1472,6 +1471,10 @@ inline void ClientImpl::Session::initiate_rebind()
     REALM_ASSERT(!m_enlisted_to_send);
 
     reset_protocol_state();
+
+    // Notify the debug hook of the SessionResumed event before sending
+    // the bind messsage
+    call_debug_hook(SyncClientHookEvent::SessionResumed);
 
     // Ready to send BIND message
     enlist_to_send(); // Throws

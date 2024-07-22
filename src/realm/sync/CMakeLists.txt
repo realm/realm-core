@@ -108,13 +108,11 @@ elseif(REALM_HAVE_OPENSSL)
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 
-if(WIN32 AND NOT WINDOWS_STORE)
-    target_link_libraries(Sync INTERFACE Version.lib)
-    if(CMAKE_VERSION VERSION_LESS "3.21")
-        # This is needed for OpenSSL, but CMake's FindOpenSSL didn't declare it
-        # on the OpenSSL::Crypto target until CMake 3.21.0. 
-        target_link_libraries(Sync INTERFACE Crypt32.lib)
+if(WIN32)
+    if(NOT WINDOWS_STORE)
+        target_link_libraries(Sync INTERFACE Version.lib)
     endif()
+    target_link_libraries(Sync INTERFACE Crypt32.lib)
 endif()
 
 install(TARGETS Sync EXPORT realm
