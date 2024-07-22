@@ -21,10 +21,38 @@
 
 ----------------------------------------------
 
+# 14.11.0 Release notes
+
+### Enhancements
+* On Windows devices Device Sync will additionally look up SSL certificates in the Windows Trusted Root Certification Authorities certificate store when establishing a connection. (PR [#7882](https://github.com/realm/realm-core/pull/7882))
+* Updated the return type of `LogCategory::get_category_names()` from `std::vector<const char*>` to `std::vector<std::string_view>`. ([PR #7879](https://github.com/realm/realm-core/pull/7879))
+* Added `realm_get_persisted_schema_version` for reading the version of the schema currently stored locally. (PR [#7873](https://github.com/realm/realm-core/pull/7873))
+* Added `realm_app_config_get_sync_client_config()` function to the C_API to get the sync_client_config value in `realm_app_config_t` if REALM_APP_SERVICES is enabled. If REALM_APP_SERVICES is not available, `realm_sync_client_config_new()` is available to create a new `sync_client_config_t` to use when initializing the sync manager. ([PR #7891](https://github.com/realm/realm-core/pull/7891))
+* Role and permissions changes no longer require a client reset to update the local realm. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
+
+### Fixed
+* FLX download progress was only updated when bootstraps completed, making it always be 0 before the first completion and then forever 1. ([PR #7869](https://github.com/realm/realm-core/issues/7869), since v14.10.2)
+* Sync client can crash if a session is resumed while the session is being suspended. ([#7860](https://github.com/realm/realm-core/issues/7860), since v12.0.0)
+* If a sync session is interrupted by a disconnect or restart while downloading a bootstrap, stale data from the previous bootstrap may be included when the session reconnects and downloads the bootstrap. This can lead to objects stored in the database that do not match the actual state of the server and potentially leading to compensating writes. ([#7827](https://github.com/realm/realm-core/issues/7827), since v12.0.0)
+* Fixed unnecessary server roundtrips when there is no download to acknowledge ([#2129](https://jira.mongodb.org/browse/RCORE-2129), since v14.8.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Protocol version has been updated to v14 to support server intiated bootstraps and role change updates without a client reset. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
+* Add support for server initiated bootstraps. ([PR #7440](https://github.com/realm/realm-core/pull/7440))
+
+----------------------------------------------
+
 # 14.10.4 Release notes
 
 ### Enhancements
-* None.
 
 ### Fixed
 * When a public name is defined on a property, calling `realm::Results::sort()` or `realm::Results::distinct()` with the internal name could throw an error like `Cannot sort on key path 'NAME': property 'PersonObject.NAME' does not exist`. ([realm/realm-js#6779](https://github.com/realm/realm-js/issues/6779), since v12.12.0)
@@ -45,14 +73,14 @@
 # 14.10.3 Release notes
 
 ### Enhancements
-* "Next launch" metadata file actions are now performed in a multi-process safe manner ([#7576](https://github.com/realm/realm-core/pull/7576)).
+* "Next launch" metadata file actions are now performed in a multi-process safe manner. ([PR #7576](https://github.com/realm/realm-core/pull/7576))
 
 ### Fixed
 * Fixed a change of mode from Strong to All when removing links from an embedded object that links to a tombstone. This affects sync apps that use embedded objects which have a `Lst<Mixed>` that contains a link to another top level object which has been deleted by another sync client (creating a tombstone locally). In this particular case, the switch would cause any remaining link removals to recursively delete the destination object if there were no other links to it. ([#7828](https://github.com/realm/realm-core/issues/7828), since 14.0.0-beta.0)
 * Fixed removing backlinks from the wrong objects if the link came from a nested list, nested dictionary, top-level dictionary, or list of mixed, and the source table had more than 256 objects. This could manifest as `array_backlink.cpp:112: Assertion failed: int64_t(value >> 1) == key.value` when removing an object. ([#7594](https://github.com/realm/realm-core/issues/7594), since v11 for dictionaries)
 * Fixed the collapse/rejoin of clusters which contained nested collections with links. This could manifest as `array.cpp:319: Array::move() Assertion failed: begin <= end [2, 1]` when removing an object. ([#7839](https://github.com/realm/realm-core/issues/7839), since the introduction of nested collections in v14.0.0-beta.0)
 * wait_for_upload_completion() was inconsistent in how it handled commits which did not produce any changesets to upload. Previously it would sometimes complete immediately if all commits waiting to be uploaded were empty, and at other times it would wait for a server roundtrip. It will now always complete immediately. ([PR #7796](https://github.com/realm/realm-core/pull/7796)).
-* `realm_sync_session_handle_error_for_testing` parameter `is_fatal` was flipped changing the expected behavior. (#[7750](https://github.com/realm/realm-core/issues/7750)).
+* `realm_sync_session_handle_error_for_testing` parameter `is_fatal` was flipped changing the expected behavior. ([#7750](https://github.com/realm/realm-core/issues/7750))
 
 ### Breaking changes
 * None.
