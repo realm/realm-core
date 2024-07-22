@@ -117,7 +117,6 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
-    using StringID = size_t;
     std::optional<StringID> get_string_id(ColKey) const;
     std::optional<StringID> get_string_id(StringData col_name) const
     {

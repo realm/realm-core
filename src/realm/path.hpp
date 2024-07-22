@@ -258,7 +258,6 @@ public:
 
     // get String ID for the obj, it makes sense to call this method only if the col_key type is either Mixed or
     // String.
-    using StringID = size_t;
     std::optional<StringID> get_string_id(const Obj& obj) const;
 
 private:

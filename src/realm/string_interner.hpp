@@ -34,8 +34,6 @@ struct CompressedStringView;
 
 namespace realm {
 
-using StringID = size_t;
-
 class StringCompressor;
 
 struct CachedString {
