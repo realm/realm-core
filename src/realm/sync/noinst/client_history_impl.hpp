@@ -258,6 +258,15 @@ public:
                                           std::uint_fast64_t&, std::uint_fast64_t&, version_type&);
     static void get_upload_download_state(DB*, std::uint_fast64_t&, std::uint_fast64_t&);
 
+    /// Record the current download progress.
+    ///
+    /// This is used when storing FLX bootstraps to make the progress available
+    /// to other processes which are observing the file. It must be called
+    /// inside of a write transaction. The data stored here is only meaningful
+    /// until the next call of integrate_server_changesets(), which will
+    /// overwrite it.
+    static void set_download_progress(Transaction& tr, DownloadableProgress);
+
     // Overriding member functions in realm::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override;
     ChunkedBinaryData get_reciprocal_transform(version_type, bool&) const override;

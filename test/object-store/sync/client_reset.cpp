@@ -232,27 +232,40 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
 
         FAIL(util::format("got error from server: %1", err.status));
     };
-
-    auto realm = Realm::get_shared_realm(realm_config);
-    auto obj_id = ObjectId::gen();
     {
-        realm->begin_transaction();
-        CppContext c(realm);
-        Object::create(
-            c, realm, "object",
-            std::any(AnyDict{{"_id", obj_id}, {"value", int64_t(5)}, {partition.property_name, partition.value}}));
-        realm->commit_transaction();
-        wait_for_upload(*realm);
+        auto realm = Realm::get_shared_realm(realm_config);
+        auto obj_id = ObjectId::gen();
+        {
+            realm->begin_transaction();
+            CppContext c(realm);
+            Object::create(c, realm, "object",
+                           std::any(AnyDict{
+                               {"_id", obj_id}, {"value", int64_t(5)}, {partition.property_name, partition.value}}));
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        }
+        wait_for_download(*realm, std::chrono::minutes(10));
+        reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
     }
-    wait_for_download(*realm, std::chrono::minutes(10));
-
-    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
-
-    wait_for_download(*realm, std::chrono::minutes(10));
-
-    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
-
-    wait_for_download(*realm, std::chrono::minutes(10));
+    {
+        // Reconnect and wait for the client reset to complete
+        auto [future, after_reset] = reset_utils::make_client_reset_handler();
+        realm_config.sync_config->notify_after_client_reset = after_reset;
+        auto realm = Realm::get_shared_realm(realm_config);
+        wait_for_download(*realm, std::chrono::minutes(10));
+        REQUIRE(future.is_ready());
+        REQUIRE(future.get_no_throw().is_ok());
+        reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
+    }
+    {
+        // Reconnect and wait for the client reset to complete
+        auto [future, after_reset] = reset_utils::make_client_reset_handler();
+        realm_config.sync_config->notify_after_client_reset = after_reset;
+        auto realm = Realm::get_shared_realm(realm_config);
+        wait_for_download(*realm, std::chrono::minutes(10));
+        REQUIRE(future.is_ready());
+        REQUIRE(future.get_no_throw().is_ok());
+    }
 }
 
 TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
@@ -1974,6 +1987,83 @@ TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baa
     auto realm = realm_pf.future.get();
     before_callback_called.future.get();
     after_callback_called.future.get();
+}
+
+TEST_CASE("sync: fast reconnect during client reset session suspend", "[sync][pbs][baas][client reset]") {
+    // This test is for validating a fix where the flx migration tests were failing due to
+    // 'handle_reconnect()' being called while the current session was being suspended as
+    // a result of receiving an error to perform a client reset.
+    const reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             partition_prop,
+         }},
+    };
+
+    auto server_app_config = minimal_app_config("client_reset_suspend", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+    auto app = test_app_session.app();
+
+    create_user_and_log_in(app);
+    SyncTestFile realm_config(app->current_user(), partition.value, schema);
+    realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+        if (err.server_requests_action == sync::ProtocolErrorInfo::Action::Warning ||
+            err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient) {
+            return;
+        }
+
+        FAIL(util::format("got error from server: %1", err.status));
+    };
+    auto create_obj = [&](SharedRealm& realm, int64_t value) {
+        auto obj_id = ObjectId::gen();
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(
+            c, realm, "object",
+            std::any(AnyDict{{"_id", obj_id}, {"value", value}, {partition.property_name, partition.value}}));
+        realm->commit_transaction();
+        return obj_id;
+    };
+
+    enum TestState { not_started, client_reset, suspend, complete };
+    TestingStateMachine<TestState> test_machine(TestState::not_started);
+    realm_config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> session_ptr,
+                                                              const SyncClientHookData& data) {
+        if (data.event == SyncClientHookEvent::SessionSuspended) {
+            test_machine.transition_with([&](const TestState cur_state) -> std::optional<TestState> {
+                if (cur_state == TestState::client_reset) {
+                    if (auto session = session_ptr.lock()) {
+                        session->handle_reconnect();
+                    }
+                    return TestState::suspend;
+                }
+                return std::nullopt;
+            });
+        }
+        return SyncClientHookAction::NoAction;
+    };
+
+    auto realm = Realm::get_shared_realm(realm_config);
+    {
+        create_obj(realm, 5);
+        wait_for_upload(*realm);
+    }
+    wait_for_download(*realm);
+    realm->sync_session()->shutdown_and_wait();
+
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
+    test_machine.transition_to(TestState::client_reset);
+
+    realm->sync_session()->resume();
+    test_machine.wait_for(TestState::suspend);
+    create_obj(realm, 64);
+    wait_for_download(*realm);
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
