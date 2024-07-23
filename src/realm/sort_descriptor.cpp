@@ -23,9 +23,69 @@
 #include <realm/util/assert.hpp>
 #include <realm/list.hpp>
 #include <realm/dictionary.hpp>
-#include <realm/string_compressor.hpp>
+#include <realm/string_interner.hpp>
 
 using namespace realm;
+
+namespace {
+
+template <typename T, typename Col>
+int compare(const T& i, const T& j, Col col)
+{
+    //1. compare compressed strings
+    if(i.compressed && j.compressed)
+    {
+        const auto string_id_i = static_cast<StringID>(i.get_value().get_int());
+        const auto string_id_j = static_cast<StringID>(j.get_value().get_int());
+        StringInterner* interner = col.table->get_string_interner(ColKey{col.col_key});
+        return interner->compare(string_id_i, string_id_j);
+    }
+    
+    //2. i is a compressed string and j is uncompressed (likely a mixed)
+    if(i.compressed)
+    {
+        const auto string_id_i = static_cast<StringID>(i.get_value().get_int());
+        const auto j_value = j.get_value();
+        const auto string_j = j_value.template get_if<StringData>();
+        if(string_j)
+        {
+            StringInterner* interner = col.table->get_string_interner(ColKey{col.col_key});
+            return -interner->compare(*string_j, string_id_i);
+        }
+        
+        //string vs mixed. extract the compressed string.
+        const auto& key = i.get_key();
+        const auto& obj = col.table->get_object(key);
+        const auto& col_key = col.col_key;
+        const auto i_value = col_key.get_value(obj);
+        return i_value.compare(j_value);
+    }
+    
+    //3. j is a compressed string and i is uncompressed (likely a mixed)
+    if(j.compressed)
+    {
+        const auto string_id_j = static_cast<StringID>(j.get_value().get_int());
+        Mixed i_value = i.get_value();
+        const auto string_i = i_value.template get_if<StringData>();
+        if(string_i)
+        {
+            StringInterner* interner = col.table->get_string_interner(ColKey{col.col_key});
+            return interner->compare(*string_i, string_id_j);
+        }
+        
+        //string vs mixed. extract the compressed string.
+        const auto& key = j.get_key();
+        const auto& obj = col.table->get_object(key);
+        const auto& col_key = col.col_key;
+        const auto j_value = col_key.get_value(obj);
+        return i_value.compare(j_value);
+    }
+    
+    //4. any other comparison
+    return i.get_value().compare(j.get_value());
+}
+
+}
 
 ConstTableRef ExtendedColumnKey::get_target_table(const Table* table) const
 {
@@ -402,47 +462,6 @@ void FilterDescriptor::execute(const Table& table, KeyValues& key_values, const 
     key_values = std::move(filtered);
 }
 
-template <typename T, typename U>
-inline int compare(const T& i, const T& j, const U& col)
-{
-    const auto id_i = i.cached_string_id;
-    const auto id_j = j.cached_string_id;
-
-    if (!id_i && !id_j)
-        // any other comparison that has nothing to do with strings
-        return i.get_value().compare(j.get_value());
-
-    if (id_i || id_j) {
-        // at least one is a compressed string.
-        const auto table = col.table;
-        const auto interner = table->get_string_interner(ColKey{col.col_key});
-
-        // two interned strings
-        if (id_i && id_j)
-            return interner->compare(*id_i, *id_j);
-
-        // one compressed string and the other one could potentially be uncompressed.
-        const auto& index = id_i ? j : i;
-        const auto& other = id_i ? id_i : id_j;
-        const auto str = index.get_value().template get_if<StringData>();
-        if (str) {
-            // compressed string vs uncompressed string
-            const auto ret = interner->compare(*str, *other);
-            // if i is a compressed string, than reverse cmp result, since
-            // we always compare i vs j and not j vs i.
-            return id_i ? -ret : ret;
-        }
-    }
-
-    // mixed str vs mixed (any other value)
-    const auto& index = id_i ? i : j;
-    const auto& key = index.get_key();
-    const auto& obj = col.table->get_object(key);
-    const auto& col_key = col.col_key;
-    const auto val = col_key.get_value(obj);
-    return id_i ? val.compare(j.get_value()) : i.get_value().compare(val);
-}
-
 // This function must conform to 'is less' predicate - that is:
 // return true if i is strictly smaller than j
 bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ordering) const
@@ -487,14 +506,9 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
 
                 // store stringID instead of the actual string if possible
                 cache_i.key = key_i;
-                cache_i.cached_string_id = col_key.get_string_id(obj);
-                if (cache_i.cached_string_id) {
-                    cache_i.value = {};
-                }
-                else {
-                    cache_i.value = col_key.get_value(obj);
-                    cache_i.cached_string_id = {};
-                }
+                const std::optional<StringID> string_id = col_key.get_string_id(obj);
+                cache_i.compressed = string_id ? true : false;
+                cache_i.value = cache_i.compressed ? static_cast<int64_t>(*string_id) : col_key.get_value(obj);
             }
 
             if (cache_j.key != key_j) {
@@ -503,14 +517,9 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
 
                 // store stringID instead of the actual string if possible
                 cache_j.key = key_j;
-                cache_j.cached_string_id = col_key.get_string_id(obj);
-                if (cache_j.cached_string_id) {
-                    cache_j.value = {};
-                }
-                else {
-                    cache_j.value = col_key.get_value(obj);
-                    cache_j.cached_string_id = {};
-                }
+                const std::optional<StringID> string_id = col_key.get_string_id(obj);
+                cache_j.compressed = string_id ? true : false;
+                cache_j.value = cache_j.compressed ? static_cast<int64_t>(*string_id) : col_key.get_value(obj);
             }
 
             c = compare(cache_i, cache_j, m_columns[t]);
@@ -542,16 +551,10 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
                 continue;
             }
         }
-
         const auto obj = col.table->get_object(key);
-        index.cached_string_id = ck.get_string_id(obj);
-        if (index.cached_string_id) {
-            index.cached_value = Mixed();
-        }
-        else {
-            index.cached_value = ck.get_value(obj);
-            // index.cached_string_id = {};
-        }
+        const std::optional<StringID> string_id = ck.get_string_id(obj);
+        index.compressed = string_id ? true : false;
+        index.cached_value = index.compressed ? static_cast<int64_t>(*string_id) : ck.get_value(obj);
     }
 }
 

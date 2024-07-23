@@ -77,9 +77,7 @@ public:
         ObjKey key_for_object;
         size_t index_in_view;
         Mixed cached_value;
-        // if the value is a string or mixed of string, we may want to store
-        // the compressed string id, instead of the whole string.
-        std::optional<StringID> cached_string_id = {};
+        bool compressed = false;
     };
     class IndexPairs : public std::vector<BaseDescriptor::IndexPair> {
     public:
@@ -126,7 +124,7 @@ public:
         struct ObjCache {
             ObjKey key;
             Mixed value;
-            std::optional<StringID> cached_string_id;
+            bool compressed = false;
 
             ObjKey get_key() const
             {
