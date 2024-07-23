@@ -978,6 +978,8 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
     if (m_websocket_error_received)
         return;
 
+    m_sending_session = sess;
+    m_sending = true;
     m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](Status status) {
         if (sentinel->destroyed) {
             return;
@@ -991,8 +993,6 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
         }
         handle_write_message(); // Throws
     });                         // Throws
-    m_sending_session = sess;
-    m_sending = true;
 }
 
 
@@ -1571,7 +1571,7 @@ void Session::integrate_changesets(const SyncProgress& progress, std::uint_fast6
                                        "received empty download message that was not the last in batch",
                                        ProtocolError::bad_progress);
         }
-        history.set_sync_progress(progress, downloadable_bytes, version_info); // Throws
+        history.set_sync_progress(progress, downloadable_bytes, version_info, logger); // Throws
         return;
     }
 
@@ -1718,9 +1718,6 @@ void Session::activate()
     catch (...) {
         on_integration_failure(IntegrationException(exception_to_status()));
     }
-
-    // Checks if there is a pending client reset
-    handle_pending_client_reset_acknowledgement();
 }
 
 
@@ -2270,16 +2267,18 @@ bool Session::client_reset_if_needed()
                     m_progress.download.last_integrated_client_version);
     REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
 
+    // Reset the cached values which are used to calculate progress since the
+    // last time sync completed
+    init_progress_handler();
+
+    // Update the download progress to match what it would have been if we'd
+    // received a MARK message from the server (as the fresh Realm which we used
+    // as the source data for the reset did).
     m_upload_progress = m_progress.upload;
     m_download_progress = m_progress.download;
-    init_progress_handler();
-    // In recovery mode, there may be new changesets to upload and nothing left to download.
-    // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
-    // For both, we want to allow uploads again without needing external changes to download first.
-    m_delay_uploads = false;
-
-    // Checks if there is a pending client reset
-    handle_pending_client_reset_acknowledgement();
+    m_server_version_at_last_download_mark = m_progress.download.server_version;
+    m_last_download_mark_received = m_last_download_mark_sent = m_target_download_mark;
+    check_for_download_completion();
 
     // If a migration or rollback is in progress, mark it complete when client reset is completed.
     if (auto migration_store = get_migration_store()) {

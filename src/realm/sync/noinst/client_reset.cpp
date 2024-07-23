@@ -545,6 +545,14 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, ut
         }
     }
 
+    // If there was nothing to recover or recovery was disabled then immediately
+    // mark the client reset as successfully complete
+    if (recovered.empty()) {
+        logger.info(util::LogCategory::reset,
+                    "Immediately removing client reset tracker as there are no recovered changesets to upload.");
+        sync::PendingResetStore::clear_pending_reset(*wt_local);
+    }
+
     wt_local->commit_and_continue_as_read();
 
     VersionID new_version_local = wt_local->get_version_of_current_transaction();

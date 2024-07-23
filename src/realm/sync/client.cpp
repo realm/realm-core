@@ -102,8 +102,6 @@ public:
     // Can be called from any thread.
     util::Future<std::string> send_test_command(std::string body);
 
-    void handle_pending_client_reset_acknowledgement();
-
     // Can be called from any thread.
     std::string get_appservices_connection_id();
 
@@ -779,14 +777,6 @@ void SessionImpl::on_resumed()
     }
 }
 
-void SessionImpl::handle_pending_client_reset_acknowledgement()
-{
-    // Ignore the call if the session is not active
-    if (m_state == State::Active) {
-        m_wrapper.handle_pending_client_reset_acknowledgement();
-    }
-}
-
 bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
 {
     // Ignore the message if the session is not active or a steady state message
@@ -1354,8 +1344,12 @@ void SessionWrapper::actualize()
         }
     }
 
-    if (!m_client_reset_config)
+    if (!m_client_reset_config) {
         check_progress(); // Throws
+        if (auto pending_reset = PendingResetStore::has_pending_reset(*m_db->start_frozen())) {
+            m_sess->logger.info(util::LogCategory::reset, "Found pending client reset tracker: %1", *pending_reset);
+        }
+    }
 }
 
 void SessionWrapper::force_close()
@@ -1649,49 +1643,6 @@ util::Future<std::string> SessionWrapper::send_test_command(std::string body)
     }
 
     return m_sess->send_test_command(std::move(body));
-}
-
-void SessionWrapper::handle_pending_client_reset_acknowledgement()
-{
-    REALM_ASSERT(!m_finalized);
-
-    auto has_pending_reset = PendingResetStore::has_pending_reset(*m_db->start_frozen());
-    if (!has_pending_reset) {
-        return; // nothing to do
-    }
-
-    m_sess->logger.info(util::LogCategory::reset, "Tracking %1", *has_pending_reset);
-
-    // Now that the client reset merge is complete, wait for the changes to synchronize with the server
-    async_wait_for(
-        true, true, [self = util::bind_ptr(this), pending_reset = std::move(*has_pending_reset)](Status status) {
-            if (status == ErrorCodes::OperationAborted) {
-                return;
-            }
-            auto& logger = self->m_sess->logger;
-            if (!status.is_ok()) {
-                logger.error(util::LogCategory::reset, "Error while tracking client reset acknowledgement: %1",
-                             status);
-                return;
-            }
-
-            logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
-
-            auto tr = self->m_db->start_write();
-            auto cur_pending_reset = PendingResetStore::has_pending_reset(*tr);
-            if (!cur_pending_reset) {
-                logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
-                return;
-            }
-            if (*cur_pending_reset == pending_reset) {
-                logger.debug(util::LogCategory::reset, "Removing client reset cycle detection tracker.");
-            }
-            else {
-                logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
-            }
-            PendingResetStore::clear_pending_reset(*tr);
-            tr->commit();
-        });
 }
 
 std::string SessionWrapper::get_appservices_connection_id()

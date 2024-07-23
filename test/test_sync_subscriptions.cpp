@@ -576,11 +576,12 @@ TEST_IF(Sync_SubscriptionStoreInternalSchemaMigration, REALM_MAX_BPNODE_SIZE == 
 
     auto tr = fixture.db->start_read();
     SyncMetadataSchemaVersions versions(tr);
-    auto flx_sub_store_version = versions.get_version_for(tr, sync::internal_schema_groups::c_flx_subscription_store);
+    auto flx_sub_store_version =
+        versions.get_version_for(*tr, sync::internal_schema_groups::c_flx_subscription_store);
     CHECK(flx_sub_store_version);
     CHECK_EQUAL(*flx_sub_store_version, 2);
 
-    CHECK(!versions.get_version_for(tr, "non_existent_table"));
+    CHECK(!versions.get_version_for(*tr, "non_existent_table"));
 }
 
 TEST(Sync_SubscriptionStoreNextPendingVersion)
@@ -843,8 +844,8 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
     {
         auto tr = db->start_read();
         // Verify opening a reader on an unitialized versions table returns uninitialized
-        SyncMetadataSchemaVersionsReader reader(tr);
-        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        SyncMetadataSchemaVersionsReader reader(*tr);
+        auto schema_version = reader.get_version_for(*tr, schema_group_name);
         CHECK(!schema_version);
     }
 
@@ -855,7 +856,7 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
         tr->promote_to_write();
         schema_versions.set_version_for(tr, schema_group_name, version);
         tr->commit_and_continue_as_read();
-        auto schema_version = schema_versions.get_version_for(tr, schema_group_name);
+        auto schema_version = schema_versions.get_version_for(*tr, schema_group_name);
         CHECK(schema_version);
         CHECK(*schema_version == version);
     }
@@ -863,8 +864,8 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
     {
         auto tr = db->start_read();
         // Verify opening a reader on an initialized versions table returns initialized
-        SyncMetadataSchemaVersionsReader reader(tr);
-        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        SyncMetadataSchemaVersionsReader reader(*tr);
+        auto schema_version = reader.get_version_for(*tr, schema_group_name);
         CHECK(schema_version);
         CHECK(*schema_version == version);
     }
@@ -874,8 +875,8 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
     {
         auto tr = db->start_read();
         // Verify opening a reader with legacy data returns uninitialized
-        SyncMetadataSchemaVersionsReader reader(tr);
-        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        SyncMetadataSchemaVersionsReader reader(*tr);
+        auto schema_version = reader.get_version_for(*tr, schema_group_name);
         CHECK(!schema_version);
     }
 
@@ -884,7 +885,7 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
         auto tr = db->start_read();
         // Initialize the schema versions table and verify the converted flx subscription store version
         SyncMetadataSchemaVersions schema_versions(tr);
-        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        auto schema_version = schema_versions.get_version_for(*tr, internal_schema_groups::c_flx_subscription_store);
         CHECK(schema_version);
         CHECK(*schema_version == legacy_version);
         // Verify the legacy table has been deleted after the conversion
@@ -903,7 +904,7 @@ TEST(Sync_SyncMetadataSchemaVersions)
     auto check_version = [this, &db](SyncMetadataSchemaVersionsReader& schema_versions,
                                      const std::string_view& group_name, int64_t expected_version) {
         auto tr = db->start_read();
-        auto schema_version = schema_versions.get_version_for(tr, group_name);
+        auto schema_version = schema_versions.get_version_for(*tr, group_name);
         CHECK(schema_version);
         CHECK(*schema_version == expected_version);
     };
@@ -953,7 +954,7 @@ TEST(Sync_SyncMetadataSchemaVersions)
     {
         // Re-read the data and verify the new values with a reader
         auto tr = db->start_read();
-        SyncMetadataSchemaVersionsReader schema_versions(tr);
+        SyncMetadataSchemaVersionsReader schema_versions(*tr);
 
         check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version2);
         check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
@@ -973,7 +974,7 @@ TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
         auto tr = db->start_read();
         // Converts the legacy table to the unified table
         SyncMetadataSchemaVersions schema_versions(tr);
-        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        auto schema_version = schema_versions.get_version_for(*tr, internal_schema_groups::c_flx_subscription_store);
         CHECK(schema_version);
         CHECK(*schema_version == version);
         // Verify the legacy table has been deleted after the conversion

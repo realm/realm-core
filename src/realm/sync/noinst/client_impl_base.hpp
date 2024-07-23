@@ -934,7 +934,6 @@ private:
     void process_pending_flx_bootstrap();
 
     bool client_reset_if_needed();
-    void handle_pending_client_reset_acknowledgement();
 
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 

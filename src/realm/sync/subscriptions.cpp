@@ -663,10 +663,10 @@ SubscriptionStore::SubscriptionStore(Private, DBRef db)
 
     auto tr = m_db->start_read();
     // Start with a reader so it doesn't try to write until we are ready
-    SyncMetadataSchemaVersionsReader schema_versions_reader(tr);
+    SyncMetadataSchemaVersionsReader schema_versions_reader(*tr);
 
     if (auto schema_version =
-            schema_versions_reader.get_version_for(tr, internal_schema_groups::c_flx_subscription_store)) {
+            schema_versions_reader.get_version_for(*tr, internal_schema_groups::c_flx_subscription_store)) {
         if (*schema_version != c_flx_schema_version) {
             throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
                                "Invalid schema version for flexible sync metadata");
