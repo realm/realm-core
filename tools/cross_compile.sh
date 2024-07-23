@@ -119,11 +119,9 @@ elif [[ "${OS}" == "emscripten" ]]; then
     mkdir -p build-emscripten
     cd build-emscripten || exit 1
 
-    ${EMCMAKE} cmake .. \
-                     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-                     -DREALM_NO_TESTS=1 \
-                     -DREALM_BUILD_LIB_ONLY=1 \
-                     ${CMAKE_FLAGS}
+    ${EMCMAKE} cmake -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+                     ${CMAKE_FLAGS} \
+                     ..
 
     make "-j${NPROC}" 2>&1
 else

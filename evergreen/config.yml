@@ -197,6 +197,20 @@ functions:
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
               $target
 
+  "compile emscripten":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        script: |-
+          set -o errexit
+          set -o pipefail
+          set -o verbose
+
+          docker pull emscripten/emsdk:${emsdk_version|latest}
+          sudo docker run -i --privileged --rm -v $(pwd):/realm-core -u $(id -u):$(id -g) --user root --workdir /realm-core \
+          emscripten/emsdk /realm-core/tools/cross_compile.sh -o emscripten -t RelWithDebInfo
+
   "run benchmark":
     - command: shell.exec
       params:
@@ -745,6 +759,12 @@ tasks:
   commands:
   - func: "compile"
 
+- name: compile-emscripten
+  exec_timeout_secs: 1800
+  tags: [ "for_pull_requests" ]
+  commands:
+  - func: "compile emscripten"
+
 - name: package
   exec_timeout_secs: 1800
   commands:
@@ -1279,6 +1299,15 @@ task_groups:
   - compile
   - .test_suite
 
+- name: compile_emscripten
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  tasks:
+  - compile-emscripten
+
 # Runs object-store-tests against baas running on remote host and runs
 # the network simulation tests as a separate task for nightly builds
 - name: network_tests
@@ -1618,6 +1647,25 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
+
+- name: ubuntu-emscripten
+  display_name: "Ubuntu (Emscripten x86_64)"
+  run_on: ubuntu2204-large
+  expansions:
+    fetch_missing_dependencies: On
+    emsdk_version: "3.1.37"
+  tasks:
+  - name: compile_emscripten
+
+- name: ubuntu-emscripten-release
+  display_name: "Ubuntu (Emscripten release x86_64)"
+  run_on: ubuntu2204-large
+  expansions:
+    fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
+    emsdk_version: "3.1.37"
+  tasks:
+  - name: compile_emscripten
 
 # disable these builders since there are constantly failing and not yet ready for nightly builds
 # - name: ubuntu2004-network-nonideal
