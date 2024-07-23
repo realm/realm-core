@@ -4133,12 +4133,8 @@ TEST_TYPES(Query_SortingCompressedStrings, std::true_type, std::false_type)
     TableRef t = rt->get_table("t");
     const auto t_string_col = t->get_column_key("t_string");
     TableView tv = t->where().find_all();
-    bool ascending;
-    if constexpr (type::value) {
-        ascending = true;
-    }
-    else {
-        ascending = false;
+    bool ascending = type::value;
+    if (!ascending) {
         std::reverse(results.begin(), results.end());
     }
     tv.sort(SortDescriptor({{t_string_col}}, {ascending}));
