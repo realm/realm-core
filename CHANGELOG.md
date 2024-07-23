@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Automatic client reset handling now reports download completion as soon as all changes from the newly downloaded file have been applied to the main Realm file rather than at an inconsistent time afterwards ([PR #7921](https://github.com/realm/realm-core/pull/7921)).
+* Cycle detection for automatic client reset handling would sometimes consider two client resets in a row to be a cycle even when the first reset did not recover any changes and so could not have triggered the second. ([PR #7921](https://github.com/realm/realm-core/pull/7921)).
 
 ### Breaking changes
 * None.

@@ -854,7 +854,7 @@ TEST(ClientReset_PinnedVersion)
 #endif // !REALM_MOBILE
 
 void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fresh, ClientResyncMode mode,
-                  SubscriptionStore* sub_store = nullptr, bool allow_recovery = true)
+                  bool expect_recovered_changes, SubscriptionStore* sub_store = nullptr, bool allow_recovery = true)
 {
     CHECK(target);
     CHECK(fresh);
@@ -917,9 +917,9 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
         CHECK_EQUAL(file_ident.salt, fresh_client_id.salt);
     }
 
-    // Client resets aren't marked as complete until the server has acknowledged
-    // sync completion to avoid reset cycles
-    {
+    // Client resets which recover changes aren't marked as complete until the
+    // server has acknowledged sync completion to avoid reset cycles
+    if (expect_recovered_changes) {
         auto tr = target->start_read();
         auto pending_reset = PendingResetStore::has_pending_reset(*tr);
         CHECK(pending_reset);
@@ -930,6 +930,10 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
         PendingResetStore::clear_pending_reset(*tr);
         tr->commit_and_continue_as_read();
         CHECK_NOT(PendingResetStore::has_pending_reset(*tr));
+    }
+    else {
+        auto pending_reset = PendingResetStore::has_pending_reset(*target->start_read());
+        CHECK_NOT(pending_reset);
     }
 }
 
@@ -1047,7 +1051,8 @@ void mark_as_synchronized(DB& db)
     progress.upload.client_version = current_version;
     progress.upload.last_integrated_server_version = current_version;
     sync::VersionInfo info_out;
-    history.set_sync_progress(progress, 0, info_out);
+    util::NullLogger logger;
+    history.set_sync_progress(progress, 0, info_out, logger);
     history.set_client_file_ident({1, 0}, false);
 }
 
@@ -1125,7 +1130,7 @@ TEST(ClientReset_NoChanges)
         // one, which shouldn't result in any changes regardless of mode
         db->write_copy(path_fresh, nullptr);
         auto db_fresh = DB::create(make_client_replication(), path_fresh);
-        expect_reset(test_context, db, db_fresh, mode);
+        expect_reset(test_context, db, db_fresh, mode, false);
 
         // End state should exactly match the pre-reset state
         CHECK_OR_RETURN(compare_groups(*db->start_read(), *backup_db->start_read()));
@@ -1167,7 +1172,7 @@ TEST(ClientReset_SimpleNonconflictingChanges)
             wt->commit();
         }
 
-        expect_reset(test_context, db, db_fresh, mode, nullptr, allow_recovery);
+        expect_reset(test_context, db, db_fresh, mode, allow_recovery, nullptr, allow_recovery);
 
         if (allow_recovery) {
             // Should have both the objects created locally and from the reset realm
@@ -1224,7 +1229,7 @@ TEST(ClientReset_SimpleConflictingWrites)
             wt->commit();
         }
 
-        expect_reset(test_context, db, db_fresh, mode, nullptr, allow_recovery);
+        expect_reset(test_context, db, db_fresh, mode, allow_recovery, nullptr, allow_recovery);
 
         auto tr = db->start_read();
         auto table = tr->get_table("class_table");
@@ -1292,7 +1297,7 @@ TEST(ClientReset_Recover_ModificationsOnDeletedObject)
         wt->commit();
     }
 
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, true);
 
     auto tr = db->start_read();
     auto table = tr->get_table("class_table");
@@ -1332,7 +1337,7 @@ TEST(ClientReset_DiscardLocal_DiscardsPendingSubscriptions)
         pending_sets.push_back(std::move(set));
     }
 
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::DiscardLocal, sub_store.get());
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::DiscardLocal, false, sub_store.get());
 
     CHECK(sub_store->get_pending_subscriptions().empty());
     auto subs = sub_store->get_latest();
@@ -1366,7 +1371,7 @@ TEST_TYPES(ClientReset_DiscardLocal_MakesAwaitingMarkActiveSubscriptionsComplete
     auto set = add_subscription(*sub_store, "complete", query, SubscriptionSet::State::AwaitingMark);
     auto future = set.get_state_change_notification(SubscriptionSet::State::Complete);
 
-    expect_reset(test_context, db, db_fresh, TEST_TYPE::value, sub_store.get());
+    expect_reset(test_context, db, db_fresh, TEST_TYPE::value, false, sub_store.get());
 
     CHECK_EQUAL(future.get(), SubscriptionSet::State::Complete);
     CHECK_EQUAL(set.state(), SubscriptionSet::State::AwaitingMark);
@@ -1394,7 +1399,7 @@ TEST(ClientReset_Recover_DoesNotCompletePendingSubscriptions)
         futures.push_back(subs.get_state_change_notification(SubscriptionSet::State::Complete));
     }
 
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, sub_store.get());
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, false, sub_store.get());
 
     for (auto& fut : futures) {
         CHECK_NOT(fut.is_ready());
@@ -1442,10 +1447,11 @@ TEST(ClientReset_Recover_UpdatesRemoteServerVersions)
 
         sync::VersionInfo info_out;
         auto& history = static_cast<ClientReplication*>(db_fresh->get_replication())->get_history();
-        history.set_sync_progress(progress, 0, info_out);
+        util::NullLogger logger;
+        history.set_sync_progress(progress, 0, info_out, logger);
     }
 
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, true);
 
     auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
     history.ensure_updated(db->get_version_of_latest_snapshot());
@@ -1508,7 +1514,7 @@ TEST(ClientReset_Recover_UploadableBytes)
                                       pre_reset_uploadable_bytes, unused, unused_version);
     CHECK_GREATER(pre_reset_uploadable_bytes, 0);
 
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, true);
 
     uint_fast64_t post_reset_uploadable_bytes;
     history.get_upload_download_state(*db->start_read(), db->get_alloc(), unused, unused_progress, unused,
@@ -1555,7 +1561,7 @@ TEST(ClientReset_Recover_ListsAreOnlyCopiedOnce)
         wt->commit();
     }
 
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, true);
 
     // List should match the pre-reset local state
     auto rt = db->start_read();
@@ -1612,7 +1618,7 @@ TEST(ClientReset_Recover_RecoverableChangesOnListsAfterUnrecoverableAreNotDuplic
         wt->commit();
     }
 
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, sub_store.get());
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, true, sub_store.get());
 
     // List should match the pre-reset local state
     auto rt = db->start_read();
@@ -1708,7 +1714,7 @@ TEST(ClientReset_Recover_ReciprocalListChanges)
     // shouldn't modify the group. However, if it reapplied the original changesets
     // and not the reciprocal history, it'd result in the list being
     // [0, 1, 2, 11, 10, 21, 12, 31, 20, 41, 22, 30, 32, 40, 42]
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, true);
 
     auto rt = db->start_read();
     auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
@@ -1767,7 +1773,7 @@ TEST(ClientReset_Recover_UpdatesReciprocalHistory)
 
     // client reset will discard the recovered array insertion as the object
     // doesn't exist, but keep the object creation
-    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
+    expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, true);
 
     // Recreate the object and add a different value to the list
     {

@@ -46,6 +46,7 @@
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/pending_bootstrap_store.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
@@ -471,6 +472,79 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
     }
 }
 
+namespace {
+struct DisconnectingWebSocketInterface : sync::WebSocketInterface {
+    std::unique_ptr<WebSocketInterface> m_impl;
+    std::atomic<bool>* disconnect;
+
+    std::string_view get_appservices_request_id() const noexcept override
+    {
+        return m_impl->get_appservices_request_id();
+    }
+
+    void async_write_binary(util::Span<const char> data, sync::SyncSocketProvider::FunctionHandler&& handler) override
+    {
+        if (*disconnect) {
+            handler(Status::OK());
+        }
+        else {
+            m_impl->async_write_binary(data, std::move(handler));
+        }
+    }
+};
+
+struct DisconnectingWebSocketObserver : sync::WebSocketObserver {
+    std::unique_ptr<WebSocketObserver> m_impl;
+    std::atomic<bool>* disconnect;
+
+    void websocket_connected_handler(const std::string& protocol) override
+    {
+        m_impl->websocket_connected_handler(protocol);
+    }
+
+    void websocket_error_handler() override
+    {
+        m_impl->websocket_error_handler();
+    }
+
+    bool websocket_binary_message_received(util::Span<const char> data) override
+    {
+        if (*disconnect)
+            return true;
+        return m_impl->websocket_binary_message_received(data);
+    }
+
+    bool websocket_closed_handler(bool was_clean, sync::websocket::WebSocketError error_code,
+                                  std::string_view message) override
+    {
+        return m_impl->websocket_closed_handler(was_clean, error_code, message);
+    }
+};
+
+// A socket provider which claims to always work, but when `disconnect = true`
+// will actually drop all incoming and outgoing messages. This enables testing
+// going offline at very specfic points.
+struct DisconnectingSocketProvider : sync::websocket::DefaultSocketProvider {
+    std::atomic<bool> disconnect{false};
+
+    DisconnectingSocketProvider()
+        : sync::websocket::DefaultSocketProvider(util::Logger::get_default_logger(), "user agent")
+    {
+    }
+
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+                                                      sync::WebSocketEndpoint&& endpoint) override
+    {
+        auto wrapped_observer = std::make_unique<DisconnectingWebSocketObserver>();
+        wrapped_observer->m_impl = std::move(observer);
+        wrapped_observer->disconnect = &disconnect;
+        auto wrapped_interface = std::make_unique<DisconnectingWebSocketInterface>();
+        wrapped_interface->m_impl = DefaultSocketProvider::connect(std::move(wrapped_observer), std::move(endpoint));
+        wrapped_interface->disconnect = &disconnect;
+        return wrapped_interface;
+    }
+};
+} // namespace
 
 TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     std::vector<ObjectSchema> schema{
@@ -494,8 +568,10 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     // some of these tests make additive schema changes which is only allowed in dev mode
     constexpr bool dev_mode = true;
+    const auto socket_provider = std::make_shared<DisconnectingSocketProvider>();
     FLXSyncTestHarness harness("flx_client_reset",
-                               {schema, {"queryable_str_field", "queryable_int_field"}, {}, dev_mode});
+                               {schema, {"queryable_str_field", "queryable_int_field"}, {}, dev_mode},
+                               instance_of<SynchronousTestTransport>, socket_provider);
 
     auto add_object = [](SharedRealm realm, std::string str_field, int64_t int_field,
                          ObjectId oid = ObjectId::gen()) {
@@ -636,11 +712,6 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             })
             ->make_remote_changes([&](SharedRealm remote_realm) {
                 add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
-                sync::SubscriptionSet::State actual =
-                    remote_realm->get_latest_subscription_set()
-                        .get_state_change_notification(sync::SubscriptionSet::State::Complete)
-                        .get();
-                REQUIRE(actual == sync::SubscriptionSet::State::Complete);
             })
             ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
                 wait_for_advance(*local_realm);
@@ -1161,20 +1232,20 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
     SECTION("DiscardLocal: open realm after client reset failure") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-        auto&& [error_future, error_handler] = make_error_handler();
-        config_local.sync_config->error_handler = error_handler;
 
         std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(config_local.path);
         // create a non-empty directory that we'll fail to delete
         util::make_dir(fresh_path);
         util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
 
-        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
-        test_reset->run();
+        std::optional<SyncError> sync_error;
+        reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session())
+            ->expect_reset_error(sync_error)
+            ->run();
 
         // Client reset fails due to sync client not being able to create the fresh realm.
-        auto sync_error = wait_for_future(std::move(error_future)).get();
-        REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
+        REQUIRE(sync_error);
+        REQUIRE(sync_error->status == ErrorCodes::AutoClientResetFailed);
 
         // Open the realm again. This should not crash.
         auto&& [err_future, err_handler] = make_error_handler();
@@ -1182,7 +1253,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
         auto realm_post_reset = Realm::get_shared_realm(config_local);
         sync_error = wait_for_future(std::move(err_future)).get();
-        REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
+        REQUIRE(sync_error->status == ErrorCodes::AutoClientResetFailed);
     }
 
     enum class ResetMode { NoReset, InitiateClientReset };
@@ -1196,6 +1267,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         auto subs = realm->get_latest_subscription_set();
         auto result = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         CHECK(result == sync::SubscriptionSet::State::Complete);
+        SyncSession::OnlyForTesting::pause_async(*realm->sync_session()).get();
         if (reset_mode == ResetMode::InitiateClientReset) {
             reset_utils::trigger_client_reset(harness.session().app_session(), realm);
         }
@@ -1542,6 +1614,134 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 CHECK(dict.get("key2").get_string() == "value");
             })
             ->run();
+    }
+
+    SECTION("client reset immediately reports download completion") {
+        config_local.sync_config->client_resync_mode =
+            GENERATE(ClientResyncMode::Recover, ClientResyncMode::DiscardLocal);
+        seed_realm(config_local, ResetMode::InitiateClientReset);
+        config_local.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
+            socket_provider->disconnect = true;
+        };
+        // Should complete even though the connection was dropped while applying
+        // the client reset as the fresh realm download waited for download completion
+        successfully_async_open_realm(config_local);
+    }
+
+    SECTION("DiscardLocal immediately reports upload completion") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        config_local.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
+            socket_provider->disconnect = true;
+        };
+
+        auto realm = Realm::get_shared_realm(config_local);
+        subscribe_to_and_add_objects(realm, 1);
+        wait_for_upload(*realm);
+        realm->sync_session()->pause();
+
+        auto pf = util::make_promise_future();
+        realm->sync_session()->wait_for_upload_completion([&](Status status) {
+            if (status.is_ok())
+                pf.promise.emplace_value();
+            else
+                pf.promise.set_error(status);
+        });
+        subscribe_to_and_add_objects(realm, 5);
+        reset_utils::trigger_client_reset(harness.session().app_session(), realm);
+        realm->sync_session()->resume();
+        // Upload completion is fired even though we're offline because the things
+        // we were waiting to upload were discarded instead
+        pf.future.get();
+    }
+
+    SECTION("Recover reports upload completion after recovered changesets are uploaded") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        config_local.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
+            socket_provider->disconnect = true;
+        };
+
+        auto realm = Realm::get_shared_realm(config_local);
+        subscribe_to_and_add_objects(realm, 1);
+        wait_for_upload(*realm);
+        realm->sync_session()->pause();
+
+        auto pf = util::make_promise_future();
+        realm->sync_session()->wait_for_upload_completion([&](Status status) {
+            if (status.is_ok())
+                pf.promise.emplace_value();
+            else
+                pf.promise.set_error(status);
+        });
+        subscribe_to_and_add_objects(realm, 5);
+        reset_utils::trigger_client_reset(harness.session().app_session(), realm);
+        realm->sync_session()->resume();
+        wait_for_download(*realm); // i.e. wait for the reset to complete
+
+        // Upload completion has not fired because we recovered local changes
+        // that are waiting to be uploaded
+        REQUIRE_FALSE(pf.future.is_ready());
+        socket_provider->disconnect = false;
+        pf.future.get();
+    }
+
+    SECTION("DiscardLocal immediately marks client reset as successful") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        seed_realm(config_local, ResetMode::InitiateClientReset);
+        config_local.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
+            socket_provider->disconnect = true;
+        };
+        successfully_async_open_realm(config_local);
+    }
+
+    SECTION("Recover immediately marks client reset as successful if there was nothing to recover") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        config_local.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
+            socket_provider->disconnect = true;
+        };
+
+        auto realm = Realm::get_shared_realm(config_local);
+        subscribe_to_and_add_objects(realm, 1);
+        wait_for_upload(*realm);
+        reset_utils::trigger_client_reset(harness.session().app_session(), realm);
+        wait_for_download(*realm); // i.e. wait for the reset to complete
+
+        REQUIRE_FALSE(sync::PendingResetStore::has_pending_reset(realm->read_group()));
+    }
+
+    SECTION("Recover marks client reset with changes to recover as successful after uploading") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        config_local.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm>) {
+            socket_provider->disconnect = true;
+        };
+
+        auto realm = Realm::get_shared_realm(config_local);
+        subscribe_to_and_add_objects(realm, 1);
+        wait_for_upload(*realm);
+        realm->sync_session()->pause();
+
+        subscribe_to_and_add_objects(realm, 5);
+        reset_utils::trigger_client_reset(harness.session().app_session(), realm);
+        realm->sync_session()->resume();
+        wait_for_download(*realm); // i.e. wait for the reset to complete
+
+        realm->refresh();
+        REQUIRE(sync::PendingResetStore::has_pending_reset(realm->read_group()));
+
+        SECTION("existing session allowed to reconnect") {
+            socket_provider->disconnect = false;
+            wait_for_upload(*realm);
+            realm->refresh();
+            REQUIRE_FALSE(sync::PendingResetStore::has_pending_reset(realm->read_group()));
+        }
+
+        SECTION("new session discovering the tracker when activating") {
+            SyncSession::OnlyForTesting::pause_async(*realm->sync_session()).get();
+            socket_provider->disconnect = false;
+            realm->sync_session()->resume();
+            wait_for_upload(*realm);
+            realm->refresh();
+            REQUIRE_FALSE(sync::PendingResetStore::has_pending_reset(realm->read_group()));
+        }
     }
 }
 

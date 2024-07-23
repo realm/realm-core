@@ -63,11 +63,13 @@ constexpr static std::string_view s_reset_action_col_name("action");
 constexpr static std::string_view s_reset_error_code_col_name("error_code");
 constexpr static std::string_view s_reset_error_msg_col_name("error_msg");
 
-void PendingResetStore::clear_pending_reset(Group& group)
+bool PendingResetStore::clear_pending_reset(Group& group)
 {
     if (auto table = group.get_table(s_meta_reset_table_name); table && !table->is_empty()) {
         table->clear();
+        return true;
     }
+    return false;
 }
 
 std::optional<PendingReset> PendingResetStore::has_pending_reset(const Group& group)

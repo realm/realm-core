@@ -328,7 +328,8 @@ struct TestClientReset {
     TestClientReset* on_post_reset(Callback&& post_reset);
     void set_pk_of_object_driving_reset(const ObjectId& pk);
     ObjectId get_pk_of_object_driving_reset() const;
-    void disable_wait_for_reset_completion();
+    TestClientReset* disable_wait_for_reset_completion();
+    TestClientReset* expect_reset_error(std::optional<SyncError>&);
 
     virtual TestClientReset* set_development_mode(bool enable = true);
     virtual void run() = 0;
@@ -343,8 +344,9 @@ protected:
     Callback m_make_remote_changes;
     Callback m_on_post_local;
     Callback m_on_post_reset;
-    bool m_did_run = false;
     ObjectId m_pk_driving_reset = ObjectId::gen();
+    std::optional<SyncError>* m_error = nullptr;
+    bool m_did_run = false;
     bool m_wait_for_reset_completion = true;
 };
 
