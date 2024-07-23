@@ -1527,6 +1527,16 @@ void Session::cancel_resumption_delay()
     if (unbind_process_complete())
         initiate_rebind(); // Throws
 
+    try {
+        process_pending_flx_bootstrap(); // throws
+    }
+    catch (const IntegrationException& error) {
+        on_integration_failure(error);
+    }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
+
     m_conn.one_more_active_unsuspended_session(); // Throws
     if (m_try_again_activation_timer) {
         m_try_again_activation_timer.reset();
@@ -1715,7 +1725,7 @@ void Session::activate()
     m_conn.one_more_active_unsuspended_session(); // Throws
 
     try {
-        process_pending_flx_bootstrap();
+        process_pending_flx_bootstrap(); // throws
     }
     catch (const IntegrationException& error) {
         on_integration_failure(error);
@@ -1806,18 +1816,19 @@ void Session::send_message()
     if (!m_bind_message_sent)
         return send_bind_message(); // Throws
 
-    if (!m_ident_message_sent) {
-        if (have_client_file_ident())
-            send_ident_message(); // Throws
-        return;
-    }
-
+    // Pending test commands can be sent any time after the BIND message is sent
     const auto has_pending_test_command = std::any_of(m_pending_test_commands.begin(), m_pending_test_commands.end(),
                                                       [](const PendingTestCommand& command) {
                                                           return command.pending;
                                                       });
     if (has_pending_test_command) {
         return send_test_command_message();
+    }
+
+    if (!m_ident_message_sent) {
+        if (have_client_file_ident())
+            send_ident_message(); // Throws
+        return;
     }
 
     if (m_error_to_send)
@@ -1979,6 +1990,7 @@ void Session::send_ident_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_ident_message_sent = true;
+    call_debug_hook(SyncClientHookEvent::IdentMessageSent);
 
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
@@ -2028,17 +2040,21 @@ void Session::send_upload_message()
         target_upload_version = m_pending_flx_sub_set->snapshot_version;
     }
 
+    bool server_version_to_ack =
+        m_upload_progress.last_integrated_server_version < m_download_progress.server_version;
+
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
     get_history().find_uploadable_changesets(m_upload_progress, target_upload_version, uploadable_changesets,
                                              locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
-        // Nothing more to upload right now
-        // If we need to limit upload up to some version other than the last client version available and there are no
-        // changes to upload, then there is no need to send an empty message.
-        if (m_pending_flx_sub_set) {
-            logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
+        // Nothing more to upload right now if:
+        //  1. We need to limit upload up to some version other than the last client version
+        //     available and there are no changes to upload
+        //  2. There are no changes to upload and no server version(s) to acknowledge
+        if (m_pending_flx_sub_set || !server_version_to_ack) {
+            logger.trace("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
                          m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
             // Other messages may be waiting to be sent
             return enlist_to_send(); // Throws
@@ -2054,11 +2070,12 @@ void Session::send_upload_message()
     version_type progress_server_version = m_upload_progress.last_integrated_server_version;
 
     if (!upload_messages_allowed()) {
-        logger.debug("UPLOAD not allowed: upload progress(progress_client_version=%1, progress_server_version=%2, "
+        logger.trace("UPLOAD not allowed (progress_client_version=%1, progress_server_version=%2, "
                      "locked_server_version=%3, num_changesets=%4)",
                      progress_client_version, progress_server_version, locked_server_version,
                      uploadable_changesets.size()); // Throws
-        return;
+        // Other messages may be waiting to be sent
+        return enlist_to_send(); // Throws
     }
 
     logger.debug("Sending: UPLOAD(progress_client_version=%1, progress_server_version=%2, "
@@ -2376,22 +2393,16 @@ Status Session::receive_download_message(const DownloadMessage& message)
     if (!is_flx || query_version > 0)
         enable_progress_notifications();
 
-    // If this is a PBS connection, then every download message is its own complete batch.
-    bool last_in_batch = is_flx ? *message.last_in_batch : true;
-    auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
-    if (is_steady_state_download_message(batch_state, query_version))
-        batch_state = DownloadBatchState::SteadyState;
-
     auto&& progress = message.progress;
     if (is_flx) {
         logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                      "latest_server_version=%3, latest_server_version_salt=%4, "
                      "upload_client_version=%5, upload_server_version=%6, progress_estimate=%7, "
-                     "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
+                     "batch_state=%8, query_version=%9, num_changesets=%10, ...)",
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.downloadable.as_estimate(), last_in_batch, query_version,
+                     message.downloadable.as_estimate(), message.batch_state, query_version,
                      message.changesets.size()); // Throws
     }
     else {
@@ -2436,6 +2447,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
                                  changeset.remote_version, server_version, progress.download.server_version)};
         }
         server_version = changeset.remote_version;
+
         // Check that per-changeset last integrated client version is "weakly"
         // increasing.
         bool good_client_version =
@@ -2461,7 +2473,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
-                                       batch_state, message.changesets.size());
+                                       message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2472,11 +2484,11 @@ Status Session::receive_download_message(const DownloadMessage& message)
         return Status::OK();
     }
 
-    initiate_integrate_changesets(message.downloadable.as_bytes(), batch_state, progress,
+    initiate_integrate_changesets(message.downloadable.as_bytes(), message.batch_state, progress,
                                   message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                  batch_state, message.changesets.size());
+                                  message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2586,7 +2598,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     // Can't process debug hook actions once the Session is undergoing deactivation, since
     // the SessionWrapper may not be available
     if (m_state == Active) {
-        auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+        auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, &info);
         if (debug_action == SyncClientHookAction::EarlyReturn) {
             return Status::OK();
         }
@@ -2646,7 +2658,7 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
+        call_debug_hook(SyncClientHookEvent::SessionSuspended, &info);
         m_conn.one_less_active_unsuspended_session(); // Throws
         on_suspended(info);                           // Throws
     }

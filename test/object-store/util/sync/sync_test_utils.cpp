@@ -274,6 +274,10 @@ void wait_for_advance(Realm& realm)
             , target_version(*realm.latest_snapshot_version())
             , done(done)
         {
+            // Are we already there...
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
         }
 
         void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
@@ -565,7 +569,7 @@ struct BaasClientReset : public TestClientReset {
         // state.
         timed_sleeping_wait_for(
             [&] {
-                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id, false);
             },
             std::chrono::seconds(30), std::chrono::seconds(1));
 
