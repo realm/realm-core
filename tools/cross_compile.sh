@@ -6,40 +6,48 @@ set -e
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 
 function usage {
-    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>] [-f <cmake_flags>]"
+    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> [-v <version>] [-a <android_abi>] [-f <cmake_flags>]"
     echo ""
     echo "Arguments:"
-    echo "   build_type=<Release|Debug>"
-    echo "   target_os=<android|ios|watchos|tvos>"
-    echo "   android_abi=<armeabi-v7a|x86|x86_64|arm64-v8a>"
+    echo "   build_type     Release|Debug|MinSizeDebug|RelWithDebInfo"
+    echo "   target_os      android|iphoneos|iphonesimulator|watchos|"
+    echo "                  watchsimulator|appletvos|appletvsimulator|"
+    echo "                  emscripten"
+    echo "   android_abi    armeabi-v7a|x86|x86_64|arm64-v8a"
     exit 1;
 }
+
+# Variables
+VERSION=
+CMAKE_FLAGS=
 
 # Parse the options
 while getopts ":o:a:t:v:f:" opt; do
     case "${opt}" in
         o)
             OS=${OPTARG}
-            [ "${OS}" == "android" ] ||
-            [ "${OS}" == "iphoneos" ] ||
-            [ "${OS}" == "iphonesimulator" ] ||
-            [ "${OS}" == "watchos" ] ||
-            [ "${OS}" == "watchsimulator" ] ||
-            [ "${OS}" == "appletvos" ] ||
-            [ "${OS}" == "appletvsimulator" ] || usage
+            [[ "${OS}" == "android" ]] ||
+            [[ "${OS}" == "iphoneos" ]] ||
+            [[ "${OS}" == "iphonesimulator" ]] ||
+            [[ "${OS}" == "watchos" ]] ||
+            [[ "${OS}" == "watchsimulator" ]] ||
+            [[ "${OS}" == "appletvos" ]] ||
+            [[ "${OS}" == "appletvsimulator" ]] || 
+            [[ "${OS}" == "emscripten" ]] || usage
             ;;
         a)
             ARCH=${OPTARG}
-            [ "${ARCH}" == "armeabi-v7a" ] ||
-            [ "${ARCH}" == "x86" ] ||
-            [ "${ARCH}" == "x86_64" ] ||
-            [ "${ARCH}" == "arm64-v8a" ] || usage
+            [[ "${ARCH}" == "armeabi-v7a" ]] ||
+            [[ "${ARCH}" == "x86" ]] ||
+            [[ "${ARCH}" == "x86_64" ]] ||
+            [[ "${ARCH}" == "arm64-v8a" ]] || usage
             ;;
         t)
             BUILD_TYPE=${OPTARG}
-            [ "${BUILD_TYPE}" == "Debug" ] ||
-            [ "${BUILD_TYPE}" == "MinSizeDebug" ] ||
-            [ "${BUILD_TYPE}" == "Release" ] || usage
+            [[ "${BUILD_TYPE}" == "Debug" ]] ||
+            [[ "${BUILD_TYPE}" == "MinSizeDebug" ]] ||
+            [[ "${BUILD_TYPE}" == "Release" ]] ||
+            [[ "${BUILD_TYPE}" == "RelWithDebInfo" ]] || usage
             ;;
         v) VERSION=${OPTARG};;
         f) CMAKE_FLAGS=${OPTARG};;
@@ -50,23 +58,25 @@ done
 shift $((OPTIND-1))
 
 # Check for obligatory fields
-if [ -z "${OS}" ] || [ -z "${BUILD_TYPE}" ]; then
-    echo "ERROR: options -o, -t and -v are always needed";
+if [[ -z "${OS}" ]] || [[ -z "${BUILD_TYPE}" ]]; then
+    echo "ERROR: options -o <os> and -t <build-type> are required";
     usage
 fi
 
-# Check for android-related obligatory fields
+if [[ -n "${VERSION}" ]]; then
+    CMAKE_FLAGS="-D REALM_VERSION='${VERSION}' ${CMAKE_FLAGS}"
+fi
+
 if [[ "${OS}" == "android" ]]; then
+    # Check for android-related obligatory fields
     if [[ -z "${ARCH}" ]]; then
-        echo "ERROR: option -a is needed for android builds";
+        echo "ERROR: option -a is required for android builds";
         usage
     elif [[ -z "${ANDROID_NDK}" ]]; then
         echo "ERROR: set ANDROID_NDK to the top level path for the Android NDK";
         usage
     fi
-fi
 
-if [ "${OS}" == "android" ]; then
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
     cmake -D CMAKE_SYSTEM_NAME=Android \
@@ -76,7 +86,6 @@ if [ "${OS}" == "android" ]; then
           -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
           -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/android.toolchain.cmake" \
           -D REALM_ENABLE_ENCRYPTION=1 \
-          -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
           -D CMAKE_MAKE_PROGRAM=ninja \
           -G Ninja \
@@ -85,6 +94,38 @@ if [ "${OS}" == "android" ]; then
 
     ninja -v
     ninja package
+elif [[ "${OS}" == "emscripten" ]]; then
+    if [[ -n "${EMSDK}" ]]; then
+        EMCMAKE="${EMSDK}/upstream/emscripten/emcmake"
+        if ! [[ -e "${EMCMAKE}" ]]; then
+            echo "emcmake not found: ${EMCMAKE}"
+            exit 1
+        fi
+    else
+        emcmake_path="$(which emcmake)"
+        if [[ -z "${emcmake_path}" ]]; then
+            echo "emcmake not found in path"
+            exit 1
+        fi
+        EMCMAKE=emcmake
+    fi
+
+    if [[ "$(uname -s)" =~ Darwin* ]]; then
+        NPROC="$(sysctl -n hw.ncpu)"
+    else
+        NPROC="$(nproc)"
+    fi
+
+    mkdir -p build-emscripten
+    cd build-emscripten || exit 1
+
+    ${EMCMAKE} cmake .. \
+                     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+                     -DREALM_NO_TESTS=1 \
+                     -DREALM_BUILD_LIB_ONLY=1 \
+                     ${CMAKE_FLAGS}
+
+    make "-j${NPROC}" 2>&1
 else
     mkdir -p build-xcode-platforms
     cd build-xcode-platforms || exit 1
@@ -93,7 +134,6 @@ else
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \
           -D REALM_BUILD_LIB_ONLY=1 \
-          -D REALM_VERSION="${VERSION}" \
           ${CMAKE_FLAGS} \
           -G Xcode ..
     xcodebuild -scheme ALL_BUILD -configuration "${BUILD_TYPE}" -destination "generic/platform=${OS}"

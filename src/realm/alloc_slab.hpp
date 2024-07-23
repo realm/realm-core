@@ -147,8 +147,8 @@ public:
     /// This can happen if the conflicting thread (or process) terminates or
     /// crashes before the next retry.
     ///
-    /// \throw FileAccessError
-    /// \throw SlabAlloc::Retry
+    /// \throw FileAccessError if unable to access the file
+    /// \throw SlabAlloc::Retry if the request cannot be completed right now
     ref_type attach_file(const std::string& file_path, Config& cfg, util::WriteObserver* write_observer = nullptr);
 
     /// @brief Expand or contract file
@@ -179,7 +179,7 @@ public:
     ///
     /// \sa own_buffer()
     ///
-    /// \throw InvalidDatabase
+    /// \throw InvalidDatabase if an error occurs while attaching the allocator
     ref_type attach_buffer(const char* data, size_t size);
 
     void init_in_memory_buffer();
