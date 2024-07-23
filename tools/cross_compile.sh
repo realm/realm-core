@@ -20,6 +20,7 @@ function usage {
 # Variables
 VERSION=
 CMAKE_FLAGS=
+EMCMAKE=emcmake
 
 # Parse the options
 while getopts ":o:a:t:v:f:" opt; do
@@ -101,16 +102,13 @@ elif [[ "${OS}" == "emscripten" ]]; then
     if [[ -n "${EMSDK}" ]]; then
         EMCMAKE="${EMSDK}/upstream/emscripten/emcmake"
         if ! [[ -e "${EMCMAKE}" ]]; then
-            echo "emcmake not found: ${EMCMAKE}"
-            exit 1
+            echo "ERROR: emcmake not found: ${EMCMAKE}"
+            usage
         fi
-    else
-        emcmake_path="$(which emcmake)"
-        if [[ -z "${emcmake_path}" ]]; then
-            echo "emcmake not found in path"
-            exit 1
-        fi
-        EMCMAKE=emcmake
+    elif ! which emcmake > /dev/null; then
+        echo "ERROR: emcmake not found in path or set EMSDK to the"
+        echo "       top level emscripten emsdk directory"
+        usage
     fi
 
     if [[ "$(uname -s)" =~ Darwin* ]]; then
