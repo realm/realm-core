@@ -64,6 +64,7 @@ if [[ -z "${OS}" ]] || [[ -z "${BUILD_TYPE}" ]]; then
 fi
 
 if [[ -n "${VERSION}" ]]; then
+    # shellcheck disable=SC2089
     CMAKE_FLAGS="-D REALM_VERSION='${VERSION}' ${CMAKE_FLAGS}"
 fi
 
@@ -79,6 +80,8 @@ if [[ "${OS}" == "android" ]]; then
 
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
+
+    # shellcheck disable=SC2086,SC2090
     cmake -D CMAKE_SYSTEM_NAME=Android \
           -D CMAKE_ANDROID_NDK="${ANDROID_NDK}" \
           -D CMAKE_INSTALL_PREFIX=install \
@@ -119,6 +122,7 @@ elif [[ "${OS}" == "emscripten" ]]; then
     mkdir -p build-emscripten
     cd build-emscripten || exit 1
 
+    # shellcheck disable=SC2086,SC2090
     ${EMCMAKE} cmake -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
                      ${CMAKE_FLAGS} \
                      ..
@@ -128,6 +132,7 @@ else
     mkdir -p build-xcode-platforms
     cd build-xcode-platforms || exit 1
 
+    # shellcheck disable=SC2086,SC2090
     cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \

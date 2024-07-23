@@ -1658,7 +1658,7 @@ buildvariants:
   - name: compile_emscripten
 
 - name: ubuntu-emscripten-release
-  display_name: "Ubuntu (Emscripten release x86_64)"
+  display_name: "Ubuntu (Emscripten x86_64 Release build)"
   run_on: ubuntu2204-large
   expansions:
     fetch_missing_dependencies: On
