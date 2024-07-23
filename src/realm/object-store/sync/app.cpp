@@ -838,7 +838,9 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
 
             get_profile(user, [this, completion = std::move(completion)](const std::shared_ptr<User>& user,
                                                                          Optional<AppError> error) {
-                switch_user(user);
+                if (!error) {
+                    switch_user(user);
+                }
                 completion(user, error);
             });
         },
