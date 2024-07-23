@@ -32,8 +32,6 @@ public:
         initiate_resolve();
     }
 
-    virtual ~DefaultWebSocketImpl() = default;
-
     void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
     {
         m_websocket.async_write_binary(data.data(), data.size(),

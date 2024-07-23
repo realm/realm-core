@@ -175,7 +175,8 @@ public:
     /// \param downloadable_bytes If specified, and if the implementation cares
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
-    void set_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes, VersionInfo&);
+    void set_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes, VersionInfo&,
+                           util::Logger& logger);
 
     /// \brief Scan through the history for changesets to be uploaded.
     ///
@@ -421,7 +422,7 @@ private:
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(const HistoryEntry&);
-    void update_sync_progress(const SyncProgress&, DownloadableProgress downloadable_bytes);
+    void update_sync_progress(const SyncProgress&, DownloadableProgress downloadable_bytes, util::Logger& logger);
     void trim_ct_history();
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);

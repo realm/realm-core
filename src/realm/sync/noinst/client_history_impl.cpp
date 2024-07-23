@@ -24,6 +24,7 @@
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <realm/sync/noinst/pending_reset_store.hpp>
 #include <realm/transaction.hpp>
 #include <realm/util/compression.hpp>
 #include <realm/util/features.h>
@@ -335,16 +336,15 @@ void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
 }
 
 
-// Overriding member function in realm::sync::ClientHistoryBase
 void ClientHistory::set_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes,
-                                      VersionInfo& version_info)
+                                      VersionInfo& version_info, util::Logger& logger)
 {
     TransactionRef wt = m_db->start_write(); // Throws
     version_type local_version = wt->get_version();
     ensure_updated(local_version); // Throws
     prepare_for_write();           // Throws
 
-    update_sync_progress(progress, downloadable_bytes); // Throws
+    update_sync_progress(progress, downloadable_bytes, logger); // Throws
 
     // Note: This transaction produces an empty changeset. Empty changesets are
     // not uploaded to the server.
@@ -489,17 +489,17 @@ void ClientHistory::integrate_server_changesets(
         // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
         // synthetic server version that represents synthetic changesets generated from state on the server.
         if (batch_state == DownloadBatchState::LastInBatch && changesets_to_integrate.empty()) {
-            update_sync_progress(progress, downloadable_bytes); // Throws
+            update_sync_progress(progress, downloadable_bytes, logger); // Throws
         }
         // Always update progress for download messages from steady state.
         else if (batch_state == DownloadBatchState::SteadyState && !changesets_to_integrate.empty()) {
             auto partial_progress = progress;
             partial_progress.download.server_version = last_changeset.remote_version;
             partial_progress.download.last_integrated_client_version = last_changeset.last_integrated_local_version;
-            update_sync_progress(partial_progress, downloadable_bytes); // Throws
+            update_sync_progress(partial_progress, downloadable_bytes, logger); // Throws
         }
         else if (batch_state == DownloadBatchState::SteadyState && changesets_to_integrate.empty()) {
-            update_sync_progress(progress, downloadable_bytes); // Throws
+            update_sync_progress(progress, downloadable_bytes, logger); // Throws
         }
         if (run_in_write_tr) {
             run_in_write_tr(*transact, changesets_for_cb);
@@ -876,7 +876,8 @@ void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 }
 
 
-void ClientHistory::update_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes)
+void ClientHistory::update_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes,
+                                         util::Logger& logger)
 {
     Array& root = m_arrays->root;
 
@@ -946,6 +947,19 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, Downloada
              RefOrTagged::make_tagged(downloadable_bytes.as_bytes())); // Throws
     root.set(s_progress_uploaded_bytes_iip,
              RefOrTagged::make_tagged(uploaded_bytes)); // Throws
+
+    if (previous_upload_client_version < progress.upload.client_version) {
+        // This is part of the client reset cycle detection.
+        // A client reset operation will write a flag to an internal table indicating that
+        // the changes there are a result of a successful reset. However, it is not possible to
+        // know if a recovery has been successful until the changes have been acknowledged by the
+        // server. The situation we want to avoid is that a recovery itself causes another reset
+        // which creates a reset cycle. However, at this point, upload progress has been made
+        // and we can remove the cycle detection flag if there is one.
+        if (PendingResetStore::clear_pending_reset(*m_group)) {
+            logger.info(util::LogCategory::reset, "Clearing pending reset tracker after upload completion.");
+        }
+    }
 
     m_progress_download = progress.download;
 

@@ -52,7 +52,8 @@ public:
     static void track_reset(Group& group, ClientResyncMode mode, PendingReset::Action action, Status error);
     // Clear the pending reset tracking information, if it exists
     // Requires a writable transaction and changes must be committed manually
-    static void clear_pending_reset(Group& group);
+    // Returns true if there was anything to remove
+    static bool clear_pending_reset(Group& group);
     static std::optional<PendingReset> has_pending_reset(const Group& group);
 
     static int64_t from_reset_action(PendingReset::Action action);
