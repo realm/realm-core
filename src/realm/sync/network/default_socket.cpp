@@ -94,7 +94,6 @@ private:
     {
         WebSocketError error = WebSocketError::websocket_ok;
         bool was_clean = true;
-        std::string msg = body.empty() ? ec.message() : std::string{body};
 
         if (ec == websocket::HttpError::bad_response_301_moved_permanently ||
             ec == websocket::HttpError::bad_response_308_permanent_redirect) {
@@ -123,7 +122,7 @@ private:
             was_clean = false;
         }
 
-        websocket_error_and_close_handler(was_clean, error, msg);
+        websocket_error_and_close_handler(was_clean, error, body.empty() ? ec.message() : body);
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
