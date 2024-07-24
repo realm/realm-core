@@ -89,7 +89,7 @@ if [[ "${OS}" == "android" ]]; then
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
           -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/android.toolchain.cmake" \
-          -D REALM_ENABLE_ENCRYPTION=1 \
+          -D REALM_ENABLE_ENCRYPTION=On \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
           -D CMAKE_MAKE_PROGRAM=ninja \
           -G Ninja \
@@ -121,7 +121,8 @@ elif [[ "${OS}" == "emscripten" ]]; then
     cd build-emscripten || exit 1
 
     # shellcheck disable=SC2086,SC2090
-    ${EMCMAKE} cmake -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+    ${EMCMAKE} cmake -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+                     -D REALM_COMBINED_TESTS=Off \
                      ${CMAKE_FLAGS} \
                      ..
 
@@ -133,8 +134,8 @@ else
     # shellcheck disable=SC2086,SC2090
     cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D REALM_NO_TESTS=1 \
-          -D REALM_BUILD_LIB_ONLY=1 \
+          -D REALM_NO_TESTS=On \
+          -D REALM_BUILD_LIB_ONLY=On \
           ${CMAKE_FLAGS} \
           -G Xcode ..
     xcodebuild -scheme ALL_BUILD -configuration "${BUILD_TYPE}" -destination "generic/platform=${OS}"

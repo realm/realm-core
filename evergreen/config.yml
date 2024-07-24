@@ -209,7 +209,7 @@ functions:
 
           docker pull emscripten/emsdk:${emsdk_version|latest}
           sudo docker run -i --privileged --rm -v $(pwd):/realm-core -u $(id -u):$(id -g) --user root --workdir /realm-core \
-          emscripten/emsdk /realm-core/tools/cross_compile.sh -o emscripten -t RelWithDebInfo
+          emscripten/emsdk /realm-core/tools/cross_compile.sh -o emscripten -t ${cmake_build_type|Debug}
 
   "run benchmark":
     - command: shell.exec
@@ -1652,7 +1652,6 @@ buildvariants:
   display_name: "Ubuntu (Emscripten x86_64)"
   run_on: ubuntu2204-large
   expansions:
-    fetch_missing_dependencies: On
     emsdk_version: "3.1.37"
   tasks:
   - name: compile_emscripten
@@ -1661,7 +1660,6 @@ buildvariants:
   display_name: "Ubuntu (Emscripten x86_64 Release build)"
   run_on: ubuntu2204-large
   expansions:
-    fetch_missing_dependencies: On
     cmake_build_type: RelWithDebInfo
     emsdk_version: "3.1.37"
   tasks:

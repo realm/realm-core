@@ -264,31 +264,34 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 # CombinedTests
-get_directory_property(OS_TEST_RESOURCES DIRECTORY object-store TEST_RESOURCES)
-set(COMBINED_RESOURCES "${REQUIRED_TEST_FILES};${SYNC_TEST_RESOURCES};${OS_TEST_RESOURCES}")
+option(REALM_COMBINED_TESTS "Build the combined test executable." On)
 
-add_executable(CombinedTests combined_tests.cpp test_all.cpp ${COMBINED_RESOURCES})
-set_target_resources(CombinedTests "${COMBINED_RESOURCES}")
-set_target_properties(CombinedTests PROPERTIES
-    OUTPUT_NAME "realm-combined-tests"
-    VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
-)
-target_include_directories(CombinedTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "object-store")
+if(REALM_COMBINED_TESTS)
+    get_directory_property(OS_TEST_RESOURCES DIRECTORY object-store TEST_RESOURCES)
+    set(COMBINED_RESOURCES "${REQUIRED_TEST_FILES};${SYNC_TEST_RESOURCES};${OS_TEST_RESOURCES}")
 
-if(WINDOWS_STORE)
-    target_sources(CombinedTests PRIVATE ${UWP_SOURCES})
+    add_executable(CombinedTests combined_tests.cpp test_all.cpp ${COMBINED_RESOURCES})
+    set_target_resources(CombinedTests "${COMBINED_RESOURCES}")
+    set_target_properties(CombinedTests PROPERTIES
+        OUTPUT_NAME "realm-combined-tests"
+        VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
+    )
+    target_include_directories(CombinedTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "object-store")
+
+    if(WINDOWS_STORE)
+        target_sources(CombinedTests PRIVATE ${UWP_SOURCES})
+    endif()
+
+    if(REALM_ENABLE_SYNC)
+        target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib TestUtil)
+    else()
+        target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib TestUtil)
+    endif()
+
+    enable_stdfilesystem(CombinedTests)
+
+    if(UNIX AND NOT APPLE)
+        # This enables symbols in backtraces
+        target_link_libraries(CombinedTests "-rdynamic")
+    endif()
 endif()
-
-if(REALM_ENABLE_SYNC)
-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib TestUtil)
-else()
-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib TestUtil)
-endif()
-
-enable_stdfilesystem(CombinedTests)
-
-if(UNIX AND NOT APPLE)
-    # This enables symbols in backtraces
-    target_link_libraries(CombinedTests "-rdynamic")
-endif()
-
