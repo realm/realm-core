@@ -953,6 +953,18 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, Downloada
     trim_sync_history(); // Throws
 }
 
+void ClientHistory::set_download_progress(Transaction& tr, DownloadableProgress p)
+{
+    using gf = _impl::GroupFriend;
+    ref_type ref = gf::get_history_ref(tr);
+    REALM_ASSERT(ref);
+    Array root(gf::get_alloc(tr));
+    root.init_from_ref(ref);
+    gf::set_history_parent(tr, root);
+    REALM_ASSERT(root.size() > s_progress_uploadable_bytes_iip);
+    root.set(s_progress_downloadable_bytes_iip,
+             RefOrTagged::make_tagged(p.as_bytes())); // Throws
+}
 
 void ClientHistory::trim_ct_history()
 {

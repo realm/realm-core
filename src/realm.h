@@ -1242,6 +1242,11 @@ RLM_API realm_schema_t* realm_get_schema(const realm_t*);
 RLM_API uint64_t realm_get_schema_version(const realm_t* realm);
 
 /**
+ * Get the schema version for this realm at the path.
+ */
+RLM_API uint64_t realm_get_persisted_schema_version(const realm_config_t* config);
+
+/**
  * Update the schema of an open realm.
  *
  * This is equivalent to calling `realm_update_schema_advanced(realm, schema, 0,
@@ -3018,8 +3023,6 @@ RLM_API void realm_app_config_set_metadata_mode(realm_app_config_t*,
 RLM_API void realm_app_config_set_metadata_encryption_key(realm_app_config_t*, const uint8_t[64]) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_security_access_group(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 
-RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t*) RLM_API_NOEXCEPT;
-
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
  * Note: the caller must delete the pointer to the string via realm_release
@@ -3741,8 +3744,21 @@ typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdat
 // callback runs.
 typedef void (*realm_async_open_task_init_subscription_func_t)(realm_thread_safe_reference_t* realm,
                                                                realm_userdata_t userdata);
-
+#if REALM_APP_SERVICES
+// If using App Services, the realm_sync_client_config_t instance is part of the
+// realm_app_config_t structure and this function returns a pointer to that
+// member property. The realm_sync_client_config_t reference returned by this
+// function should not be freed using realm_release.
+RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t*) RLM_API_NOEXCEPT;
+#else
+// If not using App Services, the realm_app_config_t structure is not defined, and
+// the real_sync_client_config_t structure returned by this function is meant to be
+// used with realm_sync_manager_create() to create a separate Sync Manager instance.
+// The realm_sync_client_config_t instance returned by this function will need to be
+// manually freed using realm_release.
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
+#endif // REALM_APP_SERVICES
+
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
                                                          realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_multiplex_sessions(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;

@@ -176,7 +176,7 @@ std::string unquote_string(std::string_view possibly_quoted_string)
 
 #if REALM_ENABLE_SYNC
 
-void subscribe_to_all_and_bootstrap(Realm& realm)
+sync::SubscriptionSet subscribe_to_all(Realm& realm)
 {
     auto mut_subs = realm.get_latest_subscription_set().make_mutable_copy();
     auto& group = realm.read_group();
@@ -188,7 +188,12 @@ void subscribe_to_all_and_bootstrap(Realm& realm)
             }
         }
     }
-    auto subs = std::move(mut_subs).commit();
+    return std::move(mut_subs).commit();
+}
+
+void subscribe_to_all_and_bootstrap(Realm& realm)
+{
+    auto subs = subscribe_to_all(realm);
     subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     wait_for_download(realm);
 }
@@ -269,6 +274,10 @@ void wait_for_advance(Realm& realm)
             , target_version(*realm.latest_snapshot_version())
             , done(done)
         {
+            // Are we already there...
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
         }
 
         void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
@@ -290,21 +299,7 @@ void wait_for_advance(Realm& realm)
 StatusWith<std::shared_ptr<Realm>> async_open_realm(const Realm::Config& config)
 {
     auto task = Realm::get_synchronized_realm(config);
-    auto pf = util::make_promise_future<ThreadSafeReference>();
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-        if (e) {
-            try {
-                std::rethrow_exception(e);
-            }
-            catch (...) {
-                pf.promise.set_error(exception_to_status());
-            }
-        }
-        else {
-            pf.promise.emplace_value(std::move(ref));
-        }
-    });
-    auto sw = std::move(pf.future).get_no_throw();
+    auto sw = task->start().get_no_throw();
     if (sw.is_ok())
         return Realm::get_shared_realm(std::move(sw.get_value()));
     return sw.get_status();
@@ -516,6 +511,17 @@ void wait_for_num_objects_in_atlas(std::shared_ptr<app::User> user, const AppSes
         std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
+std::pair<util::Future<ClientResyncMode>, std::function<void(SharedRealm, ThreadSafeReference, bool)>>
+make_client_reset_handler()
+{
+    auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
+    auto shared_promise = std::make_shared<decltype(reset_promise)>(std::move(reset_promise));
+    auto fn = [reset_promise = std::move(shared_promise)](SharedRealm, ThreadSafeReference, bool did_recover) {
+        reset_promise->emplace_value(did_recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal);
+    };
+    return std::make_pair(std::move(reset_future), std::move(fn));
+}
+
 void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session)
 {
     auto file_ident = sync_session.get_file_ident();
@@ -563,7 +569,7 @@ struct BaasClientReset : public TestClientReset {
         // state.
         timed_sleeping_wait_for(
             [&] {
-                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id, false);
             },
             std::chrono::seconds(30), std::chrono::seconds(1));
 

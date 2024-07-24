@@ -979,9 +979,6 @@ private:
             case WebSocketError::websocket_unauthorized:
             case WebSocketError::websocket_forbidden:
             case WebSocketError::websocket_moved_permanently:
-            case WebSocketError::websocket_client_too_old:
-            case WebSocketError::websocket_client_too_new:
-            case WebSocketError::websocket_protocol_mismatch:
                 break;
             default:
                 error_code = 1008;
@@ -1180,12 +1177,6 @@ std::ostream& operator<<(std::ostream& os, WebSocketError code)
                 return "WebSocket: Forbidden";
             case WebSocketError::websocket_moved_permanently:
                 return "WebSocket: Moved Permanently";
-            case WebSocketError::websocket_client_too_old:
-                return "WebSocket: Client Too Old";
-            case WebSocketError::websocket_client_too_new:
-                return "WebSocket: Client Too New";
-            case WebSocketError::websocket_protocol_mismatch:
-                return "WebSocket: Protocol Mismatch";
 
             case WebSocketError::websocket_resolve_failed:
                 return "WebSocket: Resolve Failed";

@@ -372,10 +372,6 @@ public:
     /// \param cumulative_byte_size_total is the cumulative byte size of
     /// the entire history.
     ///
-    /// \param disable_download_compaction denotes whether the fetched changesets
-    /// should be compacted before they are handed off to the
-    /// HistoryEntryHandler.
-    ///
     /// \param accum_byte_size_soft_limit denotes a soft limit on the total size
     /// of the uncompacted changesets. When the total size of the changesets
     /// exceeds this limit, no more changesets will be added.
@@ -385,7 +381,7 @@ public:
     bool fetch_download_info(file_ident_type client_file_ident, DownloadCursor& download_progress,
                              version_type end_version, UploadCursor& upload_progress, HistoryEntryHandler&,
                              std::uint_fast64_t& cumulative_byte_size_current,
-                             std::uint_fast64_t& cumulative_byte_size_total, bool disable_download_compaction,
+                             std::uint_fast64_t& cumulative_byte_size_total,
                              std::size_t accum_byte_size_soft_limit = 0x20000) const;
 
     /// The application must call this function before using the history as an
