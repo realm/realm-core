@@ -6,7 +6,6 @@
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
@@ -150,7 +149,6 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_disable_upload_activation_delay{config.disable_upload_activation_delay}
     , m_dry_run{config.dry_run}
     , m_enable_default_port_hack{config.enable_default_port_hack}
-    , m_disable_upload_compaction{config.disable_upload_compaction}
     , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_socket_provider{std::move(config.socket_provider)}
@@ -184,8 +182,6 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.pong_keepalive_timeout); // Throws
     logger.debug("Config param: fast_reconnect_limit = %1 ms",
                  config.fast_reconnect_limit); // Throws
-    logger.debug("Config param: disable_upload_compaction = %1",
-                 config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
     logger.debug(
@@ -2109,35 +2105,6 @@ void Session::send_upload_message()
 #endif
         }
 
-#if 0 // Upload log compaction is currently not implemented
-        if (!get_client().m_disable_upload_compaction) {
-            ChangesetEncoder::Buffer encode_buffer;
-
-            {
-                // Upload compaction only takes place within single changesets to
-                // avoid another client seeing inconsistent snapshots.
-                ChunkedBinaryInputStream stream{uc.changeset};
-                Changeset changeset;
-                parse_changeset(stream, changeset); // Throws
-                // FIXME: What is the point of setting these? How can compaction care about them?
-                changeset.version = uc.progress.client_version;
-                changeset.last_integrated_remote_version = uc.progress.last_integrated_server_version;
-                changeset.origin_timestamp = uc.origin_timestamp;
-                changeset.origin_file_ident = uc.origin_file_ident;
-
-                compact_changesets(&changeset, 1);
-                encode_changeset(changeset, encode_buffer);
-
-                logger.debug(util::LogCategory::changeset, "Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
-                             encode_buffer.size()); // Throws
-            }
-
-            upload_message_builder.add_changeset(
-                uc.progress.client_version, uc.progress.last_integrated_server_version, uc.origin_timestamp,
-                uc.origin_file_ident, BinaryData{encode_buffer.data(), encode_buffer.size()}); // Throws
-        }
-        else
-#endif
         {
             upload_message_builder.add_changeset(uc.progress.client_version,
                                                  uc.progress.last_integrated_server_version, uc.origin_timestamp,

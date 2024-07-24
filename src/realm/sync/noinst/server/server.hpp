@@ -162,11 +162,6 @@ public:
         /// initiated.
         milliseconds_type soft_close_timeout = default_soft_close_timeout;
 
-        /// Unless disabled, the server will try to eliminate redundant
-        /// instructions from changesets before sending them to clients,
-        /// minimizing download sizes at the expense of server CPU usage.
-        bool disable_download_compaction = false;
-
         /// If set to true, the server will cache the contents of the DOWNLOAD
         /// message(s) used for client bootstrapping.
         bool enable_download_bootstrap_cache = false;
