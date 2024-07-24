@@ -1785,6 +1785,7 @@ private:
             }
             Formatter& formatter = misc_buffers.formatter;
             if (REALM_UNLIKELY(best_match == 0)) {
+                const char* elaboration = "No version supported by both client and server";
                 auto format_ranges = [&](const auto& list) {
                     bool nonfirst = false;
                     for (auto range : list) {
@@ -1798,12 +1799,22 @@ private:
                         nonfirst = true;
                     }
                 };
+                using Range = ProtocolVersionRange;
                 formatter.reset();
                 format_ranges(protocol_version_ranges); // Throws
                 logger.error("Protocol version negotiation failed. (client supports: %1)",
                              std::string_view(formatter.data(), formatter.size())); // Throws
                 formatter.reset();
-                handle_400_bad_request("Protocol version negotiation failed."); // Throws
+                formatter << "Protocol version negotiation failed: "
+                             ""
+                          << elaboration << ".\n\n";                                   // Throws
+                formatter << "Server supports: ";                                      // Throws
+                format_ranges(std::initializer_list<Range>{{server_min, server_max}}); // Throws
+                formatter << "\n";                                                     // Throws
+                formatter << "Client supports: ";                                      // Throws
+                format_ranges(protocol_version_ranges);                                // Throws
+                formatter << "\n";                                                     // Throws
+                handle_400_bad_request({formatter.data(), formatter.size()});          // Throws
                 return;
             }
             m_negotiated_protocol_version = best_match;
@@ -2857,7 +2868,6 @@ private:
             std::size_t accum_original_size;
             std::size_t accum_compacted_size;
             ServerProtocol& protocol = get_server_protocol();
-            bool disable_download_compaction = config.disable_download_compaction;
             bool enable_cache = (config.enable_download_bootstrap_cache && m_download_progress.server_version == 0 &&
                                  m_upload_progress.client_version == 0 && m_upload_threshold.client_version == 0);
             DownloadCache& cache = m_server_file->get_download_cache();
@@ -2890,7 +2900,7 @@ private:
                     std::uint_fast64_t cumulative_byte_size_total;
                     bool not_expired = history.fetch_download_info(
                         m_client_file_ident, download_progress, end_version, upload_progress, handler,
-                        cumulative_byte_size_current, cumulative_byte_size_total, disable_download_compaction,
+                        cumulative_byte_size_current, cumulative_byte_size_total,
                         max_download_size); // Throws
                     REALM_ASSERT(upload_progress.client_version >= download_progress.last_integrated_client_version);
                     SyncConnection& conn = get_connection();
@@ -2961,12 +2971,6 @@ private:
                 last_server_version.salt, upload_progress.client_version,
                 upload_progress.last_integrated_server_version, downloadable_bytes, num_changesets, body,
                 uncompressed_body_size, compressed_body_size, body_is_compressed, logger); // Throws
-
-            if (!disable_download_compaction) {
-                std::size_t saved = accum_original_size - accum_compacted_size;
-                double saved_2 = (accum_original_size == 0 ? 0 : std::round(saved * 100.0 / accum_original_size));
-                logger.detail("Download compaction: Saved %1 bytes (%2%%)", saved, saved_2); // Throws
-            }
 
             m_download_progress = download_progress;
             logger.debug("Setting of m_download_progress.server_version = %1",
@@ -3223,8 +3227,8 @@ void ServerFile::activate() {}
 void ServerFile::register_client_access(file_ident_type) {}
 
 
-auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file, ClientType client_type)
-    -> file_ident_request_type
+auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file,
+                                    ClientType client_type) -> file_ident_request_type
 {
     auto request = ++m_last_file_ident_request;
     m_file_ident_requests[request] = {&receiver, proxy_file, client_type}; // Throws
@@ -3855,8 +3859,6 @@ void ServerImpl::start()
         logger.warn("Testing/debugging feature 'disable sync to disk' enabled - "
                     "never do this in production!"); // Throws
     }
-    logger.info("Download compaction: %1",
-                (m_config.disable_download_compaction ? "No" : "Yes")); // Throws
     logger.info("Download bootstrap caching: %1",
                 (m_config.enable_download_bootstrap_cache ? "Yes" : "No"));                // Throws
     logger.info("Max download size: %1 bytes", m_config.max_download_size);                // Throws

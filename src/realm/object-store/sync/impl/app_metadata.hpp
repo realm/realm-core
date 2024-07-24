@@ -56,7 +56,7 @@ public:
                              std::string_view device_id) = 0;
 
     // Update the stored data for an existing user
-    virtual void update_user(std::string_view user_id, const UserData& data) = 0;
+    virtual void update_user(std::string_view user_id, util::FunctionRef<void(UserData&)>) = 0;
 
     // Discard the given user's tokens and set its state to the given one (LoggedOut or Removed).
     // If the user was the active user, a new active user is selected from the

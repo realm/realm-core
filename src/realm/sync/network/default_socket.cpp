@@ -91,7 +91,7 @@ private:
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, WebSocketError::websocket_write_error, ec.message());
     }
-    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view) override
+    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view body) override
     {
         WebSocketError error = WebSocketError::websocket_ok;
         bool was_clean = true;
@@ -123,7 +123,7 @@ private:
             was_clean = false;
         }
 
-        websocket_error_and_close_handler(was_clean, error, ec.message());
+        websocket_error_and_close_handler(was_clean, error, body.empty() ? ec.message() : body);
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {

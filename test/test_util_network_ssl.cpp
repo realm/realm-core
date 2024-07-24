@@ -6,6 +6,10 @@
 #include "test.hpp"
 #include "util/semaphore.hpp"
 
+#ifdef _WIN32
+#include <wincrypt.h>
+#endif
+
 using namespace realm;
 using namespace realm::sync;
 using namespace realm::test_util;
@@ -1215,5 +1219,74 @@ TEST(Util_Network_SSL_Certificate_Failure)
     thread_1.join();
     thread_2.join();
 }
+
+#ifdef _WIN32
+
+// Adding a trusted root certificate causes a blocking popup to appear so only run this test
+// if in an interactive session with a debugger attached, otherwise CI machines will block.
+// TODO: maybe use the CI environment variable for the condition?
+TEST_IF(Util_Network_SSL_Certificate_From_Windows_Cert_Store, IsDebuggerPresent())
+{
+    std::string ca_dir = get_test_resource_path();
+
+    BIO* file = BIO_new_file((ca_dir + "crt.pem").c_str(), "rb");
+    X509* cert = PEM_read_bio_X509(file, NULL, 0, NULL);
+    BIO_free(file);
+
+    BIO* mem = BIO_new(BIO_s_mem());
+    int size = i2d_X509_bio(mem, cert);
+    BUF_MEM* buffer;
+    BIO_get_mem_ptr(mem, &buffer);
+
+    PCCERT_CONTEXT cert_context;
+    HCERTSTORE store = CertOpenSystemStoreA(NULL, "ROOT");
+    CertAddEncodedCertificateToStore(store, X509_ASN_ENCODING, reinterpret_cast<const BYTE*>(buffer->data),
+                                     static_cast<DWORD>(buffer->length), CERT_STORE_ADD_USE_EXISTING, &cert_context);
+    BIO_free(mem);
+
+    network::Service service_1, service_2;
+    network::Socket socket_1{service_1}, socket_2{service_2};
+    network::ssl::Context ssl_context_1;
+    network::ssl::Context ssl_context_2;
+
+    ssl_context_1.use_certificate_chain_file(ca_dir + "dns-chain.crt.pem");
+    ssl_context_1.use_private_key_file(ca_dir + "dns-checked-server.key.pem");
+    ssl_context_2
+        .use_default_verify(); // this will import the Windows certificates in the context's certificate store
+
+    network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
+    network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
+
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
+
+    // We expect success because the certificate is signed for www.example.com
+    // in both Common Name and SAN.
+    ssl_stream_2.set_host_name("www.example.com");
+
+    connect_sockets(socket_1, socket_2);
+
+    auto connector = [&] {
+        std::error_code ec;
+        ssl_stream_2.handshake(ec);
+        CHECK_EQUAL(std::error_code(), ec);
+    };
+    auto acceptor = [&] {
+        std::error_code ec;
+        ssl_stream_1.handshake(ec);
+        CHECK_EQUAL(std::error_code(), ec);
+    };
+
+    std::thread thread_1(std::move(connector));
+    std::thread thread_2(std::move(acceptor));
+    thread_1.join();
+    thread_2.join();
+
+    CertDeleteCertificateFromStore(cert_context);
+    CertCloseStore(store, 0);
+}
+
+#endif // _WIN32
 
 #endif // !REALM_MOBILE

@@ -55,6 +55,23 @@ RLM_API uint64_t realm_get_schema_version(const realm_t* realm)
     return rlm->schema_version();
 }
 
+RLM_API uint64_t realm_get_persisted_schema_version(const realm_config_t* config)
+{
+    auto conf = RealmConfig();
+    conf.schema_version = ObjectStore::NotVersioned;
+    conf.path = config->path;
+    conf.encryption_key = config->encryption_key;
+
+    if (config->sync_config) {
+        conf.sync_config = nullptr;
+        conf.force_sync_history = true;
+    }
+
+    auto realm = Realm::get_shared_realm(conf);
+    uint64_t version = ObjectStore::get_schema_version(realm->read_group());
+    return version;
+}
+
 RLM_API bool realm_schema_validate(const realm_schema_t* schema, uint64_t validation_mode)
 {
     return wrap_err([&]() {

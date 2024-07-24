@@ -91,7 +91,7 @@ RLM_API size_t realm_get_category_names(size_t num_values, const char** out_valu
         if (number_to_copy > num_values)
             number_to_copy = num_values;
         for (size_t n = 0; n < number_to_copy; n++) {
-            out_values[n] = vec[n];
+            out_values[n] = vec[n].data();
         }
     }
     return number_to_copy;

@@ -6,7 +6,6 @@
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/instruction_applier.hpp>
-#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/hex_dump.hpp>
@@ -790,7 +789,6 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
                                         HistoryEntryHandler& handler,
                                         std::uint_fast64_t& cumulative_byte_size_current,
                                         std::uint_fast64_t& cumulative_byte_size_total,
-                                        bool disable_download_compaction,
                                         std::size_t accum_byte_size_soft_limit) const
 {
     REALM_ASSERT(client_file_ident != 0);
@@ -818,11 +816,6 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
 
     std::vector<Changeset> changesets;
     std::vector<std::size_t> original_changeset_sizes;
-    if (!disable_download_compaction) {
-        std::size_t reserve = to_size_t(end_version - download_progress_2.server_version);
-        changesets.reserve(reserve);               // Throws
-        original_changeset_sizes.reserve(reserve); // Throws
-    }
 
     for (;;) {
         version_type begin_version = download_progress_2.server_version;
@@ -842,42 +835,12 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
         if (entry.origin_file_ident == 0)
             entry.origin_file_ident = m_local_file_ident;
 
-        if (!disable_download_compaction) {
-            ChunkedBinaryInputStream stream{entry.changeset};
-            Changeset changeset;
-            parse_changeset(stream, changeset); // Throws
-            changeset.version = download_progress_2.server_version;
-            changeset.last_integrated_remote_version = entry.remote_version;
-            changeset.origin_timestamp = entry.origin_timestamp;
-            changeset.origin_file_ident = entry.origin_file_ident;
-            changesets.push_back(std::move(changeset));                 // Throws
-            original_changeset_sizes.push_back(entry.changeset.size()); // Throws
-        }
-        else {
-            handler.handle(download_progress_2.server_version, entry, entry.changeset.size()); // Throws
-        }
+        handler.handle(download_progress_2.server_version, entry, entry.changeset.size()); // Throws
 
         accum_byte_size += entry.changeset.size();
 
         if (accum_byte_size > accum_byte_size_soft_limit)
             break;
-    }
-
-    if (!disable_download_compaction) {
-        compact_changesets(changesets.data(), changesets.size());
-
-        ChangesetEncoder::Buffer encode_buffer;
-        for (std::size_t i = 0; i < changesets.size(); ++i) {
-            auto& changeset = changesets[i];
-            encode_changeset(changeset, encode_buffer); // Throws
-            HistoryEntry entry;
-            entry.remote_version = changeset.last_integrated_remote_version;
-            entry.origin_file_ident = changeset.origin_file_ident;
-            entry.origin_timestamp = changeset.origin_timestamp;
-            entry.changeset = BinaryData{encode_buffer.data(), encode_buffer.size()};
-            handler.handle(changeset.version, entry, original_changeset_sizes[i]); // Throws
-            encode_buffer.clear();
-        }
     }
 
     // Set cumulative byte sizes.

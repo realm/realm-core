@@ -33,7 +33,7 @@ TEST(Sync_PendingBootstrapStoreBatching)
         changesets.back().original_changeset_size = 1024;
 
         bool created_new_batch = false;
-        store.add_batch(1, util::none, changesets, &created_new_batch);
+        store.add_batch(1, util::none, 0, changesets, &created_new_batch);
 
         CHECK(created_new_batch);
         CHECK(store.has_pending());
@@ -47,7 +47,7 @@ TEST(Sync_PendingBootstrapStoreBatching)
         changesets.emplace_back(5, 10, BinaryData(changeset_data.back()), 5, 3);
         changesets.back().original_changeset_size = 1024;
 
-        store.add_batch(1, progress, changesets, &created_new_batch);
+        store.add_batch(1, progress, 1, changesets, &created_new_batch);
         CHECK(!created_new_batch);
     }
 
@@ -128,7 +128,7 @@ TEST(Sync_PendingBootstrapStoreClear)
     changesets.back().original_changeset_size = 1024;
 
     bool created_new_batch = false;
-    store.add_batch(2, progress, changesets, &created_new_batch);
+    store.add_batch(2, progress, 1, changesets, &created_new_batch);
     CHECK(created_new_batch);
     CHECK(store.has_pending());
 

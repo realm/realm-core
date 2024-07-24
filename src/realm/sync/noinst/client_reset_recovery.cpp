@@ -129,15 +129,11 @@ struct ListPath {
             ColumnKey,
         } type;
 
-        bool operator==(const Element& other) const noexcept;
-        bool operator!=(const Element& other) const noexcept;
         bool operator<(const Element& other) const noexcept;
     };
 
     void append(const Element& item);
     bool operator<(const ListPath& other) const noexcept;
-    bool operator==(const ListPath& other) const noexcept;
-    bool operator!=(const ListPath& other) const noexcept;
     std::string path_to_string(Transaction& remote, const InterningBuffer& buffer);
 
     using const_iterator = typename std::vector<Element>::const_iterator;
@@ -420,26 +416,6 @@ ListPath::Element::Element(ColKey key)
 {
 }
 
-bool ListPath::Element::operator==(const Element& other) const noexcept
-{
-    if (type == other.type) {
-        switch (type) {
-            case Type::InternKey:
-                return intern_key == other.intern_key;
-            case Type::ListIndex:
-                return index == other.index;
-            case Type::ColumnKey:
-                return col_key == other.col_key;
-        }
-    }
-    return false;
-}
-
-bool ListPath::Element::operator!=(const Element& other) const noexcept
-{
-    return !(operator==(other));
-}
-
 bool ListPath::Element::operator<(const Element& other) const noexcept
 {
     if (type < other.type) {
@@ -475,24 +451,6 @@ bool ListPath::operator<(const ListPath& other) const noexcept
         return true;
     }
     return std::lexicographical_compare(m_path.begin(), m_path.end(), other.m_path.begin(), other.m_path.end());
-}
-
-bool ListPath::operator==(const ListPath& other) const noexcept
-{
-    if (m_table_key == other.m_table_key && m_obj_key == other.m_obj_key && m_path.size() == other.m_path.size()) {
-        for (size_t i = 0; i < m_path.size(); ++i) {
-            if (m_path[i] != other.m_path[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-    return false;
-}
-
-bool ListPath::operator!=(const ListPath& other) const noexcept
-{
-    return !(operator==(other));
 }
 
 std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer& buffer)

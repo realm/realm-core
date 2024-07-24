@@ -98,9 +98,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     ret.progress.upload.last_integrated_server_version = msg.read_next<sync::version_type>();
     if (is_flx_sync) {
         ret.query_version = msg.read_next<int64_t>();
-        auto last_in_batch = msg.read_next<bool>();
-        ret.batch_state =
-            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+        ret.batch_state = static_cast<sync::DownloadBatchState>(msg.read_next<int>());
     }
     else {
         ret.query_version = 0;

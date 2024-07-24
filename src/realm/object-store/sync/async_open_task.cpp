@@ -23,6 +23,7 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 namespace realm {
 
@@ -62,6 +63,25 @@ void AsyncOpenTask::start(AsyncOpenCallback callback)
         self->migrate_schema_or_complete(std::move(callback), coordinator);
     });
     session->revive_if_needed();
+}
+
+util::Future<ThreadSafeReference> AsyncOpenTask::start()
+{
+    auto pf = util::make_promise_future<ThreadSafeReference>();
+    start([promise = std::move(pf.promise)](ThreadSafeReference&& ref, std::exception_ptr e) mutable {
+        if (e) {
+            try {
+                std::rethrow_exception(e);
+            }
+            catch (...) {
+                promise.set_error(exception_to_status());
+            }
+        }
+        else {
+            promise.emplace_value(std::move(ref));
+        }
+    });
+    return std::move(pf.future);
 }
 
 void AsyncOpenTask::cancel()
@@ -126,7 +146,7 @@ void AsyncOpenTask::wait_for_bootstrap_or_complete(AsyncOpenCallback&& callback,
 
     SharedRealm shared_realm;
     try {
-        shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
+        shared_realm = coordinator->get_realm(util::Scheduler::make_dummy(), m_db_first_open);
     }
     catch (...) {
         async_open_complete(std::move(callback), coordinator, exception_to_status());

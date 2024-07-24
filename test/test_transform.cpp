@@ -1562,12 +1562,6 @@ TEST(Transform_CreateEraseCreateSequencePreservesObject)
         auto client_1 = &*it.clients[0];
         auto client_2 = &*it.clients[1];
 
-        // Disable history compaction to be certain that create-erase-create
-        // cycles are not eliminated.
-        server->history.set_disable_compaction(true);
-        client_1->history.set_disable_compaction(true);
-        client_2->history.set_disable_compaction(true);
-
         // Create baseline
         client_1->transaction([&](Peer& c) {
             auto table = c.group->add_table_with_primary_key("class_table", type_Int, "pk");

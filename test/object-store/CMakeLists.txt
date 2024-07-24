@@ -73,6 +73,7 @@ if(REALM_ENABLE_SYNC)
             sync/app.cpp
             sync/client_reset.cpp
             sync/flx_migration.cpp
+            sync/flx_role_change.cpp
             sync/flx_schema_migration.cpp
             sync/flx_sync.cpp
             sync/metadata.cpp

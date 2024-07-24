@@ -4471,22 +4471,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
         INFO("realm opened with async open");
         auto async_open_task = Realm::get_synchronized_realm(config);
 
-        auto [realm_promise, realm_future] = util::make_promise_future<ThreadSafeReference>();
-        async_open_task->start(
-            [promise = std::move(realm_promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
-                if (ouch) {
-                    try {
-                        std::rethrow_exception(ouch);
-                    }
-                    catch (...) {
-                        promise.set_error(exception_to_status());
-                    }
-                }
-                else {
-                    promise.emplace_value(std::move(ref));
-                }
-            });
-
+        auto realm_future = async_open_task->start();
         realm = Realm::get_shared_realm(std::move(realm_future.get()));
     }
 

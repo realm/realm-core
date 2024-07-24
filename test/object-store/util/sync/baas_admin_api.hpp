@@ -83,6 +83,10 @@ public:
     void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
     void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
     void create_schema(const std::string& app_id, const AppCreateConfig& config, bool use_draft = true) const;
+    bool set_feature_flag(const std::string& app_id, const std::string& flag_name, bool enable) const;
+    bool get_feature_flag(const std::string& app_id, const std::string& flag_name) const;
+    nlohmann::json get_default_rule(const std::string& app_id) const;
+    bool update_default_rule(const std::string& app_id, nlohmann::json roles) const;
 
     struct Service {
         std::string id;
@@ -129,7 +133,7 @@ public:
     std::vector<SchemaVersionInfo> get_schema_versions(const std::string& app_id) const;
     bool is_sync_enabled(const std::string& app_id) const;
     bool is_sync_terminated(const std::string& app_id) const;
-    bool is_initial_sync_complete(const std::string& app_id) const;
+    bool is_initial_sync_complete(const std::string& app_id, bool is_flx_sync) const;
 
     struct MigrationStatus {
         std::string statusMessage;
@@ -140,6 +144,8 @@ public:
     };
 
     MigrationStatus get_migration_status(const std::string& app_id) const;
+    nlohmann::json get_app_settings(const std::string& app_id) const;
+    bool patch_app_settings(const std::string& app_id, nlohmann::json&& new_settings) const;
 
     const std::string& admin_url() const noexcept
     {
@@ -199,17 +205,17 @@ struct AppCreateConfig {
         // document_filters describe which objects can be read from/written to, as
         // specified by the below read and write expressions. Set both to true to give read/write
         // access on all objects
-        ServiceRoleDocumentFilters document_filters;
+        ServiceRoleDocumentFilters document_filters = {true, true};
 
         // insert_filter and delete_filter describe which objects can be created and erased by the client,
         // respectively. Set both to true if all objects can be created/erased by the client
-        nlohmann::json insert_filter;
-        nlohmann::json delete_filter;
+        nlohmann::json insert_filter = true;
+        nlohmann::json delete_filter = true;
 
         // read and write describe the permissions for "read-all-fields"/"write-all-fields" behavior. Set both to true
         // if all fields should have read/write access
-        nlohmann::json read;
-        nlohmann::json write;
+        nlohmann::json read = true;
+        nlohmann::json write = true;
 
         // NB: for more granular field-level permissions, the "fields" and "additional_fields" keys can be included in
         // a service role to describe which fields individually can be read/written. These fields have been omitted
@@ -250,6 +256,7 @@ struct AppCreateConfig {
 realm::Schema get_default_schema();
 AppCreateConfig default_app_config();
 AppCreateConfig minimal_app_config(const std::string& name, const Schema& schema);
+nlohmann::json transform_service_role(const AppCreateConfig::ServiceRole& role_def);
 
 struct AppSession {
     std::string client_app_id;

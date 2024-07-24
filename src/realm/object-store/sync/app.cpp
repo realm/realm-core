@@ -715,12 +715,11 @@ void App::get_profile(const std::shared_ptr<User>& user,
                     identities.push_back({get<std::string>(doc, "id"), get<std::string>(doc, "provider_type")});
                 }
 
-                if (auto data = m_metadata_store->get_user(user->user_id())) {
-                    data->identities = std::move(identities);
-                    data->profile = UserProfile(get<BsonDocument>(profile_json, "data"));
-                    m_metadata_store->update_user(user->user_id(), *data);
-                    user->update_backing_data(std::move(data));
-                }
+                m_metadata_store->update_user(user->user_id(), [&](auto& data) {
+                    data.identities = std::move(identities);
+                    data.profile = UserProfile(get<BsonDocument>(profile_json, "data"));
+                    user->update_backing_data(data); // FIXME
+                });
             }
             catch (const AppError& err) {
                 return completion(nullptr, err);
@@ -812,12 +811,11 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
             try {
                 auto json = parse<BsonDocument>(response.body);
                 if (linking_user) {
-                    if (auto user_data = m_metadata_store->get_user(linking_user->user_id())) {
-                        user_data->access_token = RealmJWT(get<std::string>(json, "access_token"));
-                        // maybe a callback for this?
-                        m_metadata_store->update_user(linking_user->user_id(), *user_data);
-                        linking_user->update_backing_data(std::move(user_data));
-                    }
+                    m_metadata_store->update_user(linking_user->user_id(), [&](auto& data) {
+                        data.access_token = RealmJWT(get<std::string>(json, "access_token"));
+                        // FIXME: should be powered by callback
+                        linking_user->update_backing_data(data);
+                    });
                 }
                 else {
                     auto user_id = get<std::string>(json, "user_id");
@@ -1338,11 +1336,10 @@ void App::refresh_access_token(const std::shared_ptr<User>& user, bool update_lo
             try {
                 auto json = parse<BsonDocument>(response.body);
                 RealmJWT access_token{get<std::string>(json, "access_token")};
-                if (auto data = self->m_metadata_store->get_user(user->user_id())) {
-                    data->access_token = access_token;
-                    self->m_metadata_store->update_user(user->user_id(), *data);
-                    user->update_backing_data(std::move(data));
-                }
+                self->m_metadata_store->update_user(user->user_id(), [&](auto& data) {
+                    data.access_token = access_token;
+                    user->update_backing_data(data);
+                });
             }
             catch (AppError& err) {
                 return completion(std::move(err));

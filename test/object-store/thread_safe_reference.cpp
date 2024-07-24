@@ -332,6 +332,7 @@ TEST_CASE("thread safe reference") {
             SECTION("read-only `ThreadSafeReference` to `Results`") {
                 auto thread_safe_results = ThreadSafeReference(results);
                 JoiningThread([&thread_safe_results, &config, int_obj_col]() mutable {
+                    config.scheduler = util::Scheduler::make_dummy();
                     SharedRealm realm_in_thread = Realm::get_shared_realm(config);
                     Results resolved_results = thread_safe_results.resolve<Results>(realm_in_thread);
                     REQUIRE(resolved_results.size() == 1);
@@ -343,6 +344,7 @@ TEST_CASE("thread safe reference") {
                 Object object(read_only_realm, results.get(0));
                 auto thread_safe_object = ThreadSafeReference(object);
                 JoiningThread([&thread_safe_object, &config, int_obj_col]() mutable {
+                    config.scheduler = util::Scheduler::make_dummy();
                     SharedRealm realm_in_thread = Realm::get_shared_realm(config);
                     auto resolved_object = thread_safe_object.resolve<Object>(realm_in_thread);
                     REQUIRE(resolved_object.is_valid());

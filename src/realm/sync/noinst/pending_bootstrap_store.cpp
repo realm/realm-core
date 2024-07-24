@@ -25,6 +25,7 @@
 #include "realm/list.hpp"
 #include "realm/query.hpp"
 #include "realm/sync/changeset_parser.hpp"
+#include "realm/sync/noinst/client_history_impl.hpp"
 #include "realm/sync/noinst/protocol_codec.hpp"
 #include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/sync/protocol.hpp"
@@ -127,6 +128,7 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
 }
 
 void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
+                                      DownloadableProgress download_progress,
                                       const _impl::ClientProtocol::ReceivedChangesets& changesets,
                                       bool* created_new_batch_out)
 {
@@ -175,6 +177,9 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
         BinaryData compressed_data(compressed_changesets[idx].data(), compressed_changesets[idx].size());
         cur_changeset.set(m_changeset_data, compressed_data);
     }
+    size_t total_changesets = changesets_list.size();
+
+    ClientHistory::set_download_progress(*tr, download_progress);
 
     tr->commit();
 
@@ -183,15 +188,18 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     }
 
     if (did_create) {
-        m_logger.debug(util::LogCategory::changeset, "Created new pending bootstrap object for query version %1",
-                       query_version);
+        m_logger.debug(util::LogCategory::changeset,
+                       "Created new pending bootstrap object with %1 changesets for query version %2",
+                       total_changesets, query_version);
     }
     else {
-        m_logger.debug(util::LogCategory::changeset, "Added batch to pending bootstrap object for query version %1",
-                       query_version);
+        m_logger.debug(util::LogCategory::changeset,
+                       "Added batch of %1 changesets (%2 total) to pending bootstrap object for query version %3",
+                       changesets.size(), total_changesets, query_version);
     }
     if (progress) {
-        m_logger.debug(util::LogCategory::changeset, "Finalized pending bootstrap object for query version %1",
+        m_logger.debug(util::LogCategory::changeset,
+                       "Finalized pending bootstrap object with %1 changesets for query version %2", total_changesets,
                        query_version);
     }
     m_has_pending = true;

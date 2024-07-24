@@ -38,6 +38,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits.h>
+#include <thread>
 
 #ifndef TEST_ENABLE_LOGGING
 #define TEST_ENABLE_LOGGING 0 // change to 1 to enable trace-level logging
@@ -157,7 +158,10 @@ int run_object_store_tests(int argc, const char** argv)
 #endif
 
 #if TEST_SCHEDULER_UV
+    static std::thread::id s_main_thread_id = std::this_thread::get_id();
     realm::util::Scheduler::set_default_factory([]() -> std::shared_ptr<realm::util::Scheduler> {
+        // The libuv scheduler can only be constructed from the main thread
+        REALM_ASSERT_RELEASE(std::this_thread::get_id() == s_main_thread_id);
         return std::make_shared<realm::util::UvMainLoopScheduler>();
     });
 #endif

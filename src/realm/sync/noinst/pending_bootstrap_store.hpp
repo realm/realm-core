@@ -79,7 +79,8 @@ public:
 
     // Adds a set of changesets to the store.
     void add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
-                   const std::vector<RemoteChangeset>& changesets, bool* created_new_batch);
+                   DownloadableProgress download_progress, const std::vector<RemoteChangeset>& changesets,
+                   bool* created_new_batch);
 
     void clear();
     void clear(Transaction& wt);

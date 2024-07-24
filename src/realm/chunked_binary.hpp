@@ -54,6 +54,9 @@ public:
     /// the first chunk points to the nullptr.
     bool is_null() const;
 
+    /// Equivalent to `size() == 0`, but O(1) rather than O(N).
+    bool empty() const;
+
     /// FIXME: O(n)
     char operator[](size_t index) const;
 

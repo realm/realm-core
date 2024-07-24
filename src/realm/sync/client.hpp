@@ -420,9 +420,9 @@ public:
         /// through Client::run().
         util::UniqueFunction<ConnectionStateChangeListener> connection_state_change_listener;
 
-        /// The purpose of this sync session. Reported to the server for informational purposes and has no functional
-        /// effect.
-        SessionReason session_reason = SessionReason::Sync;
+        /// Is this session being opened for a realm whose path ends in ".fresh"? If so,
+        /// it will be downloading a fresh copy of the realm data from the server.
+        bool fresh_realm_download = false;
 
         /// Schema version
         ///

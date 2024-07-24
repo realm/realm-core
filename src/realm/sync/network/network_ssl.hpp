@@ -131,6 +131,8 @@ public:
     /// default certificates for server verification. For OpenSSL,
     /// use_default_verify() corresponds to
     /// SSL_CTX_set_default_verify_paths(SSL_CTX*);
+    ///
+    /// On Windows this also adds a lookup to the system Trusted Root Certification Authorities list.
     void use_default_verify();
 
     /// The verify file is a PEM file containing trust certificates that the
