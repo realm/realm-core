@@ -32,54 +32,39 @@ namespace {
 template <typename T, typename Col>
 int compare(const T& i, const T& j, const Col& col)
 {
-    if (i.compressed || j.compressed) {
+    Mixed m_i = i.get_value();
+    Mixed m_j = j.get_value();
 
-        StringInterner* interner = col.table->get_string_interner(ColKey{col.col_key});
+    // 1. not compressed
+    if (!i.compressed && !j.compressed)
+        return m_i.compare(m_j);
 
-        // 1. compare compressed strings
-        if (i.compressed && j.compressed) {
-            const auto string_id_i = static_cast<StringID>(i.get_value().get_int());
-            const auto string_id_j = static_cast<StringID>(j.get_value().get_int());
-            return interner->compare(string_id_i, string_id_j);
-        }
+    ColKey ck{col.col_key};
+    StringInterner* interner = col.table->get_string_interner(ck);
 
-        // 2. i is a compressed string and j is uncompressed (likely a mixed)
-        if (i.compressed) {
-            const auto string_id_i = static_cast<StringID>(i.get_value().get_int());
-            const auto j_value = j.get_value();
-            const auto string_j = j_value.template get_if<StringData>();
-            if (string_j) {
-                return -interner->compare(*string_j, string_id_i);
-            }
-
-            // string vs mixed. extract the compressed string.
-            const auto& key = i.get_key();
-            const auto& obj = col.table->get_object(key);
-            const auto& col_key = col.col_key;
-            const auto i_value = col_key.get_value(obj);
-            return i_value.compare(j_value);
-        }
-
-        // 3. j is a compressed string and i is uncompressed (likely a mixed)
-        if (j.compressed) {
-            const auto string_id_j = static_cast<StringID>(j.get_value().get_int());
-            Mixed i_value = i.get_value();
-            const auto string_i = i_value.template get_if<StringData>();
-            if (string_i) {
-                return interner->compare(*string_i, string_id_j);
-            }
-
-            // string vs mixed. extract the compressed string.
-            const auto& key = j.get_key();
-            const auto& obj = col.table->get_object(key);
-            const auto& col_key = col.col_key;
-            const auto j_value = col_key.get_value(obj);
-            return i_value.compare(j_value);
-        }
+    // 2. two compressed strings
+    if (i.compressed && j.compressed) {
+        return interner->compare((StringID)m_i.get_int(), (StringID)m_j.get_int());
     }
 
-    // 4. any other comparison
-    return i.get_value().compare(j.get_value());
+    // 3. one index is a compressed string, and the other one is mixed.
+    if (i.compressed || j.compressed) {
+        if (m_i.is_type(type_String))
+            return interner->compare(m_i.get_string(), (StringID)m_j.get_int());
+
+        if (m_j.is_type(type_String))
+            return -interner->compare(m_j.get_string(), (StringID)m_i.get_int());
+    }
+
+    // 4. compare string vs any other non-string (likely mixed comparison)
+    ObjKey key = i.compressed ? i.get_key() : j.get_key();
+    Obj obj = col.table->get_object(key);
+    if (i.compressed)
+        m_i = col.col_key.get_value(obj);
+    else
+        m_j = col.col_key.get_value(obj);
+
+    return m_i.compare(m_j);
 }
 
 } // namespace
@@ -148,9 +133,7 @@ std::optional<StringID> ExtendedColumnKey::get_string_id(const Obj& obj) const
     const auto type = m_colkey.get_type();
     if (type != col_type_String && type != col_type_Mixed)
         return {};
-    if (!has_index())
-        return obj.get_string_id(m_colkey);
-    return {};
+    return obj.get_string_id(m_colkey);
 }
 
 LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
