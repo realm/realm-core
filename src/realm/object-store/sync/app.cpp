@@ -835,8 +835,14 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 return completion(nullptr,
                                   AppError(ErrorCodes::BadToken, "Could not log in user: received malformed JWT"));
             }
-            switch_user(user);
-            get_profile(user, std::move(completion));
+
+            get_profile(user, [this, completion = std::move(completion)](const std::shared_ptr<User>& user,
+                                                                         Optional<AppError> error) {
+                if (!error) {
+                    switch_user(user);
+                }
+                completion(user, error);
+            });
         },
         false);
 }

@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* App subscription callback was getting fired before the user profile was retrieved on login, leading to an empty user profile when using the callback. ([#7889](https://github.com/realm/realm-core/issues/7889), since v14.7.0)
 
 ### Breaking changes
 * The websocket error codes `websocket_client_too_old`, `websocket_client_too_new`, and `websocket_protocol_mismatch` along with their C API constants were removed. These corresponded to errors the legacy C++ server could have sent, but the baas sync server never did. Any platform networking implementations that surfaced these errors can report a `websocket_fatal_error` instead if an unknown error occurs during the websocket handshake. If a client connects that is too old or too new, it will finish the websocket handshake and then receive an in-band sync `ERROR` message that will be handled by the sync error handler. [PR #7917](https://github.com/realm/realm-core/pull/7917)
