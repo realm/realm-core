@@ -205,11 +205,22 @@ functions:
         script: |-
           set -o errexit
           set -o pipefail
-          set -o verbose
 
-          docker pull emscripten/emsdk:${emsdk_version|latest}
-          sudo docker run -i --privileged --rm -v $(pwd):/realm-core -u $(id -u):$(id -g) --user root --workdir /realm-core \
-          emscripten/emsdk /realm-core/tools/cross_compile.sh -o emscripten -t ${cmake_build_type|Debug}
+          if [ -n "${cmake_bindir|}" ]; then
+            export CMAKE="$(./evergreen/abspath.sh "${cmake_bindir}/cmake")"
+          else
+            export CMAKE="cmake"
+          fi
+          # Check out the Emscripten SDK and activate the specified version
+          echo "Activating emscripten SDK version: ${emsdk_version|latest}"
+          git clone https://github.com/emscripten-core/emsdk.git
+          pushd emsdk/ > /dev/null
+          ./emsdk install ${emsdk_version|latest}
+          ./emsdk activate ${emsdk_version|latest}
+          source ./emsdk_env.sh
+          popd > /dev/null
+
+          tools/cross_compile.sh -o emscripten -t ${cmake_build_type|Debug}
 
   "run benchmark":
     - command: shell.exec
@@ -1652,6 +1663,8 @@ buildvariants:
   display_name: "Ubuntu (Emscripten x86_64)"
   run_on: ubuntu2204-large
   expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
     emsdk_version: "3.1.37"
   tasks:
   - name: compile_emscripten
@@ -1660,6 +1673,8 @@ buildvariants:
   display_name: "Ubuntu (Emscripten x86_64 Release build)"
   run_on: ubuntu2204-large
   expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
     cmake_build_type: RelWithDebInfo
     emsdk_version: "3.1.37"
   tasks:

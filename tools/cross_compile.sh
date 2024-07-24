@@ -21,6 +21,7 @@ function usage {
 VERSION=
 CMAKE_FLAGS=
 EMCMAKE=emcmake
+CMAKE=${CMAKE:-cmake}
 
 # Parse the options
 while getopts ":o:a:t:v:f:" opt; do
@@ -83,18 +84,18 @@ if [[ "${OS}" == "android" ]]; then
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
 
     # shellcheck disable=SC2086,SC2090
-    cmake -D CMAKE_SYSTEM_NAME=Android \
-          -D CMAKE_ANDROID_NDK="${ANDROID_NDK}" \
-          -D CMAKE_INSTALL_PREFIX=install \
-          -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
-          -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/android.toolchain.cmake" \
-          -D REALM_ENABLE_ENCRYPTION=On \
-          -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
-          -D CMAKE_MAKE_PROGRAM=ninja \
-          -G Ninja \
-          ${CMAKE_FLAGS} \
-          ..
+    ${CMAKE} -D CMAKE_SYSTEM_NAME=Android \
+             -D CMAKE_ANDROID_NDK="${ANDROID_NDK}" \
+             -D CMAKE_INSTALL_PREFIX=install \
+             -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+             -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
+             -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/android.toolchain.cmake" \
+             -D REALM_ENABLE_ENCRYPTION=On \
+             -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
+             -D CMAKE_MAKE_PROGRAM=ninja \
+             -G Ninja \
+             ${CMAKE_FLAGS} \
+             ..
 
     ninja -v
     ninja package
@@ -121,10 +122,10 @@ elif [[ "${OS}" == "emscripten" ]]; then
     cd build-emscripten || exit 1
 
     # shellcheck disable=SC2086,SC2090
-    ${EMCMAKE} cmake -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-                     -D REALM_COMBINED_TESTS=Off \
-                     ${CMAKE_FLAGS} \
-                     ..
+    ${EMCMAKE} ${CMAKE} -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+                        -D REALM_COMBINED_TESTS=Off \
+                        ${CMAKE_FLAGS} \
+                        ..
 
     make "-j${NPROC}" 2>&1
 else
@@ -132,12 +133,12 @@ else
     cd build-xcode-platforms || exit 1
 
     # shellcheck disable=SC2086,SC2090
-    cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
-          -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D REALM_NO_TESTS=On \
-          -D REALM_BUILD_LIB_ONLY=On \
-          ${CMAKE_FLAGS} \
-          -G Xcode ..
+    ${CMAKE} -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
+             -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+             -D REALM_NO_TESTS=On \
+             -D REALM_BUILD_LIB_ONLY=On \
+             ${CMAKE_FLAGS} \
+             -G Xcode ..
     xcodebuild -scheme ALL_BUILD -configuration "${BUILD_TYPE}" -destination "generic/platform=${OS}"
     PLATFORM_NAME="${OS}" EFFECTIVE_PLATFORM_NAME="-${OS}" cpack -C "${BUILD_TYPE}"
 fi
