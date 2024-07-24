@@ -3282,7 +3282,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
-TEST_CASE("app: sync logs contain baas coid") {
+TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
     class InMemoryLogger : public util::Logger {
     public:
         void do_log(const util::LogCategory& cat, Level level, const std::string& msg) final
