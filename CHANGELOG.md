@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* The websocket error codes `websocket_client_too_old`, `websocket_client_too_new`, and `websocket_protocol_mismatch` along with their C API constants were removed. These corresponded to errors the legacy C++ server could have sent, but the baas sync server never did. Any platform networking implementations that surfaced these errors can report a `websocket_fatal_error` instead if an unknown error occurs during the websocket handshake. If a client connects that is too old or too new, it will finish the websocket handshake and then receive an in-band sync `ERROR` message that will be handled by the sync error handler. [PR #7917](https://github.com/realm/realm-core/pull/7917)
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
