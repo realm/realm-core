@@ -246,7 +246,6 @@ private:
     const bool m_disable_upload_activation_delay;
     const bool m_dry_run; // For testing purposes only
     const bool m_enable_default_port_hack;
-    const bool m_disable_upload_compaction;
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
