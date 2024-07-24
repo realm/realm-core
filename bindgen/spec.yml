@@ -818,6 +818,7 @@ classes:
       get_linked_object: '(column: ColKey) const -> Nullable<Obj>'
       to_string: () const -> std::string
       get_backlink_count: '() const -> count_t'
+      erase_additional_prop: '(prop_name: StringData) const -> Obj'
       get_backlink_view: '(src_table: TableRef, src_col_key: ColKey) -> TableView'
       create_and_set_linked_object: '(column: ColKey) -> Obj'
       has_schema_property: '(column: StringData) -> bool'
