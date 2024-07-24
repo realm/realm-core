@@ -1502,6 +1502,7 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_error_message_received = false;
     m_unbound_message_received = false;
     m_client_error = util::none;
+    m_pending_compensating_write_errors.clear();
 
     m_upload_progress = m_progress.upload;
     m_last_download_mark_sent = m_last_download_mark_received;
