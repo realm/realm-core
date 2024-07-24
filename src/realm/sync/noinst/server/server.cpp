@@ -1786,17 +1786,6 @@ private:
             Formatter& formatter = misc_buffers.formatter;
             if (REALM_UNLIKELY(best_match == 0)) {
                 const char* elaboration = "No version supported by both client and server";
-                const char* identifier_hint = nullptr;
-                if (overall_client_max < server_min) {
-                    // Client is too old
-                    elaboration = "Client is too old for server";
-                    identifier_hint = "CLIENT_TOO_OLD";
-                }
-                else if (overall_client_min > server_max) {
-                    // Client is too new
-                    elaboration = "Client is too new for server";
-                    identifier_hint = "CLIENT_TOO_NEW";
-                }
                 auto format_ranges = [&](const auto& list) {
                     bool nonfirst = false;
                     for (auto range : list) {
@@ -1825,12 +1814,8 @@ private:
                 formatter << "\n";                                                     // Throws
                 formatter << "Client supports: ";                                      // Throws
                 format_ranges(protocol_version_ranges);                                // Throws
-                formatter << "\n\n";                                                   // Throws
-                formatter << "REALM_SYNC_PROTOCOL_MISMATCH";                           // Throws
-                if (identifier_hint)
-                    formatter << ":" << identifier_hint;                      // Throws
-                formatter << "\n";                                            // Throws
-                handle_400_bad_request({formatter.data(), formatter.size()}); // Throws
+                formatter << "\n";                                                     // Throws
+                handle_400_bad_request({formatter.data(), formatter.size()});          // Throws
                 return;
             }
             m_negotiated_protocol_version = best_match;
@@ -3250,8 +3235,8 @@ void ServerFile::activate() {}
 void ServerFile::register_client_access(file_ident_type) {}
 
 
-auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file, ClientType client_type)
-    -> file_ident_request_type
+auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file,
+                                    ClientType client_type) -> file_ident_request_type
 {
     auto request = ++m_last_file_ident_request;
     m_file_ident_requests[request] = {&receiver, proxy_file, client_type}; // Throws
