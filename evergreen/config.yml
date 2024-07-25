@@ -205,22 +205,39 @@ functions:
         script: |-
           set -o errexit
           set -o pipefail
+          set -o verbose
 
           if [ -n "${cmake_bindir|}" ]; then
             export CMAKE="$(./evergreen/abspath.sh "${cmake_bindir}/cmake")"
           else
             export CMAKE="cmake"
           fi
+
           # Check out the Emscripten SDK and activate the specified version
           echo "Activating emscripten SDK version: ${emsdk_version|latest}"
           git clone https://github.com/emscripten-core/emsdk.git
-          pushd emsdk/ > /dev/null
+
+          pushd emsdk/ > /dev/null  # realm-core/emsdk
           ./emsdk install ${emsdk_version|latest}
           ./emsdk activate ${emsdk_version|latest}
           source ./emsdk_env.sh
-          popd > /dev/null
+          popd > /dev/null  # realm-core
 
-          tools/cross_compile.sh -o emscripten -t ${cmake_build_type|Debug}
+          if [[ "$(uname -s)" =~ Darwin* ]]; then
+            NPROC="$(sysctl -n hw.ncpu)"
+          else
+            NPROC="$(nproc)"
+          fi
+
+          mkdir -p build-emscripten
+          pushd build-emscripten > /dev/null  # realm-core/build-emscripten
+
+          # shellcheck disable=SC2086,SC2090
+          emcmake $CMAKE -D CMAKE_BUILD_TYPE="${cmake_build_type|Debug}" \
+                           ..
+
+          make "-j$NPROC" 2>&1
+          popd > /dev/null  # realm-core
 
   "run benchmark":
     - command: shell.exec

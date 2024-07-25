@@ -123,6 +123,8 @@ elif [[ "${OS}" == "emscripten" ]]; then
 
     # shellcheck disable=SC2086,SC2090
     ${EMCMAKE} ${CMAKE} -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+                        -D REALM_NO_TESTS=On \
+                        -D REALM_BUILD_LIB_ONLY=On \
                         ${CMAKE_FLAGS} \
                         ..
 
