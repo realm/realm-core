@@ -336,7 +336,8 @@ TestAppSession::TestAppSession()
 TestAppSession::TestAppSession(AppSession session,
                                std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
                                DeleteApp delete_app, ReconnectMode reconnect_mode,
-                               std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider)
+                               std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider,
+                               std::shared_ptr<realm::util::Logger> logger)
     : m_app_session(std::make_unique<AppSession>(session))
     , m_base_file_path(util::make_temp_dir() + random_string(10))
     , m_delete_app(delete_app)
@@ -356,6 +357,11 @@ TestAppSession::TestAppSession(AppSession session,
     // connection is kept open for reuse. In tests, we want to shut
     // down sync clients immediately.
     app_config.sync_client_config.timeouts.connection_linger_time = 0;
+    if (logger) {
+        app_config.sync_client_config.logger_factory = [logger](util::Logger::Level) {
+            return logger;
+        };
+    }
 
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
 

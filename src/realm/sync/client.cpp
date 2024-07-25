@@ -1832,9 +1832,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    Optional<std::string> ssl_trust_certificate_path,
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::session, make_logger_prefix(ident),
-                                                      client.logger_ptr)} // Throws
-    , logger{*logger_ptr}
+    : logger{make_logger(ident, std::nullopt, client.logger.base_logger)} // Throws
     , m_client{client}
     , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}    // DEPRECATED
     , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)} // DEPRECATED
@@ -1911,9 +1909,13 @@ std::string ClientImpl::Connection::get_http_request_path() const
 }
 
 
-std::string ClientImpl::Connection::make_logger_prefix(connection_ident_type ident)
+std::shared_ptr<util::Logger> ClientImpl::Connection::make_logger(connection_ident_type ident,
+                                                                  std::optional<std::string_view> coid,
+                                                                  std::shared_ptr<util::Logger> base_logger)
 {
-    return util::format("Connection[%1] ", ident);
+    std::string prefix =
+        coid ? util::format("Connection[%1:%2] ", ident, *coid) : util::format("Connection[%1] ", ident);
+    return std::make_shared<util::PrefixLogger>(util::LogCategory::session, std::move(prefix), base_logger);
 }
 
 

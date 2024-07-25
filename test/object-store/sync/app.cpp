@@ -3282,6 +3282,51 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
+TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
+    class InMemoryLogger : public util::Logger {
+    public:
+        void do_log(const util::LogCategory& cat, Level level, const std::string& msg) final
+        {
+            auto formatted_line = util::format("%1 %2 %3", cat.get_name(), level, msg);
+            std::lock_guard lk(mtx);
+            log_messages.emplace_back(std::move(formatted_line));
+        }
+
+        std::vector<std::string> get_log_messages()
+        {
+            std::lock_guard lk(mtx);
+            std::vector<std::string> ret;
+            std::swap(ret, log_messages);
+            return ret;
+        }
+
+        std::mutex mtx;
+        std::vector<std::string> log_messages;
+    };
+
+    auto in_mem_logger = std::make_shared<InMemoryLogger>();
+    TestAppSession app_session(get_runtime_app_session(), nullptr, DeleteApp{false}, ReconnectMode::normal, nullptr,
+                               in_mem_logger);
+
+    const auto partition = random_string(100);
+    SyncTestFile config(app_session.app()->current_user(), partition, util::none);
+    auto realm = successfully_async_open_realm(config);
+    auto sync_session = realm->sync_session();
+    auto coid = SyncSession::OnlyForTesting::get_appservices_connection_id(*sync_session);
+
+    auto transition_log_msg =
+        util::format("Connection[1] Connected to app services with request id: \"%1\". Further log entries for this "
+                     "connection will be prefixed with \"Connection[1:%1]\" instead of \"Connection[1]\"",
+                     coid);
+    auto bind_send_msg = util::format("Connection[1:%1] Session[1]: Sending: BIND", coid);
+    auto ping_send_msg = util::format("Connection[1:%1] Will emit a ping in", coid);
+
+    auto log_messages = in_mem_logger->get_log_messages();
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(transition_log_msg)));
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(bind_send_msg)));
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(ping_send_msg)));
+}
+
 
 TEST_CASE("app: trailing slash in base url", "[sync][app]") {
     auto logger = util::Logger::get_default_logger();
