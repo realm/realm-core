@@ -56,7 +56,7 @@ int compare(const T& i, const T& j, const Col& col)
             return -interner->compare(m_j.get_string(), (StringID)m_i.get_int());
     }
 
-    // 4. compare string vs any other non-string (likely mixed comparison)
+    // 4. compare string vs any other non-string (this is going to be slow)
     ObjKey key = i.compressed ? i.get_key() : j.get_key();
     Obj obj = col.table->get_object(key);
     if (i.compressed)
