@@ -416,38 +416,49 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
 {
     if (auto previous_reset = sync::PendingResetStore::has_pending_reset(wt_local)) {
         logger.info(util::LogCategory::reset, "Found a previous %1", *previous_reset);
-        switch (previous_reset->mode) {
-            case ClientResyncMode::Manual:
-                REALM_UNREACHABLE();
-            case ClientResyncMode::DiscardLocal:
-                throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
-                                                     "giving up on '%3' mode to prevent a cycle",
-                                                     previous_reset->mode, previous_reset->time, mode));
-            case ClientResyncMode::Recover:
-                switch (mode) {
-                    case ClientResyncMode::Recover:
-                        throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
-                                                             "giving up on '%3' mode to prevent a cycle",
-                                                             previous_reset->mode, previous_reset->time, mode));
-                    case ClientResyncMode::RecoverOrDiscard:
-                        mode = ClientResyncMode::DiscardLocal;
-                        logger.info(util::LogCategory::reset,
-                                    "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
-                                    previous_reset->mode, previous_reset->time, mode);
-                        sync::PendingResetStore::clear_pending_reset(wt_local);
-                        break;
-                    case ClientResyncMode::DiscardLocal:
-                        sync::PendingResetStore::clear_pending_reset(wt_local);
-                        // previous mode Recover and this mode is Discard, this is not a cycle yet
-                        break;
-                    case ClientResyncMode::Manual:
-                        REALM_UNREACHABLE();
-                }
-                break;
-            case ClientResyncMode::RecoverOrDiscard:
-                throw ClientResetFailed(util::format("Unexpected previous '%1' mode reset from %2 did not "
-                                                     "succeed, giving up on '%3' mode to prevent a cycle",
-                                                     previous_reset->mode, previous_reset->time, mode));
+        if (action != previous_reset->action) {
+            // IF a different client reset is being performed, cler the pending client reset and start over.
+            logger.info(util::LogCategory::reset,
+                        "New '%1' client reset of type: '%2' is incompatible - clearing previous reset", action,
+                        mode);
+            sync::PendingResetStore::clear_pending_reset(wt_local);
+        }
+        else {
+            switch (previous_reset->mode) {
+                case ClientResyncMode::Manual:
+                    REALM_UNREACHABLE();
+                case ClientResyncMode::DiscardLocal:
+                    throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
+                                                         "giving up on '%3' mode to prevent a cycle",
+                                                         previous_reset->mode, previous_reset->time, mode));
+                case ClientResyncMode::Recover:
+                    switch (mode) {
+                        case ClientResyncMode::Recover:
+                            throw ClientResetFailed(
+                                util::format("A previous '%1' mode reset from %2 did not succeed, "
+                                             "giving up on '%3' mode to prevent a cycle",
+                                             previous_reset->mode, previous_reset->time, mode));
+                        case ClientResyncMode::RecoverOrDiscard:
+                            mode = ClientResyncMode::DiscardLocal;
+                            logger.info(
+                                util::LogCategory::reset,
+                                "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
+                                previous_reset->mode, previous_reset->time, mode);
+                            sync::PendingResetStore::clear_pending_reset(wt_local);
+                            break;
+                        case ClientResyncMode::DiscardLocal:
+                            sync::PendingResetStore::clear_pending_reset(wt_local);
+                            // previous mode Recover and this mode is Discard, this is not a cycle yet
+                            break;
+                        case ClientResyncMode::Manual:
+                            REALM_UNREACHABLE();
+                    }
+                    break;
+                case ClientResyncMode::RecoverOrDiscard:
+                    throw ClientResetFailed(util::format("Unexpected previous '%1' mode reset from %2 did not "
+                                                         "succeed, giving up on '%3' mode to prevent a cycle",
+                                                         previous_reset->mode, previous_reset->time, mode));
+            }
         }
     }
     if (action == PendingReset::Action::ClientResetNoRecovery) {
@@ -469,8 +480,8 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
     return mode;
 }
 
-bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
-                               util::Logger& logger, sync::SubscriptionStore* sub_store,
+bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, util::Logger& logger,
+                               sync::SubscriptionStore* sub_store,
                                util::FunctionRef<void(int64_t)> on_flx_version_complete)
 {
     DB& db_remote = *reset_config.fresh_copy;
@@ -479,13 +490,6 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
         reset_precheck_guard(wt_local, reset_config.mode, reset_config.action, reset_config.error, logger);
     bool recover_local_changes =
         actual_mode == ClientResyncMode::Recover || actual_mode == ClientResyncMode::RecoverOrDiscard;
-
-    logger.info(util::LogCategory::reset,
-                "Client reset: path_local = %1, client_file_ident = (ident: %2, salt: %3), "
-                "remote_path = %4, requested_mode = %5, action = %6, actual_mode = %7, will_recover = %8, "
-                "originating_error = %9",
-                db_local.get_path(), client_file_ident.ident, client_file_ident.salt, db_remote.get_path(),
-                reset_config.mode, reset_config.action, actual_mode, recover_local_changes, reset_config.error);
 
     auto& repl_local = dynamic_cast<ClientReplication&>(*db_local.get_replication());
     auto& history_local = repl_local.get_history();
@@ -496,13 +500,21 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
     auto& history_remote = repl_remote.get_history();
 
     sync::SaltedVersion fresh_server_version = {0, 0};
+    sync::SaltedFileIdent fresh_file_ident = {0, 0};
     {
         SyncProgress remote_progress;
         sync::version_type remote_version_unused;
-        SaltedFileIdent remote_ident_unused;
-        history_remote.get_status(remote_version_unused, remote_ident_unused, remote_progress);
+        history_remote.get_status(remote_version_unused, fresh_file_ident, remote_progress);
         fresh_server_version = remote_progress.latest_server_version;
     }
+
+    logger.info(util::LogCategory::reset,
+                "Client reset: path_local = %1, fresh_file_ident = (ident: %2, salt: %3), "
+                "fresh_server_version = (ident: %4, salt: %5), remote_path = %6, requested_mode = %7, action = %8, "
+                "actual_mode = %9, will_recover = %10, originating_error = %11",
+                db_local.get_path(), fresh_file_ident.ident, fresh_file_ident.salt, fresh_server_version.version,
+                fresh_server_version.salt, db_remote.get_path(), reset_config.mode, reset_config.action, actual_mode,
+                recover_local_changes, reset_config.error);
 
     TransactionRef tr_remote;
     std::vector<client_reset::RecoveredChange> recovered;
@@ -523,7 +535,7 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, sy
 
     // now that the state of the fresh and local Realms are identical,
     // reset the local sync history and steal the fresh Realm's ident
-    history_local.set_history_adjustments(logger, wt_local->get_version(), client_file_ident, fresh_server_version,
+    history_local.set_history_adjustments(logger, wt_local->get_version(), fresh_file_ident, fresh_server_version,
                                           recovered);
 
     int64_t subscription_version = 0;

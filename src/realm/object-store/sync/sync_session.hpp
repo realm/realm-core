@@ -30,9 +30,9 @@
 #include <realm/util/future.hpp>
 #include <realm/version_id.hpp>
 
+#include <map>
 #include <mutex>
 #include <unordered_map>
-#include <map>
 
 namespace realm {
 class DB;
@@ -345,6 +345,8 @@ public:
             return session.get_appservices_connection_id();
         }
 
+        // Supported commands can be found in `handleTestCommandMessage()`
+        // in baas/devicesync/server/qbs_client_handler_functions.go
         static util::Future<std::string> send_test_command(SyncSession& session, std::string request)
         {
             return session.send_test_command(std::move(request));
@@ -408,7 +410,7 @@ private:
 
     void download_fresh_realm(const sync::SessionErrorInfo& error_info)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, StatusWith<sync::SessionErrorInfo> error_info,
+    void handle_fresh_realm_downloaded(DBRef db, Status result, const sync::SessionErrorInfo& cr_error_info,
                                        std::optional<sync::SubscriptionSet> new_subs = std::nullopt)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);

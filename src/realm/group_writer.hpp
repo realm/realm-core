@@ -35,6 +35,9 @@ namespace realm {
 // Pre-declarations
 class Transaction;
 class SlabAlloc;
+namespace util {
+class WriteMarker;
+}
 
 class Reachable {
 public:

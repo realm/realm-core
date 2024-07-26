@@ -98,11 +98,15 @@ class TestPathGuard {
 public:
     TestPathGuard(const std::string& path);
     ~TestPathGuard() noexcept;
-    operator std::string() const
+    operator const std::string&() const noexcept
     {
         return m_path;
     }
-    operator StringData() const
+    operator StringData() const noexcept
+    {
+        return m_path;
+    }
+    operator std::string_view() const noexcept
     {
         return m_path;
     }

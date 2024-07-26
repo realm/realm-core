@@ -206,7 +206,6 @@ public:
         uint_least8_t width = get_width_from_header(header);
         WidthType wtype = get_wtype_from_header(header);
         size_t num_bytes = calc_byte_size(wtype, size, width);
-
         return num_bytes;
     }
 

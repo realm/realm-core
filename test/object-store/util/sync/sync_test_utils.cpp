@@ -176,7 +176,7 @@ std::string unquote_string(std::string_view possibly_quoted_string)
 
 #if REALM_ENABLE_SYNC
 
-void subscribe_to_all_and_bootstrap(Realm& realm)
+sync::SubscriptionSet subscribe_to_all(Realm& realm)
 {
     auto mut_subs = realm.get_latest_subscription_set().make_mutable_copy();
     auto& group = realm.read_group();
@@ -188,7 +188,12 @@ void subscribe_to_all_and_bootstrap(Realm& realm)
             }
         }
     }
-    auto subs = std::move(mut_subs).commit();
+    return std::move(mut_subs).commit();
+}
+
+void subscribe_to_all_and_bootstrap(Realm& realm)
+{
+    auto subs = subscribe_to_all(realm);
     subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     wait_for_download(realm);
 }
@@ -269,6 +274,10 @@ void wait_for_advance(Realm& realm)
             , target_version(*realm.latest_snapshot_version())
             , done(done)
         {
+            // Are we already there...
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
         }
 
         void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
@@ -287,26 +296,20 @@ void wait_for_advance(Realm& realm)
     realm.m_binding_context = nullptr;
 }
 
-void async_open_realm(const Realm::Config& config,
-                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish)
+StatusWith<std::shared_ptr<Realm>> async_open_realm(const Realm::Config& config)
 {
-    std::mutex mutex;
-    bool did_finish = false;
     auto task = Realm::get_synchronized_realm(config);
-    ThreadSafeReference tsr;
-    std::exception_ptr err = nullptr;
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-        std::lock_guard lock(mutex);
-        did_finish = true;
-        tsr = std::move(ref);
-        err = e;
-    });
-    util::EventLoop::main().run_until([&] {
-        std::lock_guard lock(mutex);
-        return did_finish;
-    });
-    task->cancel(); // don't run the above notifier again on this session
-    finish(std::move(tsr), err);
+    auto sw = task->start().get_no_throw();
+    if (sw.is_ok())
+        return Realm::get_shared_realm(std::move(sw.get_value()));
+    return sw.get_status();
+}
+
+std::shared_ptr<Realm> successfully_async_open_realm(const Realm::Config& config)
+{
+    auto status = async_open_realm(config);
+    REQUIRE(status.is_ok());
+    return status.get_value();
 }
 
 #endif // REALM_ENABLE_SYNC
@@ -383,7 +386,7 @@ struct FakeLocalClientReset : public TestClientReset {
             progress.upload.client_version = current_version;
             progress.upload.last_integrated_server_version = current_version;
             sync::VersionInfo info_out;
-            history_local->set_sync_progress(progress, nullptr, info_out);
+            history_local->set_sync_progress(progress, 0, info_out);
         }
         {
             local_realm->begin_transaction();
@@ -426,7 +429,6 @@ struct FakeLocalClientReset : public TestClientReset {
             }
             remote_realm->commit_transaction();
 
-            sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto logger = util::Logger::get_default_logger();
             sync::ClientReset reset_config{m_mode,
@@ -434,7 +436,7 @@ struct FakeLocalClientReset : public TestClientReset {
                                            {ErrorCodes::SyncClientResetRequired, "Bad client file ident"}};
 
             using _impl::client_reset::perform_client_reset_diff;
-            perform_client_reset_diff(*local_db, reset_config, fake_ident, *logger, nullptr, [](int64_t) {});
+            perform_client_reset_diff(*local_db, reset_config, *logger, nullptr, [](int64_t) {});
 
             remote_realm->close();
             if (m_on_post_reset) {
@@ -509,6 +511,17 @@ void wait_for_num_objects_in_atlas(std::shared_ptr<app::User> user, const AppSes
         std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
+std::pair<util::Future<ClientResyncMode>, std::function<void(SharedRealm, ThreadSafeReference, bool)>>
+make_client_reset_handler()
+{
+    auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
+    auto shared_promise = std::make_shared<decltype(reset_promise)>(std::move(reset_promise));
+    auto fn = [reset_promise = std::move(shared_promise)](SharedRealm, ThreadSafeReference, bool did_recover) {
+        reset_promise->emplace_value(did_recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal);
+    };
+    return std::make_pair(std::move(reset_future), std::move(fn));
+}
+
 void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session)
 {
     auto file_ident = sync_session.get_file_ident();
@@ -556,7 +569,7 @@ struct BaasClientReset : public TestClientReset {
         // state.
         timed_sleeping_wait_for(
             [&] {
-                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id, false);
             },
             std::chrono::seconds(30), std::chrono::seconds(1));
 
@@ -737,7 +750,7 @@ struct BaasFLXClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
-        wait_for_upload(*realm);
+        wait_for_download(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }

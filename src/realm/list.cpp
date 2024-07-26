@@ -503,10 +503,12 @@ void Lst<Mixed>::remove(size_t from, size_t to)
 
 void Lst<Mixed>::clear()
 {
-    if (size() > 0) {
-        if (Replication* repl = Base::get_replication()) {
-            repl->list_clear(*this);
-        }
+    auto sz = size();
+    Replication* repl = Base::get_replication();
+    if (repl && (sz > 0 || !m_col_key.is_collection() || m_level > 1)) {
+        repl->list_clear(*this);
+    }
+    if (sz > 0) {
         CascadeState state;
         bool recurse = remove_backlinks(state);
 
@@ -874,9 +876,6 @@ bool Lst<Mixed>::clear_backlink(size_t ndx, CascadeState& state) const
     if (value.is_type(type_TypedLink, type_Dictionary, type_List)) {
         if (value.is_type(type_TypedLink)) {
             auto link = value.get<ObjLink>();
-            if (link.get_obj_key().is_unresolved()) {
-                state.m_mode = CascadeState::Mode::All;
-            }
             return Base::remove_backlink(m_col_key, link, state);
         }
         else if (value.is_type(type_List)) {

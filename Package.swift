@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "14.8.0"
+let versionStr = "14.11.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -118,7 +118,6 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/client_reset.cpp",
     "realm/sync/noinst/client_reset_operation.cpp",
     "realm/sync/noinst/client_reset_recovery.cpp",
-    "realm/sync/noinst/compact_changesets.cpp",
     "realm/sync/noinst/migration_store.cpp",
     "realm/sync/noinst/pending_bootstrap_store.cpp",
     "realm/sync/noinst/pending_reset_store.cpp",
@@ -546,7 +545,6 @@ let package = Package(
                 "benchmarks",
                 "c_api",
                 "geospatial.cpp",
-                "notifications-fuzzer",
                 "query.json",
                 "sync-metadata-v4.realm",
                 "sync-metadata-v5.realm",
@@ -566,5 +564,5 @@ let package = Package(
                 .headerSearchPath("../"),
             ] + cxxSettings) as [CXXSetting]),
     ],
-    cxxLanguageStandard: .cxx17
+    cxxLanguageStandard: .cxx20
 )
