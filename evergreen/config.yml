@@ -320,6 +320,10 @@ functions:
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 $TSAN_OPTIONS"
           export UBSAN_OPTIONS="print_stacktrace=1"
 
+          if [[ -n "${enable_baas_redirector}" ]]; then
+            export ENABLE_BAAS_REDIRECTOR=On
+          fi
+
           cd build
           if ! "$CTEST" -C ${cmake_build_type|Debug} $TEST_FLAGS; then
             BAAS_PID=$(pgrep baas_server)
@@ -1263,6 +1267,20 @@ task_groups:
   - compile
   - ".test_suite !.requires_baas"
 
+# Runs only the baas integration tests
+- name: only_baas_integration_tests
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - ".requires_baas"
+
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
   max_hosts: 1
@@ -1417,6 +1435,17 @@ buildvariants:
     disable_sync_multiplexing: On
   tasks:
   - name: compile_test
+
+- name: ubuntu-with-redirects
+  display_name: "Ubuntu (Baas Redirector Enabled)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    enable_baas_redirector: On
+  tasks:
+  - name: only_baas_integration_tests
 
 - name: ubuntu-no-geospatial
   display_name: "Ubuntu (Geospatial Disabled)"
@@ -1850,6 +1879,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     enable_llvm_coverage: On
     coveralls_flag_name: "ubuntu-x86_64"
+    enable_baas_redirector: On
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-x86_64-unknown-linux-gnu.tar.bz2"
   tasks:
   - name: compile_test_coverage

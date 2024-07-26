@@ -271,7 +271,15 @@ AppSession create_app(const AppCreateConfig& config);
 AppSession get_runtime_app_session();
 
 std::string get_mongodb_server();
+// Returns the base url tests should connect to via realm to test functionality.
+// This endpoint may redirect you or may inject errors.
 std::string get_base_url();
+// Returns the base url of a real baas server after any redirects that may have been
+// injected by the test harness. Use this to validate you're talking to the right
+// URL in tests.
+std::string get_real_base_url();
+// Returns the base url of the admin API. Use this to create/administer apps that
+// your test is talking to.
 std::string get_admin_url();
 
 template <typename Factory>
