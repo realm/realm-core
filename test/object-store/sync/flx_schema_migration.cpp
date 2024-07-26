@@ -272,8 +272,8 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
         config.schema = schema_v1;
         create_schema(app_session, *config.schema, config.schema_version);
 
-        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
-                                                            const SyncClientHookData& data) mutable {
+        config.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession>,
+                                                           const SyncClientHookData& data) {
             if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
                 return SyncClientHookAction::NoAction;
             }
@@ -411,18 +411,18 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
     auto schema_migration_required = false;
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
     config.sync_config->error_handler = nullptr;
-    config.sync_config->on_sync_client_event_hook =
-        [&schema_migration_required](std::weak_ptr<SyncSession>, const SyncClientHookData& data) mutable {
-            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
-                return SyncClientHookAction::NoAction;
-            }
-            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
-            if (error_code != sync::ProtocolError::schema_version_changed) {
-                return SyncClientHookAction::NoAction;
-            }
-            schema_migration_required = true;
+    config.sync_config->on_sync_client_event_hook = [&schema_migration_required](std::weak_ptr<SyncSession>,
+                                                                                 const SyncClientHookData& data) {
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
-        };
+        }
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        if (error_code != sync::ProtocolError::schema_version_changed) {
+            return SyncClientHookAction::NoAction;
+        }
+        schema_migration_required = true;
+        return SyncClientHookAction::NoAction;
+    };
 
     auto status = async_open_realm(config);
     REQUIRE_FALSE(status.is_ok());
@@ -450,8 +450,7 @@ TEST_CASE("Fresh realm does not require schema migration", "[sync][flx][flx sche
     config.schema_version = 1;
     config.schema = schema_v1;
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
-    config.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession>,
-                                                       const SyncClientHookData& data) mutable {
+    config.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
         if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
         }
@@ -660,8 +659,12 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
     auto pf = util::make_promise_future<void>();
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
     config.sync_config->on_sync_client_event_hook = [&schema_version_changed_count, &task,
-                                                     &pf](std::weak_ptr<SyncSession>,
-                                                          const SyncClientHookData& data) mutable {
+                                                     &pf](std::weak_ptr<SyncSession> weak_session,
+                                                          const SyncClientHookData& data) {
+        auto session = weak_session.lock();
+        if (!session) {
+            return SyncClientHookAction::NoAction;
+        }
         if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
         }
@@ -768,7 +771,11 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     config.sync_config->on_sync_client_event_hook = [&harness, &schema_version_changed_count,
                                                      &once](std::weak_ptr<SyncSession> weak_session,
-                                                            const SyncClientHookData& data) mutable {
+                                                            const SyncClientHookData& data) {
+        auto session = weak_session.lock();
+        if (!session) {
+            return SyncClientHookAction::NoAction;
+        }
         if (schema_version_changed_count == 1 && data.event == SyncClientHookEvent::DownloadMessageReceived &&
             !once) {
             once = true;
@@ -777,8 +784,6 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
         if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
         }
-        auto session = weak_session.lock();
-        REQUIRE(session);
 
         auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
         if (error_code == sync::ProtocolError::initial_sync_not_completed) {
@@ -857,8 +862,12 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     auto pf = util::make_promise_future<void>();
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
     config.sync_config->on_sync_client_event_hook = [&schema_version_changed_count, &task,
-                                                     &pf](std::weak_ptr<SyncSession>,
-                                                          const SyncClientHookData& data) mutable {
+                                                     &pf](std::weak_ptr<SyncSession> weak_session,
+                                                          const SyncClientHookData& data) {
+        auto session = weak_session.lock();
+        if (!session) {
+            return SyncClientHookAction::NoAction;
+        }
         if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
         }
@@ -999,8 +1008,7 @@ TEST_CASE("Client reset and schema migration", "[sync][flx][flx schema migration
     config.schema = schema_v1;
     config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
-    config.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession>,
-                                                       const SyncClientHookData& data) mutable {
+    config.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession>, const SyncClientHookData& data) {
         if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
             return SyncClientHookAction::NoAction;
         }
