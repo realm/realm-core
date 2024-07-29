@@ -296,10 +296,10 @@ int StringCompressor::compare(CompressedStringView& A, CompressedStringView& B)
             return code_A - code_B;
 
         // 2. all the other possible cases
-        std::string a{(char)code_A, 1};
-        std::string b{(char)code_B, 1};
-        StringData sd_a = code_A < 256 ? a : m_symbols[code_A - 256].expansion;
-        StringData sd_b = code_B < 256 ? b : m_symbols[code_B - 256].expansion;
+        std::string str_a{(char)code_A, 1};
+        std::string str_b{(char)code_B, 1};
+        StringData sd_a = code_A < 256 ? str_a : m_symbols[code_A - 256].expansion;
+        StringData sd_b = code_B < 256 ? str_b : m_symbols[code_B - 256].expansion;
 
         REALM_ASSERT_DEBUG(sd_a != sd_b);
         if (sd_a < sd_b)

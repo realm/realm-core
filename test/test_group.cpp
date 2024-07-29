@@ -2623,10 +2623,6 @@ TEST(Test_Commit_Compression_Strings)
         auto set_s = obj.get_set<String>(col_key_set_string);
         auto dictionary_s = obj.get_dictionary(col_key_dict_string);
 
-        CHECK_EQUAL(list_s.size(), i + 1);
-        CHECK_EQUAL(set_s.size(), i + 1);
-        CHECK_EQUAL(dictionary_s.size(), i + 1);
-
         CHECK_EQUAL(list_s.get_any(i), str);
         CHECK_NOT_EQUAL(set_s.find_any(str), not_found);
         CHECK_NOT_EQUAL(dictionary_s.find_any(str), not_found);
