@@ -29,6 +29,7 @@
 #include "realm/sync/noinst/protocol_codec.hpp"
 #include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/sync/protocol.hpp"
+#include "realm/sync/subscriptions.hpp"
 #include "realm/sync/transform.hpp"
 #include "realm/util/assert.hpp"
 #include "realm/util/buffer.hpp"
@@ -61,9 +62,11 @@ constexpr static std::string_view c_progress_latest_server_version_salt("latest_
 
 } // namespace
 
-PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
+PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger,
+                                             std::shared_ptr<SubscriptionStore> subscription_store)
     : m_db(std::move(db))
     , m_logger(logger)
+    , m_subscription_store(std::move(subscription_store))
 {
     std::vector<SyncMetadataTable> internal_tables{
         {&m_table,
@@ -129,8 +132,7 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
 
 void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
                                       DownloadableProgress download_progress,
-                                      const _impl::ClientProtocol::ReceivedChangesets& changesets,
-                                      bool* created_new_batch_out)
+                                      const _impl::ClientProtocol::ReceivedChangesets& changesets)
 {
     std::vector<util::AppendBuffer<char>> compressed_changesets;
     compressed_changesets.reserve(changesets.size());
@@ -181,11 +183,11 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
 
     ClientHistory::set_download_progress(*tr, download_progress);
 
-    tr->commit();
-
-    if (created_new_batch_out) {
-        *created_new_batch_out = did_create;
+    if (did_create) {
+        m_subscription_store->begin_bootstrap(*tr, query_version);
     }
+
+    tr->commit();
 
     if (did_create) {
         m_logger.debug(util::LogCategory::changeset,
@@ -202,6 +204,7 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
                        "Finalized pending bootstrap object with %1 changesets for query version %2", total_changesets,
                        query_version);
     }
+
     m_has_pending = true;
 }
 
@@ -210,27 +213,19 @@ bool PendingBootstrapStore::has_pending() const noexcept
     return m_has_pending;
 }
 
-void PendingBootstrapStore::clear()
-{
-    auto tr = m_db->start_write();
-    clear(*tr);
-    tr->commit();
-}
-
-void PendingBootstrapStore::clear(Transaction& wt)
+void PendingBootstrapStore::clear(Transaction& wt, int64_t query_version)
 {
     auto bootstrap_table = wt.get_table(m_table);
     bootstrap_table->clear();
+    if (m_has_pending) {
+        m_subscription_store->cancel_bootstrap(wt, query_version);
+    }
     m_has_pending = false;
 }
 
-PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t limit_in_bytes)
+PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(Transaction& tr, size_t limit_in_bytes)
 {
-    auto tr = m_db->start_read();
-    auto bootstrap_table = tr->get_table(m_table);
-    if (bootstrap_table->is_empty()) {
-        return {};
-    }
+    auto bootstrap_table = tr.get_table(m_table);
 
     // We should only have one pending bootstrap at a time.
     REALM_ASSERT(bootstrap_table->size() == 1);
@@ -249,7 +244,7 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
             progress_obj.get<int64_t>(m_progress_download_client_version);
         progress.upload.last_integrated_server_version = progress_obj.get<int64_t>(m_progress_upload_server_version);
         progress.upload.client_version = progress_obj.get<int64_t>(m_progress_upload_client_version);
-        ret.progress = std::move(progress);
+        ret.progress = progress;
     }
 
     auto changeset_list = bootstrap_obj.get_linklist(m_changesets);
@@ -310,14 +305,10 @@ PendingBootstrapStore::PendingBatchStats PendingBootstrapStore::pending_stats()
     return stats;
 }
 
-void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t count)
+void PendingBootstrapStore::pop_front_pending(const Transaction& tr, size_t count)
 {
-    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Writing);
-    auto bootstrap_table = tr->get_table(m_table);
-    if (bootstrap_table->is_empty()) {
-        return;
-    }
-
+    REALM_ASSERT_3(tr.get_transact_stage(), ==, DB::transact_Writing);
+    auto bootstrap_table = tr.get_table(m_table);
     // We should only have one pending bootstrap at a time.
     REALM_ASSERT(bootstrap_table->size() == 1);
 
@@ -333,18 +324,22 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
         }
     }
 
+    int64_t query_version = bootstrap_obj.get<int64_t>(m_query_version);
     if (changeset_list.is_empty()) {
         m_logger.debug(util::LogCategory::changeset, "Removing pending bootstrap obj for query version %1",
-                       bootstrap_obj.get<int64_t>(m_query_version));
+                       query_version);
         bootstrap_obj.remove();
     }
     else {
         m_logger.debug(util::LogCategory::changeset,
-                       "Removing pending bootstrap batch for query version %1. %2 changeset remaining",
-                       bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
+                       "Removing pending bootstrap batch for query version %1. %2 changeset remaining", query_version,
+                       changeset_list.size());
     }
 
     m_has_pending = !bootstrap_table->is_empty();
+    if (!m_has_pending) {
+        m_subscription_store->complete_bootstrap(tr, query_version);
+    }
 }
 
 } // namespace realm::sync

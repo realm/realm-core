@@ -916,8 +916,8 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
 
     sync::ClientReset cr_config{mode, fresh, error, action};
 
-    bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *target, std::move(cr_config),
-                                                               sub_store, [](int64_t) {});
+    bool did_reset =
+        _impl::client_reset::perform_client_reset(*test_context.logger, *target, std::move(cr_config), sub_store);
     CHECK(did_reset);
 
     // Should have closed and deleted the fresh realm
@@ -1121,8 +1121,8 @@ TEST(ClientReset_UninitializedFile)
 
     // Should not perform a client reset because the target file has never been
     // written to
-    bool did_reset = _impl::client_reset::perform_client_reset(*test_context.logger, *db_empty, std::move(cr_config),
-                                                               nullptr, [](int64_t) {});
+    bool did_reset =
+        _impl::client_reset::perform_client_reset(*test_context.logger, *db_empty, std::move(cr_config), nullptr);
     CHECK_NOT(did_reset);
     auto rd_tr = db_empty->start_frozen();
     CHECK_NOT(PendingResetStore::has_pending_reset(rd_tr));
@@ -1293,9 +1293,9 @@ TEST(ClientReset_Recover_RecoveryDisabled)
                                 {ErrorCodes::SyncClientResetRequired, "Bad client file identifier (IDENT)"},
                                 sync::ProtocolErrorInfo::Action::ClientResetNoRecovery};
 
-    CHECK_THROW((_impl::client_reset::perform_client_reset(*test_context.logger, *dbs.first, std::move(cr_config),
-                                                           nullptr, [](int64_t) {})),
-                sync::ClientResetFailed);
+    CHECK_THROW(
+        _impl::client_reset::perform_client_reset(*test_context.logger, *dbs.first, std::move(cr_config), nullptr),
+        sync::ClientResetFailed);
     auto rd_tr = dbs.first->start_frozen();
     CHECK_NOT(PendingResetStore::has_pending_reset(rd_tr));
 }
@@ -1542,15 +1542,15 @@ TEST(ClientReset_Recover_UploadableBytes)
     uint_fast64_t unused, pre_reset_uploadable_bytes;
     DownloadableProgress unused_progress;
     version_type unused_version;
-    history.get_upload_download_state(*db, unused, unused_progress, unused, pre_reset_uploadable_bytes, unused,
-                                      unused_version);
+    history.get_upload_download_state(*db->start_read(), db->get_alloc(), unused, unused_progress, unused,
+                                      pre_reset_uploadable_bytes, unused, unused_version);
     CHECK_GREATER(pre_reset_uploadable_bytes, 0);
 
     expect_reset(test_context, db, db_fresh, ClientResyncMode::Recover, nullptr);
 
     uint_fast64_t post_reset_uploadable_bytes;
-    history.get_upload_download_state(*db, unused, unused_progress, unused, post_reset_uploadable_bytes, unused,
-                                      unused_version);
+    history.get_upload_download_state(*db->start_read(), db->get_alloc(), unused, unused_progress, unused,
+                                      post_reset_uploadable_bytes, unused, unused_version);
     CHECK_GREATER(post_reset_uploadable_bytes, 0);
     CHECK_GREATER(pre_reset_uploadable_bytes, post_reset_uploadable_bytes);
 }

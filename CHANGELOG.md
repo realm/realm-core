@@ -17,6 +17,7 @@
 
 ### Internals
 * Fix emscripten build and add emscripten debug/release compile tasks to evergreen. ([PR #7916](https://github.com/realm/realm-core/pull/7916))
+* Subscription set state change notifications now work in a multiprocess-compatible manner ([PR #7862](https://github.com/realm/realm-core/pull/7862)).
 
 ----------------------------------------------
 

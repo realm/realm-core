@@ -784,10 +784,6 @@ public:
     /// \brief Gets the migration store associated with this Session.
     MigrationStore* get_migration_store();
 
-    /// Update internal client state when a flx subscription becomes complete outside
-    /// of the normal sync process. This can happen during client reset.
-    void on_flx_sync_version_complete(int64_t version);
-
     /// If this session is currently suspended, resume it immediately.
     ///
     /// It is an error to call this function before activation of the session,
@@ -928,7 +924,6 @@ private:
     //@}
 
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
-    void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
     // Processes an FLX download message, if it's a bootstrap message. If it's not a bootstrap
     // message then this is a noop and will return false. Otherwise this will return true
@@ -940,8 +935,6 @@ private:
 
     bool client_reset_if_needed();
     void handle_pending_client_reset_acknowledgement();
-
-    void update_subscription_version_info();
 
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 
@@ -1115,7 +1108,7 @@ private:
     Status receive_mark_message(request_ident_type);
     Status receive_unbound_message();
     Status receive_error_message(const ProtocolErrorInfo& info);
-    Status receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
+    void receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
     Status receive_test_command_response(request_ident_type, std::string_view body);
 
     void initiate_rebind();

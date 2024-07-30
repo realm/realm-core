@@ -104,8 +104,6 @@ public:
 
     void handle_pending_client_reset_acknowledgement();
 
-    void update_subscription_version_info();
-
     // Can be called from any thread.
     std::string get_appservices_connection_id();
 
@@ -149,7 +147,7 @@ private:
         uint64_t uploadable;
         uint64_t downloaded;
         uint64_t downloadable;
-        int64_t query_version;
+        int64_t query_version = 0;
         double download_estimate;
 
         // Does not check snapshot
@@ -179,11 +177,7 @@ private:
     const uint64_t m_schema_version;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
-    int64_t m_flx_active_version = 0;
-    int64_t m_flx_last_seen_version = 0;
-    int64_t m_flx_pending_mark_version = 0;
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
-
     std::shared_ptr<MigrationStore> m_migration_store;
 
     // Set to true when this session wrapper is actualized (i.e. the wrapped
@@ -242,8 +236,6 @@ private:
     void on_resumed();
     void on_connection_state_changed(ConnectionState, const std::optional<SessionErrorInfo>&);
     void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
-    void on_flx_sync_error(int64_t version, std::string_view err_msg);
-    void on_flx_sync_version_complete(int64_t version);
 
     void init_progress_handler();
     void check_progress();
@@ -795,14 +787,6 @@ void SessionImpl::handle_pending_client_reset_acknowledgement()
     }
 }
 
-void SessionImpl::update_subscription_version_info()
-{
-    // Ignore the call if the session is not active
-    if (m_state == State::Active) {
-        m_wrapper.update_subscription_version_info();
-    }
-}
-
 bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
 {
     // Ignore the message if the session is not active or a steady state message
@@ -818,10 +802,8 @@ bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
         maybe_progress = message.progress;
     }
 
-    bool new_batch = false;
     try {
-        bootstrap_store->add_batch(*message.query_version, std::move(maybe_progress), message.downloadable,
-                                   message.changesets, &new_batch);
+        bootstrap_store->add_batch(*message.query_version, maybe_progress, message.downloadable, message.changesets);
     }
     catch (const LogicError& ex) {
         if (ex.code() == ErrorCodes::LimitExceeded) {
@@ -832,12 +814,6 @@ bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
             return true;
         }
         throw;
-    }
-
-    // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
-    // bootstrapping.
-    if (new_batch && message.batch_state == DownloadBatchState::MoreToCome) {
-        on_flx_sync_progress(*message.query_version, DownloadBatchState::MoreToCome);
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, message.progress,
@@ -891,13 +867,11 @@ void SessionImpl::process_pending_flx_bootstrap()
     TransactionRef transact = get_db()->start_write();
     while (bootstrap_store->has_pending()) {
         auto start_time = std::chrono::steady_clock::now();
-        auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
+        auto pending_batch = bootstrap_store->peek_pending(*transact, m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
-            // Close the write transaction before clearing the bootstrap store to avoid a deadlock because the
-            // bootstrap store requires a write transaction itself.
-            transact->close();
-            bootstrap_store->clear();
+            bootstrap_store->clear(*transact, pending_batch.query_version);
+            transact->commit();
             return;
         }
 
@@ -915,7 +889,7 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, 1.0, pending_batch.changesets, new_version, batch_state, logger, transact,
-            [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
+            [&](const Transaction& tr, util::Span<Changeset> changesets_applied) {
                 REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, changesets_applied.size());
             });
@@ -935,7 +909,6 @@ void SessionImpl::process_pending_flx_bootstrap()
     }
 
     REALM_ASSERT_3(query_version, !=, -1);
-    on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 
     on_changesets_integrated(new_version.realm_version, progress);
     auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
@@ -948,15 +921,7 @@ void SessionImpl::on_flx_sync_error(int64_t version, std::string_view err_msg)
 {
     // Ignore the call if the session is not active
     if (m_state == State::Active) {
-        m_wrapper.on_flx_sync_error(version, err_msg);
-    }
-}
-
-void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch_state)
-{
-    // Ignore the call if the session is not active
-    if (m_state == State::Active) {
-        m_wrapper.on_flx_sync_progress(version, batch_state);
+        get_flx_subscription_store()->set_error(version, err_msg);
     }
 }
 
@@ -972,14 +937,6 @@ MigrationStore* SessionImpl::get_migration_store()
     // Should never be called if session is not active
     REALM_ASSERT_EX(m_state == State::Active, m_state);
     return m_wrapper.get_migration_store();
-}
-
-void SessionImpl::on_flx_sync_version_complete(int64_t version)
-{
-    // Ignore the call if the session is not active
-    if (m_state == State::Active) {
-        m_wrapper.on_flx_sync_version_complete(version);
-    }
 }
 
 SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
@@ -1182,75 +1139,6 @@ bool SessionWrapper::has_flx_subscription_store() const
     return static_cast<bool>(m_flx_subscription_store);
 }
 
-void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
-{
-    REALM_ASSERT(!m_finalized);
-    get_flx_subscription_store()->update_state(version, SubscriptionSet::State::Error, err_msg);
-}
-
-void SessionWrapper::on_flx_sync_version_complete(int64_t version)
-{
-    REALM_ASSERT(!m_finalized);
-    m_flx_last_seen_version = version;
-    m_flx_active_version = version;
-}
-
-void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
-{
-    if (!has_flx_subscription_store()) {
-        return;
-    }
-
-    REALM_ASSERT(!m_finalized);
-    if (batch_state == DownloadBatchState::SteadyState) {
-        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
-                                   "Unexpected batch state of SteadyState while downloading bootstrap");
-    }
-    // Is this a server-initiated bootstrap? Skip notifying the subscription store
-    if (new_version == m_flx_active_version) {
-        return;
-    }
-    if (new_version < m_flx_active_version) {
-        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
-                                   util::format("Bootstrap query version %1 is less than active version %2",
-                                                new_version, m_flx_active_version));
-    }
-    if (new_version < m_flx_last_seen_version) {
-        throw IntegrationException(
-            ErrorCodes::SyncProtocolInvariantFailed,
-            util::format("Download message query version %1 is less than current bootstrap version %2", new_version,
-                         m_flx_last_seen_version));
-    }
-
-    SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
-
-    switch (batch_state) {
-        case DownloadBatchState::SteadyState:
-            // Cannot be called with this value.
-            REALM_UNREACHABLE();
-        case DownloadBatchState::LastInBatch:
-            on_flx_sync_version_complete(new_version);
-            if (new_version == 0) {
-                new_state = SubscriptionSet::State::Complete;
-            }
-            else {
-                new_state = SubscriptionSet::State::AwaitingMark;
-                m_flx_pending_mark_version = new_version;
-            }
-            break;
-        case DownloadBatchState::MoreToCome:
-            if (m_flx_last_seen_version == new_version) {
-                return;
-            }
-
-            m_flx_last_seen_version = new_version;
-            new_state = SubscriptionSet::State::Bootstrapping;
-            break;
-    }
-
-    get_flx_subscription_store()->update_state(new_version, new_state);
-}
-
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 {
     REALM_ASSERT(!m_finalized);
@@ -1443,7 +1331,8 @@ void SessionWrapper::actualize()
     conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);    // Throws
     std::unique_ptr<SessionImpl> sess = std::make_unique<SessionImpl>(*this, conn); // Throws
     if (m_sync_mode == SyncServerMode::FLX) {
-        m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess->logger);
+        m_flx_pending_bootstrap_store =
+            std::make_unique<PendingBootstrapStore>(m_db, sess->logger, m_flx_subscription_store);
     }
 
     sess->logger.info("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
@@ -1452,10 +1341,6 @@ void SessionWrapper::actualize()
         m_sess = nullptr;
     });
     conn.activate_session(std::move(sess)); // Throws
-
-    // Initialize the variables relying on the bootstrap store from the event loop to guarantee that a previous
-    // session cannot change the state of the bootstrap store at the same time.
-    update_subscription_version_info();
 
     if (was_created)
         conn.activate(); // Throws
@@ -1563,6 +1448,10 @@ void SessionWrapper::on_download_completion()
     // completion without this.
     check_progress();
 
+    if (m_flx_subscription_store) {
+        m_flx_subscription_store->download_complete();
+    }
+
     while (!m_download_completion_handlers.empty()) {
         auto handler = std::move(m_download_completion_handlers.back());
         m_download_completion_handlers.pop_back();
@@ -1572,13 +1461,6 @@ void SessionWrapper::on_download_completion()
         auto handler = std::move(m_sync_completion_handlers.back());
         m_upload_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
-    }
-
-    if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
-        m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
-                             m_flx_pending_mark_version);
-        m_flx_subscription_store->update_state(m_flx_pending_mark_version, SubscriptionSet::State::Complete);
-        m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 }
 
@@ -1626,15 +1508,34 @@ void SessionWrapper::check_progress()
     REALM_ASSERT(!m_finalized);
     REALM_ASSERT(m_sess);
 
-    if (!m_progress_handler && m_upload_completion_handlers.empty() && m_sync_completion_handlers.empty())
+    // Check if there's anything which even wants progress or completion information
+    bool has_progress_handler = m_progress_handler && m_reliable_download_progress;
+    bool has_completion_handler = !m_upload_completion_handlers.empty() || !m_sync_completion_handlers.empty();
+    if (!m_flx_subscription_store && !has_progress_handler && !has_completion_handler)
         return;
 
-    version_type uploaded_version;
+    // The order in which we report each type of completion or progress is important,
+    // and changing it needs to be avoided as it'd be a breaking change to the APIs
+
+    TransactionRef tr;
     ReportedProgress p;
+    if (m_flx_subscription_store) {
+        m_flx_subscription_store->report_progress(tr);
+    }
+
+    if (!has_progress_handler && !has_completion_handler)
+        return;
+    // The subscription store may have started a read transaction that we'll
+    // reuse, but it may not have needed to or may not exist
+    if (!tr)
+        tr = m_db->start_read();
+
+    version_type uploaded_version;
     DownloadableProgress downloadable;
-    ClientHistory::get_upload_download_state(*m_db, p.downloaded, downloadable, p.uploaded, p.uploadable, p.snapshot,
-                                             uploaded_version);
-    p.query_version = m_flx_last_seen_version;
+    ClientHistory::get_upload_download_state(*tr, m_db->get_alloc(), p.downloaded, downloadable, p.uploaded,
+                                             p.uploadable, p.snapshot, uploaded_version);
+    if (m_flx_subscription_store && has_progress_handler)
+        p.query_version = m_flx_subscription_store->get_downloading_query_version(*tr);
 
     report_progress(p, downloadable);
     report_upload_completion(uploaded_version);
@@ -1791,15 +1692,6 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
             PendingResetStore::clear_pending_reset(tr);
             tr->commit();
         });
-}
-
-void SessionWrapper::update_subscription_version_info()
-{
-    if (!m_flx_subscription_store)
-        return;
-    auto versions_info = m_flx_subscription_store->get_version_info();
-    m_flx_active_version = versions_info.active;
-    m_flx_pending_mark_version = versions_info.pending_mark;
 }
 
 std::string SessionWrapper::get_appservices_connection_id()
