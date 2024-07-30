@@ -197,6 +197,48 @@ functions:
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
               $target
 
+  "compile emscripten":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        script: |-
+          set -o errexit
+          set -o pipefail
+          set -o verbose
+
+          if [ -n "${cmake_bindir|}" ]; then
+            export CMAKE="$(./evergreen/abspath.sh "${cmake_bindir}/cmake")"
+          else
+            export CMAKE="cmake"
+          fi
+
+          # Check out the Emscripten SDK and activate the specified version
+          echo "Activating emscripten SDK version: ${emsdk_version|latest}"
+          git clone https://github.com/emscripten-core/emsdk.git
+
+          pushd emsdk/ > /dev/null  # realm-core/emsdk
+          ./emsdk install ${emsdk_version|latest}
+          ./emsdk activate ${emsdk_version|latest}
+          source ./emsdk_env.sh
+          popd > /dev/null  # realm-core
+
+          if [[ "$(uname -s)" =~ Darwin* ]]; then
+            NPROC="$(sysctl -n hw.ncpu)"
+          else
+            NPROC="$(nproc)"
+          fi
+
+          mkdir -p build-emscripten
+          pushd build-emscripten > /dev/null  # realm-core/build-emscripten
+
+          # shellcheck disable=SC2086,SC2090
+          emcmake $CMAKE -D CMAKE_BUILD_TYPE="${cmake_build_type|Debug}" \
+                           ..
+
+          make "-j$NPROC" 2>&1
+          popd > /dev/null  # realm-core
+
   "run benchmark":
     - command: shell.exec
       params:
@@ -749,6 +791,12 @@ tasks:
   commands:
   - func: "compile"
 
+- name: compile-emscripten
+  exec_timeout_secs: 1800
+  tags: [ "for_pull_requests" ]
+  commands:
+  - func: "compile emscripten"
+
 - name: package
   exec_timeout_secs: 1800
   commands:
@@ -1297,6 +1345,15 @@ task_groups:
   - compile
   - .test_suite
 
+- name: compile_emscripten
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  tasks:
+  - compile-emscripten
+
 # Runs object-store-tests against baas running on remote host and runs
 # the network simulation tests as a separate task for nightly builds
 - name: network_tests
@@ -1647,6 +1704,27 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
+
+- name: ubuntu-emscripten
+  display_name: "Ubuntu (Emscripten x86_64)"
+  run_on: ubuntu2204-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    emsdk_version: "3.1.37"
+  tasks:
+  - name: compile_emscripten
+
+- name: ubuntu-emscripten-release
+  display_name: "Ubuntu (Emscripten x86_64 Release build)"
+  run_on: ubuntu2204-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    cmake_build_type: RelWithDebInfo
+    emsdk_version: "3.1.37"
+  tasks:
+  - name: compile_emscripten
 
 # disable these builders since there are constantly failing and not yet ready for nightly builds
 # - name: ubuntu2004-network-nonideal

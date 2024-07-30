@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix emscripten build and add emscripten debug/release compile tasks to evergreen. ([PR #7916](https://github.com/realm/realm-core/pull/7916))
 
 ----------------------------------------------
 
