@@ -24,10 +24,12 @@
 #include <stdexcept>
 #include <string>
 #include <iostream>
+#include <memory>
 
 #include <realm/util/assert.hpp>
-#include <memory>
 #include <realm/unicode.hpp>
+#include <realm/array.hpp>
+#include <realm/string_interner.hpp>
 
 #include "test.hpp"
 
@@ -169,6 +171,45 @@ TEST(UTF8_Compare_Core_utf8)
     CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
 }
 
+TEST(UTF8_Compare_Core_utf8_interned_strings)
+{
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    auto str_compare = [&](StringData a, StringData b) {
+        auto id1 = interner.lookup(a);
+        auto id2 = interner.lookup(b);
+        CHECK(id1 && id2);
+        return interner.compare(*id1, *id2) < 0;
+    };
+
+    // intern all the utf8 strings
+    interner.intern(uae);
+    interner.intern(uAE);
+    interner.intern(ua);
+    interner.intern(uA);
+    interner.intern(u16sur);
+    interner.intern(u16sur2);
+
+    // re-do the same comparisons as per the test that is not using
+    // compressed strings.
+    CHECK_EQUAL(false, str_compare(uae, uae));
+    CHECK_EQUAL(false, str_compare(uAE, uAE));
+    CHECK_EQUAL(false, str_compare(uae, ua));
+    CHECK_EQUAL(true, str_compare(ua, uae));
+    CHECK_EQUAL(true, str_compare(uAE, uae));
+    CHECK_EQUAL(false, str_compare(uae, uA));
+    CHECK_EQUAL(true, str_compare(uA, uAE));
+    CHECK_EQUAL(true, str_compare(uA, u16sur));
+    CHECK_EQUAL(false, str_compare(u16sur, uA));
+    CHECK_EQUAL(false, str_compare(u16sur, u16sur));
+    CHECK_EQUAL(true, str_compare(u16sur, u16sur2));
+    CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
+    CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
+
+    parent.destroy_deep();
+}
 
 TEST(UTF8_Compare_Core_utf8_invalid)
 {
@@ -194,8 +235,17 @@ TEST(UTF8_Compare_Core_utf8_invalid)
     // that return value is arbitrary for invalid utf8
     bool ret = i1 < i2;
     CHECK_EQUAL(ret, i2 < i1); // must sort the same as before regardless of succeeding data
-}
 
+    // the same applies if the strings are interned.
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+    auto id1 = interner.intern(invalid1);
+    auto id2 = interner.intern(invalid2);
+    bool ret_interned = interner.compare(id1, id2) == -1;
+    CHECK_EQUAL(ret_interned, ret);
+    parent.destroy_deep();
+}
 
 TEST(Compare_Core_utf8_invalid_crash)
 {
@@ -218,7 +268,6 @@ TEST(Compare_Core_utf8_invalid_crash)
     }
 }
 
-
 TEST(UTF8_Compare_Core_utf8_zero)
 {
     auto str_compare = [](StringData a, StringData b) {
@@ -237,6 +286,52 @@ TEST(UTF8_Compare_Core_utf8_zero)
     // Number of trailing 0 makes a difference
     CHECK_EQUAL(true, str_compare(StringData("a\0", 2), StringData("a\0\0", 3)));
     CHECK_EQUAL(false, str_compare(StringData("a\0\0", 3), StringData("a\0", 2)));
+}
+
+TEST(UTF8_Compare_Core_utf8_zero_compressed_string)
+{
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    auto str_compare = [&](StringData a, StringData b) {
+        auto id1 = interner.lookup(a);
+        auto id2 = interner.lookup(b);
+        CHECK(id1 && id2);
+        return interner.compare(*id1, *id2) < 0;
+    };
+
+    const char* empty = "\0";
+    const char* a = "a";
+    const char* aa = "a\0a";
+    const char* ab = "a\0b";
+    const char* a0 = "a\0";
+    const char* a00 = "a\0\0";
+
+    // intern all the utf8 strings
+    interner.intern(StringData(empty, 1));
+    interner.intern(StringData(a));
+    interner.intern(StringData(aa, 3));
+    interner.intern(StringData(ab, 3));
+    interner.intern(StringData(a0, 2));
+    interner.intern(StringData(a00, 3));
+
+
+    // Realm must support 0 characters in utf8 strings
+    CHECK_EQUAL(false, str_compare(StringData("\0", 1), StringData("\0", 1)));
+    CHECK_EQUAL(true, str_compare(StringData("\0", 1), StringData("a")));
+    CHECK_EQUAL(false, str_compare("a", StringData("\0", 1)));
+
+    // 0 in middle of strings
+    CHECK_EQUAL(true, str_compare(StringData("a\0a", 3), StringData("a\0b", 3)));
+    CHECK_EQUAL(false, str_compare(StringData("a\0b", 3), StringData("a\0a", 3)));
+    CHECK_EQUAL(false, str_compare(StringData("a\0a", 3), StringData("a\0a", 3)));
+
+    // Number of trailing 0 makes a difference
+    CHECK_EQUAL(true, str_compare(StringData("a\0", 2), StringData("a\0\0", 3)));
+    CHECK_EQUAL(false, str_compare(StringData("a\0\0", 3), StringData("a\0", 2)));
+
+    parent.destroy_deep();
 }
 
 } // anonymous namespace
