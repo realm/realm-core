@@ -109,7 +109,7 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger,
             throw RuntimeError(ErrorCodes::SchemaVersionMismatch,
                                "Invalid schema version for FLX sync pending bootstrap table group");
         }
-        load_sync_metadata_schema(tr, &internal_tables);
+        load_sync_metadata_schema(*tr, &internal_tables);
     }
     else {
         tr->promote_to_write();
@@ -117,7 +117,7 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger,
         SyncMetadataSchemaVersions schema_versions(tr);
         // Create the metadata schema and set the version (in the same commit)
         schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, c_schema_version);
-        create_sync_metadata_schema(tr, &internal_tables);
+        create_sync_metadata_schema(*tr, &internal_tables);
         tr->commit_and_continue_as_read();
     }
     REALM_ASSERT(m_table);
