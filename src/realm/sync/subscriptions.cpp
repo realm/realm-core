@@ -282,7 +282,7 @@ MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<SubscriptionStore> 
 
 void MutableSubscriptionSet::check_is_mutable() const
 {
-    if (m_tr->get_transact_stage() != DB::transact_Writing) {
+    if (!m_tr || m_tr->get_transact_stage() != DB::transact_Writing) {
         throw WrongTransactionState("Not a write transaction");
     }
 }
@@ -547,7 +547,7 @@ int64_t SubscriptionStore::get_downloading_query_version(Transaction& tr) const
 
 SubscriptionSet MutableSubscriptionSet::commit()
 {
-    if (m_tr->get_transact_stage() != DB::transact_Writing) {
+    if (!m_tr || m_tr->get_transact_stage() != DB::transact_Writing) {
         throw LogicError(ErrorCodes::WrongTransactionState, "SubscriptionSet has already been committed");
     }
     auto mgr = get_flx_subscription_store(); // Throws
@@ -577,7 +577,12 @@ SubscriptionSet MutableSubscriptionSet::commit()
 
     mgr->report_progress(m_tr);
 
-    return mgr->get_refreshed(m_obj.get_key(), flx_version, m_tr->get_version_of_current_transaction());
+    DB::VersionID commit_version = m_tr->get_version_of_current_transaction();
+    // release the read lock so that this instance doesn't keep a version pinned
+    // for the remainder of its lifetime
+    m_tr.reset();
+
+    return mgr->get_refreshed(m_obj.get_key(), flx_version, commit_version);
 }
 
 std::string SubscriptionSet::to_ext_json() const
