@@ -2060,6 +2060,22 @@ buildvariants:
     cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
     cmake_generator: "Visual Studio 16 2019"
     cmake_generator_platform: "Win32"
+    cmake_build_type: "Release"
+    extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    no_tests: On
+  tasks:
+  - name: compile_only
+
+- name: windows-x64-uwp
+  display_name: "Windows X64 (UWP)"
+  run_on: windows-vsCurrent-large
+  expansions:
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+    cmake_generator: "Visual Studio 16 2019"
+    extra_flags: "-A x64"
     cmake_build_type: "Debug"
     extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
