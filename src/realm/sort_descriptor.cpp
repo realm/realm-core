@@ -56,13 +56,12 @@ int compare(const T& i, const T& j, const Col& col)
             return -interner->compare(m_j.get_string(), (StringID)m_i.get_int());
     }
 
-    // 4. compare string vs any other non-string (this is going to be slow)
-    ObjKey key = i.compressed ? i.get_key() : j.get_key();
-    Obj obj = col.table->get_object(key);
+    // 4. compare string vs any other non-string (since value comparison is triggered only if the type matches, we can
+    // skip fetching the actual values)
     if (i.compressed)
-        m_i = col.col_key.get_value(obj);
+        m_i = Mixed{""};
     else
-        m_j = col.col_key.get_value(obj);
+        m_j = Mixed{""};
 
     return m_i.compare(m_j);
 }
