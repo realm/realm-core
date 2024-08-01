@@ -6559,4 +6559,30 @@ TEST(Parser_Wildcard)
     CHECK_EQUAL(q.count(), 1);
 }
 
+ONLY(Test_Between_OverLinks)
+{
+    Group g;
+    TableRef parent = g.add_table("Parent");
+    TableRef child = g.add_table("Child");
+
+    ColKey ck_child = parent->add_column(*child, "child");
+    ColKey ck_int = child->add_column(type_Int, "int");
+
+    for (size_t i = 0; i < 100; ++i) {
+        auto obj = child->create_object();
+        obj.set(ck_int, (int)i);
+        parent->create_object().set(ck_child, obj.get_key());
+    }
+
+    // this works is using a RelationalNode
+    auto q = parent->query("child.int < 50");
+    CHECK(q.count() == 50);
+
+    // this is not working with colkey not found and it using the
+    // in between node.
+    auto q1 = parent->query("child.int BETWEEN {0,100}");
+    CHECK(q1.count() == 100);
+}
+
+
 #endif // TEST_PARSER
