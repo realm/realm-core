@@ -5390,7 +5390,6 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
 
     // Log comapction is true by default, but we emphasize it.
     config.disable_upload_compaction = false;
-    config.disable_download_compaction = false;
 
     ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();

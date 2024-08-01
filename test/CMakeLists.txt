@@ -200,7 +200,6 @@ if(REALM_ENABLE_SYNC)
         test_array_sync.cpp
         test_changeset_encoding.cpp
         test_client_reset.cpp
-        test_compact_changesets.cpp
         test_crypto.cpp
         test_embedded_objects.cpp
         test_instruction_replication.cpp

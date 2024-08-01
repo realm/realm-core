@@ -436,7 +436,7 @@ struct FakeLocalClientReset : public TestClientReset {
                                            {ErrorCodes::SyncClientResetRequired, "Bad client file ident"}};
 
             using _impl::client_reset::perform_client_reset_diff;
-            perform_client_reset_diff(*local_db, reset_config, *logger, nullptr, [](int64_t) {});
+            perform_client_reset_diff(*local_db, reset_config, *logger, nullptr);
 
             remote_realm->close();
             if (m_on_post_reset) {

@@ -2793,6 +2793,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
     };
 
+    auto peek_pending_state = [](const DBRef& db) {
+        auto logger = util::Logger::get_default_logger();
+        sync::PendingBootstrapStore bootstrap_store(db, *logger, nullptr);
+        REQUIRE(bootstrap_store.has_pending());
+        return bootstrap_store.peek_pending(*db->start_read(), 1024 * 1024 * 16);
+    };
+
     auto mutate_realm = [&] {
         harness.load_initial_data([&](SharedRealm realm) {
             auto table = realm->read_group().get_table("class_TopLevel");
@@ -2847,10 +2854,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            auto logger = util::Logger::get_default_logger();
-            sync::PendingBootstrapStore bootstrap_store(realm, *logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(pending_batch.progress);
 
@@ -2940,10 +2944,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            util::StderrLogger logger;
-            sync::PendingBootstrapStore bootstrap_store(realm, logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(pending_batch.progress);
 
@@ -3009,10 +3010,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            auto logger = util::Logger::get_default_logger();
-            sync::PendingBootstrapStore bootstrap_store(realm, *logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(!pending_batch.progress);
             REQUIRE(pending_batch.remaining_changesets == 0);
@@ -3086,10 +3084,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            auto logger = util::Logger::get_default_logger();
-            sync::PendingBootstrapStore bootstrap_store(realm, *logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            auto pending_batch = peek_pending_state(realm);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(static_cast<bool>(pending_batch.progress));
             REQUIRE(pending_batch.remaining_changesets == 0);
@@ -4200,6 +4195,165 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
             util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed", test_obj_id_2));
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
+}
+
+TEST_CASE("flx: compensating write errors are not duplicated", "[sync][flx][compensating write][baas]") {
+    FLXSyncTestHarness harness("flx_compensating_writes");
+    auto config = harness.make_test_file();
+
+    auto test_obj_id_1 = ObjectId::gen();
+    auto test_obj_id_2 = ObjectId::gen();
+
+    enum class TestState { Start, FirstError, SecondError, Resume, ThirdError, FourthError };
+    TestingStateMachine<TestState> state(TestState::Start);
+
+    std::mutex errors_mutex;
+    std::vector<std::pair<ObjectId, sync::version_type>> error_to_download_version;
+    std::vector<sync::CompensatingWriteErrorInfo> compensating_writes;
+    sync::version_type download_version;
+
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_session,
+                                                        const SyncClientHookData& data) {
+        if (auto session = weak_session.lock(); !session) {
+            return SyncClientHookAction::NoAction;
+        }
+        SyncClientHookAction action = SyncClientHookAction::NoAction;
+        state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                // Before the session is resumed, ignore the download messages received
+                // to undo the out-of-view writes.
+                if (data.event == SyncClientHookEvent::DownloadMessageReceived &&
+                    (cur_state == TestState::FirstError || cur_state == TestState::SecondError)) {
+                    action = SyncClientHookAction::EarlyReturn;
+                }
+                else if (data.event == SyncClientHookEvent::DownloadMessageReceived &&
+                         (cur_state == TestState::Resume || cur_state == TestState::ThirdError)) {
+                    download_version = data.progress.download.server_version;
+                }
+                else if (data.event == SyncClientHookEvent::BindMessageSent && cur_state == TestState::SecondError) {
+                    return TestState::Resume;
+                }
+                return std::nullopt;
+            }
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                return std::nullopt;
+            }
+
+            REQUIRE(error_code == sync::ProtocolError::compensating_write);
+            REQUIRE_FALSE(data.error_info->compensating_writes.empty());
+
+            if (cur_state == TestState::Start) {
+                return TestState::FirstError;
+            }
+            else if (cur_state == TestState::FirstError) {
+                // Return early so the second compensating write error is not saved
+                // by the sync client.
+                // This is so server versions received to undo the out-of-view writes are
+                // [x, x, y] instead of [x, y, x, y] (server versions don't increase
+                // monotonically as the client expects).
+                action = SyncClientHookAction::EarlyReturn;
+                return TestState::SecondError;
+            }
+            // Save third and fourth compensating write errors after resume.
+            std::lock_guard<std::mutex> lk(errors_mutex);
+            for (const auto& compensating_write : data.error_info->compensating_writes) {
+                error_to_download_version.emplace_back(compensating_write.primary_key.get_object_id(),
+                                                       *data.error_info->compensating_write_server_version);
+            }
+            return std::nullopt;
+        });
+        return action;
+    };
+
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+        std::unique_lock<std::mutex> lk(errors_mutex);
+        REQUIRE(error.status == ErrorCodes::SyncCompensatingWrite);
+        for (const auto& compensating_write : error.compensating_writes_info) {
+            auto tracked_error = std::find_if(error_to_download_version.begin(), error_to_download_version.end(),
+                                              [&](const auto& pair) {
+                                                  return pair.first == compensating_write.primary_key.get_object_id();
+                                              });
+            REQUIRE(tracked_error != error_to_download_version.end());
+            CHECK(tracked_error->second <= download_version);
+            compensating_writes.push_back(compensating_write);
+        }
+        lk.unlock();
+
+        state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+            if (cur_state == TestState::Resume) {
+                return TestState::ThirdError;
+            }
+            else if (cur_state == TestState::ThirdError) {
+                return TestState::FourthError;
+            }
+            return std::nullopt;
+        });
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto queryable_str_field = table->get_column_key("queryable_str_field");
+    auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+    new_query.insert_or_assign(Query(table).equal(queryable_str_field, "bizz"));
+    std::move(new_query).commit();
+
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+
+    CppContext c(realm);
+    realm->begin_transaction();
+    Object::create(c, realm, "TopLevel",
+                   util::Any(AnyDict{
+                       {"_id", test_obj_id_1},
+                       {"queryable_str_field", std::string{"foo"}},
+                   }));
+    realm->commit_transaction();
+
+    realm->begin_transaction();
+    Object::create(c, realm, "TopLevel",
+                   util::Any(AnyDict{
+                       {"_id", test_obj_id_2},
+                       {"queryable_str_field", std::string{"baz"}},
+                   }));
+    realm->commit_transaction();
+    state.wait_for(TestState::SecondError);
+
+    nlohmann::json error_body = {
+        {"tryAgain", true},           {"message", "fake error"},
+        {"shouldClientReset", false}, {"isRecoveryModeDisabled", false},
+        {"action", "Transient"},
+    };
+    nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                   {"args", nlohmann::json{{"errorCode", 229}, {"errorBody", error_body}}}};
+
+    // Trigger a retryable transient error to resume the session.
+    auto test_cmd_res =
+        wait_for_future(SyncSession::OnlyForTesting::send_test_command(*realm->sync_session(), test_command.dump()))
+            .get();
+    CHECK(test_cmd_res == "{}");
+    state.wait_for(TestState::FourthError);
+
+    REQUIRE(compensating_writes.size() == 2);
+    auto& write_info = compensating_writes[0];
+    CHECK(write_info.primary_key.is_type(type_ObjectId));
+    CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
+    CHECK(write_info.object_name == "TopLevel");
+    CHECK(write_info.reason == util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed; object is "
+                                            "outside of the current query view",
+                                            test_obj_id_1));
+
+    write_info = compensating_writes[1];
+    CHECK(write_info.primary_key.is_type(type_ObjectId));
+    CHECK(write_info.primary_key.get_object_id() == test_obj_id_2);
+    CHECK(write_info.object_name == "TopLevel");
+    CHECK(write_info.reason == util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed; object is "
+                                            "outside of the current query view",
+                                            test_obj_id_2));
+    realm->refresh();
+    auto top_level_table = realm->read_group().get_table("class_TopLevel");
+    CHECK(top_level_table->is_empty());
 }
 
 TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][bootstrap][baas]") {
