@@ -117,6 +117,11 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
+    std::optional<StringID> get_string_id(ColKey) const;
+    std::optional<StringID> get_string_id(StringData col_name) const
+    {
+        return get_string_id(get_column_key(col_name));
+    }
     Mixed get_any(ColKey col_key) const;
     Mixed get_any(StringData col_name) const
     {

@@ -290,16 +290,17 @@ int StringCompressor::compare(CompressedStringView& A, CompressedStringView& B)
         if (code_A == code_B)
             continue;
         // symbols did not match:
+
         // 1. both symbols are single characters
         if (code_A < 256 && code_B < 256)
             return code_A - code_B;
-        std::string a_str(code_A, 1);
-        auto str_A = std::string_view(code_A < 256 ? a_str : m_symbols[code_A - 256].expansion);
-        std::string b_str(code_B, 1);
-        auto str_B = std::string_view(code_B < 256 ? b_str : m_symbols[code_B - 256].expansion);
-        // to ensure comparison as StringData we need to convert the stringviews
-        StringData sd_a(str_A.data(), str_A.size());
-        StringData sd_b(str_B.data(), str_B.size());
+
+        // 2. all the other possible cases
+        std::string str_a{(char)code_A, 1};
+        std::string str_b{(char)code_B, 1};
+        StringData sd_a = code_A < 256 ? str_a : m_symbols[code_A - 256].expansion;
+        StringData sd_b = code_B < 256 ? str_b : m_symbols[code_B - 256].expansion;
+
         REALM_ASSERT_DEBUG(sd_a != sd_b);
         if (sd_a < sd_b)
             return -1;

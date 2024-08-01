@@ -20,6 +20,7 @@
 #include <realm/impl/array_writer.hpp>
 #include <realm/table.hpp>
 #include <realm/string_interner.hpp>
+#include <realm/string_compressor.hpp>
 #include <realm/mixed.hpp>
 
 using namespace realm;
@@ -192,7 +193,7 @@ StringData ArrayString::get(size_t ndx) const
     return {};
 }
 
-std::optional<StringID> realm::ArrayString::get_string_id(size_t ndx) const
+std::optional<StringID> ArrayString::get_string_id(size_t ndx) const
 {
     if (m_type == Type::interned_strings) {
         return StringID(static_cast<Array*>(m_arr)->get(ndx));
