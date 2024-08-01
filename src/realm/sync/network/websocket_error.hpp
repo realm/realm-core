@@ -44,9 +44,6 @@ enum class WebSocketError {
     websocket_unauthorized = RLM_ERR_WEBSOCKET_UNAUTHORIZED,
     websocket_forbidden = RLM_ERR_WEBSOCKET_FORBIDDEN,
     websocket_moved_permanently = RLM_ERR_WEBSOCKET_MOVEDPERMANENTLY,
-    websocket_client_too_old = RLM_ERR_WEBSOCKET_CLIENT_TOO_OLD,
-    websocket_client_too_new = RLM_ERR_WEBSOCKET_CLIENT_TOO_NEW,
-    websocket_protocol_mismatch = RLM_ERR_WEBSOCKET_PROTOCOL_MISMATCH,
 
     websocket_resolve_failed = RLM_ERR_WEBSOCKET_RESOLVE_FAILED,
     websocket_connection_failed = RLM_ERR_WEBSOCKET_CONNECTION_FAILED,

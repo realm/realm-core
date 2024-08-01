@@ -165,7 +165,13 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     }
 
     // Mark the version 2 set as complete.
-    store->update_state(2, SubscriptionSet::State::Complete);
+    {
+        auto tr = fixture.db->start_write();
+        store->begin_bootstrap(*tr, 2);
+        store->complete_bootstrap(*tr, 2);
+        tr->commit();
+        store->download_complete();
+    }
 
     // There should now only be one set, version 2, that is complete. Trying to
     // get version 1 should report that it was superseded
@@ -178,6 +184,18 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         // By marking version 2 as complete version 1 will get superseded and removed.
         CHECK_EQUAL(store->get_by_version(1).state(), SubscriptionSet::State::Superseded);
     }
+
+    // Trying to begin a bootstrap on the superseded version should report that
+    // the server did something invalid
+    {
+        auto tr = fixture.db->start_write();
+        CHECK_THROW_ERROR(store->begin_bootstrap(*tr, 1), SyncProtocolInvariantFailed, "nonexistent query version 1");
+        CHECK_THROW_ERROR(store->begin_bootstrap(*tr, 4), SyncProtocolInvariantFailed, "nonexistent query version 4");
+    }
+    CHECK_THROW_ERROR(store->set_error(2, "err1"), SyncProtocolInvariantFailed,
+                      "Received error 'err1' for already-completed query version 2");
+    CHECK_THROW_ERROR(store->set_error(4, "err2"), SyncProtocolInvariantFailed,
+                      "Invalid state update for nonexistent query version 4");
 
     {
         auto set = store->get_latest().make_mutable_copy();
@@ -277,111 +295,239 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
     }
 }
 
-TEST(Sync_SubscriptionStoreNotifications)
+TEST(Sync_SubscriptionStoreNotifications_Basics)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
     auto store = SubscriptionStore::create(fixture.db);
 
-    std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store->get_latest().make_mutable_copy();
-    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Pending));
+    auto v1_pending = sub_set.get_state_change_notification(SubscriptionSet::State::Pending);
+    auto v1_bootstrapping = sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping);
+    auto v1_awaiting_mark = sub_set.get_state_change_notification(SubscriptionSet::State::AwaitingMark);
+    auto v1_complete = sub_set.get_state_change_notification(SubscriptionSet::State::Complete);
+    auto v1_error = sub_set.get_state_change_notification(SubscriptionSet::State::Error);
+    auto v1_superseded = sub_set.get_state_change_notification(SubscriptionSet::State::Superseded);
     sub_set = sub_set.commit().make_mutable_copy();
-    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set = sub_set.commit().make_mutable_copy();
-    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set = sub_set.commit().make_mutable_copy();
-    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set = sub_set.commit().make_mutable_copy();
-    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set = sub_set.commit().make_mutable_copy();
-    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set.commit();
+    auto v2_pending = sub_set.get_state_change_notification(SubscriptionSet::State::Pending);
+    auto v2_bootstrapping = sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping);
+    auto v2_complete = sub_set.get_state_change_notification(SubscriptionSet::State::Complete);
 
     // This should complete immediately because transitioning to the Pending state happens when you commit.
-    CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
+    CHECK(v1_pending.is_ready());
+    CHECK_EQUAL(v1_pending.get(), SubscriptionSet::State::Pending);
 
     // This should also return immediately with a ready future because the subset is in the correct state.
     CHECK_EQUAL(store->get_by_version(1).get_state_change_notification(SubscriptionSet::State::Pending).get(),
                 SubscriptionSet::State::Pending);
 
-    // This should not be ready yet because we haven't updated its state.
-    CHECK_NOT(notification_futures[1].is_ready());
+    // v2 hasn't been committed yet
+    CHECK_NOT(v2_pending.is_ready());
+    sub_set.commit();
+    CHECK(v2_pending.is_ready());
+    CHECK_EQUAL(v2_pending.get(), SubscriptionSet::State::Pending);
 
-    store->update_state(2, SubscriptionSet::State::Bootstrapping);
+    // v1 bootstrapping hasn't begun yet
+    CHECK_NOT(v1_bootstrapping.is_ready());
 
-    // Now we should be able to get the future result because we updated the state.
-    CHECK_EQUAL(notification_futures[1].get(), SubscriptionSet::State::Bootstrapping);
+    {
+        auto tr = fixture.db->start_write();
+        store->begin_bootstrap(*tr, 1);
+        tr->commit_and_continue_as_read();
+        store->report_progress(tr);
+    }
 
-    // This should not be ready yet because we haven't updated its state.
-    CHECK_NOT(notification_futures[2].is_ready());
+    // v1 is now in the bootstrapping state but v2 isn't
+    CHECK(v1_bootstrapping.is_ready());
+    CHECK_EQUAL(v1_bootstrapping.get(), SubscriptionSet::State::Bootstrapping);
+    CHECK_NOT(v2_bootstrapping.is_ready());
 
-    // Update the state to complete - skipping the bootstrapping phase entirely.
-    store->update_state(3, SubscriptionSet::State::Complete);
+    // Requesting a new notification for the bootstrapping state completes immediately
+    CHECK_EQUAL(store->get_by_version(1).get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
+                SubscriptionSet::State::Bootstrapping);
 
-    // Now we should be able to get the future result because we updated the state and skipped the bootstrapping
-    // phase.
-    CHECK_EQUAL(notification_futures[2].get(), SubscriptionSet::State::Complete);
+    // Completing the bootstrap advances us to the awaiting mark state
+    {
+        auto tr = fixture.db->start_write();
+        store->complete_bootstrap(*tr, 1);
+        tr->commit_and_continue_as_read();
+        store->report_progress(tr);
+    }
 
-    // Update one of the subscription sets to have an error state along with an error message.
-    std::string error_msg = "foo bar bizz buzz. i'm an error string for this test!";
-    CHECK_NOT(notification_futures[3].is_ready());
-    auto old_sub_set = store->get_by_version(4);
-    store->update_state(4, SubscriptionSet::State::Error, std::string_view(error_msg));
+    CHECK(v1_awaiting_mark.is_ready());
+    CHECK_EQUAL(v1_awaiting_mark.get(), SubscriptionSet::State::AwaitingMark);
+    CHECK_NOT(v1_complete.is_ready());
+    CHECK_NOT(v2_bootstrapping.is_ready());
 
-    CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Pending);
-    CHECK(old_sub_set.error_str().is_null());
-    old_sub_set.refresh();
-    CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Error);
-    CHECK_EQUAL(old_sub_set.error_str(), error_msg);
+    // Receiving download completion after the bootstrap application adavances us to Complete
+    store->download_complete();
+    store->report_progress();
 
-    // This should return a non-OK Status with the error message we set on the subscription set.
-    auto err_res = notification_futures[3].get_no_throw();
-    CHECK_NOT(err_res.is_ok());
-    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::SubscriptionFailed);
-    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+    CHECK(v1_complete.is_ready());
+    CHECK_EQUAL(v1_complete.get(), SubscriptionSet::State::Complete);
+    CHECK_NOT(v1_error.is_ready());
+    CHECK_NOT(v1_superseded.is_ready());
+    CHECK_NOT(v2_bootstrapping.is_ready());
 
-    // Getting a ready future on a set that's already in the error state should also return immediately with an error.
-    err_res = store->get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
-    CHECK_NOT(err_res.is_ok());
-    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::SubscriptionFailed);
-    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+    // Completing v2's bootstrap supersedes v1, completing both that and the error notification
+    {
+        auto tr = fixture.db->start_write();
+        store->begin_bootstrap(*tr, 2);
+        store->complete_bootstrap(*tr, 2);
+        tr->commit_and_continue_as_read();
+        store->report_progress(tr);
+    }
 
-    // When a higher version supercedes an older one - i.e. you send query sets for versions 5/6 and the server starts
-    // bootstrapping version 6 - we expect the notifications for both versions to be fulfilled when the latest one
-    // completes bootstrapping.
-    CHECK_NOT(notification_futures[4].is_ready());
-    CHECK_NOT(notification_futures[5].is_ready());
+    CHECK(v1_error.is_ready());
+    CHECK(v1_superseded.is_ready());
+    CHECK(v2_bootstrapping.is_ready());
+    CHECK_EQUAL(v1_error.get(), SubscriptionSet::State::Superseded);
+    CHECK_EQUAL(v1_superseded.get(), SubscriptionSet::State::Superseded);
+    CHECK_EQUAL(v2_bootstrapping.get(), SubscriptionSet::State::AwaitingMark);
 
-    old_sub_set = store->get_by_version(5);
+    // v2 is not actually complete until we get download completion
+    CHECK_NOT(v2_complete.is_ready());
+    store->download_complete();
+    store->report_progress();
+    CHECK(v2_complete.is_ready());
+    CHECK_EQUAL(v2_complete.get(), SubscriptionSet::State::Complete);
+}
 
-    store->update_state(6, SubscriptionSet::State::Complete);
+TEST(Sync_SubscriptionStoreNotifications_Errors)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db);
 
-    CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superseded);
-    CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);
+    const auto states = {SubscriptionSet::State::Bootstrapping, SubscriptionSet::State::AwaitingMark,
+                         SubscriptionSet::State::Complete, SubscriptionSet::State::Error};
 
-    // Also check that new requests for the superseded sub set get filled immediately.
-    CHECK_EQUAL(old_sub_set.get_state_change_notification(SubscriptionSet::State::Complete).get(),
-                SubscriptionSet::State::Superseded);
-    old_sub_set.refresh();
-    CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Superseded);
+    auto sub_set = store->get_latest().make_mutable_copy();
+    std::vector<util::Future<SubscriptionSet::State>> v1_futures;
+    for (auto state : states)
+        v1_futures.push_back(sub_set.get_state_change_notification(state));
+    auto v1_superseded = sub_set.get_state_change_notification(SubscriptionSet::State::Superseded);
+    auto v1_sub_set = sub_set.commit();
+    sub_set = v1_sub_set.make_mutable_copy();
+    std::vector<util::Future<SubscriptionSet::State>> v2_futures;
+    for (auto state : states)
+        v2_futures.push_back(sub_set.get_state_change_notification(state));
+    auto v2_sub_set = sub_set.commit();
+    sub_set = v2_sub_set.make_mutable_copy();
+    std::vector<util::Future<SubscriptionSet::State>> v3_futures;
+    for (auto state : states)
+        v3_futures.push_back(sub_set.get_state_change_notification(state));
+    auto v3_sub_set = sub_set.commit();
 
-    // Check that asking for a state change that is less than the current state of the sub set gets filled
-    // immediately.
-    CHECK_EQUAL(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
-                SubscriptionSet::State::Complete);
+    // Error state completes notifications for all states except superseded
+    store->set_error(1, "v1 error message");
+    store->report_progress();
+    for (auto& fut : v1_futures) {
+        CHECK(fut.is_ready());
+        auto status = fut.get_no_throw();
+        CHECK_NOT(status.is_ok());
+        CHECK_EQUAL(status.get_status().code(), ErrorCodes::SubscriptionFailed);
+        CHECK_EQUAL(status.get_status().reason(), "v1 error message");
+    }
+    CHECK_NOT(v1_superseded.is_ready());
 
-    // Check that if a subscription set gets updated to a new state and the SubscriptionSet returned by commit() is
-    // not explicitly refreshed (i.e. is reading from a snapshot from before the state change), that it can still
-    // return a ready future.
-    auto mut_set = store->get_latest().make_mutable_copy();
-    auto waitable_set = mut_set.commit();
+    // Sub set is not updated until refreshing
+    CHECK_EQUAL(v1_sub_set.state(), SubscriptionSet::State::Pending);
 
-    store->update_state(waitable_set.version(), SubscriptionSet::State::Complete);
+    v1_sub_set.refresh();
+    CHECK_EQUAL(v1_sub_set.state(), SubscriptionSet::State::Error);
+    CHECK_EQUAL(v1_sub_set.error_str(), "v1 error message");
 
-    auto fut = waitable_set.get_state_change_notification(SubscriptionSet::State::Complete);
-    CHECK(fut.is_ready());
-    CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
+    // Directly fetching while in an error state works too
+    v1_sub_set = store->get_by_version(1);
+    CHECK_EQUAL(v1_sub_set.state(), SubscriptionSet::State::Error);
+    CHECK_EQUAL(v1_sub_set.error_str(), "v1 error message");
+
+    // v1 failing does not update v2 or v3
+    for (auto& fut : v2_futures)
+        CHECK_NOT(fut.is_ready());
+    for (auto& fut : v3_futures)
+        CHECK_NOT(fut.is_ready());
+
+    // v3 failing does not update v2
+    store->set_error(3, "v3 error message");
+    store->report_progress();
+
+    CHECK_NOT(v1_superseded.is_ready());
+    for (auto& fut : v2_futures)
+        CHECK_NOT(fut.is_ready());
+    for (auto& fut : v3_futures) {
+        CHECK(fut.is_ready());
+        auto status = fut.get_no_throw();
+        CHECK_NOT(status.is_ok());
+        CHECK_EQUAL(status.get_status().code(), ErrorCodes::SubscriptionFailed);
+        CHECK_EQUAL(status.get_status().reason(), "v3 error message");
+    }
+
+    // Trying to begin a bootstrap on the errored version should report that
+    // the server did something invalid
+    {
+        auto tr = fixture.db->start_write();
+        CHECK_THROW_ERROR(store->begin_bootstrap(*tr, 3), SyncProtocolInvariantFailed,
+                          "Received bootstrap for query version 3 after receiving the error 'v3 error message'");
+    }
+}
+
+TEST(Sync_SubscriptionStoreNotifications_MultipleStores)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store_1 = SubscriptionStore::create(fixture.db);
+    auto db_2 = DB::create(make_client_replication(), sub_store_path);
+    auto store_2 = SubscriptionStore::create(db_2);
+
+    store_1->get_latest().make_mutable_copy().commit();
+
+    auto sub_set = store_2->get_latest();
+    auto future = sub_set.get_state_change_notification(SubscriptionSet::State::Pending);
+    CHECK(future.is_ready());
+
+    future = sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping);
+    CHECK_NOT(future.is_ready());
+    {
+        auto tr = fixture.db->start_write();
+        store_1->begin_bootstrap(*tr, 1);
+        tr->commit();
+    }
+    CHECK_NOT(future.is_ready());
+    store_2->report_progress();
+    CHECK(future.is_ready());
+
+    future = sub_set.get_state_change_notification(SubscriptionSet::State::AwaitingMark);
+    CHECK_NOT(future.is_ready());
+    {
+        auto tr = fixture.db->start_write();
+        store_1->complete_bootstrap(*tr, 1);
+        tr->commit();
+    }
+    CHECK_NOT(future.is_ready());
+    store_2->report_progress();
+    CHECK(future.is_ready());
+
+    future = sub_set.get_state_change_notification(SubscriptionSet::State::Complete);
+    CHECK_NOT(future.is_ready());
+    store_1->download_complete();
+    CHECK_NOT(future.is_ready());
+    store_2->report_progress();
+    CHECK(future.is_ready());
+
+    future = sub_set.get_state_change_notification(SubscriptionSet::State::Superseded);
+    CHECK_NOT(future.is_ready());
+    store_1->get_active().make_mutable_copy().commit();
+    {
+        auto tr = fixture.db->start_write();
+        store_1->begin_bootstrap(*tr, 2);
+        store_1->complete_bootstrap(*tr, 2);
+        tr->commit();
+    }
+    CHECK_NOT(future.is_ready());
+    store_2->report_progress();
+    CHECK(future.is_ready());
 }
 
 TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
@@ -455,8 +601,16 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     sub_set = mut_sub_set.commit();
     auto pending_set = sub_set.version();
 
-    store->update_state(complete_set, SubscriptionSet::State::Complete);
-    store->update_state(bootstrapping_set, SubscriptionSet::State::Bootstrapping);
+    {
+        auto tr = fixture.db->start_write();
+        store->begin_bootstrap(*tr, complete_set);
+        store->complete_bootstrap(*tr, complete_set);
+        tr->commit();
+        store->download_complete();
+        tr = fixture.db->start_write();
+        store->begin_bootstrap(*tr, bootstrapping_set);
+        tr->commit();
+    }
 
     auto pending_version = store->get_next_pending_version(0);
     CHECK(pending_version);

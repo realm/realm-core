@@ -481,8 +481,7 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
 }
 
 bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, util::Logger& logger,
-                               sync::SubscriptionStore* sub_store,
-                               util::FunctionRef<void(int64_t)> on_flx_version_complete)
+                               sync::SubscriptionStore* sub_store)
 {
     DB& db_remote = *reset_config.fresh_copy;
     auto wt_local = db_local.start_write();
@@ -538,18 +537,16 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, ut
     history_local.set_history_adjustments(logger, wt_local->get_version(), fresh_file_ident, fresh_server_version,
                                           recovered);
 
-    int64_t subscription_version = 0;
     if (sub_store) {
         if (recover_local_changes) {
-            subscription_version = sub_store->mark_active_as_complete(*wt_local);
+            sub_store->mark_active_as_complete(*wt_local);
         }
         else {
-            subscription_version = sub_store->set_active_as_latest(*wt_local);
+            sub_store->set_active_as_latest(*wt_local);
         }
     }
 
     wt_local->commit_and_continue_as_read();
-    on_flx_version_complete(subscription_version);
 
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger.info(util::LogCategory::reset,

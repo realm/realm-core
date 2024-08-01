@@ -58,8 +58,8 @@ if(UNIX AND NOT APPLE)
     find_library(LIBRT rt)
     if(LIBRT)
         target_link_libraries(TestUtil ${LIBRT})
-    # Android has librt included in libc
-    elseif(NOT ANDROID)
+    # Android and Emscripten have librt included in libc
+    elseif(NOT ANDROID AND NOT EMSCRIPTEN)
         message(WARNING "librt was not found. This means that the benchmarks will not be able to link properly.")
     endif()
 endif()
