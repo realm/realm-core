@@ -35,6 +35,7 @@ using namespace realm;
 TEST(StringInterner_Basic_Creation)
 {
     Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
     StringData my_string = "aaaaaaaaaaaaaaa";
@@ -50,12 +51,12 @@ TEST(StringInterner_Basic_Creation)
     CHECK_EQUAL(my_string, origin_string);
 
     CHECK(interner.compare(*stored_id, id) == 0); // compare agaist self.
-    parent.destroy_deep();
 }
 
 TEST(StringInterner_InternMultipleStrings)
 {
     Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
 
@@ -72,12 +73,12 @@ TEST(StringInterner_InternMultipleStrings)
         CHECK_EQUAL(*stored_id, id);
         CHECK_EQUAL(interner.compare(str, id), 0);
     }
-    parent.destroy_deep();
 }
 
 TEST(StringInterner_TestLookup)
 {
     Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
 
@@ -96,13 +97,12 @@ TEST(StringInterner_TestLookup)
         CHECK(id);
         CHECK(interner.compare(StringData(s), *id) == 0);
     }
-
-    parent.destroy_deep();
 }
 
 TEST(StringInterner_VerifyComparison)
 {
     Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
 
@@ -173,13 +173,12 @@ TEST(StringInterner_VerifyComparison)
     res = interner.compare(test_upper_case_id, test_lower_case_id);
     CHECK_LESS(interner.get(test_upper_case_id), interner.get(test_lower_case_id));
     CHECK_EQUAL(res, -1);
-
-    parent.destroy_deep();
 }
 
 TEST(StringInterner_VerifyInterningNull)
 {
     Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
     auto null_id = interner.intern({});
@@ -203,13 +202,12 @@ TEST(StringInterner_VerifyInterningNull)
     CHECK_LESS(StringData{}, interner.get(str_id)); // compare via StringData
     CHECK_EQUAL(interner.compare(StringData{"test"}, null_id), 1);
     CHECK_GREATER(StringData{"test"}, interner.get(null_id));
-
-    parent.destroy_deep();
 }
 
 TEST(StringInterner_VerifyLongString)
 {
     Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
 
@@ -221,13 +219,12 @@ TEST(StringInterner_VerifyLongString)
     const auto stored_id = interner.lookup(StringData(long_string));
     CHECK_EQUAL(stored_id, 1);
     CHECK(interner.compare(StringData(long_string), *stored_id) == 0);
-
-    parent.destroy_deep();
 }
 
 TEST(StringInterner_VerifyExpansionFromSmallStringToLongString)
 {
     Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
 
@@ -249,6 +246,4 @@ TEST(StringInterner_VerifyExpansionFromSmallStringToLongString)
     stored_id = interner.lookup(StringData(long_string));
     CHECK_EQUAL(stored_id, id);
     CHECK(interner.compare(StringData(long_string), *stored_id) == 0);
-
-    parent.destroy_deep();
 }
