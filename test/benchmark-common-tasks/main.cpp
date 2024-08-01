@@ -1632,28 +1632,28 @@ struct BenchmarkSort : BenchmarkWithStrings {
 
 // benchmark for testing compressed string sorting.
 // N is the size of the string to generate
-// M is the numer of times we want store the string (number of dups)
+// M is the number of times we want store the string (number of dups)
 template <size_t N, size_t M>
-struct BenchmarkSortCompressed : BenchmarkWithStrings {
-    mutable std::string _name;
+struct BenchmarkSortCompressed : BenchmarkWithStringsTable {
+    std::string compressed_benchmark_name;
 
     BenchmarkSortCompressed()
-        : BenchmarkWithStrings()
+        : BenchmarkWithStringsTable()
     {
         if constexpr (N <= 15) {
-            _name = util::format("SortCompressedSmall(%1,%2)", std::to_string(N), std::to_string(M));
+            compressed_benchmark_name = util::format("SortCompressedSmall(%1,%2)", N, M);
         }
         else if constexpr (N <= 63) {
-            _name = util::format("SortCompressedMedium(%1,%2)", std::to_string(N), std::to_string(M));
+            compressed_benchmark_name = util::format("SortCompressedMedium(%1,%2)", N, M);
         }
         else {
-            _name = util::format("SortCompressedLarge(%1,%2)", std::to_string(N), std::to_string(M));
+            compressed_benchmark_name = util::format("SortCompressedLarge(%1,%2)", N, M);
         }
     }
 
     const char* name() const
     {
-        return _name.c_str();
+        return compressed_benchmark_name.c_str();
     }
 
     void before_all(DBRef group)
@@ -1678,13 +1678,11 @@ struct BenchmarkSortCompressed : BenchmarkWithStrings {
 
         std::string str = "";
         for (size_t i = 0; i < BASE_SIZE; ++i) {
-
             if (i % M == 0)
                 str = gen_string(N);
 
             Obj obj = t->create_object();
             obj.set<StringData>(m_col, str);
-            m_keys.push_back(obj.get_key());
         }
         tr.commit();
     }

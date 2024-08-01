@@ -143,9 +143,28 @@ TEST(UTF8_Compare_Strings)
 
 TEST(UTF8_Compare_Core_utf8)
 {
-    auto str_compare = [](StringData a, StringData b) {
-        return a < b;
+    Array parent(Allocator::get_default());
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    auto str_compare = [&interner, this](StringData a, StringData b) {
+        auto id1 = interner.lookup(a);
+        auto id2 = interner.lookup(b);
+        CHECK_EQUAL((id1 && id2), true);
+        const auto ret_interner_cmp = interner.compare(*id1, *id2) < 0;
+        const auto ret_cmp = a < b;
+        CHECK_EQUAL(ret_cmp, ret_interner_cmp);
+        return ret_cmp;
     };
+
+    // intern all the utf8 strings
+    interner.intern(uae);
+    interner.intern(uAE);
+    interner.intern(ua);
+    interner.intern(uA);
+    interner.intern(u16sur);
+    interner.intern(u16sur2);
+
     // single utf16 code points (tests mostly Windows)
     CHECK_EQUAL(false, str_compare(uae, uae));
     CHECK_EQUAL(false, str_compare(uAE, uAE));
@@ -166,44 +185,6 @@ TEST(UTF8_Compare_Core_utf8)
     CHECK_EQUAL(false, str_compare(u16sur, u16sur));
 
     // Test where both are surrogate
-    CHECK_EQUAL(true, str_compare(u16sur, u16sur2));
-    CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
-    CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
-}
-
-TEST(UTF8_Compare_Core_utf8_interned_strings)
-{
-    Array parent(Allocator::get_default());
-    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
-    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
-
-    auto str_compare = [&](StringData a, StringData b) {
-        auto id1 = interner.lookup(a);
-        auto id2 = interner.lookup(b);
-        CHECK(id1 && id2);
-        return interner.compare(*id1, *id2) < 0;
-    };
-
-    // intern all the utf8 strings
-    interner.intern(uae);
-    interner.intern(uAE);
-    interner.intern(ua);
-    interner.intern(uA);
-    interner.intern(u16sur);
-    interner.intern(u16sur2);
-
-    // re-do the same comparisons as per the test that is not using
-    // compressed strings.
-    CHECK_EQUAL(false, str_compare(uae, uae));
-    CHECK_EQUAL(false, str_compare(uAE, uAE));
-    CHECK_EQUAL(false, str_compare(uae, ua));
-    CHECK_EQUAL(true, str_compare(ua, uae));
-    CHECK_EQUAL(true, str_compare(uAE, uae));
-    CHECK_EQUAL(false, str_compare(uae, uA));
-    CHECK_EQUAL(true, str_compare(uA, uAE));
-    CHECK_EQUAL(true, str_compare(uA, u16sur));
-    CHECK_EQUAL(false, str_compare(u16sur, uA));
-    CHECK_EQUAL(false, str_compare(u16sur, u16sur));
     CHECK_EQUAL(true, str_compare(u16sur, u16sur2));
     CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
     CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
@@ -242,7 +223,7 @@ TEST(UTF8_Compare_Core_utf8_invalid)
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
     auto id1 = interner.intern(invalid1);
     auto id2 = interner.intern(invalid2);
-    bool ret_interned = interner.compare(id1, id2) == -1;
+    bool ret_interned = interner.compare(id1, id2) < 0;
     CHECK_EQUAL(ret_interned, ret);
     parent.destroy_deep();
 }
@@ -270,45 +251,17 @@ TEST(Compare_Core_utf8_invalid_crash)
 
 TEST(UTF8_Compare_Core_utf8_zero)
 {
-    auto str_compare = [](StringData a, StringData b) {
-        return a < b;
-    };
-    // Realm must support 0 characters in utf8 strings
-    CHECK_EQUAL(false, str_compare(StringData("\0", 1), StringData("\0", 1)));
-    CHECK_EQUAL(true, str_compare(StringData("\0", 1), StringData("a")));
-    CHECK_EQUAL(false, str_compare("a", StringData("\0", 1)));
-
-    // 0 in middle of strings
-    CHECK_EQUAL(true, str_compare(StringData("a\0a", 3), StringData("a\0b", 3)));
-    CHECK_EQUAL(false, str_compare(StringData("a\0b", 3), StringData("a\0a", 3)));
-    CHECK_EQUAL(false, str_compare(StringData("a\0a", 3), StringData("a\0a", 3)));
-
-    // Number of trailing 0 makes a difference
-    CHECK_EQUAL(true, str_compare(StringData("a\0", 2), StringData("a\0\0", 3)));
-    CHECK_EQUAL(false, str_compare(StringData("a\0\0", 3), StringData("a\0", 2)));
-}
-
-TEST(UTF8_Compare_Core_utf8_zero_compressed_string)
-{
     Array parent(Allocator::get_default());
     parent.create(NodeHeader::type_HasRefs, false, 1, 0);
     StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
 
-    auto str_compare = [&](StringData a, StringData b) {
-        auto id1 = interner.lookup(a);
-        auto id2 = interner.lookup(b);
-        CHECK(id1 && id2);
-        return interner.compare(*id1, *id2) < 0;
-    };
-
+    // intern all the utf8 strings
     const char* empty = "\0";
     const char* a = "a";
     const char* aa = "a\0a";
     const char* ab = "a\0b";
     const char* a0 = "a\0";
     const char* a00 = "a\0\0";
-
-    // intern all the utf8 strings
     interner.intern(StringData(empty, 1));
     interner.intern(StringData(a));
     interner.intern(StringData(aa, 3));
@@ -316,6 +269,15 @@ TEST(UTF8_Compare_Core_utf8_zero_compressed_string)
     interner.intern(StringData(a0, 2));
     interner.intern(StringData(a00, 3));
 
+    auto str_compare = [&interner, this](StringData a, StringData b) {
+        auto id1 = interner.lookup(a);
+        auto id2 = interner.lookup(b);
+        CHECK_EQUAL((id1 && id2), true);
+        const auto ret_interner_cmp = interner.compare(*id1, *id2) < 0;
+        const auto ret_cmp = a < b;
+        CHECK_EQUAL(ret_cmp, ret_interner_cmp);
+        return ret_cmp;
+    };
 
     // Realm must support 0 characters in utf8 strings
     CHECK_EQUAL(false, str_compare(StringData("\0", 1), StringData("\0", 1)));
@@ -333,7 +295,6 @@ TEST(UTF8_Compare_Core_utf8_zero_compressed_string)
 
     parent.destroy_deep();
 }
-
 } // anonymous namespace
 
 #endif // TEST_UTF8
