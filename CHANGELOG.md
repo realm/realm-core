@@ -1,10 +1,32 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Sync log statements now include the app services connection id in their prefix (e.g `Connection[1:<connection id>] Session[1]: log message`) to make correlating sync activity to server logs easier during troubleshooting ((PR #7849)[https://github.com/realm/realm-core/pull/7849]).
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 14.11.2 Release notes
+
+### Enhancements
+* Sync log statements now include the app services connection id in their prefix (e.g `Connection[1:<connection id>] Session[1]: log message`) to make correlating sync activity to server logs easier during troubleshooting ((PR #7849)[https://github.com/realm/realm-core/pull/7849]).
+
+### Fixed
 * Sync client may report duplicate compensating write errors ([#7708](https://github.com/realm/realm-core/issues/7708), since v14.8.0).
 
 ### Breaking changes
