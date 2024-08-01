@@ -6559,7 +6559,7 @@ TEST(Parser_Wildcard)
     CHECK_EQUAL(q.count(), 1);
 }
 
-ONLY(Test_Between_OverLinks)
+TEST(Test_Between_OverLinks)
 {
     Group g;
     TableRef parent = g.add_table("Parent");
@@ -6578,8 +6578,7 @@ ONLY(Test_Between_OverLinks)
     auto q = parent->query("child.int < 50");
     CHECK(q.count() == 50);
 
-    // this is not working with colkey not found and it using the
-    // in between node.
+    // this uses the new in between node and verifies that the link is followed.
     auto q1 = parent->query("child.int BETWEEN {0,100}");
     CHECK(q1.count() == 100);
 }
