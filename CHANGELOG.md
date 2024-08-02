@@ -1,10 +1,10 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Updated bundled OpenSSL version to 3.3.1. (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Updated bundled OpenSSL version to 3.3.1. (PR [#7947](https://github.com/realm/realm-core/pull/7947))
 
 ### Fixed
-* Fixed issues loading the native Realm libraries on Linux ARMv7 systems when they linked against our bundled OpenSSL resulting in errors like `unexpected reloc type 0x03`. ([#????](https://github.com/realm/realm-core/issues/????), since v14.1.0)
+* Fixed issues loading the native Realm libraries on Linux ARMv7 systems when they linked against our bundled OpenSSL resulting in errors like `unexpected reloc type 0x03`. ([#7947](https://github.com/realm/realm-core/issues/7947), since v14.1.0)
 
 ### Breaking changes
 * None.
