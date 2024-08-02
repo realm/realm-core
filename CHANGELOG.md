@@ -1,12 +1,10 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Updated bundled OpenSSL version to 3.3.1. (PR [#????](https://github.com/realm/realm-core/pull/????))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed issues loading the native Realm libraries on Linux ARMv7 systems when they linked against our bundled OpenSSL resulting in errors like `unexpected reloc type 0x03`. ([#????](https://github.com/realm/realm-core/issues/????), since v14.1.0)
 
 ### Breaking changes
 * None.
@@ -17,7 +15,7 @@
 -----------
 
 ### Internals
-* None.
+* Reverted the bfd linker override in the Linux-armv7 toolchain file because the upstream OpenSSL issue it was working around was resolved.
 
 ----------------------------------------------
 
