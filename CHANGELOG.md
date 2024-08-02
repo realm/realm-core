@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Improve sync bootstrap performance by reducing the number of table selections in the replication logs for embedded objects. ([#7945](https://github.com/realm/realm-core/issues/7945))
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
 
@@ -17,7 +18,7 @@
 -----------
 
 ### Internals
-* Improve sync bootstrap performance by reducing the number of table selections in the replication logs for embedded objects. ([#7945](https://github.com/realm/realm-core/issues/7945))
+* None.
 
 ----------------------------------------------
 
