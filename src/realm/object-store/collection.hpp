@@ -45,6 +45,7 @@ public:
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
     Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll);
+    Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, const StringData prop_name);
 
     const std::shared_ptr<Realm>& get_realm() const
     {
