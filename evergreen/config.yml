@@ -137,8 +137,16 @@ functions:
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
 
+          if [[ -n "${compress|}" ]]; then
+              set_cmake_var realm_vars REALM_COMPRESS PATH "${cmake_toolchain_file}"
+          fi
+
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL "${build_command_line_tools|On}"
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL "${enable_realm_encryption|On}"
+          if [[ -n "${compress|}" ]]; then
+              set_cmake_var realm_vars REALM_COMPRESS PATH "${cmake_toolchain_file}"
+          fi
+
 
           if [[ -n "${fetch_missing_dependencies|}" ]]; then
               set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
@@ -1962,6 +1970,22 @@ buildvariants:
   tasks:
   - name: compile_test_coverage
   - name: finalize_coverage_data
+
+- name: macos-array-compression
+  display_name: "MacOS 14 arm64 (Compress Arrays)"
+  run_on: macos-14-arm64
+  expansions:
+    cmake_bindir: "/opt/homebrew/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+    compress: On
+    cmake_build_type: Debug
+  tasks:
+  - name: compile_test
 
 - name: ubuntu-no-app-services
   display_name: "Ubuntu (AppServices Disabled)"

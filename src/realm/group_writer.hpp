@@ -138,7 +138,7 @@ public:
 
     size_t get_file_size() const noexcept;
 
-    ref_type write_array(const char*, size_t, uint32_t) override;
+    ref_type write_array(const char*, size_t, uint32_t, uint32_t) override;
 
 #ifdef REALM_DEBUG
     void dump();

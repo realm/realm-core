@@ -71,6 +71,7 @@ inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
         return reinterpret_cast<uint32_t*>(m_data)[ndx];
     }
     return get_direct(m_data, width, ndx);
+    REALM_UNREACHABLE();
 }
 
 void ArrayUnsigned::create(size_t initial_size, uint64_t ubound_value)
@@ -168,7 +169,8 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
     REALM_ASSERT_DEBUG(m_width >= 8);
-    bool do_expand = value > m_ubound;
+
+    bool do_expand = value > (uint64_t)m_ubound;
     const uint8_t old_width = m_width;
     const uint8_t new_width = do_expand ? bit_width(value) : m_width;
     const auto old_size = m_size;
@@ -215,6 +217,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 void ArrayUnsigned::erase(size_t ndx)
 {
     REALM_ASSERT_DEBUG(m_width >= 8);
+
     copy_on_write(); // Throws
 
     size_t w = m_width >> 3;

@@ -39,17 +39,18 @@ void OutputStream::write(const char* data, size_t size)
 }
 
 
-ref_type OutputStream::write_array(const char* data, size_t size, uint32_t checksum)
+ref_type OutputStream::write_array(const char* data, size_t size, uint32_t checksum, uint32_t checksum_bytes)
 {
     REALM_ASSERT(size % 8 == 0);
+    REALM_ASSERT(checksum_bytes == 4 || checksum_bytes == 2);
 
     const char* data_1 = data;
     size_t size_1 = size;
 
     const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
-    m_out.write(cksum_bytes, 4); // Throws
-    data_1 += 4;
-    size_1 -= 4;
+    m_out.write(cksum_bytes, checksum_bytes); // Throws
+    data_1 += checksum_bytes;
+    size_1 -= checksum_bytes;
 
     do_write(data_1, size_1); // Throws
 

@@ -1413,7 +1413,6 @@ struct BenchmarkQueryChainedOrIntsIndexed : BenchmarkQueryChainedOrInts {
     }
 };
 
-
 struct BenchmarkQueryIntEquality : BenchmarkQueryChainedOrInts {
     const char* name() const
     {

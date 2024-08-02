@@ -212,6 +212,7 @@ public:
     {
         return m_offset;
     }
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const = 0;
 
 protected:
 #if REALM_MAX_BPNODE_SIZE > 256
@@ -228,7 +229,7 @@ protected:
 
         uint64_t get(size_t ndx) const
         {
-            return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
+            return is_attached() ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
         }
     };
 
@@ -320,6 +321,7 @@ public:
 
     void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const override;
     static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
                                  const std::vector<ObjKey>& keys, CascadeState& state);
     static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,

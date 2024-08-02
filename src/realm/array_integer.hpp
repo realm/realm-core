@@ -29,16 +29,10 @@ namespace realm {
 class ArrayInteger : public Array, public ArrayPayload {
 public:
     using value_type = int64_t;
-
-    using Array::add;
     using Array::find_first;
-    using Array::get;
-    using Array::insert;
-    using Array::move;
-    using Array::set;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override {}
+    ~ArrayInteger() noexcept override = default;
 
     static value_type default_value(bool)
     {
@@ -70,8 +64,15 @@ public:
     }
     template <class cond>
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state) const;
-
     size_t find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const;
+
+    template <class T>
+    static ref_type typed_write(ref_type ref, T& out, Allocator& alloc)
+    {
+        Array arr(alloc);
+        arr.init_from_ref(ref);
+        return arr.write(out, false, out.only_modified, out.compress);
+    }
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {
@@ -142,6 +143,14 @@ public:
     size_t find_first(value_type value, size_t begin = 0, size_t end = npos) const;
     size_t find_first_in_range(int64_t from, int64_t to, size_t start, size_t end) const;
 
+    template <class T>
+    static ref_type typed_write(ref_type ref, T& out, Allocator& alloc)
+    {
+        Array arr(alloc);
+        arr.init_from_ref(ref);
+        return arr.write(out, false, out.only_modified, out.compress);
+    }
+
 protected:
     void avoid_null_collision(int64_t value);
 
@@ -157,12 +166,6 @@ private:
 
 
 // Implementation:
-
-inline ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
-    : Array(allocator)
-{
-    m_is_inner_bptree_node = false;
-}
 
 inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
     : Array(allocator)

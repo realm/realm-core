@@ -18,6 +18,8 @@
 
 #include <realm/array_mixed.hpp>
 #include <realm/array_basic.hpp>
+#include <realm/dictionary.hpp>
+#include <realm/impl/array_writer.hpp>
 
 using namespace realm;
 
@@ -275,6 +277,7 @@ size_t ArrayMixed::find_first(Mixed value, size_t begin, size_t end) const noexc
     DataType type = value.get_type();
     if (end == realm::npos)
         end = size();
+
     for (size_t i = begin; i < end; i++) {
         if (Mixed::data_types_are_comparable(this->get_type(i), type) && get(i) == value) {
             return i;
@@ -329,6 +332,89 @@ int64_t ArrayMixed::get_key(size_t ndx) const
 void ArrayMixed::verify() const
 {
     // TODO: Implement
+}
+
+ref_type ArrayMixed::typed_write(ref_type top_ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+{
+    if (out.only_modified && alloc.is_read_only(top_ref))
+        return top_ref;
+
+    ArrayRef top(alloc);
+    top.init_from_ref(top_ref);
+    size_t sz = top.size();
+    TempArray written_leaf(sz);
+
+    /*
+     Mixed stores things using different arrays. We need to take into account this in order to
+     understand what we need to compress and what we can instead leave not compressed.
+
+     The main subarrays are:
+
+     composite array : index 0
+     int array : index 1
+     pair_int array: index 2
+     string array: index 3
+     ref array: index 4
+     key array: index 5
+
+     Description of each array:
+     1. composite array: the data stored here is either a small int (< 32 bits) or an offset to one of
+        the other arrays where the actual data is.
+     2. int and pair int arrays, they are used for storing integers, timestamps, floats, doubles,
+     decimals, links. In general we can compress them, but we need to be careful, controlling the col_type
+     should prevent compressing data that we want to leave in the current format.
+     3. string array is for strings and binary data (no compression for now)
+     4. ref array is actually storing refs to collections. they can only be BPlusTree<int, Mixed> or
+     BPlusTree<string, Mixed>.
+     5. key array stores unique identifiers for collections in mixed (integers that can be compressed)
+     */
+    Array composite(alloc);
+    composite.init_from_ref(top.get_as_ref(0));
+    written_leaf.set_as_ref(0, composite.write(out, true, out.only_modified, false));
+    for (size_t i = 1; i < sz; ++i) {
+        auto ref = top.get(i);
+        ref_type new_ref = ref;
+        if (ref && !(out.only_modified && alloc.is_read_only(ref))) {
+            if (i < 3) { // int, and pair_int
+                // integer arrays
+                new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
+            }
+            else if (i == 4) { // collection in mixed
+                ArrayRef arr_ref(alloc);
+                arr_ref.init_from_ref(ref);
+                auto ref_sz = arr_ref.size();
+                TempArray written_ref_leaf(ref_sz);
+
+                for (size_t k = 0; k < ref_sz; k++) {
+                    ref_type new_sub_ref = 0;
+                    if (auto sub_ref = arr_ref.get(k)) {
+                        auto header = alloc.translate(sub_ref);
+                        // Now we have to find out if the nested collection is a
+                        // dictionary or a list. If the top array has a size of 2
+                        // and it is not a BplusTree inner node, then it is a dictionary
+                        if (NodeHeader::get_size_from_header(header) == 2 &&
+                            !NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+                            new_sub_ref = Dictionary::typed_write(sub_ref, out, alloc);
+                        }
+                        else {
+                            new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, alloc);
+                        }
+                    }
+                    written_ref_leaf.set_as_ref(k, new_sub_ref);
+                }
+                new_ref = written_ref_leaf.write(out);
+            }
+            else if (i == 5) { // unique keys associated to collections in mixed
+                new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
+            }
+            else {
+                // all the rest we don't want to compress it, at least for now (strings will be needed)
+                new_ref = Array::write(ref, alloc, out, out.only_modified, false);
+            }
+        }
+        written_leaf.set(i, new_ref);
+    }
+    return written_leaf.write(out);
 }
 
 void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const

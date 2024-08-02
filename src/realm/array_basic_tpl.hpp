@@ -40,16 +40,12 @@ inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
     size_t byte_size = std::max(byte_size_0, Node::initial_capacity + 0); // Throws
-
-    MemRef mem = allocator.alloc(byte_size); // Throws
-
-    bool is_inner_bptree_node = false;
-    bool has_refs = false;
-    bool context_flag = false;
-    int width = sizeof(T);
-    init_header(mem.get_addr(), is_inner_bptree_node, has_refs, context_flag, wtype_Multiply, width, init_size,
-                byte_size);
-
+    MemRef mem = allocator.alloc(byte_size);                              // Throws
+    uint8_t flags = 0;
+    const int width = sizeof(T) * 8; // element width is in bits now
+    const auto header = mem.get_addr();
+    init_header(header, Encoding::WTypMult, flags, width, init_size);
+    set_capacity_in_header(byte_size, header);
     return mem;
 }
 

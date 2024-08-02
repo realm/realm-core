@@ -544,6 +544,9 @@ public:
         return false;
     }
 
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
+                         bool compress) const;
+
 private:
     template <class T>
     TableView find_all(ColKey col_key, T value);
@@ -687,6 +690,8 @@ public:
         Table& m_table;
         Replication* const* m_repl;
     };
+
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const;
 
 private:
     enum LifeCycleCookie {

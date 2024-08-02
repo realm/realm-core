@@ -190,6 +190,12 @@ public:
     }
     void verify() const;
 
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
+    {
+        REALM_ASSERT_DEBUG(m_root);
+        return m_root->typed_write(ref, out);
+    }
+
 protected:
     friend class Obj;
     friend class Cluster;
