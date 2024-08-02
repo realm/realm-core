@@ -392,6 +392,7 @@ private:
     util::Logger* m_logger = nullptr;
     const Table* m_selected_table = nullptr;
     ObjKey m_selected_obj;
+    bool m_selected_obj_is_newly_created = false;
     CollectionId m_selected_collection;
     // The ObjKey of the most recently created object for each table (indexed
     // by the Table's index in the group). Most insertion patterns will only
@@ -405,8 +406,8 @@ private:
     [[nodiscard]] bool select_collection(const CollectionBase&);
 
     void do_select_table(const Table*);
-    void do_select_obj(ObjKey key, const Table*, bool newly_created);
-    void do_select_collection(ConstTableRef table, ColKey col_key, ObjKey obj_key, StablePath&& path);
+    [[nodiscard]] bool do_select_obj(ObjKey key, const Table*);
+    void do_select_collection(const CollectionBase& coll);
     // When true, the currently selected object was created in this transaction
     // and we don't need to emit instructions for mutations on it
     bool check_for_newly_created_object(ObjKey key, const Table* table);
@@ -463,7 +464,7 @@ inline void Replication::unselect_all() noexcept
 {
     m_selected_table = nullptr;
     m_selected_collection = CollectionId();
-    // FIXME: m_selected_obj ?
+    m_selected_obj_is_newly_created = false;
 }
 
 inline void Replication::select_table(const Table* table)
@@ -474,25 +475,20 @@ inline void Replication::select_table(const Table* table)
 
 inline bool Replication::select_collection(const CollectionBase& coll)
 {
-    ConstTableRef table = coll.get_table();
-    ColKey col_key = coll.get_col_key();
-    ObjKey obj_key = coll.get_owner_key();
-    auto path = coll.get_stable_path();
-
-    bool newly_created_object = check_for_newly_created_object(coll.get_owner_key(), table.unchecked_ptr());
+    bool newly_created_object =
+        check_for_newly_created_object(coll.get_owner_key(), coll.get_table().unchecked_ptr());
     if (CollectionId(coll) != m_selected_collection) {
-        do_select_collection(table, col_key, obj_key, std::move(path)); // Throws
+        do_select_collection(coll); // Throws
     }
     return !newly_created_object;
 }
 
 inline bool Replication::select_obj(ObjKey key, const Table* table)
 {
-    bool newly_created = check_for_newly_created_object(key, table);
     if (key != m_selected_obj || table != m_selected_table) {
-        do_select_obj(key, table, newly_created);
+        return !do_select_obj(key, table);
     }
-    return !newly_created;
+    return !m_selected_obj_is_newly_created;
 }
 
 inline void Replication::rename_class(TableKey table_key, StringData)

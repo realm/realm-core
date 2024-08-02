@@ -144,6 +144,7 @@ void Replication::track_new_object(const Table* table, ObjKey key)
 {
     if (table == m_selected_table) {
         m_selected_obj = key;
+        m_selected_obj_is_newly_created = true;
     }
 
     auto table_index = table->get_index_in_group();
@@ -206,6 +207,7 @@ void Replication::do_select_table(const Table* table)
     m_selected_table = table;
     m_selected_collection = CollectionId();
     m_selected_obj = ObjKey();
+    m_selected_obj_is_newly_created = false;
 }
 
 bool Replication::check_for_newly_created_object(ObjKey key, const Table* table)
@@ -217,11 +219,13 @@ bool Replication::check_for_newly_created_object(ObjKey key, const Table* table)
     return false;
 }
 
-void Replication::do_select_obj(ObjKey key, const Table* table, bool newly_created_object)
+bool Replication::do_select_obj(ObjKey key, const Table* table)
 {
-    if (!newly_created_object) {
+    bool newly_created = check_for_newly_created_object(key, table);
+    if (!newly_created) {
         select_table(table);
         m_selected_obj = key;
+        m_selected_obj_is_newly_created = false;
         m_selected_collection = CollectionId();
     }
 
@@ -241,13 +245,14 @@ void Replication::do_select_obj(ObjKey key, const Table* table, bool newly_creat
             logger->log(LogCategory::object, LogLevel::debug, "Mutating anonymous object '%1'[%2]", class_name, key);
         }
     }
+    return newly_created;
 }
 
-void Replication::do_select_collection(ConstTableRef table, ColKey col_key, ObjKey obj_key, StablePath&& path)
+void Replication::do_select_collection(const CollectionBase& coll)
 {
-    if (select_obj(obj_key, table.unchecked_ptr())) {
-        m_encoder.select_collection(col_key, obj_key, path); // Throws
-        m_selected_collection = CollectionId(table->get_key(), obj_key, std::move(path));
+    if (select_obj(coll.get_owner_key(), coll.get_table().unchecked_ptr())) {
+        m_encoder.select_collection(coll.get_col_key(), coll.get_owner_key(), coll.get_stable_path()); // Throws
+        m_selected_collection = CollectionId(coll);
     }
 }
 
