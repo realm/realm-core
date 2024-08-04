@@ -223,16 +223,6 @@ void check_realm_schema(const std::string& path, const std::vector<ObjectSchema>
     }
 }
 
-auto make_error_handler()
-{
-    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
-    auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) {
-        error_promise->emplace_value(std::move(err));
-    };
-    return std::make_pair(std::move(error_future), std::move(fn));
-}
-
 } // namespace
 
 TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx schema migration][baas]") {

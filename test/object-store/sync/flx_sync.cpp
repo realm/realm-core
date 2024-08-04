@@ -24,6 +24,7 @@
 #include <util/crypt_key.hpp>
 #include <util/sync/flx_sync_harness.hpp>
 #include <util/sync/sync_test_utils.hpp>
+#include <object-store/util/sync/redirect_server.hpp>
 
 #include <realm/object_id.hpp>
 #include <realm/query_expression.hpp>
@@ -253,16 +254,6 @@ TEST_CASE("flx: test commands work", "[sync][flx][test command][baas]") {
         REQUIRE(bad_status.get_status().reason() ==
                 "Must supply command name in \"command\" field of test command json object");
     });
-}
-
-static auto make_error_handler()
-{
-    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
-    auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) {
-        error_promise->emplace_value(std::move(err));
-    };
-    return std::make_pair(std::move(error_future), std::move(fn));
 }
 
 TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
@@ -1594,6 +1585,112 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
     });
 }
 
+TEST_CASE("Invalid refresh token results in a sync error", "[sync][flx][compensating write][baas]") {
+    const Schema person_schema{{"Person",
+                                {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                 {"role", PropertyType::String},
+                                 {"name", PropertyType::String},
+                                 {"emp_id", PropertyType::Int}}}};
+
+    auto fill_person_schema = [](SharedRealm realm, std::string role, size_t count) {
+        CppContext c(realm);
+        for (size_t i = 0; i < count; ++i) {
+            auto obj = Object::create(c, realm, "Person",
+                                      std::any(AnyDict{
+                                          {"_id", ObjectId::gen()},
+                                          {"role", role},
+                                          {"name", util::format("%1-%2", role, i)},
+                                          {"emp_id", static_cast<int64_t>(i)},
+                                      }));
+        }
+    };
+
+    auto update_base_url = [](FLXSyncTestHarness& flx_harness, std::string_view base_url) {
+        auto pf = util::make_promise_future<void>();
+        flx_harness.app()->update_base_url(base_url, [promise = util::CopyablePromiseHolder<void>(std::move(
+                                                          pf.promise))](util::Optional<AppError> error) mutable {
+            if (error) {
+                promise.get_promise().set_error(error->to_status());
+                return;
+            }
+            promise.get_promise().emplace_value();
+        });
+        auto result = pf.future.get_no_throw();
+        if (!result.is_ok()) {
+            FAIL(util::format("Failed to update base_url (%1): %2", base_url, result));
+        }
+    };
+
+    std::atomic<bool> reject_token_request{false};
+    auto transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
+    auto test_server = get_test_redirector();
+    FLXSyncTestHarness harness("exp_refresh_during_sub",
+                               FLXSyncTestHarness::ServerSchema{person_schema, {"role", "name"}}, transport);
+    // Initialize the realm with some data
+    harness.load_initial_data([&](SharedRealm realm) {
+        fill_person_schema(realm, "employee", 25);
+    });
+
+    transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
+        if (req.url.find("/auth/session") != std::string::npos) {
+            // Is this an access token request that should be rejected?
+            if (reject_token_request.load()) {
+                return app::Response{
+                    static_cast<int>(sync::HTTPStatus::Unauthorized), 0, {}, "Simulated user unauthorized"};
+            }
+        }
+        return std::nullopt;
+    };
+
+    harness.do_with_new_user([&](std::shared_ptr<app::User> user) {
+        REQUIRE(user);
+        // Uses new user
+        auto config = harness.make_test_file();
+        config.sync_config->error_handler = [](std::shared_ptr<realm::SyncSession>, realm::SyncError) {};
+        {
+            // Force the token to refresh when the sync session attempts to connect
+            test_server->set_redirect_hook([&](const sync::HTTPRequest& req) -> std::optional<sync::HTTPResponse> {
+                if (req.path.find("/location") != std::string::npos) {
+                    std::string base_url(test_server->base_url());
+                    auto scheme = base_url.find("://");
+                    auto ws_url = util::format("ws%1", base_url.substr(scheme));
+                    nlohmann::json body{{"deployment_model", "GLOBAL"},
+                                        {"location", "US-VA"},
+                                        {"hostname", test_server->base_url()},
+                                        {"ws_hostname", ws_url}};
+                    auto body_str = body.dump();
+
+                    return sync::HTTPResponse{
+                        sync::HTTPStatus::Ok, "Okay", {{"content-type", "application/json"}}, std::move(body_str)};
+                }
+
+                if (req.path.find("/realm-sync") != std::string::npos) {
+                    return sync::HTTPResponse{
+                        sync::HTTPStatus::Unauthorized, "User Unauthorized", {}, "Simulated user unauthorized"};
+                }
+                return std::nullopt;
+            });
+            reject_token_request = true;
+            auto pf = util::make_promise_future<void>();
+            update_base_url(harness, test_server->base_url());
+            auto realm = Realm::get_shared_realm(config);
+            auto subs = subscribe_to_all(*realm);
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                .get_async([promise = util::CopyablePromiseHolder<void>(std::move(pf.promise))](
+                               StatusWith<sync::SubscriptionSet::State> state) mutable {
+                    if (!state.is_ok()) {
+                        promise.get_promise().set_error(state.get_status());
+                        return;
+                    }
+                    promise.get_promise().emplace_value();
+                });
+            auto result = pf.future.get_no_throw();
+            REQUIRE_FALSE(result.is_ok());
+            REQUIRE(result.reason().find("Simulated user unauthorized") != std::string::npos);
+        }
+    });
+}
+
 TEST_CASE("flx: uploading an object that is out-of-view results in compensating write",
           "[sync][flx][compensating write][baas]") {
     static std::optional<FLXSyncTestHarness> harness;
@@ -1630,23 +1727,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
     create_user_and_log_in(harness->app());
     auto user = harness->app()->current_user();
-
-    auto make_error_handler = [] {
-        auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-        auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
-        auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
-            if (!error_promise) {
-                util::format(std::cerr,
-                             "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                             err.status);
-                abort();
-            }
-            error_promise->emplace_value(std::move(err));
-            error_promise.reset();
-        };
-
-        return std::make_pair(std::move(error_future), std::move(fn));
-    };
 
     auto validate_sync_error = [&](const SyncError& sync_error, Mixed expected_pk, const char* expected_object_name,
                                    const std::string& error_msg_fragment) {

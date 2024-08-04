@@ -149,6 +149,8 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 sync::SubscriptionSet subscribe_to_all(Realm& realm);
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
+std::pair<util::Future<SyncError>, std::function<void(std::shared_ptr<SyncSession>, SyncError)>> make_error_handler();
+
 #if REALM_APP_SERVICES
 struct AutoVerifiedEmailCredentials : app::AppCredentials {
     AutoVerifiedEmailCredentials();

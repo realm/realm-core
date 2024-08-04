@@ -198,6 +198,22 @@ void subscribe_to_all_and_bootstrap(Realm& realm)
     wait_for_download(realm);
 }
 
+std::pair<util::Future<SyncError>, std::function<void(std::shared_ptr<SyncSession>, SyncError)>> make_error_handler()
+{
+    auto&& [error_promise, error_future] = util::make_promise_future<SyncError>();
+    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
+    auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
+        // Subsequent error calls should throw an error and abort the test.
+        if (!error_promise) {
+            FAIL(util::format("An unexpected sync error was caught by the test error handler: '%1'\n", err.status));
+        }
+        error_promise->emplace_value(std::move(err));
+        error_promise.reset();
+    };
+
+    return std::make_pair(std::move(error_future), std::move(fn));
+}
+
 #if REALM_ENABLE_AUTH_TESTS
 
 void wait_for_sessions_to_close(const TestAppSession& test_app_session)

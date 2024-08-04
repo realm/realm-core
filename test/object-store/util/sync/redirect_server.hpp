@@ -60,6 +60,17 @@ public:
         m_server_thread.join();
     }
 
+    // Const to allow calling on const refrence
+    void set_redirect_hook(util::UniqueFunction<std::optional<HTTPResponse>(const HTTPRequest&)>&& hook) const
+    {
+        m_redirect_hook = std::move(hook);
+    }
+
+    void clear_redirect_hook() const
+    {
+        m_redirect_hook = nullptr;
+    }
+
     std::string base_url() const
     {
         return util::format("http://localhost:%1", m_endpoint.port());
@@ -173,13 +184,16 @@ private:
         std::optional<websocket::Socket> websocket;
     };
 
-    void send_simple_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, std::string body)
+    void send_http_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, std::string body,
+                            HTTPHeaders headers = {})
     {
         m_logger->debug("sending http response %1: %2 \"%3\"", status, reason, body);
         HTTPResponse resp;
         resp.status = status;
         resp.reason = std::move(reason);
         resp.body = std::move(body);
+        if (headers.size() > 0)
+            resp.headers = std::move(headers);
         conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
             if (ec && ec != util::error::operation_aborted) {
                 m_logger->warn("Error sending response: %1", ec);
@@ -245,6 +259,16 @@ private:
                     return;
                 }
 
+                if (m_redirect_hook) {
+                    if (auto response = m_redirect_hook(req)) {
+                        send_http_response(conn, response->status, std::move(response->reason),
+                                           response->body ? std::move(*response->body) : std::string{},
+                                           response->headers.size() > 0 ? std::move(response->headers)
+                                                                        : HTTPHeaders{});
+                        return;
+                    }
+                }
+
                 if (req.path.find("/location") != std::string::npos) {
                     std::string_view base_url(m_redirect_to_base_url);
                     auto scheme = base_url.find("://");
@@ -255,16 +279,14 @@ private:
                                         {"ws_hostname", ws_url}};
                     auto body_str = body.dump();
 
-                    send_simple_response(conn, HTTPStatus::Ok, "Okay", std::move(body_str));
+                    send_http_response(conn, HTTPStatus::Ok, "Okay", std::move(body_str));
                     return;
                 }
 
                 if (req.path.find("/realm-sync") != std::string::npos) {
                     do_websocket_redirect(conn, req);
-                    return;
                 }
-
-                send_simple_response(conn, HTTPStatus::NotFound, "Not found", {});
+                send_http_response(conn, HTTPStatus::NotFound, "Not found", {});
             });
         });
     }
@@ -275,7 +297,43 @@ private:
     network::Acceptor m_acceptor;
     network::Endpoint m_endpoint;
     std::thread m_server_thread;
+    // These are mutable so the setters can be called on a const refrence
+    mutable util::UniqueFunction<std::optional<HTTPResponse>(const HTTPRequest&)> m_redirect_hook;
 };
+
+class TestHttpServer {
+public:
+    explicit TestHttpServer(std::unique_ptr<RedirectingHttpServer> local_server)
+        : m_local_server{std::move(local_server)}
+        , m_server(*m_local_server)
+    {
+    }
+
+    explicit TestHttpServer(const RedirectingHttpServer& global_redirector)
+        : m_server(global_redirector)
+    {
+    }
+
+    ~TestHttpServer()
+    {
+        m_server.clear_redirect_hook();
+    }
+
+    void set_redirect_hook(util::UniqueFunction<std::optional<HTTPResponse>(const HTTPRequest&)>&& hook)
+    {
+        m_server.set_redirect_hook(std::move(hook));
+    }
+
+    std::string base_url() const
+    {
+        return m_server.base_url();
+    }
+
+private:
+    std::unique_ptr<RedirectingHttpServer> m_local_server;
+    const RedirectingHttpServer& m_server;
+};
+
 
 } // namespace realm::sync
 

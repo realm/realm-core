@@ -282,6 +282,13 @@ std::string get_real_base_url();
 // your test is talking to.
 std::string get_admin_url();
 
+// Create a reference to the redirector (or make a temporary one) to fake websocket
+// redirections or authorization failed errors.
+namespace sync {
+class TestHttpServer;
+} // namespace sync
+std::unique_ptr<sync::TestHttpServer> get_test_redirector();
+
 template <typename Factory>
 inline app::AppConfig get_config(Factory factory, const AppSession& app_session)
 {

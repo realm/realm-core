@@ -609,6 +609,15 @@ static std::optional<sync::RedirectingHttpServer>& get_redirector(const std::str
     return redirector;
 }
 
+std::unique_ptr<sync::TestHttpServer> get_test_redirector()
+{
+    if (auto& redirector = get_redirector({})) {
+        return std::make_unique<sync::TestHttpServer>(*redirector);
+    }
+    return std::make_unique<sync::TestHttpServer>(
+        std::make_unique<sync::RedirectingHttpServer>(get_real_base_url(), util::Logger::get_default_logger()));
+}
+
 class BaasaasLauncher : public Catch::EventListenerBase {
 public:
     static std::optional<Baasaas>& get_baasaas_holder()
