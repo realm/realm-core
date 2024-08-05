@@ -31,26 +31,8 @@
 
 namespace realm {
 
-// Quick hack to make "Queries with Integer null columns" able to compile in Visual Studio 2015 which doesn't full
-// support sfinae
-// (real cause hasn't been investigated yet, cannot exclude that we don't obey c++11 standard)
-struct HackClass {
-    template <class A, class B, class C>
-    bool can_match(A, B, C)
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-    template <class A, class B, class C>
-    bool will_match(A, B, C)
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-};
-
 // Does v2 contain v1?
-struct Contains : public HackClass {
+struct Contains {
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const
     {
         return v2.contains(v1);
@@ -108,7 +90,7 @@ struct Contains : public HackClass {
 };
 
 // Does v2 contain something like v1 (wildcard matching)?
-struct Like : public HackClass {
+struct Like {
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const
     {
         return v2.like(v1);
@@ -172,7 +154,7 @@ struct Like : public HackClass {
 };
 
 // Does v2 begin with v1?
-struct BeginsWith : public HackClass {
+struct BeginsWith {
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const
     {
         return v2.begins_with(v1);
@@ -223,7 +205,7 @@ struct BeginsWith : public HackClass {
 };
 
 // Does v2 end with v1?
-struct EndsWith : public HackClass {
+struct EndsWith {
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const
     {
         return v2.ends_with(v1);
@@ -355,7 +337,7 @@ struct NotEqual {
 };
 
 // Does v2 contain v1?
-struct ContainsIns : public HackClass {
+struct ContainsIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,
                     bool = false) const
     {
@@ -441,7 +423,7 @@ struct ContainsIns : public HackClass {
 };
 
 // Does v2 contain something like v1 (wildcard matching)?
-struct LikeIns : public HackClass {
+struct LikeIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,
                     bool = false) const
     {
@@ -526,7 +508,7 @@ struct LikeIns : public HackClass {
 };
 
 // Does v2 begin with v1?
-struct BeginsWithIns : public HackClass {
+struct BeginsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,
                     bool = false) const
     {
@@ -592,7 +574,7 @@ struct BeginsWithIns : public HackClass {
 };
 
 // Does v2 end with v1?
-struct EndsWithIns : public HackClass {
+struct EndsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,
                     bool = false) const
     {
@@ -658,7 +640,7 @@ struct EndsWithIns : public HackClass {
     static const int condition = -1;
 };
 
-struct EqualIns : public HackClass {
+struct EqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,
                     bool = false) const
     {
@@ -730,7 +712,7 @@ struct EqualIns : public HackClass {
     static const int condition = -1;
 };
 
-struct NotEqualIns : public HackClass {
+struct NotEqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,
                     bool = false) const
     {
@@ -930,7 +912,7 @@ struct Less {
     }
 };
 
-struct LessEqual : public HackClass {
+struct LessEqual {
     static const int avx = 0x12; // _CMP_LE_OQ
     template <class T>
     bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const
@@ -966,7 +948,7 @@ struct LessEqual : public HackClass {
     static const int condition = -1;
 };
 
-struct GreaterEqual : public HackClass {
+struct GreaterEqual {
     static const int avx = 0x1D; // _CMP_GE_OQ
     template <class T>
     bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const
