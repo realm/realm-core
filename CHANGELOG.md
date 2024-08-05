@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix a test failure in "sync progress: flx download progress add new objects while in the steady state" while running against QBSv2 ([PR #7953](https://github.com/realm/realm-core/pull/7953)).
 
 ----------------------------------------------
 

@@ -1305,12 +1305,6 @@ TEMPLATE_TEST_CASE("sync progress: upload progress", "[sync][baas][progress]", P
 
 namespace {
 struct EstimatesAreValid : Catch::Matchers::MatcherGenericBase {
-    size_t initial_object_count = 0;
-    EstimatesAreValid(size_t initial_count = 0)
-        : initial_object_count(initial_count)
-    {
-    }
-
     bool match(std::vector<double> const& entries) const
     {
         // Download progress should always end with an estimate of 1
@@ -1333,18 +1327,10 @@ struct EstimatesAreValid : Catch::Matchers::MatcherGenericBase {
         if (size == 1)
             return true;
 
-        // The actual progress for the first message should be the number of
-        // objects downloaded divided by the total number of objects, but in
-        // practice the server starts with a lower estimate so that's only an
-        // upper bound.
-        double expected_first = double(initial_object_count + 1) / (initial_object_count + size);
-        if (entries.front() > expected_first + .01)
-            return false;
-
         // As each of our DOWNLOAD messages have a fixed size, the progress
         // estimate should go up by the same amount each time.
-        double expected_step = (1.0 - entries.front()) / (size - 1);
-        for (size_t i = 1; i < size; ++i) {
+        double expected_step = 1.0 / size;
+        for (size_t i = 0; i < size; ++i) {
             double expected = entries.front() + i * expected_step;
             if (!WithinRel(entries[i], 0.1).match(expected)) {
                 return false;
@@ -1355,7 +1341,41 @@ struct EstimatesAreValid : Catch::Matchers::MatcherGenericBase {
 
     std::string describe() const override
     {
-        return "estimated progress must progress from non-1 to 1 in fixed-size non-zero steps";
+        return "estimated progress must progress from 0 to 1 in fixed-size non-zero steps";
+    }
+};
+
+struct HistoryScanEstimatesAreValid : Catch::Matchers::MatcherGenericBase {
+    bool match(std::vector<double> const& entries) const
+    {
+        // Download progress should always end with an estimate of 1
+        if (entries.empty() || entries.back() != 1)
+            return false;
+
+        // All estimates should be between 0 and 1
+        for (double estimate : entries) {
+            if (estimate < 0 || estimate > 1)
+                return false;
+        }
+
+        // With QBSv2, an offline client reconnecting performs a history scan
+        // and the progress reported is the progress through versions rather
+        // than download progress. This means that we can't assume anything
+        // beyond what is strictly guaranteed: each reported progress must be
+        // greater than the previous one, with the exception that 0.9999 can be
+        // repeated.
+        double prev = entries.front();
+        for (size_t i = 1; i < entries.size(); ++i) {
+            if (entries[i] < prev || (entries[i] == prev && prev != 0.9999))
+                return false;
+            prev = entries[i];
+        }
+        return true;
+    }
+
+    std::string describe() const override
+    {
+        return "estimated progress must monotonically increase from less than 1 to 1";
     }
 };
 } // namespace
@@ -1550,7 +1570,7 @@ TEST_CASE("sync progress: flx download progress", "[sync][baas][progress]") {
         suspended_realm->sync_session()->resume();
         wait_for_download(*suspended_realm);
         REQUIRE(suspended_estimates.size() >= 5);
-        REQUIRE_THAT(suspended_estimates, EstimatesAreValid(5));
+        REQUIRE_THAT(suspended_estimates, HistoryScanEstimatesAreValid());
     }
 
     SECTION("cleanup") {
