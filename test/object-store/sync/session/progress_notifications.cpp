@@ -1615,6 +1615,7 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
                 return "both local and remote changes";
         }
         FAIL(util::format("Missing case for unhandled TestMode value: ", static_cast<int>(tm)));
+        REALM_UNREACHABLE();
     };
 
     auto logger = util::Logger::get_default_logger();
