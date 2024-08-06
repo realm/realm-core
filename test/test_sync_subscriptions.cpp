@@ -1092,4 +1092,34 @@ TEST(Sync_MutableSubscriptionSetOperations)
     }
 }
 
+TEST(Sync_MutableSubscriptionReleasesReadLock)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db);
+
+    auto read_tr = fixture.db->start_read();
+    Query query_a(read_tr->get_table("class_a"));
+    query_a.greater_equal(fixture.bar_col, int64_t(1));
+
+    uint_fast64_t num_versions_before_subscription = fixture.db->get_number_of_versions();
+    auto mut_subs = store->get_latest().make_mutable_copy();
+    auto [it, inserted] = mut_subs.insert_or_assign("a sub", query_a);
+    CHECK(inserted);
+    CHECK_EQUAL(mut_subs.size(), 1);
+    mut_subs.commit();
+
+    // simulate sync writes fullfilling the subscription
+    size_t num_writes = 10;
+    while (--num_writes) {
+        auto wt = fixture.db->start_write();
+        wt->commit();
+        read_tr->advance_read(); // update our reader so that its old version can be cleaned up
+    }
+    uint_fast64_t num_versions_after_sync_writes = fixture.db->get_number_of_versions();
+
+    // check that the mut_subs in not keeping a transaction pinned
+    CHECK_EQUAL(num_versions_after_sync_writes, num_versions_before_subscription);
+}
+
 } // namespace realm::sync
