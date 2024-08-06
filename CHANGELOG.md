@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Improve sync bootstrap performance by reducing the number of table selections in the replication logs for embedded objects. ([#7945](https://github.com/realm/realm-core/issues/7945))
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Client reset cycle detection now checks if the previous recovery attempt was made by the same core version, and if not attempts recovery again ([PR #7944](https://github.com/realm/realm-core/pull/7944)).
 
