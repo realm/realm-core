@@ -2591,7 +2591,8 @@ Changeset& Transformer::get_reciprocal_transform(TransformHistory& history, file
                                                  version_type version, const HistoryEntry& history_entry)
 {
     auto& changeset = m_reciprocal_transform_cache[version]; // Throws
-    if (changeset.empty()) {
+    // There can be empty changesets in the cache, so check the version too.
+    if (changeset.empty() && changeset.version == 0) {
         bool is_compressed = false;
         ChunkedBinaryData data = history.get_reciprocal_transform(version, is_compressed);
         ChunkedBinaryInputStream in{data};
