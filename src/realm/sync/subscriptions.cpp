@@ -671,7 +671,7 @@ SubscriptionStore::SubscriptionStore(Private, DBRef db)
             throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
                                "Invalid schema version for flexible sync metadata");
         }
-        load_sync_metadata_schema(tr, &internal_tables);
+        load_sync_metadata_schema(*tr, &internal_tables);
     }
     else {
         tr->promote_to_write();
@@ -679,7 +679,7 @@ SubscriptionStore::SubscriptionStore(Private, DBRef db)
         SyncMetadataSchemaVersions schema_versions(tr);
         // Create the metadata schema and set the version (in the same commit)
         schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, c_flx_schema_version);
-        create_sync_metadata_schema(tr, &internal_tables);
+        create_sync_metadata_schema(*tr, &internal_tables);
         tr->commit_and_continue_as_read();
     }
     REALM_ASSERT(m_sub_set_table);

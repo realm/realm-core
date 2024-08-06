@@ -823,7 +823,7 @@ static void create_legacy_metadata_schema(DBRef db, int64_t version)
     std::vector<SyncMetadataTable> legacy_table_def{
         {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
     auto tr = db->start_write();
-    create_sync_metadata_schema(tr, &legacy_table_def);
+    create_sync_metadata_schema(*tr, &legacy_table_def);
     tr->commit_and_continue_writing();
     auto legacy_meta_table = tr->get_table(legacy_table_key);
     auto legacy_object = legacy_meta_table->create_object();
