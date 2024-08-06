@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed conflict resolution bug related to ArrayErase and Clear instructions, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization ([#7893](https://github.com/realm/realm-core/issues/7893), since v14.8.0).
+* Fixed bug which would prevent eventual consistency during conflict resolution. Affected clients would experience data divergence and potentially consistency errors as a result. ([PR #7955](https://github.com/realm/realm-core/pull/7955), since v14.8.0)
 
 ### Breaking changes
 * None.
