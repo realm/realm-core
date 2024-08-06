@@ -162,7 +162,8 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
 
     SECTION("callback is invoked immediately when a progress update has already occurred") {
         progress.set_local_version(1);
-        progress.update(0, 0, 0, 0, 1, 0.0, 0.0, 0);
+        // progress is reported as 1.0 for transferrable/transferred values of 0
+        progress.update(0, 0, 0, 0, 1, 1.0, 1.0, 0);
 
         bool callback_was_called = false;
         SECTION("for upload notifications, with no data transfer ongoing") {
@@ -174,7 +175,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                 },
                 NotifierType::upload, false, 0);
             REQUIRE(callback_was_called);
-            REQUIRE(estimate == 0.0);
+            REQUIRE(estimate == 1.0);
         }
 
         SECTION("for download notifications, with no data transfer ongoing") {
@@ -185,7 +186,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                     estimate = ep;
                 },
                 NotifierType::download, false, 0);
-            REQUIRE(estimate == 0.0);
+            REQUIRE(estimate == 1.0);
             REQUIRE(callback_was_called);
         }
 
@@ -206,7 +207,8 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
     }
 
     SECTION("callback is invoked after each update for streaming notifiers") {
-        progress.update(0, 0, 0, 0, 1, 0.0, 0.0, 0);
+        // progress is reported as 1.0 for transferrable/transferred values of 0
+        progress.update(0, 0, 0, 0, 1, 1.0, 1.0, 0);
 
         bool callback_was_called = false;
         uint64_t transferred = 0;

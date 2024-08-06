@@ -1585,7 +1585,7 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 util::UniqueFunction<void()>
 SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
 {
-    uint64_t transfered = is_download ? current_progress.downloaded : current_progress.uploaded;
+    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferable = is_download ? current_progress.downloadable : current_progress.uploadable;
     double estimate = is_download ? current_progress.download_estimate : current_progress.upload_estimate;
 
@@ -1617,16 +1617,19 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
         // the total number of uploadable bytes available rather than the number of
         // bytes this NotifierPackage was waiting to upload.
         if (!is_download) {
-            estimate = transferable > 0 ? std::min(transfered / double(transferable), 1.0) : 0.0;
+            // If the upload transferable value is 0, report a progress estimate of 1.0,
+            // since the non-streaming request is going to be expired below and there
+            // is nothing to upload.
+            estimate = transferable > 0 ? std::min(transferred / double(transferable), 1.0) : 1.0;
         }
     }
 
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
     is_expired =
-        !is_streaming && (transfered >= transferable && (!is_download || !pending_query_version || estimate >= 1.0));
+        !is_streaming && (transferred >= transferable && (!is_download || !pending_query_version || estimate >= 1.0));
     return [=, notifier = notifier] {
-        notifier(transfered, transferable, estimate);
+        notifier(transferred, transferable, estimate);
     };
 }
 
