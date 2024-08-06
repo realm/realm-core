@@ -37,8 +37,19 @@ namespace realm {
 class StringCompressor;
 
 struct CachedString {
-    uint8_t m_weight = 0;
+    std::atomic<uint8_t> m_weight = 0;
     std::unique_ptr<std::string> m_decompressed;
+    CachedString() {}
+    CachedString(CachedString&& other)
+    {
+        m_decompressed = std::move(other.m_decompressed);
+        m_weight.store(other.m_weight.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    }
+    CachedString(uint8_t init_weight, std::unique_ptr<std::string>&& ptr)
+    {
+        m_decompressed = std::move(ptr);
+        m_weight.store(init_weight, std::memory_order_relaxed);
+    }
 };
 
 class StringInterner {

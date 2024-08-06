@@ -375,7 +375,7 @@ void StringInterner::rebuild_internal()
             continue;
         }
         if (auto& w = m_decompressed_strings[id - 1].m_weight) {
-            w >>= 1;
+            w = w >> 1;
         }
         else {
             m_decompressed_strings[id - 1].m_decompressed.reset();
@@ -420,7 +420,7 @@ StringID StringInterner::intern(StringData sd)
     // it's a new string
     bool learn = true;
     auto c_str = m_compressor->compress(sd, learn);
-    m_decompressed_strings.push_back({64, std::make_unique<std::string>(sd)});
+    m_decompressed_strings.emplace_back(64, std::make_unique<std::string>(sd));
     auto id = m_decompressed_strings.size();
     m_in_memory_strings.push_back(id);
     add_to_hash_map(m_hash_map, h, id, 32);
@@ -673,15 +673,19 @@ StringData StringInterner::get(StringID id)
         return StringData{nullptr};
     REALM_ASSERT_DEBUG(id <= m_decompressed_strings.size());
     CachedString& cs = m_decompressed_strings[id - 1];
-    std::lock_guard lock(m_mutex);
-    if (cs.m_decompressed) {
-        if (cs.m_weight < 128)
-            cs.m_weight += 64;
+    if (auto weight = cs.m_weight.load(std::memory_order_acquire)) {
+        REALM_ASSERT_DEBUG(cs.m_decompressed);
+        if (weight < 128) {
+            // ignore if this fails - that happens if some other thread bumps the value
+            // concurrently. And if so, we can live with loosing our own "bump"
+            cs.m_weight.compare_exchange_strong(weight, weight + 64, std::memory_order_acq_rel);
+        }
         return {cs.m_decompressed->c_str(), cs.m_decompressed->size()};
     }
-    cs.m_weight = 64;
+    std::lock_guard lock(m_mutex);
     cs.m_decompressed = std::make_unique<std::string>(m_compressor->decompress(get_compressed(id)));
     m_in_memory_strings.push_back(id);
+    cs.m_weight.store(64, std::memory_order_release);
     return {cs.m_decompressed->c_str(), cs.m_decompressed->size()};
 }
 
