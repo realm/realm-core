@@ -74,7 +74,7 @@ private:
     // when ever we meet a string too large to be placed inline.
     Array m_current_long_string_node;
     void rebuild_internal();
-    CompressedStringView& get_compressed(StringID id);
+    CompressedStringView& get_compressed(StringID id, bool lock_if_mutating = false);
     // return true if the leaf was reloaded
     bool load_leaf_if_needed(DataLeaf& leaf);
     // return 'true' if the new ref was different and forced a reload
