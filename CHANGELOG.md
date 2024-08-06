@@ -3,6 +3,7 @@
 ### Enhancements
 * Improve sync bootstrap performance by reducing the number of table selections in the replication logs for embedded objects. ([#7945](https://github.com/realm/realm-core/issues/7945))
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Released a read lock which was pinned for the duration of a mutable subscription even after commit. This frees resources earlier, and may improve performance of sync bootstraps where the starting state is large. ([#7946](https://github.com/realm/realm-core/issues/7946))
 * Client reset cycle detection now checks if the previous recovery attempt was made by the same core version, and if not attempts recovery again ([PR #7944](https://github.com/realm/realm-core/pull/7944)).
 
 ### Fixed
