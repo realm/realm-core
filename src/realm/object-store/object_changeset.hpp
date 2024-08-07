@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <variant>
 
 namespace realm {
 
@@ -36,8 +37,49 @@ namespace realm {
  */
 class ObjectChangeSet {
 public:
+    class KeyOrString {
+    public:
+        KeyOrString(ColKey ck)
+            : m_col_or_string(ck)
+        {
+        }
+        KeyOrString(std::string&& prop)
+            : m_col_or_string(std::move(prop))
+        {
+        }
+        size_t hash() const noexcept
+        {
+            return std::hash<std::variant<ColKey, std::string>>{}(m_col_or_string);
+        }
+        bool operator==(const KeyOrString& other) const
+        {
+            return m_col_or_string == other.m_col_or_string;
+        }
+        bool is_col() const
+        {
+            return std::holds_alternative<ColKey>(m_col_or_string);
+        }
+        ColKey get_col() const
+        {
+            if (const ColKey* pval = std::get_if<ColKey>(&m_col_or_string)) {
+                return *pval;
+            }
+            return ColKey();
+        }
+        const std::string& get_name() const
+        {
+            if (const std::string* pval = std::get_if<std::string>(&m_col_or_string)) {
+                return *pval;
+            }
+            return empty_string;
+        }
+
+    private:
+        static std::string empty_string;
+        std::variant<ColKey, std::string> m_col_or_string;
+    };
     using ObjectSet = std::unordered_set<ObjKey>;
-    using ColumnSet = std::unordered_set<ColKey>;
+    using ColumnSet = std::unordered_set<KeyOrString>;
     using ObjectMapToColumnSet = std::unordered_map<ObjKey, ColumnSet>;
 
     ObjectChangeSet() = default;
@@ -48,6 +90,7 @@ public:
 
     void insertions_add(ObjKey obj);
     void modifications_add(ObjKey obj, ColKey col);
+    void modifications_add(ObjKey obj, std::string&& prop_name);
     void deletions_add(ObjKey obj);
 
     bool insertions_remove(ObjKey obj);
@@ -127,5 +170,15 @@ private:
 };
 
 } // end namespace realm
+
+namespace std {
+template <>
+struct hash<::realm::ObjectChangeSet::KeyOrString> {
+    inline size_t operator()(const ::realm::ObjectChangeSet::KeyOrString& prop) const noexcept
+    {
+        return prop.hash();
+    }
+};
+} // namespace std
 
 #endif // REALM_OBJECT_CHANGESET_HPP

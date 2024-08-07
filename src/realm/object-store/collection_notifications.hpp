@@ -105,6 +105,7 @@ struct CollectionChangeSet {
 
     // Per-column version of `modifications`
     std::unordered_map<int64_t, IndexSet> columns;
+    std::unordered_map<std::string, IndexSet> additional_properties;
 
     std::set<StableIndex> paths;
 

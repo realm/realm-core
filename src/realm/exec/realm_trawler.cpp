@@ -979,6 +979,12 @@ public:
         return true;
     }
 
+    bool modify_object(const std::string& prop_name, realm::ObjKey key)
+    {
+        std::cout << "Modify object: " << prop_name << " on " << key << std::endl;
+        return true;
+    }
+
     bool collection_set(size_t ndx)
     {
         std::cout << "Collection set at " << ndx << std::endl;

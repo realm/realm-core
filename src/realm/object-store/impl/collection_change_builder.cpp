@@ -239,6 +239,7 @@ void CollectionChangeBuilder::clear(size_t old_size)
     insertions.clear();
     moves.clear();
     columns.clear();
+    additional_properties.clear();
     deletions.set(old_size);
     collection_was_cleared = true;
 }
@@ -704,5 +705,5 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
 
     return {std::move(deletions),     std::move(insertions), std::move(modifications_in_old),
             std::move(modifications), std::move(moves),      collection_root_was_deleted,
-            collection_was_cleared,   std::move(columns)};
+            collection_was_cleared,   std::move(columns),    std::move(additional_properties)};
 }

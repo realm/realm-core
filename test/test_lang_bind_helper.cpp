@@ -2151,6 +2151,10 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK(col == link_col && obj == okey);
                 return true;
             }
+            bool modify_object(std::string&&, ObjKey)
+            {
+                return true;
+            }
             ObjKey o0, o1, okey;
             ColKey link_col, link_list_col;
         } parser(test_context);
@@ -2233,6 +2237,10 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
             }
 
             bool modify_object(ColKey, ObjKey) const
+            {
+                throw ObserverError();
+            }
+            bool modify_object(const std::string&, ObjKey) const
             {
                 throw ObserverError();
             }

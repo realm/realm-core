@@ -528,6 +528,10 @@ TEST(Shared_ReadAfterCompact)
             {
                 return true;
             }
+            bool modify_object(std::string&&, ObjKey)
+            {
+                return true;
+            }
             void parse_complete() {}
             int nb_objects = 0;
         } parser;

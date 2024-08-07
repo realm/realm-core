@@ -434,6 +434,18 @@ void Replication::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
 
 void Replication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
+    const Table* source_table = dict.get_table().unchecked_ptr();
+    auto col = dict.get_col_key();
+
+    if (source_table->is_additional_props_col(col)) {
+        // Here we have to fake it and pretend we are setting a property on the object
+        ObjKey obj_key = dict.get_owner_key();
+        select_table(source_table); // Throws
+        if (select_obj(obj_key)) {
+            m_encoder.modify_object(key.get_string(), obj_key); // Throws
+        }
+        return;
+    }
     if (select_collection(dict)) { // Throws
         m_encoder.collection_insert(ndx);
     }
@@ -442,6 +454,18 @@ void Replication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixe
 
 void Replication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
+    const Table* source_table = dict.get_table().unchecked_ptr();
+    auto col = dict.get_col_key();
+
+    if (source_table->is_additional_props_col(col)) {
+        // Here we have to fake it and pretend we are setting a property on the object
+        ObjKey obj_key = dict.get_owner_key();
+        select_table(source_table); // Throws
+        if (select_obj(obj_key)) {
+            m_encoder.modify_object(key.get_string(), obj_key); // Throws
+        }
+        return;
+    }
     if (select_collection(dict)) { // Throws
         m_encoder.collection_set(ndx);
     }
