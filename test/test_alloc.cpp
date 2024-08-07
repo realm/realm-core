@@ -242,7 +242,7 @@ TEST(Alloc_BadBuffer)
     GROUP_TEST_PATH(path);
 
     // Produce an invalid buffer
-    char buffer[32];
+    alignas(8) char buffer[32];
     for (size_t i = 0; i < sizeof buffer; ++i)
         buffer[i] = char((i + 192) % 128);
 
