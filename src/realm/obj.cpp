@@ -642,6 +642,13 @@ bool Obj::has_property(StringData prop_name) const
     return false;
 }
 
+bool Obj::has_schema_property(StringData prop_name) const
+{
+    if (m_table->get_column_key(prop_name))
+        return true;
+    return false;
+}
+
 std::vector<StringData> Obj::get_additional_properties() const
 {
     std::vector<StringData> ret;

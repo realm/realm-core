@@ -118,6 +118,7 @@ public:
     U get(ColKey col_key) const;
 
     bool has_property(StringData prop_name) const;
+    bool has_schema_property(StringData prop_name) const;
 
     std::vector<StringData> get_additional_properties() const;
 
