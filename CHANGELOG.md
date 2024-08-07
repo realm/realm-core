@@ -30,6 +30,7 @@
 
 ### Fixed
 * Sync client may report duplicate compensating write errors ([#7708](https://github.com/realm/realm-core/issues/7708), since v14.8.0).
+* String serialization of timestamps with a sufficiently large timestamp value could overflow an int causing undefined behavior, causing potentially bad values for the month/day/year values in stringified dates. ([PR #7934](https://github.com/realm/realm-core/pull/7934)).
 
 ### Breaking changes
 * None.
