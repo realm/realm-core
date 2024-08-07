@@ -1414,10 +1414,7 @@ public:
         bool resolver_thread_started = m_resolver_thread.joinable();
         if (resolver_thread_started)
             return;
-        auto func = [this]() noexcept {
-            resolver_thread();
-        };
-        m_resolver_thread = std::thread{std::move(func)};
+        m_resolver_thread = std::thread{&Impl::resolver_thread, this};
     }
 
     void add_wait_oper(LendersWaitOperPtr op)

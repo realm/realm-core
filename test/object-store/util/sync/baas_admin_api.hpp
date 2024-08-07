@@ -293,6 +293,22 @@ inline app::AppConfig get_config(Factory factory, const AppSession& app_session)
              "A device version", "A framework name", "A framework version", "A bundle id"}};
 }
 
+class DisableDevelopmentMode {
+public:
+    DisableDevelopmentMode(const AppSession& session)
+        : m_session(session)
+    {
+        session.admin_api.set_development_mode_to(session.server_app_id, false);
+    }
+    ~DisableDevelopmentMode()
+    {
+        m_session.admin_api.set_development_mode_to(m_session.server_app_id, true);
+    }
+
+private:
+    const AppSession& m_session;
+};
+
 } // namespace realm
 
 #endif // REALM_ENABLE_AUTH_TESTS

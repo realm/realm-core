@@ -978,8 +978,6 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
     if (m_websocket_error_received)
         return;
 
-    m_sending_session = sess;
-    m_sending = true;
     m_websocket->async_write_binary(out.as_span(), [this, sentinel = m_websocket_sentinel](Status status) {
         if (sentinel->destroyed) {
             return;
@@ -993,6 +991,8 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
         }
         handle_write_message(); // Throws
     });                         // Throws
+    m_sending_session = sess;
+    m_sending = true;
 }
 
 
