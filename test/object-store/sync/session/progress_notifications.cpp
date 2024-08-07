@@ -28,6 +28,7 @@
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 
 using namespace realm::app;
 #endif
@@ -1602,7 +1603,7 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
     std::vector<ProgressEntry> streaming_progress;
     std::vector<ProgressEntry> non_streaming_progress;
 
-    enum TestMode { NO_CHANGES, LOCAL_CHANGES, REMOTE_CHANGES, BOTH_CHANGED };
+    enum TestMode { NO_CHANGES, LOCAL_CHANGES, REMOTE_CHANGES, BOTH_CHANGED, BOTH_CHANGED_W_DISCARD };
     auto xlate_test_mode = [](TestMode tm) -> std::string_view {
         switch (tm) {
             case NO_CHANGES:
@@ -1613,6 +1614,8 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
                 return "remote changes only";
             case BOTH_CHANGED:
                 return "both local and remote changes";
+            case BOTH_CHANGED_W_DISCARD:
+                return "both local and remote changes";
         }
         FAIL(util::format("Missing case for unhandled TestMode value: ", static_cast<int>(tm)));
         REALM_UNREACHABLE();
@@ -1620,17 +1623,22 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
 
     auto logger = util::Logger::get_default_logger();
     TestType setup;
-    auto test_mode =
-        GENERATE(TestMode::NO_CHANGES, TestMode::LOCAL_CHANGES, TestMode::REMOTE_CHANGES, TestMode::BOTH_CHANGED);
-
-    logger->debug("PROGRESS TEST: %1 upload notifications at end of client reset with %2", setup,
-                  xlate_test_mode(test_mode));
+    auto test_mode = GENERATE(TestMode::NO_CHANGES, TestMode::LOCAL_CHANGES, TestMode::REMOTE_CHANGES,
+                              TestMode::BOTH_CHANGED, TestMode::BOTH_CHANGED_W_DISCARD);
 
     // Set up the main realm for the test
     auto config = setup.make_config();
-    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
     config.sync_config->notify_after_client_reset = reset_handler;
+    if (test_mode == TestMode::BOTH_CHANGED_W_DISCARD) {
+        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    }
+    else {
+        config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    }
+
+    logger->debug("PROGRESS TEST: %1 upload progress notifications after %2 client reset with %3", setup,
+                  config.sync_config->client_resync_mode, xlate_test_mode(test_mode));
 
     // Functions to create the progress notification callbacks
     auto make_streaming_cb = [&](std::string_view desc) {
@@ -1680,13 +1688,15 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
         realm->sync_session()->shutdown_and_wait(); // Close the sync session
 
         // Set up some local changes if the test calls for it
-        if (test_mode == TestMode::LOCAL_CHANGES || test_mode == TestMode::BOTH_CHANGED) {
+        if (test_mode == TestMode::LOCAL_CHANGES || test_mode == TestMode::BOTH_CHANGED ||
+            test_mode == TestMode::BOTH_CHANGED_W_DISCARD) {
             logger->trace("PROGRESS TEST: adding local objects");
             setup.add_objects(realm, 5, 100); // Add some local objects while offline
         }
 
         // Set up some remote changes if the test calls for it
-        if (test_mode == TestMode::REMOTE_CHANGES || test_mode == TestMode::BOTH_CHANGED) {
+        if (test_mode == TestMode::REMOTE_CHANGES || test_mode == TestMode::BOTH_CHANGED ||
+            test_mode == TestMode::BOTH_CHANGED_W_DISCARD) {
             logger->trace("PROGRESS TEST: adding remote objects");
             // Make a new config for a different user
             setup.create_user_and_log_in();
@@ -1733,8 +1743,9 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
         logger->trace("PROGRESS TEST: non-streaming progress size: %1", non_streaming_progress.size());
         print_progress(non_streaming_progress);
 
-        // Testing for no changes or remote only changes
-        if (test_mode == TestMode::NO_CHANGES || test_mode == TestMode::REMOTE_CHANGES) {
+        // Validations for no changes, remote only changes, or both changes with discard local client reset
+        if (test_mode == TestMode::NO_CHANGES || test_mode == TestMode::REMOTE_CHANGES ||
+            test_mode == TestMode::BOTH_CHANGED_W_DISCARD) {
             // Sometimes a second upload would be sent, resulting in a size of 2
             REQUIRE(streaming_progress.size() > 0);
             REQUIRE(streaming_progress[0] == ProgressEntry{0, 0, 1.0});
@@ -1742,6 +1753,7 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
             // Needs to be changed to 1.0 after PR #7957 is merged
             REQUIRE(non_streaming_progress[0] == ProgressEntry{0, 0, 0.0});
         }
+        // Validations for local changes only or both local and remote changes
         else if (test_mode == TestMode::LOCAL_CHANGES || test_mode == TestMode::BOTH_CHANGED) {
             // Multiple notifications may sent for the changes to upload after client reset
             if (config.sync_config->flx_sync_requested) {
@@ -1756,6 +1768,10 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
             }
             REQUIRE(streaming_progress.back().estimate == 1.0);     // should end with progress of 1.0
             REQUIRE(non_streaming_progress.back().estimate == 1.0); // should end with progress of 1.0
+        }
+        else {
+            // Unhandled TestMode case
+            FAIL(util::format("Unhandled TestMode case: ", static_cast<int>(test_mode)));
         }
     }
 
