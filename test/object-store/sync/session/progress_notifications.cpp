@@ -1623,64 +1623,97 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
     auto test_mode =
         GENERATE(TestMode::NO_CHANGES, TestMode::LOCAL_CHANGES, TestMode::REMOTE_CHANGES, TestMode::BOTH_CHANGED);
 
-    logger->debug("PROGRESS_TEST: %1 upload notifications at end of client reset with %2", setup,
+    logger->debug("PROGRESS TEST: %1 upload notifications at end of client reset with %2", setup,
                   xlate_test_mode(test_mode));
 
+    // Set up the main realm for the test
     auto config = setup.make_config();
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     auto&& [reset_future, reset_handler] = reset_utils::make_client_reset_handler();
     config.sync_config->notify_after_client_reset = reset_handler;
 
-    auto&& make_streaming_cb = [&](std::string_view desc) {
+    // Functions to create the progress notification callbacks
+    auto make_streaming_cb = [&](std::string_view desc) {
         return [&, desc](uint64_t transferred, uint64_t transferrable, double estimate) {
-            logger->debug("%1 Progress callback called xferred: %2, xferrable: %3, estimate: %4", desc, transferred,
-                          transferrable, estimate_to_string(estimate));
+            logger->debug("PROGRESS TEST: %1 Progress callback called xferred: %2, xferrable: %3, estimate: %4", desc,
+                          transferred, transferrable, estimate_to_string(estimate));
             std::lock_guard lk(progress_mutex);
             streaming_progress.push_back(ProgressEntry{transferred, transferrable, estimate});
         };
     };
-    auto&& make_non_streaming_cb = [&](std::string_view desc) {
+    auto make_non_streaming_cb = [&](std::string_view desc) {
         return [&, desc](uint64_t transferred, uint64_t transferrable, double estimate) {
-            logger->debug("%1 Progress callback called xferred: %2, xferrable: %3, estimate: %4", desc, transferred,
-                          transferrable, estimate_to_string(estimate));
+            logger->debug("PROGRESS TEST: %1 Progress callback called xferred: %2, xferrable: %3, estimate: %4", desc,
+                          transferred, transferrable, estimate_to_string(estimate));
             std::lock_guard lk(progress_mutex);
             non_streaming_progress.push_back(ProgressEntry{transferred, transferrable, estimate});
         };
     };
+
+    auto wait_for_sync = [](SharedRealm& r) {
+        // If a FLX session, also wait for the subscription to complete
+        if (r->config().sync_config->flx_sync_requested) {
+            auto sub = r->get_latest_subscription_set();
+            REQUIRE(sub.state() != sync::SubscriptionSet::State::Error);
+            if (sub.state() != sync::SubscriptionSet::State::Complete) {
+                auto result =
+                    sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+                REQUIRE(result.is_ok());
+                REQUIRE(result.get_value() == sync::SubscriptionSet::State::Complete);
+            }
+        }
+        wait_for_download(*r);
+        wait_for_upload(*r);
+    };
+
     {
+        // Setup the realm and add some data (FLX subscription is added during initialization)
         auto realm = Realm::get_shared_realm(config);
+
+        // For FLX sessions, don't create any more subscriptions for future realms
+        config.sync_config->rerun_init_subscription_on_open = false;
+        config.sync_config->subscription_initializer = nullptr;
+
+        // Add some data and wait for upload
         setup.add_objects(realm, 10, 100);
-        wait_for_upload(*realm);
+        wait_for_sync(realm);                       // wait for sync/subs to complete
         realm->sync_session()->shutdown_and_wait(); // Close the sync session
+
         // Set up some local changes if the test calls for it
         if (test_mode == TestMode::LOCAL_CHANGES || test_mode == TestMode::BOTH_CHANGED) {
-            logger->trace("PROGRESS_TEST: adding local objects");
+            logger->trace("PROGRESS TEST: adding local objects");
             setup.add_objects(realm, 5, 100); // Add some local objects while offline
         }
+
         // Set up some remote changes if the test calls for it
         if (test_mode == TestMode::REMOTE_CHANGES || test_mode == TestMode::BOTH_CHANGED) {
-            logger->trace("PROGRESS_TEST: adding remote objects");
+            logger->trace("PROGRESS TEST: adding remote objects");
             // Make a new config for a different user
             setup.create_user_and_log_in();
-            auto remote_config = setup.make_config(); // With the new user we just created
+            auto remote_config = setup.make_config(); // Includes the new user just created
             auto remote_realm = Realm::get_shared_realm(remote_config);
             setup.add_objects(remote_realm, 5, 100); // Add some objects remotely
-            wait_for_upload(*remote_realm);          // wait for sync
+            wait_for_sync(remote_realm);             // wait for sync/subs to complete
         }
         reset_utils::trigger_client_reset(setup.app_session(), realm);
     }
     auto realm = Realm::get_shared_realm(config);
+    // Register progress notifiers
     realm->sync_session()->register_progress_notifier(make_non_streaming_cb("Non-Streaming Upload"),
                                                       NotifierType::upload, false);
     realm->sync_session()->register_progress_notifier(make_streaming_cb("Streaming Upload"), NotifierType::upload,
                                                       true);
+
+    // Wait for the client reset to complete
     auto status = wait_for_future(std::move(reset_future)).get_no_throw();
     if (!status.is_ok()) {
         FAIL(status.get_status());
     }
-    // Progress notifications haven't been sent yet - wait for sync after client reset
+
+    // Progress notifications may not have been sent yet - wait for sync after client reset
     wait_for_download(*realm);
     wait_for_upload(*realm);
+
     {
         std::lock_guard<std::mutex> lk(progress_mutex);
         logger->debug("PROGRESS TEST: retrieved progress calls: streaming - %1, non-streaming - %2",
@@ -1695,9 +1728,9 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
                               entry.transferrable, entry.transferred, estimate_to_string(entry.estimate));
             }
         };
-        logger->trace("PROGRESS_TEST: streaming progress size: %1", streaming_progress.size());
+        logger->trace("PROGRESS TEST: streaming progress size: %1", streaming_progress.size());
         print_progress(streaming_progress);
-        logger->trace("PROGRESS_TEST: non-streaming progress size: %1", non_streaming_progress.size());
+        logger->trace("PROGRESS TEST: non-streaming progress size: %1", non_streaming_progress.size());
         print_progress(non_streaming_progress);
 
         // Testing for no changes or remote only changes
@@ -1705,15 +1738,23 @@ TEMPLATE_TEST_CASE("sync progress: upload progress during client reset", "[sync]
             // Sometimes a second upload would be sent, resulting in a size of 2
             REQUIRE(streaming_progress.size() > 0);
             REQUIRE(streaming_progress[0] == ProgressEntry{0, 0, 1.0});
-            REQUIRE(non_streaming_progress.size() == 1);
+            REQUIRE(non_streaming_progress.size() > 0);
             // Needs to be changed to 1.0 after PR #7957 is merged
             REQUIRE(non_streaming_progress[0] == ProgressEntry{0, 0, 0.0});
         }
         else if (test_mode == TestMode::LOCAL_CHANGES || test_mode == TestMode::BOTH_CHANGED) {
-            // Multiple notifications are sent since there are changes to upload after client reset
-            REQUIRE(streaming_progress.size() > 1);
-            REQUIRE(streaming_progress.back().estimate == 1.0); // should end with progress of 1.0
-            REQUIRE(non_streaming_progress.size() > 1);
+            // Multiple notifications may sent for the changes to upload after client reset
+            if (config.sync_config->flx_sync_requested) {
+                // FLX sessions report upload progress as a single notification
+                REQUIRE(streaming_progress.size() > 0);
+                REQUIRE(non_streaming_progress.size() > 0);
+            }
+            else {
+                // PBS sessions report upload progress when changes are uploaded and when upload is acked
+                REQUIRE(streaming_progress.size() > 1);
+                REQUIRE(non_streaming_progress.size() > 1);
+            }
+            REQUIRE(streaming_progress.back().estimate == 1.0);     // should end with progress of 1.0
             REQUIRE(non_streaming_progress.back().estimate == 1.0); // should end with progress of 1.0
         }
     }
