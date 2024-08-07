@@ -60,7 +60,7 @@ bool MigrationStore::load_data(bool read_only)
             throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
                                "Invalid schema version for flexible sync migration store metadata");
         }
-        load_sync_metadata_schema(tr, &internal_tables);
+        load_sync_metadata_schema(*tr, &internal_tables);
     }
     else {
         if (read_only) {
@@ -72,7 +72,7 @@ bool MigrationStore::load_data(bool read_only)
         SyncMetadataSchemaVersions schema_versions(tr);
         // Create the metadata schema and set the version (in the same commit)
         schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
-        create_sync_metadata_schema(tr, &internal_tables);
+        create_sync_metadata_schema(*tr, &internal_tables);
         tr->commit_and_continue_as_read();
     }
     REALM_ASSERT(m_migration_table);

@@ -20,8 +20,6 @@
 #include <realm/util/uri.hpp>
 #include <realm/version.hpp>
 
-#include <realm/sync/network/websocket.hpp> // Only for websocket::Error TODO remove
-
 #include <system_error>
 #include <sstream>
 
@@ -1364,13 +1362,8 @@ void Connection::receive_query_error_message(int raw_error_code, std::string_vie
                                             "Received a FLX query error message on a non-FLX sync connection"});
     }
 
-    Session* sess = find_and_validate_session(session_ident, "QUERY_ERROR");
-    if (REALM_UNLIKELY(!sess)) {
-        return;
-    }
-
-    if (auto status = sess->receive_query_error_message(raw_error_code, message, query_version); !status.is_ok()) {
-        close_due_to_protocol_error(std::move(status));
+    if (Session* sess = find_and_validate_session(session_ident, "QUERY_ERROR")) {
+        sess->receive_query_error_message(raw_error_code, message, query_version);
     }
 }
 
@@ -1586,7 +1579,7 @@ void Session::integrate_changesets(const SyncProgress& progress, std::uint_fast6
     auto transact = get_db()->start_read();
     history.integrate_server_changesets(
         progress, downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
-        [&](const TransactionRef&, util::Span<Changeset> changesets) {
+        [&](const Transaction&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
         }); // Throws
     if (received_changesets.size() == 1) {
@@ -2238,13 +2231,10 @@ bool Session::client_reset_if_needed()
     Status cr_status = client_reset_config->error;
     ProtocolErrorInfo::Action cr_action = client_reset_config->action;
 
-    auto on_flx_version_complete = [this](int64_t version) {
-        this->on_flx_sync_version_complete(version);
-    };
     try {
         // The file ident from the fresh realm will be copied over to the local realm
         bool did_reset = client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config),
-                                                            get_flx_subscription_store(), on_flx_version_complete);
+                                                            get_flx_subscription_store());
 
         call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
         if (!did_reset) {
@@ -2290,8 +2280,6 @@ bool Session::client_reset_if_needed()
 
     // Checks if there is a pending client reset
     handle_pending_client_reset_acknowledgement();
-
-    update_subscription_version_info();
 
     // If a migration or rollback is in progress, mark it complete when client reset is completed.
     if (auto migration_store = get_migration_store()) {
@@ -2526,16 +2514,10 @@ Status Session::receive_unbound_message()
 }
 
 
-Status Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
+void Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
 {
     logger.info("Received QUERY_ERROR \"%1\" (error_code=%2, query_version=%3)", message, error_code, query_version);
-    // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm and SessionWrapper must
-    // not be accessed any longer.
-    if (m_state == Active) {
-        on_flx_sync_error(query_version, message); // throws
-    }
-    return Status::OK();
+    on_flx_sync_error(query_version, message); // throws
 }
 
 // The caller (Connection) must discard the session if the session has become

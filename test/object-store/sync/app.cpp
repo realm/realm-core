@@ -3305,6 +3305,7 @@ TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
     };
 
     auto in_mem_logger = std::make_shared<InMemoryLogger>();
+    in_mem_logger->set_level_threshold(InMemoryLogger::Level::all);
     TestAppSession app_session(get_runtime_app_session(), nullptr, DeleteApp{false}, ReconnectMode::normal, nullptr,
                                in_mem_logger);
 
