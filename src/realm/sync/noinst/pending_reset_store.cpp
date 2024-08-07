@@ -54,22 +54,117 @@ bool operator==(const sync::PendingReset& lhs, const PendingReset::Action& actio
     return lhs.action == action;
 }
 
+namespace {
 // A table without a "class_" prefix will not generate sync instructions.
-constexpr static std::string_view s_meta_reset_table_name("client_reset_metadata");
-constexpr static std::string_view s_version_col_name("core_version");
-constexpr static std::string_view s_timestamp_col_name("time");
-constexpr static std::string_view s_reset_recovery_mode_col_name("mode");
-constexpr static std::string_view s_reset_action_col_name("action");
-constexpr static std::string_view s_reset_error_code_col_name("error_code");
-constexpr static std::string_view s_reset_error_msg_col_name("error_msg");
+constexpr std::string_view s_meta_reset_table_name("client_reset_metadata");
+constexpr std::string_view s_core_version_col_name("core_version");
+constexpr std::string_view s_recovered_version_col_name("recovered_version");
+constexpr std::string_view s_timestamp_col_name("time");
+constexpr std::string_view s_reset_recovery_mode_col_name("mode");
+constexpr std::string_view s_reset_action_col_name("action");
+constexpr std::string_view s_reset_error_code_col_name("error_code");
+constexpr std::string_view s_reset_error_msg_col_name("error_msg");
 
-bool PendingResetStore::clear_pending_reset(Group& group)
+int64_t from_reset_action(PendingReset::Action action)
+{
+    switch (action) {
+        case PendingReset::Action::ClientReset:
+            return 1;
+        case PendingReset::Action::ClientResetNoRecovery:
+            return 2;
+        case PendingReset::Action::MigrateToFLX:
+            return 3;
+        case PendingReset::Action::RevertToPBS:
+            return 4;
+        default:
+            throw ClientResetFailed(util::format("Unsupported client reset action: %1 for pending reset", action));
+    }
+}
+
+PendingReset::Action to_reset_action(int64_t action)
+{
+    switch (action) {
+        case 1:
+            return PendingReset::Action::ClientReset;
+        case 2:
+            return PendingReset::Action::ClientResetNoRecovery;
+        case 3:
+            return PendingReset::Action::MigrateToFLX;
+        case 4:
+            return PendingReset::Action::RevertToPBS;
+        default:
+            return PendingReset::Action::NoAction;
+    }
+}
+
+ClientResyncMode to_resync_mode(int64_t mode)
+{
+    // Retains compatibility with v1
+    // RecoverOrDiscard is treated as Recover and is not stored
+    switch (mode) {
+        case 0: // DiscardLocal
+            return ClientResyncMode::DiscardLocal;
+        case 1: // Recover
+            return ClientResyncMode::Recover;
+        default:
+            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
+    }
+}
+
+int64_t from_resync_mode(ClientResyncMode mode)
+{
+    // Retains compatibility with v1
+    switch (mode) {
+        case ClientResyncMode::DiscardLocal:
+            return 0; // DiscardLocal
+        case ClientResyncMode::RecoverOrDiscard:
+            [[fallthrough]]; // RecoverOrDiscard is treated as Recover
+        case ClientResyncMode::Recover:
+            return 1; // Recover
+        default:
+            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
+    }
+}
+} // namespace
+
+void PendingResetStore::clear_pending_reset(Group& group)
 {
     if (auto table = group.get_table(s_meta_reset_table_name); table && !table->is_empty()) {
         table->clear();
-        return true;
     }
-    return false;
+}
+
+void PendingResetStore::remove_if_complete(Group& group, version_type version, util::Logger& logger)
+{
+    auto table = group.get_table(s_meta_reset_table_name);
+    if (!table || table->is_empty())
+        return;
+
+    auto reset_store = PendingResetStore::load_schema(group);
+    if (!reset_store) {
+        logger.info(util::LogCategory::reset, "Clearing pending reset tracker created by different core version.");
+        table->clear();
+        return;
+    }
+
+    auto reset_entry = *table->begin();
+    if (reset_entry.get<String>(reset_store->m_core_version) != REALM_VERSION_STRING) {
+        logger.info(util::LogCategory::reset, "Clearing pending reset tracker created by different core version.");
+        table->clear();
+        return;
+    }
+
+    auto target_version = version_type(reset_entry.get<Int>(reset_store->m_recovered_version));
+    if (target_version > version) {
+        logger.detail(util::LogCategory::reset, "Pending reset not complete: uploaded %1 but need to reach %2",
+                      version, target_version);
+        return;
+    }
+
+    logger.info(util::LogCategory::reset,
+                "Clearing pending reset tracker after upload of version %1 has been acknowledged by server.",
+                target_version);
+    table->clear();
 }
 
 std::optional<PendingReset> PendingResetStore::has_pending_reset(const Group& group)
@@ -86,7 +181,7 @@ std::optional<PendingReset> PendingResetStore::has_pending_reset(const Group& gr
         return std::nullopt;
     }
     auto reset_entry = *table->begin();
-    if (reset_entry.get<String>(reset_store->m_version) != REALM_VERSION_STRING) {
+    if (reset_entry.get<String>(reset_store->m_core_version) != REALM_VERSION_STRING) {
         // Previous pending reset was written by a different version, so ignore it
         return std::nullopt;
     }
@@ -113,7 +208,7 @@ void PendingResetStore::track_reset(Group& group, ClientResyncMode mode, Pending
     REALM_ASSERT(table);
     table->clear();
     table->create_object(null_key, {
-                                       {reset_store.m_version, Mixed(REALM_VERSION_STRING)},
+                                       {reset_store.m_core_version, Mixed(REALM_VERSION_STRING)},
                                        {reset_store.m_timestamp, Timestamp(std::chrono::system_clock::now())},
                                        {reset_store.m_recovery_mode, from_resync_mode(mode)},
                                        {reset_store.m_action, from_reset_action(action)},
@@ -122,12 +217,23 @@ void PendingResetStore::track_reset(Group& group, ClientResyncMode mode, Pending
                                    });
 }
 
+void PendingResetStore::set_recovered_version(Group& group, version_type version)
+{
+    auto reset_store = PendingResetStore::load_schema(group);
+    REALM_ASSERT(reset_store);
+    auto table = group.get_table(reset_store->m_pending_reset_table);
+    REALM_ASSERT(table);
+    REALM_ASSERT(!table->is_empty());
+    table->begin()->set(reset_store->m_recovered_version, int64_t(version));
+}
+
 PendingResetStore::PendingResetStore(const Group& g)
     : m_internal_tables{
           {&m_pending_reset_table,
            s_meta_reset_table_name,
            {
-               {&m_version, s_version_col_name, type_String},
+               {&m_core_version, s_core_version_col_name, type_String},
+               {&m_recovered_version, s_recovered_version_col_name, type_Int},
                {&m_timestamp, s_timestamp_col_name, type_Timestamp},
                {&m_recovery_mode, s_reset_recovery_mode_col_name, type_Int},
                {&m_action, s_reset_action_col_name, type_Int},
@@ -162,67 +268,6 @@ PendingResetStore PendingResetStore::load_or_create_schema(Group& group)
         create_sync_metadata_schema(group, &reset_store.m_internal_tables);
     }
     return reset_store;
-}
-
-int64_t PendingResetStore::from_reset_action(PendingReset::Action action)
-{
-    switch (action) {
-        case PendingReset::Action::ClientReset:
-            return 1;
-        case PendingReset::Action::ClientResetNoRecovery:
-            return 2;
-        case PendingReset::Action::MigrateToFLX:
-            return 3;
-        case PendingReset::Action::RevertToPBS:
-            return 4;
-        default:
-            throw ClientResetFailed(util::format("Unsupported client reset action: %1 for pending reset", action));
-    }
-}
-
-PendingReset::Action PendingResetStore::to_reset_action(int64_t action)
-{
-    switch (action) {
-        case 1:
-            return PendingReset::Action::ClientReset;
-        case 2:
-            return PendingReset::Action::ClientResetNoRecovery;
-        case 3:
-            return PendingReset::Action::MigrateToFLX;
-        case 4:
-            return PendingReset::Action::RevertToPBS;
-        default:
-            return PendingReset::Action::NoAction;
-    }
-}
-
-ClientResyncMode PendingResetStore::to_resync_mode(int64_t mode)
-{
-    // Retains compatibility with v1
-    // RecoverOrDiscard is treated as Recover and is not stored
-    switch (mode) {
-        case 0: // DiscardLocal
-            return ClientResyncMode::DiscardLocal;
-        case 1: // Recover
-            return ClientResyncMode::Recover;
-        default:
-            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
-    }
-}
-
-int64_t PendingResetStore::from_resync_mode(ClientResyncMode mode)
-{
-    // Retains compatibility with v1
-    switch (mode) {
-        case ClientResyncMode::DiscardLocal:
-            return 0; // DiscardLocal
-        case ClientResyncMode::RecoverOrDiscard:
-            [[fallthrough]]; // RecoverOrDiscard is treated as Recover
-        case ClientResyncMode::Recover:
-            return 1; // Recover
-        default:
-            throw ClientResetFailed(util::format("Unsupported client reset resync mode: %1 for pending reset", mode));
-    }
 }
 
 } // namespace realm::sync

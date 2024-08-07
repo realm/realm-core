@@ -46,20 +46,21 @@ bool operator==(const sync::PendingReset& lhs, const PendingReset::Action& actio
 
 class PendingResetStore {
 public:
-    // Store the pending reset tracking information - it is an error if the tracking info already
-    // exists in the store
+    // Store the pending reset tracking information. Any pre-existing tracking
+    // will be deleted and replaced with this.
     // Requires a writable transaction and changes must be committed manually
     static void track_reset(Group& group, ClientResyncMode mode, PendingReset::Action action, Status error);
+    // Record the version of the final recovered changeset that must be uploaded
+    // for a client reset to be complete. Not called for DiscardLocal or if there
+    // was nothing to recover.
+    static void set_recovered_version(Group&, version_type);
     // Clear the pending reset tracking information, if it exists
     // Requires a writable transaction and changes must be committed manually
-    // Returns true if there was anything to remove
-    static bool clear_pending_reset(Group& group);
+    static void clear_pending_reset(Group& group);
+    // Remove the pending reset tracking information if it exists and the version
+    // set with set_recovered_version() is less than or equal to version.
+    static void remove_if_complete(Group& group, version_type version, util::Logger&);
     static std::optional<PendingReset> has_pending_reset(const Group& group);
-
-    static int64_t from_reset_action(PendingReset::Action action);
-    static PendingReset::Action to_reset_action(int64_t action);
-    static ClientResyncMode to_resync_mode(int64_t mode);
-    static int64_t from_resync_mode(ClientResyncMode mode);
 
 private:
     // The instantiated class is only used internally
@@ -67,7 +68,8 @@ private:
 
     std::vector<SyncMetadataTable> m_internal_tables;
     TableKey m_pending_reset_table;
-    ColKey m_version;
+    ColKey m_core_version;
+    ColKey m_recovered_version;
     ColKey m_timestamp;
     ColKey m_recovery_mode;
     ColKey m_action;

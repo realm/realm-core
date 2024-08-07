@@ -91,7 +91,7 @@ void ClientHistory::set_history_adjustments(
         for (size_t i = 0, size = m_arrays->remote_versions.size(); i < size; ++i) {
             m_arrays->remote_versions.set(i, server_version.version);
             version_type version = m_sync_history_base_version + i;
-            logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version + 1,
+            logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version,
                          m_arrays->changesets.get(i).size(), server_version.version);
         }
     }
@@ -956,9 +956,7 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, Downloada
         // server. The situation we want to avoid is that a recovery itself causes another reset
         // which creates a reset cycle. However, at this point, upload progress has been made
         // and we can remove the cycle detection flag if there is one.
-        if (PendingResetStore::clear_pending_reset(*m_group)) {
-            logger.info(util::LogCategory::reset, "Clearing pending reset tracker after upload completion.");
-        }
+        PendingResetStore::remove_if_complete(*m_group, progress.upload.client_version, logger);
     }
 
     m_progress_download = progress.download;

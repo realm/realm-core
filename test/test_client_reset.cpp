@@ -937,35 +937,6 @@ void expect_reset(unit_test::TestContext& test_context, DBRef& target, DBRef& fr
     }
 }
 
-TEST(ClientReset_ConvertResyncMode)
-{
-    CHECK(PendingResetStore::to_resync_mode(0) == ClientResyncMode::DiscardLocal);
-    CHECK(PendingResetStore::to_resync_mode(1) == ClientResyncMode::Recover);
-    CHECK_THROW(PendingResetStore::to_resync_mode(2), sync::ClientResetFailed);
-
-    CHECK(PendingResetStore::from_resync_mode(ClientResyncMode::DiscardLocal) == 0);
-    CHECK(PendingResetStore::from_resync_mode(ClientResyncMode::RecoverOrDiscard) == 1);
-    CHECK(PendingResetStore::from_resync_mode(ClientResyncMode::Recover) == 1);
-    CHECK_THROW(PendingResetStore::from_resync_mode(ClientResyncMode::Manual), sync::ClientResetFailed);
-}
-
-TEST(ClientReset_ConvertResetAction)
-{
-    CHECK(PendingResetStore::to_reset_action(0) == sync::ProtocolErrorInfo::Action::NoAction);
-    CHECK(PendingResetStore::to_reset_action(1) == sync::ProtocolErrorInfo::Action::ClientReset);
-    CHECK(PendingResetStore::to_reset_action(2) == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery);
-    CHECK(PendingResetStore::to_reset_action(3) == sync::ProtocolErrorInfo::Action::MigrateToFLX);
-    CHECK(PendingResetStore::to_reset_action(4) == sync::ProtocolErrorInfo::Action::RevertToPBS);
-    CHECK(PendingResetStore::to_reset_action(5) == sync::ProtocolErrorInfo::Action::NoAction);
-
-    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::ClientReset) == 1);
-    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) == 2);
-    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateToFLX) == 3);
-    CHECK(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::RevertToPBS) == 4);
-    CHECK_THROW(PendingResetStore::from_reset_action(sync::ProtocolErrorInfo::Action::MigrateSchema),
-                sync::ClientResetFailed);
-}
-
 TEST_TYPES(
     ClientReset_TrackReset,
     std::integral_constant<sync::ProtocolErrorInfo::Action, sync::ProtocolErrorInfo::Action::ClientReset>,

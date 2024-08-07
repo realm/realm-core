@@ -552,6 +552,12 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, ut
                     "Immediately removing client reset tracker as there are no recovered changesets to upload.");
         sync::PendingResetStore::clear_pending_reset(*wt_local);
     }
+    else {
+        logger.debug(util::LogCategory::reset,
+                     "Marking %1 as the version which must be uploaded to complete client reset recovery.",
+                     recovered.back().version);
+        sync::PendingResetStore::set_recovered_version(*wt_local, recovered.back().version);
+    }
 
     wt_local->commit_and_continue_as_read();
 
