@@ -1064,7 +1064,12 @@ void ClientHistory::trim_sync_history()
 bool ClientHistory::no_pending_local_changes(version_type version) const
 {
     ensure_updated(version);
-    for (size_t i = 0; i < sync_history_size(); i++) {
+    size_t base_version = 0;
+    auto upload_client_version =
+        version_type(m_arrays->root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int());
+    if (upload_client_version > m_sync_history_base_version)
+        base_version = size_t(upload_client_version - m_sync_history_base_version);
+    for (size_t i = base_version; i < sync_history_size(); i++) {
         if (m_arrays->origin_file_idents.get(i) == 0) {
             std::size_t pos = 0;
             BinaryData chunk = m_arrays->changesets.get_at(i, pos);
