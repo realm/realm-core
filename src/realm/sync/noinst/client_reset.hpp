@@ -62,10 +62,6 @@ namespace _impl::client_reset {
 void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger,
                     bool allow_schema_additions);
 
-ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResyncMode mode,
-                                      sync::ProtocolErrorInfo::Action action, const std::optional<Status>& error,
-                                      util::Logger& logger);
-
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_fresh' as the source of truth.
 // If the fresh path is not provided, discard mode is assumed and all data in the local

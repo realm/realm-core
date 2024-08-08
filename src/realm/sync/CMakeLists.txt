@@ -76,6 +76,7 @@ set(NOINST_HEADERS
     noinst/integer_codec.hpp
     noinst/migration_store.hpp
     noinst/pending_bootstrap_store.hpp
+    noinst/pending_reset_store.hpp
     noinst/protocol_codec.hpp
     noinst/root_certs.hpp
     noinst/sync_metadata_schema.hpp
