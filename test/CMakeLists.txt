@@ -222,6 +222,7 @@ if(REALM_ENABLE_SYNC)
         test_util_network_ssl.cpp
         test_util_uri.cpp
         test_util_websocket.cpp
+        websocket_server.cpp
     )
 
     set(SYNC_TEST_HEADERS
@@ -230,6 +231,7 @@ if(REALM_ENABLE_SYNC)
         fuzz_tester.hpp
         peer.hpp
         sync_fixtures.hpp
+        websocket_server.hpp
     )
 
     file(GLOB SYNC_TEST_RESOURCES

@@ -29,6 +29,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/util/basic_system_errors.hpp>
+#include <realm/util/flat_map.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/string_data.hpp>
 
@@ -158,7 +159,7 @@ private:
 };
 
 /// Case-insensitive map suitable for storing HTTP headers.
-using HTTPHeaders = std::map<std::string, std::string, HeterogeneousCaseInsensitiveCompare>;
+using HTTPHeaders = util::FlatMap<std::string, std::string, HeterogeneousCaseInsensitiveCompare>;
 
 struct HTTPRequest {
     HTTPMethod method = HTTPMethod::Get;

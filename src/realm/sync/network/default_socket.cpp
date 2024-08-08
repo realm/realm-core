@@ -2,6 +2,7 @@
 
 #include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/network/network.hpp>
+#include <realm/sync/network/network_error.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/util/basic_system_errors.hpp>
@@ -38,7 +39,7 @@ public:
     {
         m_websocket.async_write_binary(data.data(), data.size(),
                                        [write_handler = std::move(handler)](std::error_code ec, size_t) {
-                                           write_handler(DefaultWebSocketImpl::get_status_from_util_error(ec));
+                                           write_handler(network::get_status_from_network_error(ec));
                                        });
     }
 
@@ -145,33 +146,6 @@ private:
     bool websocket_binary_message_received(const char* ptr, std::size_t size) override
     {
         return m_observer->websocket_binary_message_received(util::Span<const char>(ptr, size));
-    }
-
-    static Status get_status_from_util_error(std::error_code ec)
-    {
-        if (!ec) {
-            return Status::OK();
-        }
-        switch (ec.value()) {
-            case util::error::operation_aborted:
-                return {ErrorCodes::Error::OperationAborted, "Write operation cancelled"};
-            case util::error::address_family_not_supported:
-                [[fallthrough]];
-            case util::error::invalid_argument:
-                return {ErrorCodes::Error::InvalidArgument, ec.message()};
-            case util::error::no_memory:
-                return {ErrorCodes::Error::OutOfMemory, ec.message()};
-            case util::error::connection_aborted:
-                [[fallthrough]];
-            case util::error::connection_reset:
-                [[fallthrough]];
-            case util::error::broken_pipe:
-                [[fallthrough]];
-            case util::error::resource_unavailable_try_again:
-                return {ErrorCodes::Error::ConnectionClosed, ec.message()};
-            default:
-                return {ErrorCodes::Error::UnknownError, ec.message()};
-        }
     }
 
     void initiate_resolve();
