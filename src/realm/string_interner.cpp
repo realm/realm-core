@@ -374,7 +374,9 @@ void StringInterner::rebuild_internal()
             continue;
         }
         if (auto& w = m_decompressed_strings[id - 1].m_weight) {
-            w = w >> 1;
+            auto val = w.load(std::memory_order_acquire);
+            val = val >> 1;
+            w.store(val, std::memory_order_release);
         }
         else {
             m_decompressed_strings[id - 1].m_decompressed.reset();
@@ -394,7 +396,7 @@ void StringInterner::rebuild_internal()
     for (size_t idx = 0; idx < m_compressed_leafs.size(); ++idx) {
         auto ref = m_data.get_as_ref(idx);
         auto& leaf_meta = m_compressed_leafs[idx];
-        leaf_meta.m_is_loaded = false;
+        leaf_meta.m_is_loaded.store(false, std::memory_order_release);
         leaf_meta.m_compressed.clear();
         leaf_meta.m_leaf_ref = ref;
     }
@@ -461,7 +463,7 @@ StringID StringInterner::intern(StringData sd)
             }
             m_current_string_leaf.destroy();
             // force later reload of leaf
-            m_compressed_leafs.back().m_is_loaded = false;
+            m_compressed_leafs.back().m_is_loaded.store(false, std::memory_order_release);
         }
     }
     if (m_current_long_string_node.is_attached()) {
