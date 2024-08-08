@@ -126,6 +126,23 @@ ClientHistory& get_history(DBRef db)
     return get_replication(db).get_history();
 }
 
+Changeset get_reciprocal_changeset(ClientHistory& hist, version_type version)
+{
+    bool is_compressed = false;
+    auto data = hist.get_reciprocal_transform(version, is_compressed);
+    Changeset reciprocal_changeset;
+    ChunkedBinaryInputStream in{data};
+    if (is_compressed) {
+        size_t total_size;
+        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
+        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
+    }
+    else {
+        sync::parse_changeset(in, reciprocal_changeset); // Throws
+    }
+    return reciprocal_changeset;
+}
+
 #if !REALM_MOBILE // the server is not implemented on devices
 TEST(Sync_BadVirtualPath)
 {
@@ -6925,19 +6942,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
-    bool is_compressed = false;
-    auto data = history.get_reciprocal_transform(latest_local_version, is_compressed);
-    Changeset reciprocal_changeset;
-    ChunkedBinaryInputStream in{data};
-    if (is_compressed) {
-        size_t total_size;
-        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
-        CHECK(decompressed);
-        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
-    }
-    else {
-        sync::parse_changeset(in, reciprocal_changeset); // Throws
-    }
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
     // The only instruction in the reciprocal changeset was discarded during OT.
     CHECK(reciprocal_changeset.empty());
 }
@@ -6982,7 +6987,7 @@ TEST(Sync_SetEmptyReciprocalChangesetAfterNonEmptyReciprocalChangeset)
     }();
 
     // Create remote changeset (erase at the same index) that:
-    //  1. Updates the size of the first local update
+    //  1. Updates the prior_size of the first local update
     //  2. Discards the second local update
     // After OT, we end up with two reciprocal changesets: a non-empty
     // and an empty one.
@@ -7019,20 +7024,15 @@ TEST(Sync_SetEmptyReciprocalChangesetAfterNonEmptyReciprocalChangeset)
     history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
-    bool is_compressed = false;
-    auto data = history.get_reciprocal_transform(latest_local_version, is_compressed);
-    Changeset reciprocal_changeset;
-    ChunkedBinaryInputStream in{data};
-    if (is_compressed) {
-        size_t total_size;
-        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
-        CHECK(decompressed);
-        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
-    }
-    else {
-        sync::parse_changeset(in, reciprocal_changeset); // Throws
-    }
-    // The only instruction in the reciprocal changeset was discarded during OT.
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
+    // The second reciprocal changeset is empty.
     CHECK(reciprocal_changeset.empty());
 }
 
@@ -7138,7 +7138,8 @@ TEST(Sync_GetEmptyReciprocalChangesetFromCache)
 
     SyncProgress progress = {};
     progress.download.server_version = server_changesets.back().version;
-    progress.download.last_integrated_client_version = server_changesets.back().last_integrated_remote_version;
+    // Prevent history being trimmed when server changes are integrated so we can verify the reciprocal changesets.
+    progress.download.last_integrated_client_version = server_changesets.front().last_integrated_remote_version;
     progress.latest_server_version.version = server_changesets.back().version;
     progress.latest_server_version.salt = 0x7876543217654321;
 
@@ -7153,6 +7154,16 @@ TEST(Sync_GetEmptyReciprocalChangesetFromCache)
     auto dict = tr->get_table("class_table")->get_object_with_primary_key(42).get_dictionary("dict");
     CHECK(!dict.is_empty());
     CHECK(dict.get("key") == -6);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+    // The second reciprocal changeset is empty.
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
+    CHECK(reciprocal_changeset.empty());
 }
 
 TEST(Sync_GetEmptyReciprocalChangesetFromArray)
@@ -7255,9 +7266,11 @@ TEST(Sync_GetEmptyReciprocalChangesetFromArray)
                                                changeset.origin_file_ident);
 
         SyncProgress progress = {};
-        progress.download.server_version = server_changesets.back().version;
-        progress.download.last_integrated_client_version = server_changesets.back().last_integrated_remote_version;
-        progress.latest_server_version.version = server_changesets.back().version;
+        progress.download.server_version = changeset.version;
+        // Prevent history being trimmed when server changes are integrated so we can verify the reciprocal
+        // changesets.
+        progress.download.last_integrated_client_version = server_changesets.front().last_integrated_remote_version;
+        progress.latest_server_version.version = changeset.version;
         progress.latest_server_version.salt = 0x7876543217654321;
 
         uint_fast64_t downloadable_bytes = 0;
@@ -7272,6 +7285,16 @@ TEST(Sync_GetEmptyReciprocalChangesetFromArray)
     auto dict = tr->get_table("class_table")->get_object_with_primary_key(42).get_dictionary("dict");
     CHECK(!dict.is_empty());
     CHECK(dict.get("key") == -6);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+    // The second reciprocal changeset is empty.
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
+    CHECK(reciprocal_changeset.empty());
 }
 
 TEST(Sync_InvalidChangesetFromServer)
