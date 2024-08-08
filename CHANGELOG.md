@@ -21,7 +21,7 @@
 -----------
 
 ### Internals
-* None.
+* Added test to verify upload progress notification reporting during a client reset. [PR #7958](https://github.com/realm/realm-core/pull/7958)
 
 ----------------------------------------------
 
