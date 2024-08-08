@@ -126,6 +126,23 @@ ClientHistory& get_history(DBRef db)
     return get_replication(db).get_history();
 }
 
+Changeset get_reciprocal_changeset(ClientHistory& hist, version_type version)
+{
+    bool is_compressed = false;
+    auto data = hist.get_reciprocal_transform(version, is_compressed);
+    Changeset reciprocal_changeset;
+    ChunkedBinaryInputStream in{data};
+    if (is_compressed) {
+        size_t total_size;
+        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
+        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
+    }
+    else {
+        sync::parse_changeset(in, reciprocal_changeset); // Throws
+    }
+    return reciprocal_changeset;
+}
+
 #if !REALM_MOBILE // the server is not implemented on devices
 TEST(Sync_BadVirtualPath)
 {
@@ -6890,8 +6907,8 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     }();
 
     // Create changeset which moves element from index 7 to index 0 in array.
-    // This changeset will discard the previous move (reciprocal changeset), leaving the local reciprocal changesets
-    // with no instructions (empty).
+    // This changeset will discard the previous move (reciprocal changeset),
+    // leaving the local reciprocal changeset with no instructions (empty).
     Changeset changeset;
     ArrayMove instr;
     instr.table = changeset.intern_string("table");
@@ -6915,7 +6932,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
 
     SyncProgress progress = {};
     progress.download.server_version = changeset.version;
-    progress.download.last_integrated_client_version = latest_local_version - 1;
+    progress.download.last_integrated_client_version = changeset.last_integrated_remote_version;
     progress.latest_server_version.version = changeset.version;
     progress.latest_server_version.salt = 0x7876543217654321;
 
@@ -6925,20 +6942,358 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
-    bool is_compressed = false;
-    auto data = history.get_reciprocal_transform(latest_local_version, is_compressed);
-    Changeset reciprocal_changeset;
-    ChunkedBinaryInputStream in{data};
-    if (is_compressed) {
-        size_t total_size;
-        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
-        CHECK(decompressed);
-        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
-    }
-    else {
-        sync::parse_changeset(in, reciprocal_changeset); // Throws
-    }
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
     // The only instruction in the reciprocal changeset was discarded during OT.
+    CHECK(reciprocal_changeset.empty());
+}
+
+TEST(Sync_SetEmptyReciprocalChangesetAfterNonEmptyReciprocalChangeset)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        // Create schema: single table with array of ints as property.
+        tr->add_table_with_primary_key("class_table", type_Int, "_id")->add_column_list(type_Int, "ints");
+        tr->commit_and_continue_writing();
+
+        // Create object and initialize array.
+        TableRef table = tr->get_table("class_table");
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        ints.insert(0, 1);
+        ints.insert(1, 2);
+        ints.insert(2, 3);
+        tr->commit_and_continue_writing();
+
+        // Update two elements in the list.
+
+        ints.set_any(2, Mixed{4});
+        tr->commit_and_continue_writing();
+
+        ints.set_any(0, Mixed{5});
+        return tr->commit();
+    }();
+
+    // Create remote changeset (erase at the same index) that:
+    //  1. Updates the prior_size of the first local update
+    //  2. Discards the second local update
+    // After OT, we end up with two reciprocal changesets: a non-empty
+    // and an empty one.
+    Changeset changeset;
+    ArrayErase instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.prior_size = 3;
+    instr.path.push_back(0);
+    changeset.push_back(instr);
+    changeset.version = 1;
+    // Make it so the merging window contains the last two local updates.
+    changeset.last_integrated_remote_version = latest_local_version - 2;
+    changeset.origin_timestamp = timestamp;
+    changeset.origin_file_ident = 2;
+
+    ChangesetEncoder::Buffer encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
+    encode_changeset(changeset, encoded);
+    server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                           BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
+                                           changeset.origin_file_ident);
+
+    SyncProgress progress = {};
+    progress.download.server_version = changeset.version;
+    progress.download.last_integrated_client_version = changeset.last_integrated_remote_version;
+    progress.latest_server_version.version = changeset.version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, *test_context.logger, transact);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
+    // The second reciprocal changeset is empty.
+    CHECK(reciprocal_changeset.empty());
+}
+
+TEST(Sync_GetEmptyReciprocalChangesetFromCache)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        // Create schema
+        TableRef table = tr->add_table_with_primary_key("class_table", type_Int, "_id");
+        table->add_column_list(type_Int, "ints");
+        table->add_column_dictionary(type_Int, "dict");
+        tr->commit_and_continue_writing();
+
+        // Create object
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        ints.insert(0, 1);
+        ints.insert(1, 2);
+        ints.insert(2, 3);
+        tr->commit_and_continue_writing();
+
+        // Update list
+        ints.set_any(2, Mixed{4});
+        tr->commit_and_continue_writing();
+
+        // Update dictionary
+        auto dict = obj.get_dictionary("dict");
+        dict.insert("key", 42);
+        return tr->commit();
+    }();
+
+    std::vector<Changeset> server_changesets;
+    // Create remote changeset that updates the list and discards
+    // the (local) dictionary update.
+    Changeset changeset;
+    ArrayErase instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.prior_size = 3;
+    instr.path.push_back(0);
+    changeset.push_back(instr);
+    Update instr2;
+    instr2.table = changeset.intern_string("table");
+    instr2.object = instr::PrimaryKey{42};
+    instr2.field = changeset.intern_string("dict");
+    auto key = changeset.intern_string("key2");
+    instr2.path.push_back(key);
+    instr2.value = Payload{int64_t(0)};
+    changeset.push_back(instr2);
+    Clear instr3;
+    instr3.table = changeset.intern_string("table");
+    instr3.object = instr::PrimaryKey{42};
+    instr3.field = changeset.intern_string("dict");
+    instr3.collection_type = instr::CollectionType::Dictionary;
+    changeset.push_back(instr3);
+    changeset.version = 1;
+    // Make it so the merging window contains the last two local updates.
+    changeset.last_integrated_remote_version = latest_local_version - 2;
+    changeset.origin_timestamp = timestamp - 2;
+    changeset.origin_file_ident = 2;
+    server_changesets.push_back(changeset);
+
+    // Create changeset that inserts the same key as the local (discarded) update.
+    Changeset changeset2;
+    Update instr4;
+    instr4.table = changeset2.intern_string("table");
+    instr4.object = instr::PrimaryKey{42};
+    instr4.field = changeset2.intern_string("dict");
+    key = changeset2.intern_string("key");
+    instr4.path.push_back(key);
+    instr4.value = Payload{int64_t(-6)};
+    changeset2.push_back(instr4);
+    changeset2.version = 2;
+    // Make it so the merging window contains the local dictionary update.
+    changeset2.last_integrated_remote_version = latest_local_version - 1;
+    changeset2.origin_timestamp = timestamp - 1;
+    changeset2.origin_file_ident = 2;
+    server_changesets.push_back(changeset2);
+
+    std::vector<ChangesetEncoder::Buffer> encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
+    for (const auto& changeset : server_changesets) {
+        encoded.emplace_back();
+        encode_changeset(changeset, encoded.back());
+        server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                               BinaryData(encoded.back().data(), encoded.back().size()),
+                                               changeset.origin_timestamp, changeset.origin_file_ident);
+    }
+
+    SyncProgress progress = {};
+    progress.download.server_version = server_changesets.back().version;
+    // Prevent history being trimmed when server changes are integrated so we can verify the reciprocal changesets.
+    progress.download.last_integrated_client_version = server_changesets.front().last_integrated_remote_version;
+    progress.latest_server_version.version = server_changesets.back().version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, *test_context.logger, transact);
+
+    // The remote dictionary update persists.
+    auto tr = db->start_read();
+    auto dict = tr->get_table("class_table")->get_object_with_primary_key(42).get_dictionary("dict");
+    CHECK(!dict.is_empty());
+    CHECK(dict.get("key") == -6);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+    // The second reciprocal changeset is empty.
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
+    CHECK(reciprocal_changeset.empty());
+}
+
+TEST(Sync_GetEmptyReciprocalChangesetFromArray)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        // Create schema
+        TableRef table = tr->add_table_with_primary_key("class_table", type_Int, "_id");
+        table->add_column_list(type_Int, "ints");
+        table->add_column_dictionary(type_Int, "dict");
+        tr->commit_and_continue_writing();
+
+        // Create object
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        ints.insert(0, 1);
+        ints.insert(1, 2);
+        ints.insert(2, 3);
+        tr->commit_and_continue_writing();
+
+        // Update list
+        ints.set_any(2, Mixed{4});
+        tr->commit_and_continue_writing();
+
+        // Update dictionary
+        auto dict = obj.get_dictionary("dict");
+        dict.insert("key", 42);
+        return tr->commit();
+    }();
+
+    std::vector<Changeset> server_changesets;
+    // Create remote changeset that updates the list and discards
+    // the (local) dictionary update.
+    Changeset changeset;
+    ArrayErase instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.prior_size = 3;
+    instr.path.push_back(0);
+    changeset.push_back(instr);
+    Update instr2;
+    instr2.table = changeset.intern_string("table");
+    instr2.object = instr::PrimaryKey{42};
+    instr2.field = changeset.intern_string("dict");
+    auto key = changeset.intern_string("key2");
+    instr2.path.push_back(key);
+    instr2.value = Payload{int64_t(0)};
+    changeset.push_back(instr2);
+    Clear instr3;
+    instr3.table = changeset.intern_string("table");
+    instr3.object = instr::PrimaryKey{42};
+    instr3.field = changeset.intern_string("dict");
+    instr3.collection_type = instr::CollectionType::Dictionary;
+    changeset.push_back(instr3);
+    changeset.version = 1;
+    // Make it so the merging window contains the last two local updates.
+    changeset.last_integrated_remote_version = latest_local_version - 2;
+    changeset.origin_timestamp = timestamp - 2;
+    changeset.origin_file_ident = 2;
+    server_changesets.push_back(changeset);
+
+    // Create changeset that inserts the same key as the local (discarded) update.
+    Changeset changeset2;
+    Update instr4;
+    instr4.table = changeset2.intern_string("table");
+    instr4.object = instr::PrimaryKey{42};
+    instr4.field = changeset2.intern_string("dict");
+    key = changeset2.intern_string("key");
+    instr4.path.push_back(key);
+    instr4.value = Payload{int64_t(-6)};
+    changeset2.push_back(instr4);
+    changeset2.version = 2;
+    // Make it so the merging window contains the local dictionary update.
+    changeset2.last_integrated_remote_version = latest_local_version - 1;
+    changeset2.origin_timestamp = timestamp - 1;
+    changeset2.origin_file_ident = 2;
+    server_changesets.push_back(changeset2);
+
+    std::vector<RemoteChangeset> server_changesets_encoded;
+    for (const auto& changeset : server_changesets) {
+        ChangesetEncoder::Buffer encoded;
+        encode_changeset(changeset, encoded);
+        server_changesets_encoded.clear();
+        server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                               BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
+                                               changeset.origin_file_ident);
+
+        SyncProgress progress = {};
+        progress.download.server_version = changeset.version;
+        // Prevent history being trimmed when server changes are integrated so we can verify the reciprocal
+        // changesets.
+        progress.download.last_integrated_client_version = server_changesets.front().last_integrated_remote_version;
+        progress.latest_server_version.version = changeset.version;
+        progress.latest_server_version.salt = 0x7876543217654321;
+
+        uint_fast64_t downloadable_bytes = 0;
+        VersionInfo version_info;
+        auto transact = db->start_read();
+        history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
+                                            DownloadBatchState::SteadyState, *test_context.logger, transact);
+    }
+
+    // The remote dictionary update persists.
+    auto tr = db->start_read();
+    auto dict = tr->get_table("class_table")->get_object_with_primary_key(42).get_dictionary("dict");
+    CHECK(!dict.is_empty());
+    CHECK(dict.get("key") == -6);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+    // The second reciprocal changeset is empty.
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
     CHECK(reciprocal_changeset.empty());
 }
 
