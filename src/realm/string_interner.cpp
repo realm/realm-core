@@ -365,7 +365,6 @@ void StringInterner::update_from_parent(bool writable)
 
 void StringInterner::rebuild_internal()
 {
-    // std::lock_guard lock(m_mutex);
     // release old decompressed strings
     for (size_t idx = 0; idx < m_in_memory_strings.size(); ++idx) {
         StringID id = m_in_memory_strings[idx];
@@ -406,7 +405,6 @@ StringInterner::~StringInterner() {}
 StringID StringInterner::intern(StringData sd)
 {
     REALM_ASSERT(m_top.is_attached());
-    //  std::lock_guard lock(m_mutex);
     //  special case for null string
     if (sd.data() == nullptr)
         return 0;
@@ -428,7 +426,6 @@ StringID StringInterner::intern(StringData sd)
     REALM_ASSERT_DEBUG(index == id - 1);
     bool need_long_string_node = c_str.size() >= 65536;
 
-    // TODO: update_internal must set up m_current_long_string_node if it is in use
     if (need_long_string_node && !m_current_long_string_node.is_attached()) {
 
         m_current_long_string_node.create(NodeHeader::type_HasRefs);
@@ -597,6 +594,8 @@ CompressedStringView& StringInterner::get_compressed(StringID id, bool lock_if_m
     auto hi = index >> 8;
     auto lo = index & 0xFFUL;
 
+    // This is an instance of the "double checked locking" idiom, chosen to minimize
+    // locking in the common case of the leaf already being fully initialized.
     DataLeaf& leaf = m_compressed_leafs[hi];
     if (leaf.m_is_loaded.load(std::memory_order_acquire)) {
         return leaf.m_compressed[lo];
@@ -618,7 +617,6 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
         // "dead" mode
         return {};
     }
-    // std::lock_guard lock(m_mutex);
     if (sd.data() == nullptr)
         return 0;
     uint32_t h = (uint32_t)sd.hash();
@@ -641,8 +639,7 @@ int StringInterner::compare(StringID A, StringID B)
     if (B == 0)
         return 1;
     // ok, no nulls.
-    // std::lock_guard lock(m_mutex);
-    //  0 is null, the first index starts from 1.
+    // StringID 0 is null, the first true index starts from 1.
     REALM_ASSERT_DEBUG(A <= m_decompressed_strings.size());
     REALM_ASSERT_DEBUG(B <= m_decompressed_strings.size());
     REALM_ASSERT(m_compressor);
@@ -659,7 +656,6 @@ int StringInterner::compare(StringData s, StringID A)
     if (A == 0)
         return 1;
     // ok, no nulls
-    // std::lock_guard lock(m_mutex);
     REALM_ASSERT_DEBUG(A <= m_decompressed_strings.size());
     REALM_ASSERT(m_compressor);
     return m_compressor->compare(s, get_compressed(A, true));
@@ -672,6 +668,9 @@ StringData StringInterner::get(StringID id)
     if (id == 0)
         return StringData{nullptr};
     REALM_ASSERT_DEBUG(id <= m_decompressed_strings.size());
+
+    // Avoid taking a lock in the (presumably) common case, where the leaf with the compressed
+    // strings have already been loaded. Such leafs have "m_weight" > 0.
     CachedString& cs = m_decompressed_strings[id - 1];
     if (auto weight = cs.m_weight.load(std::memory_order_acquire)) {
         REALM_ASSERT_DEBUG(cs.m_decompressed);

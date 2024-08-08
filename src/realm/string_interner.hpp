@@ -54,13 +54,23 @@ struct CachedString {
 
 class StringInterner {
 public:
-    // To be used exclusively from Table
+    // Use of the StringInterner must honour the restrictions on concurrency given
+    // below. Currently this is ensured by only using concurrent access on frozen
+    // objects.
+    //
+    // Limitations wrt concurrency:
+    //
+    // To be used exclusively from Table and in a non-concurrent setting:
     StringInterner(Allocator& alloc, Array& parent, ColKey col_key, bool writable);
     void update_from_parent(bool writable);
     ~StringInterner();
 
-    // To be used from Obj and for searching
+    // To be used from Obj within a write transaction or during commit.
+    // To be used only in a non-concurrent setting:
     StringID intern(StringData);
+
+    // The following four methods can be used in a concurrent setting with each other,
+    // but not concurrently with any of the above methods.
     std::optional<StringID> lookup(StringData);
     int compare(StringID A, StringID B);
     int compare(StringData, StringID A);
@@ -98,7 +108,8 @@ private:
     std::vector<CachedString> m_decompressed_strings;
     std::vector<StringID> m_in_memory_strings;
     // Mutual exclusion is needed for frozen transactions only. Live objects are
-    // only used in single threaded contexts so don't need them. For now, just use always.
+    // only used in single threaded contexts so don't need them. For now, we don't
+    // distinguish, assuming that locking is sufficiently low in both scenarios.
     std::mutex m_mutex;
 };
 } // namespace realm
