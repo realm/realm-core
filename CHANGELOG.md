@@ -13,7 +13,7 @@
 * Fixed bug which would prevent eventual consistency during conflict resolution. Affected clients would experience data divergence and potentially consistency errors as a result. ([PR #7955](https://github.com/realm/realm-core/pull/7955), since v14.8.0)
 
 ### Breaking changes
-* None.
+* Progress notifications that would previously report transferrable and transferred values of 0 are no longer being reported. ([PR #7971](https://github.com/realm/realm-core/pull/7971))
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
