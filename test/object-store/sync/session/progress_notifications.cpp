@@ -160,12 +160,42 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
         REQUIRE_FALSE(callback_was_called);
     }
 
+    SECTION("callback is not invoked for empty progress") {
+        bool is_streaming = GENERATE(true, false);
+        auto direction = GENERATE(NotifierType::upload, NotifierType::download);
+        bool callback_was_called = false;
+        SECTION("registered when latest progress was empty") {
+            progress.update(0, 0, 0, 0, 1, 1.0, 1.0, 0);
+            progress.register_callback(
+                [&](auto, auto, double) {
+                    callback_was_called = true;
+                },
+                direction, is_streaming, 0);
+            REQUIRE_FALSE(callback_was_called);
+        }
+
+        SECTION("received empty progress update") {
+            progress.register_callback(
+                [&](auto, auto, double) {
+                    callback_was_called = true;
+                },
+                direction, is_streaming, 0);
+            REQUIRE_FALSE(callback_was_called);
+            progress.update(0, 0, 0, 0, 1, 0.0, 0.0, 0);
+            REQUIRE_FALSE(callback_was_called);
+        }
+
+        // Verify notifications are received if not empty
+        progress.update(0, 20, 0, 10, 1, 0.0, 0.0, 0);
+        REQUIRE(callback_was_called);
+    }
+
     SECTION("callback is invoked immediately when a progress update has already occurred") {
         progress.set_local_version(1);
-        progress.update(0, 0, 0, 0, 1, 0.0, 0.0, 0);
+        progress.update(100, 200, 50, 100, 1, 0.5, 0.5, 0);
 
         bool callback_was_called = false;
-        SECTION("for upload notifications, with no data transfer ongoing") {
+        SECTION("for upload notifications") {
             double estimate = 0.0;
             progress.register_callback(
                 [&](auto, auto, double ep) {
@@ -174,10 +204,10 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                 },
                 NotifierType::upload, false, 0);
             REQUIRE(callback_was_called);
-            REQUIRE(estimate == 0.0);
+            REQUIRE(estimate == 0.5);
         }
 
-        SECTION("for download notifications, with no data transfer ongoing") {
+        SECTION("for download notifications") {
             double estimate = 0.0;
             progress.register_callback(
                 [&](auto, auto, double ep) {
@@ -185,7 +215,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                     estimate = ep;
                 },
                 NotifierType::download, false, 0);
-            REQUIRE(estimate == 0.0);
+            REQUIRE(estimate == 0.5);
             REQUIRE(callback_was_called);
         }
 
@@ -206,7 +236,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
     }
 
     SECTION("callback is invoked after each update for streaming notifiers") {
-        progress.update(0, 0, 0, 0, 1, 0.0, 0.0, 0);
+        progress.update(0, 100, 100, 100, 1, 0.0, 1.0, 0);
 
         bool callback_was_called = false;
         uint64_t transferred = 0;
@@ -893,7 +923,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                 TestInputValue{2, 0.6, 900, 1000},
                 TestInputValue{2, 1, 1000, 1000},
             }, {
-                ProgressEntry{0, 0, 0},
                 ProgressEntry{200, 200, 1},
                 ProgressEntry{300, 600, 0.2},
                 ProgressEntry{400, 600, 0.4},
