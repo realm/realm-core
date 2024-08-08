@@ -8,7 +8,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed an "invalid column key" exception when using a RQL "BETWEEN" query on an int or timestamp property across links. ([#7935](https://github.com/realm/realm-core/issues/7935), since v14.10.1)
 
 ### Breaking changes
 * None.
@@ -171,7 +171,7 @@
 
 ### Enhancements
 * It is no longer an error to set a base url for an App with a trailing slash - for example, `https://services.cloud.mongodb.com/` instead of `https://services.cloud.mongodb.com` - before this change that would result in a 404 error from the server ([PR #7791](https://github.com/realm/realm-core/pull/7791)).
-* Performance has been improved for range queries on integers and timestamps. Requires that you use the "BETWEEN" operation in MQL or the Query::between() method when you build the query. (PR [#7785](https://github.com/realm/realm-core/pull/7785))
+* Performance has been improved for range queries on integers and timestamps. Requires that you use the "BETWEEN" operation in RQL or the Query::between() method when you build the query. (PR [#7785](https://github.com/realm/realm-core/pull/7785))
 * Expose `Obj::add_int()` in the bindgen spec. ([PR #7797](https://github.com/realm/realm-core/pull/7797)).
 
 ### Fixed
