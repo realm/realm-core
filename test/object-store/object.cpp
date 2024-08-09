@@ -155,6 +155,80 @@ public:
     mutable CreatePolicy last_create_policy;
 };
 
+TEST_CASE("object with flexible schema") {
+    using namespace std::string_literals;
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
+    config.flexible_schema = true;
+    config.schema = Schema{{
+        "table",
+        {
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
+        },
+    }};
+
+    config.schema_version = 0;
+    auto r = Realm::get_shared_realm(config);
+    auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
+
+    TestContext d(r);
+
+    SECTION("add_notification_callback()") {
+        auto table = r->read_group().get_table("class_table");
+        std::vector<int64_t> pks = {3, 4, 7, 9, 10, 21, 24, 34, 42, 50};
+        r->begin_transaction();
+        for (int i = 0; i < 10; ++i)
+            table->create_object_with_primary_key(pks[i]).set("value 1", i).set("value 2", i);
+        r->commit_transaction();
+
+        auto r2 = coordinator.get_realm();
+
+        CollectionChangeSet change;
+        auto obj = *table->begin();
+        Object object(r, obj);
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+        };
+
+        auto require_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
+            auto token = object.add_notification_callback(
+                [&](CollectionChangeSet c) {
+                    change = c;
+                },
+                key_path_array);
+            advance_and_notify(*r);
+            return token;
+        };
+
+        SECTION("modifying the object sends a change notification") {
+            auto token = require_change(object);
+
+            write([&] {
+                obj.set("value 1", 10);
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            CHECK(change.columns.size() == 0);
+            REQUIRE(change.additional_properties.size() == 1);
+            REQUIRE_INDICES(change.additional_properties["value 1"], 0);
+
+            write([&] {
+                obj.set("value 2", 10);
+            });
+            CHECK(change.columns.size() == 0);
+            REQUIRE(change.additional_properties.size() == 1);
+            REQUIRE_INDICES(change.additional_properties["value 2"], 0);
+        }
+    }
+}
+
 TEST_CASE("object") {
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();

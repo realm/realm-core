@@ -299,6 +299,11 @@ struct ObjectMutationObserver : _impl::NoOpTransactionLogParser {
         CHECK(expected_modifications.erase(std::tuple(get_current_table(), obj, col)));
         return true;
     }
+    bool modify_object(std::string&&, ObjKey)
+    {
+        // CHECK(expected_modifications.erase(std::tuple(get_current_table(), obj, col)));
+        return true;
+    }
     bool remove_object(ObjKey)
     {
         return true;

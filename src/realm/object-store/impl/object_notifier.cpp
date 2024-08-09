@@ -106,7 +106,12 @@ void ObjectNotifier::run()
 
     // Finally we add all changes to `m_change` which is later used to notify about the changed columns.
     m_change.modifications.add(0);
-    for (auto col : *column_modifications) {
-        m_change.columns[col.value].add(0);
+    for (auto prop : *column_modifications) {
+        if (prop.is_col()) {
+            m_change.columns[prop.get_col().value].add(0);
+        }
+        else {
+            m_change.additional_properties[prop.get_name()].add(0);
+        }
     }
 }

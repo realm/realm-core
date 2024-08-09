@@ -168,6 +168,10 @@ public:
     {
         return true;
     }
+    bool modify_object(const std::string&, ObjKey)
+    {
+        return true;
+    }
 
     // Must have descriptor selected:
     bool insert_column(ColKey)
@@ -240,6 +244,7 @@ public:
         return true;
     }
     bool modify_object(ColKey col_key, ObjKey key);
+    bool modify_object(StringData prop_name, ObjKey key);
 
     // Must have descriptor selected:
     bool insert_column(ColKey col_key);
@@ -324,7 +329,7 @@ private:
     void append_simple_instr(L... numbers);
 
     template <typename... L>
-    void append_string_instr(Instruction, StringData);
+    void append_string_instr(Instruction, StringData, L... numbers);
 
     template <class T>
     static char* encode_int(char*, T value);
@@ -574,15 +579,17 @@ void TransactLogEncoder::append_simple_instr(L... numbers)
 }
 
 template <typename... L>
-void TransactLogEncoder::append_string_instr(Instruction instr, StringData string)
+void TransactLogEncoder::append_string_instr(Instruction instr, StringData string, L... numbers)
 {
-    size_t max_required_bytes = 1 + max_enc_bytes_per_int + string.size();
+    size_t max_required_bytes = 1 + max_enc_bytes_per_int + string.size() + max_size_list(numbers...);
+    ;
     char* ptr = reserve(max_required_bytes); // Throws
     *ptr++ = char(instr);
-    ptr = encode(ptr, int(type_String));
+    ptr = encode(ptr, ColKey{}.value);
     ptr = encode(ptr, size_t(string.size()));
     ptr = std::copy(string.data(), string.data() + string.size(), ptr);
     advance(ptr);
+    encode_list(ptr, numbers...);
 }
 
 inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key)
@@ -624,6 +631,12 @@ inline bool TransactLogEncoder::rename_column(ColKey col_key)
 inline bool TransactLogEncoder::modify_object(ColKey col_key, ObjKey key)
 {
     append_simple_instr(instr_Set, col_key, key); // Throws
+    return true;
+}
+
+inline bool TransactLogEncoder::modify_object(StringData prop_name, ObjKey key)
+{
+    append_string_instr(instr_Set, prop_name, key); // Throws
     return true;
 }
 
@@ -697,9 +710,20 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     switch (instr) {
         case instr_Set: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
+            StringData prop;
+            if (!col_key) {
+                // Setting an additional property
+                prop = read_string(m_string_buffer);
+            }
             ObjKey key(read_int<int64_t>());              // Throws
-            if (!handler.modify_object(col_key, key))     // Throws
-                parser_error();
+            if (col_key) {
+                if (!handler.modify_object(col_key, key)) // Throws
+                    parser_error();
+            }
+            else {
+                if (!handler.modify_object(std::string(prop), key)) // Throws
+                    parser_error();
+            }
             return;
         }
         case instr_SetDefault:
@@ -1058,6 +1082,10 @@ public:
         return false;
     }
     bool modify_object(ColKey, ObjKey)
+    {
+        return false;
+    }
+    bool modify_object(std::string&&, ObjKey)
     {
         return false;
     }

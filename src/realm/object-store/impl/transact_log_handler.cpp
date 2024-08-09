@@ -113,7 +113,7 @@ void KVOAdapter::before(Transaction& sg)
         auto column_modifications = table.get_columns_modified(key);
         if (column_modifications) {
             for (auto col : *column_modifications) {
-                observer.changes[col.value].kind = BindingContext::ColumnInfo::Kind::Set;
+                observer.changes[col.get_col().value].kind = BindingContext::ColumnInfo::Kind::Set;
             }
         }
     }
@@ -322,6 +322,10 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     {
         return true;
     }
+    bool modify_object(const std::string&, ObjKey)
+    {
+        return true;
+    }
     bool select_collection(ColKey, ObjKey, const StablePath&)
     {
         return true;
@@ -465,6 +469,13 @@ public:
     {
         if (m_active_table)
             m_active_table->modifications_add(key, col);
+        return true;
+    }
+
+    bool modify_object(std::string&& prop_name, ObjKey key)
+    {
+        if (m_active_table)
+            m_active_table->modifications_add(key, std::move(prop_name));
         return true;
     }
 

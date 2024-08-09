@@ -20,6 +20,8 @@
 
 using namespace realm;
 
+std::string ObjectChangeSet::KeyOrString::empty_string;
+
 void ObjectChangeSet::insertions_add(ObjKey obj)
 {
     m_insertions.insert(obj);
@@ -30,6 +32,14 @@ void ObjectChangeSet::modifications_add(ObjKey obj, ColKey col)
     // don't report modifications on new objects
     if (m_insertions.find(obj) == m_insertions.end()) {
         m_modifications[obj].insert(col);
+    }
+}
+
+void ObjectChangeSet::modifications_add(ObjKey obj, std::string&& prop_name)
+{
+    // don't report modifications on new objects
+    if (m_insertions.find(obj) == m_insertions.end()) {
+        m_modifications[obj].insert(std::move(prop_name));
     }
 }
 
@@ -82,7 +92,7 @@ bool ObjectChangeSet::modifications_contains(ObjKey obj, const std::vector<ColKe
     }
 
     // If a filter was set we need to check if the changed column is part of this filter.
-    const std::unordered_set<ColKey>& changed_columns_for_object = m_modifications.at(obj);
+    const std::unordered_set<KeyOrString>& changed_columns_for_object = m_modifications.at(obj);
     for (const auto& column_key_in_filter : filtered_column_keys) {
         if (changed_columns_for_object.count(column_key_in_filter)) {
             return true;
