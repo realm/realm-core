@@ -321,6 +321,8 @@ public:
     // Returns `true` if the Realm is frozen, `false` otherwise.
     bool is_frozen() const;
 
+    bool has_pending_unuploaded_changes() const noexcept;
+
     // Returns true if the Realm is either in a read or frozen transaction
     bool is_in_read_transaction() const
     {

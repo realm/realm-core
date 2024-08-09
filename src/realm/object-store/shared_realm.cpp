@@ -1213,6 +1213,11 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     }
 }
 
+bool Realm::has_pending_unuploaded_changes() const noexcept
+{
+    return !m_transaction->get_history()->no_pending_local_changes(m_transaction->get_version());
+}
+
 OwnedBinaryData Realm::write_copy()
 {
     verify_thread();

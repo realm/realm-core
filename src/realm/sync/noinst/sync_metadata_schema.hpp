@@ -129,11 +129,11 @@ Status try_load_sync_metadata_schema(const Group& g, std::vector<SyncMetadataTab
 
 class SyncMetadataSchemaVersionsReader {
 public:
-    explicit SyncMetadataSchemaVersionsReader(const TransactionRef& ref);
+    explicit SyncMetadataSchemaVersionsReader(const Group& g);
 
-    std::optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
+    std::optional<int64_t> get_version_for(const Group& g, std::string_view schema_group_name);
 
-    std::optional<int64_t> get_legacy_version(const TransactionRef& tr);
+    std::optional<int64_t> get_legacy_version(const Group& g);
 
 protected:
     TableKey m_table;
