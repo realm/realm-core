@@ -364,7 +364,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     // or throw an exception if updating is disabled.
     if (auto primary_prop = object_schema.primary_key_property()) {
         auto primary_value =
-            ctx.value_for_property(value, *primary_prop, primary_prop - &object_schema.persisted_properties[0]);
+            ctx.value_for_property(value, primary_prop->name, primary_prop - &object_schema.persisted_properties[0]);
         if (!primary_value)
             primary_value = ctx.default_value_for_property(object_schema, *primary_prop);
         if (!primary_value && !is_nullable(primary_prop->type))
@@ -417,30 +417,44 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     // that.
     if (out_row && object_schema.table_type != ObjectSchema::ObjectType::TopLevelAsymmetric)
         *out_row = obj;
-    for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
-        auto& prop = object_schema.persisted_properties[i];
-        // If table has primary key, it must have been set during object creation
-        if (prop.is_primary && skip_primary)
-            continue;
 
-        auto v = ctx.value_for_property(value, prop, i);
-        if (!created && !v)
-            continue;
+    std::unordered_set<StringData> props_supplied;
+    ctx.enumerate_dictionary(value, [&](StringData name, auto&& value) {
+        if (auto prop = object_schema.property_for_name(name)) {
+            if (!prop->is_primary || !skip_primary)
+                object.set_property_value_impl(ctx, *prop, value, policy, false);
+            props_supplied.insert(name);
+        }
+        else {
+            object.set_additional_property_value_impl(ctx, name, value, policy);
+        }
+    });
 
-        bool is_default = false;
-        if (!v) {
-            v = ctx.default_value_for_property(object_schema, prop);
-            is_default = true;
+    if (created) {
+        // assign default values
+        for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
+            auto& prop = object_schema.persisted_properties[i];
+            // If table has primary key, it must have been set during object creation
+            if (prop.is_primary && skip_primary)
+                continue;
+
+            bool already_set = props_supplied.count(prop.name);
+            if (already_set)
+                continue;
+
+            bool is_default = true;
+            auto v = ctx.default_value_for_property(object_schema, prop);
+
+            // We consider null or a missing value to be equivalent to an empty
+            // array/set for historical reasons; the original implementation did this
+            // accidentally and it's not worth changing.
+            if ((!v || ctx.is_null(*v)) && !is_nullable(prop.type) && !is_collection(prop.type)) {
+                if (prop.is_primary || !ctx.allow_missing(value))
+                    throw MissingPropertyValueException(object_schema.name, prop.name);
+            }
+            if (v)
+                object.set_property_value_impl(ctx, prop, *v, policy, is_default);
         }
-        // We consider null or a missing value to be equivalent to an empty
-        // array/set for historical reasons; the original implementation did this
-        // accidentally and it's not worth changing.
-        if ((!v || ctx.is_null(*v)) && !is_nullable(prop.type) && !is_collection(prop.type)) {
-            if (prop.is_primary || !ctx.allow_missing(value))
-                throw MissingPropertyValueException(object_schema.name, prop.name);
-        }
-        if (v)
-            object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
     if (object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
         return Object{};
