@@ -430,7 +430,6 @@ public:
         std::string server_ssl_certificate_path = get_test_resource_path() + "test_sync_ca.pem";
         std::string server_ssl_certificate_key_path = get_test_resource_path() + "test_sync_key.pem";
 
-        bool disable_download_compaction = false;
         bool disable_upload_compaction = false;
 
         bool disable_history_compaction = false;
@@ -525,7 +524,6 @@ public:
             config_2.connection_reaper_timeout = config.server_connection_reaper_timeout;
             config_2.connection_reaper_interval = config.server_connection_reaper_interval;
             config_2.max_download_size = config.max_download_size;
-            config_2.disable_download_compaction = config.disable_download_compaction;
             config_2.tcp_no_delay = true;
             config_2.authorization_header_name = config.authorization_header_name;
             config_2.encryption_key = config.server_encryption_key;
@@ -549,7 +547,6 @@ public:
             config_2.reconnect_mode = ReconnectMode::testing;
             config_2.ping_keepalive_period = config.client_ping_period;
             config_2.pong_keepalive_timeout = config.client_pong_timeout;
-            config_2.disable_upload_compaction = config.disable_upload_compaction;
             config_2.one_connection_per_session = config.one_connection_per_session;
             config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
             config_2.fix_up_object_ids = true;

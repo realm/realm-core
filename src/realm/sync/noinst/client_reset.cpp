@@ -410,18 +410,17 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     }
 }
 
-ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResyncMode mode,
-                                      PendingReset::Action action, const std::optional<Status>& error,
-                                      util::Logger& logger)
+static ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResyncMode mode,
+                                             PendingReset::Action action, const Status& error, util::Logger& logger)
 {
-    if (auto previous_reset = sync::PendingResetStore::has_pending_reset(wt_local)) {
+    if (auto previous_reset = sync::PendingResetStore::has_pending_reset(*wt_local)) {
         logger.info(util::LogCategory::reset, "Found a previous %1", *previous_reset);
         if (action != previous_reset->action) {
             // IF a different client reset is being performed, cler the pending client reset and start over.
             logger.info(util::LogCategory::reset,
                         "New '%1' client reset of type: '%2' is incompatible - clearing previous reset", action,
                         mode);
-            sync::PendingResetStore::clear_pending_reset(wt_local);
+            sync::PendingResetStore::clear_pending_reset(*wt_local);
         }
         else {
             switch (previous_reset->mode) {
@@ -444,10 +443,10 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
                                 util::LogCategory::reset,
                                 "A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
                                 previous_reset->mode, previous_reset->time, mode);
-                            sync::PendingResetStore::clear_pending_reset(wt_local);
+                            sync::PendingResetStore::clear_pending_reset(*wt_local);
                             break;
                         case ClientResyncMode::DiscardLocal:
-                            sync::PendingResetStore::clear_pending_reset(wt_local);
+                            sync::PendingResetStore::clear_pending_reset(*wt_local);
                             // previous mode Recover and this mode is Discard, this is not a cycle yet
                             break;
                         case ClientResyncMode::Manual:
@@ -473,7 +472,7 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
             mode = ClientResyncMode::DiscardLocal;
         }
     }
-    sync::PendingResetStore::track_reset(wt_local, mode, action, error);
+    sync::PendingResetStore::track_reset(*wt_local, mode, action, error);
     // Ensure we save the tracker object even if we encounter an error and roll
     // back the client reset later
     wt_local->commit_and_continue_writing();
@@ -481,8 +480,7 @@ ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResy
 }
 
 bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, util::Logger& logger,
-                               sync::SubscriptionStore* sub_store,
-                               util::FunctionRef<void(int64_t)> on_flx_version_complete)
+                               sync::SubscriptionStore* sub_store)
 {
     DB& db_remote = *reset_config.fresh_copy;
     auto wt_local = db_local.start_write();
@@ -538,18 +536,16 @@ bool perform_client_reset_diff(DB& db_local, sync::ClientReset& reset_config, ut
     history_local.set_history_adjustments(logger, wt_local->get_version(), fresh_file_ident, fresh_server_version,
                                           recovered);
 
-    int64_t subscription_version = 0;
     if (sub_store) {
         if (recover_local_changes) {
-            subscription_version = sub_store->mark_active_as_complete(*wt_local);
+            sub_store->mark_active_as_complete(*wt_local);
         }
         else {
-            subscription_version = sub_store->set_active_as_latest(*wt_local);
+            sub_store->set_active_as_latest(*wt_local);
         }
     }
 
     wt_local->commit_and_continue_as_read();
-    on_flx_version_complete(subscription_version);
 
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger.info(util::LogCategory::reset,

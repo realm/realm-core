@@ -737,7 +737,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") 
 // MARK: - UsernamePasswordProviderClient Tests
 
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][baas]") {
-    const std::string base_url = get_base_url();
+    const std::string base_url = get_real_base_url();
     AutoVerifiedEmailCredentials creds;
     auto email = creds.email;
     auto password = creds.password;
@@ -3282,6 +3282,52 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
+TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
+    class InMemoryLogger : public util::Logger {
+    public:
+        void do_log(const util::LogCategory& cat, Level level, const std::string& msg) final
+        {
+            auto formatted_line = util::format("%1 %2 %3", cat.get_name(), level, msg);
+            std::lock_guard lk(mtx);
+            log_messages.emplace_back(std::move(formatted_line));
+        }
+
+        std::vector<std::string> get_log_messages()
+        {
+            std::lock_guard lk(mtx);
+            std::vector<std::string> ret;
+            std::swap(ret, log_messages);
+            return ret;
+        }
+
+        std::mutex mtx;
+        std::vector<std::string> log_messages;
+    };
+
+    auto in_mem_logger = std::make_shared<InMemoryLogger>();
+    in_mem_logger->set_level_threshold(InMemoryLogger::Level::all);
+    TestAppSession app_session(get_runtime_app_session(), nullptr, DeleteApp{false}, ReconnectMode::normal, nullptr,
+                               in_mem_logger);
+
+    const auto partition = random_string(100);
+    SyncTestFile config(app_session.app()->current_user(), partition, util::none);
+    auto realm = successfully_async_open_realm(config);
+    auto sync_session = realm->sync_session();
+    auto coid = SyncSession::OnlyForTesting::get_appservices_connection_id(*sync_session);
+
+    auto transition_log_msg =
+        util::format("Connection[1] Connected to app services with request id: \"%1\". Further log entries for this "
+                     "connection will be prefixed with \"Connection[1:%1]\" instead of \"Connection[1]\"",
+                     coid);
+    auto bind_send_msg = util::format("Connection[1:%1] Session[1]: Sending: BIND", coid);
+    auto ping_send_msg = util::format("Connection[1:%1] Will emit a ping in", coid);
+
+    auto log_messages = in_mem_logger->get_log_messages();
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(transition_log_msg)));
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(bind_send_msg)));
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(ping_send_msg)));
+}
+
 
 TEST_CASE("app: trailing slash in base url", "[sync][app]") {
     auto logger = util::Logger::get_default_logger();
@@ -4172,6 +4218,17 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
 
     SECTION("jwt happy path") {
         bool processed = false;
+        bool logged_in_once = false;
+
+        auto token = app->subscribe([&logged_in_once, &app](auto&) {
+            REQUIRE(!logged_in_once);
+            auto user = app->current_user();
+            auto metadata = user->user_profile();
+
+            // Ensure that the JWT metadata fields are available when the callback is fired on login.
+            CHECK(metadata["name"] == "Foo Bar");
+            logged_in_once = true;
+        });
 
         std::shared_ptr<User> user = log_in(app, AppCredentials::custom(jwt));
 
@@ -4192,6 +4249,10 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
         auto custom_data = *user->custom_data();
         CHECK(custom_data["name"] == "Not Foo Bar");
         CHECK(metadata["name"] == "Foo Bar");
+
+        REQUIRE(logged_in_once);
+
+        app->unsubscribe(token);
     }
 }
 

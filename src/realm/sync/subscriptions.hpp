@@ -339,17 +339,51 @@ public:
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version) const;
     std::vector<SubscriptionSet> get_pending_subscriptions() REQUIRES(!m_pending_notifications_mutex);
 
-    // Update the state of an existing subscription set. `error_str` must be set
-    // if the new state is Error, and must not be set otherwise. Many state
-    // transitions are not legal; see the state diagram on SubscriptionSet.
-    //
-    // If set to State::Complete, this will erase all subscription sets with a
-    // version less than the given one.
+    // Mark query_version as having received an error from the server. Will
+    // throw an exception if the version is not in a state where an error is
+    // expected (i.e. if it's already completed or superseded).
     //
     // This should only be called internally within the sync client.
-    void update_state(int64_t version_id, SubscriptionSet::State state,
-                      std::optional<std::string_view> error_str = util::none)
-        REQUIRES(!m_pending_notifications_mutex);
+    void set_error(int64_t query_version, std::string_view error_str);
+    // Mark query_version as having begun bootstrapping. This should be called
+    // inside the write transaction used to store the first set of changesets.
+    // Has no effect if the version is already complete. Throws if the version
+    // is superseded or errored.
+    //
+    // This should only be called internally within the sync client.
+    void begin_bootstrap(const Transaction&, int64_t query_version);
+    // Mark query_version as having completed bootstrapping. This should be
+    // called inside the write transaction which removes the final pending changeset.
+    // Has no effect if the version is already complete. Throws if the version
+    // is superseded or errored.
+    //
+    // This should only be called internally within the sync client.
+    void complete_bootstrap(const Transaction&, int64_t query_version);
+    // Roll query_version back to the Pending state if it is currently Bootstrapping.
+    // Has no effect if the bootstrap in progress is not the first boostrap for
+    // this subscription set.
+    //
+    // This should only be called internally within the sync client.
+    void cancel_bootstrap(const Transaction&, int64_t query_version);
+    // Report that a download has completed, meaning that the active subscription
+    // set should advance to the Completed state if it is currently in the
+    // AwaitingMark state. Has no effect if it is in any other state.
+    //
+    // This should only be called internally within the sync client.
+    void download_complete();
+
+    // If there are any notifications registered, check if they have been completed
+    // and fulfill them if so.
+    void report_progress() REQUIRES(!m_pending_notifications_mutex);
+    void report_progress(TransactionRef& tr) REQUIRES(!m_pending_notifications_mutex);
+
+    // Get the query version which we most recently received a DOWNLOAD message
+    // for (which may be distinct from both the latest and active versions).
+    int64_t get_downloading_query_version(Transaction& rt) const;
+
+    // Mark the currently active subscription set as being complete without going
+    // through the normal bootstrapping flow. Used for client resets where we
+    // copy the data for the subscription over from the fresh Realm.
     int64_t mark_active_as_complete(Transaction& wt) REQUIRES(!m_pending_notifications_mutex);
 
     // Notify all subscription state change notification handlers on this subscription store with the
@@ -385,10 +419,6 @@ private:
         SubscriptionSet::State notify_when;
     };
 
-    void process_notifications(State new_state, int64_t version, std::string_view error_str)
-        REQUIRES(!m_pending_notifications_mutex);
-    void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
-
     Obj get_active(const Transaction& tr);
     SubscriptionSet get_refreshed(ObjKey, int64_t flx_version, std::optional<DB::VersionID> version = util::none);
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set);
@@ -397,6 +427,7 @@ private:
     void initialize_subscriptions_table(TransactionRef&& tr);
     // Clear the table and reinitialize it.
     void clear(Transaction& wt);
+    void do_complete_bootstrap(const Transaction&, int64_t query_version, SubscriptionSet::State new_state);
 
     friend class MutableSubscriptionSet;
     friend class Subscription;
@@ -418,7 +449,6 @@ private:
     ColKey m_sub_set_subscriptions;
 
     util::CheckedMutex m_pending_notifications_mutex;
-    int64_t m_min_outstanding_version GUARDED_BY(m_pending_notifications_mutex) = 0;
     std::list<NotificationRequest> m_pending_notifications GUARDED_BY(m_pending_notifications_mutex);
 };
 

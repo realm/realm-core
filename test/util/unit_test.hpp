@@ -163,6 +163,20 @@
         }                                                                                                            \
     }())
 
+#define CHECK_THROW_ERROR(expr, ec, message)                                                                         \
+    ([&] {                                                                                                           \
+        try {                                                                                                        \
+            (expr);                                                                                                  \
+            test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
+        }                                                                                                            \
+        catch (const Exception& e) {                                                                                 \
+            CHECK_EQUAL(e.code(), ErrorCodes::ec);                                                                   \
+            CHECK_STRING_CONTAINS(e.what(), message);                                                                \
+            return true;                                                                                             \
+        }                                                                                                            \
+        return false;                                                                                                \
+    }())
+
 #define CHECK_NOTHROW(expr)                                                                                          \
     ([&] {                                                                                                           \
         try {                                                                                                        \

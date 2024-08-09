@@ -436,7 +436,7 @@ struct FakeLocalClientReset : public TestClientReset {
                                            {ErrorCodes::SyncClientResetRequired, "Bad client file ident"}};
 
             using _impl::client_reset::perform_client_reset_diff;
-            perform_client_reset_diff(*local_db, reset_config, *logger, nullptr, [](int64_t) {});
+            perform_client_reset_diff(*local_db, reset_config, *logger, nullptr);
 
             remote_realm->close();
             if (m_on_post_reset) {
@@ -569,7 +569,7 @@ struct BaasClientReset : public TestClientReset {
         // state.
         timed_sleeping_wait_for(
             [&] {
-                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id, false);
             },
             std::chrono::seconds(30), std::chrono::seconds(1));
 
