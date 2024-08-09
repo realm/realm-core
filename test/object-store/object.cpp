@@ -281,6 +281,7 @@ TEST_CASE("object") {
         {"person",
          {
              {"_id", PropertyType::String, Property::IsPrimary{true}},
+             {"name", PropertyType::String},
              {"age", PropertyType::Int},
              {"scores", PropertyType::Array | PropertyType::Int},
              {"assistant", PropertyType::Object | PropertyType::Nullable, "person"},
@@ -1180,7 +1181,6 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-0000-0000-0000-4136c566a962")},
@@ -1532,7 +1532,6 @@ TEST_CASE("object") {
                 {"string array", AnyVec{"a"s, "b"s, "c"s}},
                 {"data array", AnyVec{"d"s, "e"s, "f"s}},
                 {"date array", AnyVec{}},
-                {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
                 {"object id array", AnyVec{ObjectId("000000000000000000000001")}},
                 {"decimal array", AnyVec{Decimal128("1.23e45")}},
                 {"uuid array", AnyVec{UUID("3b241101-1111-bbbb-cccc-4136c566a962")}},
@@ -1672,7 +1671,6 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
@@ -1688,7 +1686,6 @@ TEST_CASE("object") {
                               {"data", "olleh"s},
                               {"date", Timestamp(10, 20)},
                               {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-                              {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
                               {"object id", ObjectId("000000000000000000000001")},
                               {"decimal", Decimal128("1.23e45")},
                               {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
@@ -1720,9 +1717,9 @@ TEST_CASE("object") {
         obj = create(AnyDict{{"_id", d.null_value()}}, "nullable string pk");
         REQUIRE(obj.get_obj().is_null(col_pk_str));
 
-        obj = create(AnyDict{{}}, "nullable int pk");
+        obj = create(AnyDict{}, "nullable int pk");
         REQUIRE(obj.get_obj().get<util::Optional<Int>>(col_pk_int) == 10);
-        obj = create(AnyDict{{}}, "nullable string pk");
+        obj = create(AnyDict{}, "nullable string pk");
         REQUIRE(obj.get_obj().get<String>(col_pk_str) == "value");
     }
 
