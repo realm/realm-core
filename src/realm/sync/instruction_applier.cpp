@@ -1495,8 +1495,13 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
 InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resolve_field(Obj& obj, InternString field)
 {
     auto field_name = get_string(field);
-    ColKey col = obj.get_table()->get_column_key(field_name);
+    auto table = obj.get_table().unchecked_ptr();
+    ColKey col = table->get_column_key(field_name);
     if (!col) {
+        if (auto ck = table->get_additional_prop_col()) {
+            auto dict = obj.get_dictionary(ck);
+            return resolve_dictionary_element(dict, field);
+        }
         on_error(util::format("%1: No such field: '%2' in class '%3'", m_instr_name, field_name,
                               obj.get_table()->get_name()));
         return Status::DidNotResolve;

@@ -611,51 +611,62 @@ void SyncReplication::set_clear(const CollectionBase& set)
     }
 }
 
-void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed& key, const Mixed& value)
+void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed& key, const Mixed* value)
 {
     // If link is unresolved, it should not be communicated.
-    if (value.is_unresolved_link()) {
+    if (value && value->is_unresolved_link()) {
         return;
     }
 
-    if (select_collection(dict)) {
-        Instruction::Update instr;
-        REALM_ASSERT(key.get_type() == type_String);
-        populate_path_instr(instr, dict);
+    Instruction::Update instr;
+    REALM_ASSERT(key.get_type() == type_String);
+
+    const Table* source_table = dict.get_table().unchecked_ptr();
+    auto col = dict.get_col_key();
+    ObjKey obj_key = dict.get_owner_key();
+    if (source_table->is_additional_props_col(col)) {
+        // Here we have to fake it and pretend we are setting/erasing a property on the object
+        if (!select_table(*source_table)) {
+            return;
+        }
+
+        populate_path_instr(instr, *source_table, obj_key, {key.get_string()});
+    }
+    else {
+        if (!select_collection(dict)) {
+            return;
+        }
+
+        populate_path_instr(instr, *source_table, obj_key, dict.get_short_path());
         StringData key_value = key.get_string();
         instr.path.push_back(m_encoder.intern_string(key_value));
-        instr.value = as_payload(dict, value);
-        instr.is_default = false;
-        emit(instr);
     }
+    if (value) {
+        instr.value = as_payload(*source_table, col, *value);
+    }
+    else {
+        instr.value = Instruction::Payload::Erased{};
+    }
+    instr.is_default = false;
+    emit(instr);
 }
 
 void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
     Replication::dictionary_insert(dict, ndx, key, value);
-    dictionary_update(dict, key, value);
+    dictionary_update(dict, key, &value);
 }
 
 void SyncReplication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
     Replication::dictionary_set(dict, ndx, key, value);
-    dictionary_update(dict, key, value);
+    dictionary_update(dict, key, &value);
 }
 
 void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
 {
     Replication::dictionary_erase(dict, ndx, key);
-
-    if (select_collection(dict)) {
-        Instruction::Update instr;
-        REALM_ASSERT(key.get_type() == type_String);
-        populate_path_instr(instr, dict);
-        StringData key_value = key.get_string();
-        instr.path.push_back(m_encoder.intern_string(key_value));
-        instr.value = Instruction::Payload::Erased{};
-        instr.is_default = false;
-        emit(instr);
-    }
+    dictionary_update(dict, key, nullptr);
 }
 
 void SyncReplication::dictionary_clear(const CollectionBase& dict)
@@ -750,7 +761,25 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
 {
     REALM_ASSERT(key);
     // The first path entry will be the column key
-    REALM_ASSERT(path[0].is_col_key());
+    std::string field_name;
+    if (path[0].is_col_key()) {
+        auto ck = path[0].get_col_key();
+        if (table.is_additional_props_col(ck)) {
+            // We are modifying a collection nested in an additional property
+            REALM_ASSERT(path.size() > 1);
+            field_name = path[1].get_key();
+            // Erase the "__additional" part of the path
+            path.erase(path.begin());
+        }
+        else {
+            field_name = table.get_column_name(ck);
+        }
+    }
+    else {
+        // In the case of an additional property directly on an object,
+        // the first element is a string.
+        field_name = path[0].get_key();
+    }
 
     if (table.is_embedded()) {
         // For embedded objects, Obj::traverse_path() yields the top object
@@ -760,7 +789,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         // Populate top object in the normal way.
         auto top_table = table.get_parent_group()->get_table(full_path.top_table);
 
-        full_path.path_from_top.emplace_back(table.get_column_name(path[0].get_col_key()));
+        full_path.path_from_top.emplace_back(field_name);
 
         for (auto it = path.begin() + 1; it != path.end(); ++it) {
             full_path.path_from_top.emplace_back(std::move(*it));
@@ -781,8 +810,6 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         m_last_object = key;
         m_last_primary_key = instr.object;
     }
-
-    StringData field_name = table.get_column_name(path[0].get_col_key());
 
     if (m_last_field_name == field_name) {
         instr.field = m_last_interned_field_name;

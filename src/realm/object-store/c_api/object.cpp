@@ -253,31 +253,31 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* r
     });
 }
 
-RLM_API bool realm_get_value(const realm_object_t* obj, realm_property_key_t col, realm_value_t* out_value)
+RLM_API bool realm_get_value(const realm_object_t* object, realm_property_key_t col, realm_value_t* out_value)
 {
-    return realm_get_values(obj, 1, &col, out_value);
+    return realm_get_values(object, 1, &col, out_value);
 }
 
-RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, const realm_property_key_t* properties,
+RLM_API bool realm_get_values(const realm_object_t* object, size_t num_values, const realm_property_key_t* properties,
                               realm_value_t* out_values)
 {
     return wrap_err([&]() {
-        obj->verify_attached();
+        object->verify_attached();
 
-        auto o = obj->get_obj();
+        auto obj = object->get_obj();
 
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
 
             if (col_key.is_collection()) {
-                auto table = o.get_table();
-                auto& schema = schema_for_table(obj->get_realm(), table->get_key());
+                auto table = obj.get_table();
+                auto& schema = schema_for_table(object->get_realm(), table->get_key());
                 throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
             }
 
-            auto val = o.get_any(col_key);
+            auto val = obj.get_any(col_key);
             if (out_values) {
-                auto converted = objkey_to_typed_link(val, col_key, *o.get_table());
+                auto converted = objkey_to_typed_link(val, col_key, *obj.get_table());
                 out_values[i] = to_capi(converted);
             }
         }
@@ -286,18 +286,34 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
     });
 }
 
-RLM_API bool realm_set_value(realm_object_t* obj, realm_property_key_t col, realm_value_t new_value, bool is_default)
+RLM_API bool realm_get_value_by_name(const realm_object_t* object, const char* property_name,
+                                     realm_value_t* out_value)
 {
-    return realm_set_values(obj, 1, &col, &new_value, is_default);
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto obj = object->get_obj();
+        auto val = obj.get_any(property_name);
+        if (out_value) {
+            *out_value = to_capi(val);
+        }
+        return true;
+    });
 }
 
-RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const realm_property_key_t* properties,
+RLM_API bool realm_set_value(realm_object_t* object, realm_property_key_t col, realm_value_t new_value,
+                             bool is_default)
+{
+    return realm_set_values(object, 1, &col, &new_value, is_default);
+}
+
+RLM_API bool realm_set_values(realm_object_t* object, size_t num_values, const realm_property_key_t* properties,
                               const realm_value_t* values, bool is_default)
 {
     return wrap_err([&]() {
-        obj->verify_attached();
-        auto o = obj->get_obj();
-        auto table = o.get_table();
+        object->verify_attached();
+        auto obj = object->get_obj();
+        auto table = obj.get_table();
 
         // Perform validation up front to avoid partial updates. This is
         // unlikely to incur performance overhead because the object itself is
@@ -308,12 +324,12 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
             table->check_column(col_key);
 
             if (col_key.is_collection()) {
-                auto& schema = schema_for_table(obj->get_realm(), table->get_key());
+                auto& schema = schema_for_table(object->get_realm(), table->get_key());
                 throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
             }
 
             auto val = from_capi(values[i]);
-            check_value_assignable(obj->get_realm(), *table, col_key, val);
+            check_value_assignable(object->get_realm(), *table, col_key, val);
         }
 
         // Actually write the properties.
@@ -321,36 +337,94 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
             auto val = from_capi(values[i]);
-            o.set_any(col_key, val, is_default);
+            obj.set_any(col_key, val, is_default);
         }
 
         return true;
     });
 }
 
-RLM_API bool realm_set_json(realm_object_t* obj, realm_property_key_t col, const char* json_string)
+RLM_API bool realm_set_value_by_name(realm_object_t* object, const char* property_name, realm_value_t new_value)
 {
     return wrap_err([&]() {
-        obj->verify_attached();
-        auto o = obj->get_obj();
+        object->verify_attached();
+        auto obj = object->get_obj();
+        obj.set_any(property_name, from_capi(new_value));
+        return true;
+    });
+}
+
+RLM_API bool realm_has_property(realm_object_t* object, const char* property_name, bool* out_has_property)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+        if (out_has_property) {
+            auto obj = object->get_obj();
+            *out_has_property = obj.has_property(property_name);
+        }
+        return true;
+    });
+}
+
+RLM_API void realm_get_additional_properties(realm_object_t* object, const char** out_prop_names, size_t max,
+                                             size_t* out_n)
+{
+    size_t copied = 0;
+    wrap_err([&]() {
+        object->verify_attached();
+        auto obj = object->get_obj();
+        auto vec = obj.get_additional_properties();
+        copied = vec.size();
+        if (out_prop_names) {
+            if (max < copied) {
+                copied = max;
+            }
+            auto it = vec.begin();
+            auto to_copy = copied;
+            while (to_copy--) {
+                *out_prop_names++ = (*it++).data();
+            }
+        }
+        return true;
+    });
+    if (out_n) {
+        *out_n = copied;
+    }
+}
+
+RLM_API bool realm_erase_additional_property(realm_object_t* object, const char* property_name)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+        auto obj = object->get_obj();
+        obj.erase_additional_prop(property_name);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_json(realm_object_t* object, realm_property_key_t col, const char* json_string)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+        auto obj = object->get_obj();
         ColKey col_key(col);
         if (col_key.get_type() != col_type_Mixed) {
-            auto table = o.get_table();
-            auto& schema = schema_for_table(obj->get_realm(), table->get_key());
+            auto table = obj.get_table();
+            auto& schema = schema_for_table(object->get_realm(), table->get_key());
             throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
         }
-        o.set_json(ColKey(col), json_string);
+        obj.set_json(ColKey(col), json_string);
         return true;
     });
 }
 
 
-RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_key_t col)
+RLM_API realm_object_t* realm_set_embedded(realm_object_t* object, realm_property_key_t col)
 {
     return wrap_err([&]() {
-        obj->verify_attached();
-        auto& o = obj->get_obj();
-        return new realm_object_t({obj->get_realm(), o.create_and_set_linked_object(ColKey(col))});
+        object->verify_attached();
+        auto& obj = object->get_obj();
+        return new realm_object_t({object->get_realm(), obj.create_and_set_linked_object(ColKey(col))});
     });
 }
 
@@ -380,12 +454,35 @@ RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t* object, realm_p
     });
 }
 
-RLM_API realm_object_t* realm_get_linked_object(realm_object_t* obj, realm_property_key_t col)
+RLM_API realm_list_t* realm_set_list_by_name(realm_object_t* object, const char* property_name)
 {
     return wrap_err([&]() {
-        obj->verify_attached();
-        const auto& o = obj->get_obj().get_linked_object(ColKey(col));
-        return o ? new realm_object_t({obj->get_realm(), o}) : nullptr;
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        obj.set_collection(property_name, CollectionType::List);
+        return new realm_list_t{List{object->get_realm(), obj.get_list_ptr<Mixed>(property_name)}};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_set_dictionary_by_name(realm_object_t* object, const char* property_name)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        obj.set_collection(property_name, CollectionType::Dictionary);
+        return new realm_dictionary_t{
+            object_store::Dictionary{object->get_realm(), obj.get_dictionary_ptr(property_name)}};
+    });
+}
+
+RLM_API realm_object_t* realm_get_linked_object(realm_object_t* object, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+        const auto& obj = object->get_obj().get_linked_object(ColKey(col));
+        return obj ? new realm_object_t({object->get_realm(), obj}) : nullptr;
     });
 }
 
@@ -405,6 +502,20 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
         }
 
         return new realm_list_t{List{object->get_realm(), std::move(obj), col_key}};
+    });
+}
+
+RLM_API realm_list_t* realm_get_list_by_name(realm_object_t* object, const char* prop_name)
+{
+    return wrap_err([&]() -> realm_list_t* {
+        object->verify_attached();
+
+        const auto& obj = object->get_obj();
+        auto collection = obj.get_collection_ptr(StringData(prop_name));
+        if (collection->get_collection_type() == CollectionType::List) {
+            return new realm_list_t{List{object->get_realm(), std::move(collection)}};
+        }
+        return nullptr;
     });
 }
 
@@ -442,6 +553,20 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
         }
 
         return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), std::move(obj), col_key}};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_get_dictionary_by_name(realm_object_t* object, const char* prop_name)
+{
+    return wrap_err([&]() -> realm_dictionary_t* {
+        object->verify_attached();
+
+        const auto& obj = object->get_obj();
+        auto collection = obj.get_collection_ptr(StringData(prop_name));
+        if (collection->get_collection_type() == CollectionType::Dictionary) {
+            return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), std::move(collection)}};
+        }
+        return nullptr;
     });
 }
 
