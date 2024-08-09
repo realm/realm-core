@@ -65,12 +65,6 @@ public:
     void set_dictionary_key_type(size_t column_ndx, DataType key_type);
     DataType get_dictionary_key_type(size_t column_ndx) const;
 
-    // Auto Enumerated string columns
-    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
-    size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
-    bool is_string_enum_type(size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
-
     //@{
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const noexcept;
@@ -92,7 +86,7 @@ private:
     static constexpr size_t s_names_ndx = 1;
     static constexpr size_t s_attributes_ndx = 2;
     static constexpr size_t s_vacant_1 = 3;
-    static constexpr size_t s_enum_keys_ndx = 4;
+    // static constexpr size_t s_enum_keys_ndx = 4;
     static constexpr size_t s_col_keys_ndx = 5;
     static constexpr size_t s_spec_max_size = 6;
 
@@ -100,8 +94,8 @@ private:
     Array m_types;            // 1st slot in m_top
     ArrayStringShort m_names; // 2nd slot in m_top
     Array m_attr;             // 3rd slot in m_top
-                              // 4th slot in m_top not cached
-    Array m_enumkeys;         // 5th slot in m_top
+                              // 4th slot in m_top, old subspecs. Not used since v6.0.0
+                              // 5th slot in m_top, old enum keys which was never released
     Array m_keys;             // 6th slot in m_top
     size_t m_num_public_columns = 0;
 
@@ -151,13 +145,11 @@ inline Spec::Spec(Allocator& alloc) noexcept
     , m_types(alloc)
     , m_names(alloc)
     , m_attr(alloc)
-    , m_enumkeys(alloc)
     , m_keys(alloc)
 {
     m_types.set_parent(&m_top, s_types_ndx);
     m_names.set_parent(&m_top, s_names_ndx);
     m_attr.set_parent(&m_top, s_attributes_ndx);
-    m_enumkeys.set_parent(&m_top, s_enum_keys_ndx);
     m_keys.set_parent(&m_top, s_col_keys_ndx);
 }
 

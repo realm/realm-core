@@ -256,6 +256,10 @@ public:
     ObjKey get_link_target(const Obj& obj) const;
     Mixed get_value(const Obj& obj) const;
 
+    // get String ID for the obj, it makes sense to call this method only if the col_key type is either Mixed or
+    // String.
+    std::optional<StringID> get_string_id(const Obj& obj) const;
+
 private:
     ColKey m_colkey;
     PathElement m_index;

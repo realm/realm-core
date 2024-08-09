@@ -62,6 +62,8 @@ set(REALM_SOURCES
     table.cpp
     table_ref.cpp
     obj_list.cpp
+    string_interner.cpp
+    string_compressor.cpp
     object_id.cpp
     table_view.cpp
     tokenizer.cpp
@@ -178,6 +180,8 @@ set(REALM_INSTALL_HEADERS
     null.hpp
     obj.hpp
     obj_list.hpp
+    string_interner.hpp
+    string_compressor.hpp
     object_id.hpp
     path.hpp
     owned_data.hpp

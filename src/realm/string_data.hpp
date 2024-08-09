@@ -34,6 +34,11 @@
 
 namespace realm {
 
+// Compressed strings have unique IDs, this defines a global alias
+// for this. A StringID is an entry inside an array of N compressed strings.
+// 0 means null, all the other ids [1, N-1] represent a valid string.
+using StringID = size_t;
+
 /// Selects CityHash64 on 64-bit platforms, and Murmur2 on 32-bit platforms.
 /// This is what libc++ does, and it is a good general choice for a
 /// non-cryptographic hash function (suitable for std::unordered_map etc.).

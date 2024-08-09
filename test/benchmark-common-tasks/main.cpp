@@ -1630,6 +1630,70 @@ struct BenchmarkSort : BenchmarkWithStrings {
     }
 };
 
+// benchmark for testing compressed string sorting.
+// N is the size of the string to generate
+// M is the number of times we want store the string (number of dups)
+template <size_t N, size_t M>
+struct BenchmarkSortCompressed : BenchmarkWithStringsTable {
+    std::string compressed_benchmark_name;
+
+    BenchmarkSortCompressed()
+        : BenchmarkWithStringsTable()
+    {
+        if constexpr (N <= 15) {
+            compressed_benchmark_name = util::format("SortCompressedSmall(%1,%2)", N, M);
+        }
+        else if constexpr (N <= 63) {
+            compressed_benchmark_name = util::format("SortCompressedMedium(%1,%2)", N, M);
+        }
+        else {
+            compressed_benchmark_name = util::format("SortCompressedLarge(%1,%2)", N, M);
+        }
+    }
+
+    const char* name() const
+    {
+        return compressed_benchmark_name.c_str();
+    }
+
+    void before_all(DBRef group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table(name());
+
+        auto gen_string = [](size_t length) {
+            const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv"
+                                         "wxyz0123456789";
+            std::random_device rd;
+            std::mt19937 generator(rd());
+            std::uniform_int_distribution<> distribution(0, (int)alphabet.size() - 1);
+
+            std::string random_str;
+            for (size_t i = 0; i < length; ++i)
+                random_str += alphabet[distribution(generator)];
+
+            return random_str;
+        };
+
+        std::string str = "";
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            if (i % M == 0)
+                str = gen_string(N);
+
+            Obj obj = t->create_object();
+            obj.set<StringData>(m_col, str);
+        }
+        tr.commit();
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        TableView view = table->get_sorted_view(m_col);
+    }
+};
+
 struct BenchmarkEmptyCommit : Benchmark {
     const char* name() const
     {
@@ -2663,6 +2727,11 @@ int benchmark_common_tasks_main()
     BENCH(IterateTableByIteratorIndex);
 
     BENCH(BenchmarkSort);
+    BENCH(BenchmarkSortCompressed<10, 500>);
+    BENCH(BenchmarkSortCompressed<50, 500>);
+    BENCH(BenchmarkSortCompressed<100, 500>);
+    BENCH(BenchmarkSortCompressed<1000, 5000>);
+
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkSortIntList);
     BENCH(BenchmarkSortIntDictionary);

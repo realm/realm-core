@@ -43,7 +43,6 @@ public:
     void set_obj(realm::Group& group, FuzzLog& log, State& s);
     void remove_obj(realm::Group& group, FuzzLog& log, State& s);
     void remove_recursive(realm::Group& group, FuzzLog& log, State& s);
-    void enumerate_column(realm::Group& group, FuzzLog& log, State& s);
     void get_all_column_names(realm::Group& group, FuzzLog& log);
     void commit(realm::SharedRealm shared_realm, FuzzLog& log);
     void rollback(realm::SharedRealm shared_realm, realm::Group& group, FuzzLog& log);

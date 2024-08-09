@@ -17,7 +17,10 @@
  **************************************************************************/
 
 #include <realm/array_string.hpp>
-#include <realm/spec.hpp>
+#include <realm/impl/array_writer.hpp>
+#include <realm/table.hpp>
+#include <realm/string_interner.hpp>
+#include <realm/string_compressor.hpp>
 #include <realm/mixed.hpp>
 
 using namespace realm;
@@ -52,14 +55,9 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
         else {
             auto arr = new (&m_storage) Array(m_alloc);
             arr->init_from_mem(mem);
-            m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
-            ArrayParent* p;
-            REALM_ASSERT(m_spec != nullptr);
-            REALM_ASSERT(m_col_ndx != realm::npos);
-            ref_type r = m_spec->get_enumkeys_ref(m_col_ndx, p);
-            m_string_enum_values->init_from_ref(r);
-            m_string_enum_values->set_parent(p, m_col_ndx);
-            m_type = Type::enum_strings;
+            // init for new interned strings
+            m_type = Type::interned_strings;
+            // consider if we want this invariant: REALM_ASSERT_DEBUG(m_string_interner);
         }
     }
     else {
@@ -110,7 +108,7 @@ size_t ArrayString::size() const
             return static_cast<ArraySmallBlobs*>(m_arr)->size();
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->size();
-        case Type::enum_strings:
+        case Type::interned_strings:
             return static_cast<Array*>(m_arr)->size();
     }
     return {};
@@ -128,7 +126,7 @@ void ArrayString::add(StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->add_string(value);
             break;
-        case Type::enum_strings: {
+        case Type::interned_strings: {
             auto a = static_cast<Array*>(m_arr);
             size_t ndx = a->size();
             a->add(0);
@@ -150,14 +148,9 @@ void ArrayString::set(size_t ndx, StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->set_string(ndx, value);
             break;
-        case Type::enum_strings: {
-            size_t sz = m_string_enum_values->size();
-            size_t res = m_string_enum_values->find_first(value, 0, sz);
-            if (res == realm::not_found) {
-                m_string_enum_values->add(value);
-                res = sz;
-            }
-            static_cast<Array*>(m_arr)->set(ndx, res);
+        case Type::interned_strings: {
+            auto id = m_string_interner->intern(value);
+            static_cast<Array*>(m_arr)->set(ndx, id);
             break;
         }
     }
@@ -175,9 +168,10 @@ void ArrayString::insert(size_t ndx, StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->insert_string(ndx, value);
             break;
-        case Type::enum_strings: {
+        case Type::interned_strings: {
             static_cast<Array*>(m_arr)->insert(ndx, 0);
             set(ndx, value);
+            break;
         }
     }
 }
@@ -191,29 +185,20 @@ StringData ArrayString::get(size_t ndx) const
             return static_cast<ArraySmallBlobs*>(m_arr)->get_string(ndx);
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
-        case Type::enum_strings: {
-            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_enum_values->get(index);
+        case Type::interned_strings: {
+            size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
+            return m_string_interner->get(id);
         }
     }
     return {};
 }
 
-StringData ArrayString::get_legacy(size_t ndx) const
+std::optional<StringID> ArrayString::get_string_id(size_t ndx) const
 {
-    switch (m_type) {
-        case Type::small_strings:
-            return static_cast<ArrayStringShort*>(m_arr)->get(ndx);
-        case Type::medium_strings:
-            return static_cast<ArraySmallBlobs*>(m_arr)->get_string_legacy(ndx);
-        case Type::big_strings:
-            return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
-        case Type::enum_strings: {
-            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_enum_values->get(index);
-        }
+    if (m_type == Type::interned_strings) {
+        return StringID(static_cast<Array*>(m_arr)->get(ndx));
     }
-    return {};
+    return m_string_interner->lookup(get(ndx));
 }
 
 Mixed ArrayString::get_any(size_t ndx) const
@@ -230,9 +215,9 @@ bool ArrayString::is_null(size_t ndx) const
             return static_cast<ArraySmallBlobs*>(m_arr)->is_null(ndx);
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
-        case Type::enum_strings: {
-            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_enum_values->is_null(index);
+        case Type::interned_strings: {
+            size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
+            return id == 0;
         }
     }
     return {};
@@ -250,7 +235,7 @@ void ArrayString::erase(size_t ndx)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->erase(ndx);
             break;
-        case Type::enum_strings:
+        case Type::interned_strings:
             static_cast<Array*>(m_arr)->erase(ndx);
             break;
     }
@@ -273,9 +258,8 @@ void ArrayString::move(ArrayString& dst, size_t ndx)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->truncate(ndx);
             break;
-        case Type::enum_strings:
-            // this operation will never be called for enumerated columns
-            REALM_UNREACHABLE();
+        case Type::interned_strings:
+            m_arr->truncate(ndx);
             break;
     }
 }
@@ -292,13 +276,23 @@ void ArrayString::clear()
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->clear();
             break;
-        case Type::enum_strings:
+        case Type::interned_strings:
             static_cast<Array*>(m_arr)->clear();
             break;
     }
 }
 
 size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const noexcept
+{
+    // This should only be called if we don't have a string id for this particular array (aka no string interner)
+    std::optional<StringID> id;
+    if (m_type == Type::interned_strings)
+        id = m_string_interner->lookup(value);
+
+    return find_first(value, begin, end, id);
+}
+
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::optional<StringID> id) const noexcept
 {
     switch (m_type) {
         case Type::small_strings:
@@ -313,14 +307,14 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
             return static_cast<ArrayBigBlobs*>(m_arr)->find_first(as_binary, true, begin, end);
             break;
         }
-        case Type::enum_strings: {
-            size_t sz = m_string_enum_values->size();
-            size_t res = m_string_enum_values->find_first(value, 0, sz);
-            if (res != realm::not_found) {
-                return static_cast<Array*>(m_arr)->find_first(res, begin, end);
+        case Type::interned_strings: {
+            if (id) {
+                return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
             }
             break;
         }
+        default:
+            break;
     }
     return not_found;
 }
@@ -369,7 +363,8 @@ size_t ArrayString::lower_bound(StringData value)
             return lower_bound_string(static_cast<ArraySmallBlobs*>(m_arr), value);
         case Type::big_strings:
             return lower_bound_string(static_cast<ArrayBigBlobs*>(m_arr), value);
-        case Type::enum_strings:
+        case Type::interned_strings:
+            REALM_UNREACHABLE();
             break;
     }
     return realm::npos;
@@ -380,8 +375,8 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
     if (m_type == Type::big_strings)
         return Type::big_strings;
 
-    if (m_type == Type::enum_strings)
-        return Type::enum_strings;
+    if (m_type == Type::interned_strings)
+        return Type::interned_strings;
 
     if (m_type == Type::medium_strings) {
         if (value_size <= medium_string_max_size)
@@ -472,9 +467,45 @@ void ArrayString::verify() const
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->verify();
             break;
-        case Type::enum_strings:
+        case Type::interned_strings:
             static_cast<Array*>(m_arr)->verify();
             break;
     }
 #endif
+}
+
+template <>
+ref_type ArrayString::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+{
+    Array leaf(alloc);
+    leaf.init_from_ref(ref);
+    ref_type ret_val;
+    auto header = leaf.get_header();
+    if (NodeHeader::get_hasrefs_from_header(header) ||
+        NodeHeader::get_wtype_from_header(header) == NodeHeader::wtype_Multiply) {
+        // We're interning these strings
+        ArrayString as(alloc);
+        as.init_from_ref(ref);
+        StringInterner* interner = out.table->get_string_interner(out.col_key);
+        auto sz = as.size();
+        Array interned(Allocator::get_default());
+        interned.create(NodeHeader::type_Normal, true, sz);
+        for (size_t i = 0; i < sz; ++i) {
+            interned.set(i, interner->intern(as.get(i)));
+        }
+        ret_val = interned.write(out, false, false, out.compress);
+        interned.destroy();
+        // in a transactional setting:
+        // Destroy all sub-arrays if present, in order to release memory in file
+        // This is contrary to the rest of the handling in this function, but needed
+        // here since sub-arrays may not have been COW'ed and therefore not freed in file.
+        // We rely on 'only_modified' to indicate that we're in a transactional setting.
+        if (out.only_modified)
+            leaf.destroy_deep(true);
+    }
+    else {
+        // just write out the array using integer leaf compression
+        ret_val = leaf.write(out, false, out.only_modified, out.compress);
+    }
+    return ret_val;
 }

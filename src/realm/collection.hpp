@@ -12,15 +12,17 @@
 
 namespace realm {
 
+class StringInterner;
 template <class L>
 struct CollectionIterator;
 
 // Used in Cluster when removing owning object
 class DummyParent : public CollectionParent {
 public:
-    DummyParent(TableRef t, ref_type ref)
+    DummyParent(TableRef t, ref_type ref, ColKey ck)
         : m_obj(t, MemRef(), ObjKey(), 0)
         , m_ref(ref)
+        , m_col_key(ck)
     {
     }
     FullPath get_path() const noexcept final
@@ -37,7 +39,7 @@ public:
     }
     ColKey get_col_key() const noexcept final
     {
-        return {};
+        return m_col_key;
     }
     void add_index(Path&, const Index&) const noexcept final {}
     size_t find_index(const Index&) const noexcept final
@@ -62,6 +64,7 @@ public:
 protected:
     Obj m_obj;
     ref_type m_ref;
+    ColKey m_col_key;
     UpdateStatus update_if_needed() const final
     {
         return UpdateStatus::Updated;
@@ -111,6 +114,7 @@ public:
         bool path_only_unary_keys = false; // Not from list
         Allocator* alloc = nullptr;
         Group* group = nullptr;
+        StringInterner* interner = nullptr;
     };
     static void get_any(QueryCtrlBlock&, Mixed, size_t);
 };

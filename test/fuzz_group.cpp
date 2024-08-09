@@ -79,7 +79,6 @@ enum INS {
     CREATE_TABLE_VIEW,
     COMPACT,
     IS_NULL,
-    ENUMERATE_COLUMN,
 
     COUNT
 };
@@ -595,19 +594,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, std:
                         *log << "wt->get_table(" << table_key << ")->remove_object_recursive(" << key << ");\n";
                     }
                     t->remove_object_recursive(key);
-                }
-            }
-            else if (instr == ENUMERATE_COLUMN && wt->size() > 0) {
-                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
-                TableRef t = wt->get_table(table_key);
-                auto all_col_keys = t->get_column_keys();
-                if (!all_col_keys.empty()) {
-                    size_t ndx = get_next(s) % all_col_keys.size();
-                    ColKey col = all_col_keys[ndx];
-                    if (log) {
-                        *log << "wt->get_table(" << table_key << ")->enumerate_string_column(" << col << ");\n";
-                    }
-                    wt->get_table(table_key)->enumerate_string_column(col);
                 }
             }
             else if (instr == COMMIT) {

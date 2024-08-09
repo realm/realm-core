@@ -24,10 +24,13 @@
 #include <stdexcept>
 #include <string>
 #include <iostream>
+#include <memory>
 
 #include <realm/util/assert.hpp>
-#include <memory>
 #include <realm/unicode.hpp>
+#include <realm/array.hpp>
+#include <realm/string_interner.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 #include "test.hpp"
 
@@ -86,10 +89,22 @@ const char* u16sur2 = "\xF0\xA0\x9C\xB1"; // same as above, with larger unicode
 
 TEST(UTF8_Compare_Strings)
 {
+    Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
+
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), std::string("b"));
-    auto str_compare = [](StringData a, StringData b) {
-        return a < b;
+
+    auto str_compare = [&interner, this](StringData a, StringData b) {
+        auto id1 = interner.intern(a);
+        auto id2 = interner.intern(b);
+        const auto ret_interner_cmp = interner.compare(id1, id2) < 0;
+        const auto ret_cmp = a < b;
+        CHECK_EQUAL(ret_cmp, ret_interner_cmp);
+        return ret_cmp;
     };
 
     // simplest test
@@ -141,9 +156,21 @@ TEST(UTF8_Compare_Strings)
 
 TEST(UTF8_Compare_Core_utf8)
 {
-    auto str_compare = [](StringData a, StringData b) {
-        return a < b;
+    Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
+
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    auto str_compare = [&interner, this](StringData a, StringData b) {
+        auto id1 = interner.intern(a);
+        auto id2 = interner.intern(b);
+        const auto ret_interner_cmp = interner.compare(id1, id2) < 0;
+        const auto ret_cmp = a < b;
+        CHECK_EQUAL(ret_cmp, ret_interner_cmp);
+        return ret_cmp;
     };
+
     // single utf16 code points (tests mostly Windows)
     CHECK_EQUAL(false, str_compare(uae, uae));
     CHECK_EQUAL(false, str_compare(uAE, uAE));
@@ -169,7 +196,6 @@ TEST(UTF8_Compare_Core_utf8)
     CHECK_EQUAL(false, str_compare(u16sur2, u16sur2));
 }
 
-
 TEST(UTF8_Compare_Core_utf8_invalid)
 {
     // Test that invalid utf8 won't make decisions on data beyond Realm payload. Do
@@ -194,8 +220,17 @@ TEST(UTF8_Compare_Core_utf8_invalid)
     // that return value is arbitrary for invalid utf8
     bool ret = i1 < i2;
     CHECK_EQUAL(ret, i2 < i1); // must sort the same as before regardless of succeeding data
-}
 
+    // the same applies if the strings are interned.
+    Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+    auto id1 = interner.intern(invalid1);
+    auto id2 = interner.intern(invalid2);
+    bool ret_interned = interner.compare(id1, id2) < 0;
+    CHECK_EQUAL(ret_interned, ret);
+}
 
 TEST(Compare_Core_utf8_invalid_crash)
 {
@@ -218,12 +253,22 @@ TEST(Compare_Core_utf8_invalid_crash)
     }
 }
 
-
 TEST(UTF8_Compare_Core_utf8_zero)
 {
-    auto str_compare = [](StringData a, StringData b) {
-        return a < b;
+    Array parent(Allocator::get_default());
+    _impl::DeepArrayDestroyGuard dg(&parent);
+    parent.create(NodeHeader::type_HasRefs, false, 1, 0);
+    StringInterner interner(Allocator::get_default(), parent, ColKey(0), true);
+
+    auto str_compare = [&interner, this](StringData a, StringData b) {
+        auto id1 = interner.intern(a);
+        auto id2 = interner.intern(b);
+        const auto ret_interner_cmp = interner.compare(id1, id2) < 0;
+        const auto ret_cmp = a < b;
+        CHECK_EQUAL(ret_cmp, ret_interner_cmp);
+        return ret_cmp;
     };
+
     // Realm must support 0 characters in utf8 strings
     CHECK_EQUAL(false, str_compare(StringData("\0", 1), StringData("\0", 1)));
     CHECK_EQUAL(true, str_compare(StringData("\0", 1), StringData("a")));
@@ -238,7 +283,6 @@ TEST(UTF8_Compare_Core_utf8_zero)
     CHECK_EQUAL(true, str_compare(StringData("a\0", 2), StringData("a\0\0", 3)));
     CHECK_EQUAL(false, str_compare(StringData("a\0\0", 3), StringData("a\0", 2)));
 }
-
 } // anonymous namespace
 
 #endif // TEST_UTF8

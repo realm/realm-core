@@ -891,45 +891,6 @@ void ClusterTree::clear(CascadeState& state)
     m_size = 0;
 }
 
-void ClusterTree::enumerate_string_column(ColKey col_key)
-{
-    Allocator& alloc = get_alloc();
-
-    ArrayString keys(alloc);
-    ArrayString leaf(alloc);
-    keys.create();
-
-    auto collect_strings = [col_key, &leaf, &keys](const Cluster* cluster) {
-        cluster->init_leaf(col_key, &leaf);
-        size_t sz = leaf.size();
-        size_t key_size = keys.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto v = leaf.get(i);
-            size_t pos = keys.lower_bound(v);
-            if (pos == key_size || keys.get(pos) != v) {
-                keys.insert(pos, v); // Throws
-                key_size++;
-            }
-        }
-
-        return IteratorControl::AdvanceToNext;
-    };
-
-    auto upgrade = [col_key, &keys](Cluster* cluster) {
-        cluster->upgrade_string_to_enum(col_key, keys);
-    };
-
-    // Populate 'keys' array
-    traverse(collect_strings);
-
-    // Store key strings in spec
-    size_t spec_ndx = m_owner->colkey2spec_ndx(col_key);
-    const_cast<Spec*>(&m_owner->m_spec)->upgrade_string_to_enum(spec_ndx, keys.get_ref());
-
-    // Replace column in all clusters
-    update(upgrade);
-}
-
 void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 {
     if (new_root != m_root) {
@@ -1095,13 +1056,12 @@ void ClusterTree::update(UpdateFunction func)
     }
 }
 
-void ClusterTree::set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const
+void ClusterTree::set_string_interner(ArrayPayload& arr, ColKey col_key) const
 {
     // Check for owner. This function may be called in context of DictionaryClusterTree
     // in which case m_owner is null (and spec never needed).
     if (m_owner) {
-        auto spec_ndx = m_owner->leaf_ndx2spec_ndx(col_ndx);
-        arr.set_spec(&m_owner->m_spec, spec_ndx);
+        arr.set_string_interner(m_owner->get_string_interner(col_key));
     }
 }
 
@@ -1132,12 +1092,6 @@ void ClusterTree::nullify_incoming_links(ObjKey obj_key, CascadeState& state)
 {
     REALM_ASSERT(state.m_group);
     m_root->nullify_incoming_links(ClusterNode::RowKey(obj_key), state);
-}
-
-bool ClusterTree::is_string_enum_type(ColKey::Idx col_ndx) const
-{
-    size_t spec_ndx = m_owner->leaf_ndx2spec_ndx(col_ndx);
-    return m_owner->m_spec.is_string_enum_type(spec_ndx);
 }
 
 void ClusterTree::remove_all_links(CascadeState& state)
