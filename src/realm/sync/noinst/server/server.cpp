@@ -1802,9 +1802,8 @@ private:
                 using Range = ProtocolVersionRange;
                 formatter.reset();
                 format_ranges(protocol_version_ranges); // Throws
-                logger.error("Protocol version negotiation failed: %1 "
-                             "(client supports: %2)",
-                             elaboration, std::string_view(formatter.data(), formatter.size())); // Throws
+                logger.error("Protocol version negotiation failed. (client supports: %1)",
+                             std::string_view(formatter.data(), formatter.size())); // Throws
                 formatter.reset();
                 formatter << "Protocol version negotiation failed: "
                              ""

@@ -110,6 +110,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/network/default_socket.cpp",
     "realm/sync/network/http.cpp",
     "realm/sync/network/network.cpp",
+    "realm/sync/network/network_error.cpp",
     "realm/sync/network/network_ssl.cpp",
     "realm/sync/network/websocket.cpp",
     "realm/sync/noinst/changeset_index.cpp",

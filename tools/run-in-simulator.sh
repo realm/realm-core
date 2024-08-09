@@ -15,6 +15,13 @@ runtimeId="$(xcrun simctl list runtimes | grep -o 'com.apple.CoreSimulator.SimRu
 xcrun simctl create "$id" com.apple.CoreSimulator.SimDeviceType.iPhone-11 "$runtimeId"
 xcrun simctl boot "$id"
 
+function cleanup() {
+    xcrun simctl shutdown "$id"
+    xcrun simctl delete "$id"
+}
+
+trap "cleanup" EXIT
+
 xcrun simctl install "$id" "$appPath"
 xcrun simctl launch --console-pty "$id" "$bundleId"
 
@@ -28,5 +35,3 @@ while [ ! -s "$outputFile" ] && [ $((retries++)) -lt 100 ]; do
     sleep 5
 done
 
-xcrun simctl shutdown "$id"
-xcrun simctl delete "$id"
