@@ -230,11 +230,7 @@ struct WebSocketObserver {
     /// @param data A util::Span containing the data received from the server.
     ///             The buffer is only valid until the function returns.
     ///
-    /// @return bool designates whether the WebSocket object should continue
-    ///         processing messages. The normal return value is true . False must
-    ///         be returned if the websocket object has been destroyed during
-    ///         execution of the function.
-    virtual bool websocket_binary_message_received(util::Span<const char> data) = 0;
+    virtual void websocket_binary_message_received(util::Span<const char> data) = 0;
 
     /// Called whenever the WebSocket connection has been closed, either as a result
     /// of a WebSocket error or a normal close.
@@ -244,12 +240,7 @@ struct WebSocketObserver {
     /// @param error_code The error code received or synthesized when the websocket was closed.
     /// @param message    The message received in the close frame when the websocket was closed.
     ///
-    /// @return bool designates whether the WebSocket object has been destroyed
-    ///         during the execution of this function. The normal return value is
-    ///         True to indicate the WebSocket object is no longer valid. If False
-    ///         is returned, the WebSocket object will be destroyed at some point
-    ///         in the future.
-    virtual bool websocket_closed_handler(bool was_clean, websocket::WebSocketError error_code,
+    virtual void websocket_closed_handler(bool was_clean, websocket::WebSocketError error_code,
                                           std::string_view message) = 0;
 };
 

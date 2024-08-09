@@ -159,14 +159,14 @@ public:
         m_observer->websocket_error_handler();
     }
 
-    bool websocket_binary_message_received(util::Span<const char> data) final
+    void websocket_binary_message_received(util::Span<const char> data) final
     {
-        return m_observer->websocket_binary_message_received(data);
+        m_observer->websocket_binary_message_received(data);
     }
 
-    bool websocket_closed_handler(bool was_clean, sync::websocket::WebSocketError code, std::string_view msg) final
+    void websocket_closed_handler(bool was_clean, sync::websocket::WebSocketError code, std::string_view msg) final
     {
-        return m_observer->websocket_closed_handler(was_clean, code, msg);
+        m_observer->websocket_closed_handler(was_clean, code, msg);
     }
 
 private:
@@ -297,23 +297,19 @@ RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm
         realm_websocket_observer->get()->websocket_error_handler();
 }
 
-RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
+RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
                                                  const char* data, size_t data_size)
 {
-    if (!realm_websocket_observer)
-        return false;
-
-    return realm_websocket_observer->get()->websocket_binary_message_received(util::Span{data, data_size});
+    if (realm_websocket_observer)
+        realm_websocket_observer->get()->websocket_binary_message_received(util::Span{data, data_size});
 }
 
-RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
+RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
                                                 realm_web_socket_errno_e code, const char* reason)
 {
-    if (!realm_websocket_observer)
-        return false;
-
-    return realm_websocket_observer->get()->websocket_closed_handler(
-        was_clean, static_cast<sync::websocket::WebSocketError>(code), reason);
+    if (realm_websocket_observer)
+        realm_websocket_observer->get()->websocket_closed_handler(
+            was_clean, static_cast<sync::websocket::WebSocketError>(code), reason);
 }
 
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t* config,

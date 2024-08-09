@@ -572,7 +572,6 @@ public:
         for (int i = 0; i < m_num_clients; ++i) {
             m_clients[i]->shutdown_and_wait();
         }
-        m_client_socket_providers.clear();
         for (int i = 0; i < m_num_servers; ++i) {
             if (m_server_threads[i].joinable())
                 CHECK(!m_server_threads[i].join());
