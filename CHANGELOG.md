@@ -27,6 +27,7 @@
 
 ### Internals
 * Reverted the bfd linker override in the Linux-armv7 toolchain file because the upstream OpenSSL issue it was working around was resolved.
+* Fix a test failure in "sync progress: flx download progress add new objects while in the steady state" while running against QBSv2 ([PR #7953](https://github.com/realm/realm-core/pull/7953)).
 
 ----------------------------------------------
 
