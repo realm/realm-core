@@ -140,19 +140,20 @@ void Replication::erase_column(const Table* t, ColKey col_key)
     m_encoder.erase_column(col_key); // Throws
 }
 
-void Replication::track_new_object(ObjKey key)
+void Replication::track_new_object(const Table* table, ObjKey key)
 {
-    m_selected_obj = key;
-    m_selected_collection = CollectionId();
-    m_newly_created_object = true;
+    if (table == m_selected_table) {
+        m_selected_obj = key;
+        m_selected_obj_is_newly_created = true;
+    }
 
-    auto table_index = m_selected_table->get_index_in_group();
+    auto table_index = table->get_index_in_group();
     if (table_index >= m_most_recently_created_object.size()) {
         if (table_index >= m_most_recently_created_object.capacity())
             m_most_recently_created_object.reserve(table_index * 2);
         m_most_recently_created_object.resize(table_index + 1);
     }
-    m_most_recently_created_object[table_index] = m_selected_obj;
+    m_most_recently_created_object[table_index] = key;
 }
 
 void Replication::create_object(const Table* t, GlobalKey id)
@@ -162,7 +163,7 @@ void Replication::create_object(const Table* t, GlobalKey id)
     }
     select_table(t);                              // Throws
     m_encoder.create_object(id.get_local_key(0)); // Throws
-    track_new_object(id.get_local_key(0));        // Throws
+    track_new_object(t, id.get_local_key(0));     // Throws
 }
 
 void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mixed pk)
@@ -173,13 +174,12 @@ void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mix
     }
     select_table(t);              // Throws
     m_encoder.create_object(key); // Throws
-    track_new_object(key);
+    track_new_object(t, key);
 }
 
 void Replication::create_linked_object(const Table* t, ObjKey key)
 {
-    select_table(t);       // Throws
-    track_new_object(key); // Throws
+    track_new_object(t, key); // Throws
     // Does not need to encode anything as embedded tables can't be observed
 }
 
@@ -207,30 +207,37 @@ void Replication::do_select_table(const Table* table)
     m_selected_table = table;
     m_selected_collection = CollectionId();
     m_selected_obj = ObjKey();
+    m_selected_obj_is_newly_created = false;
 }
 
-void Replication::do_select_obj(ObjKey key)
+bool Replication::check_for_newly_created_object(ObjKey key, const Table* table)
 {
-    m_selected_obj = key;
-    m_selected_collection = CollectionId();
-
-    auto table_index = m_selected_table->get_index_in_group();
+    auto table_index = table->get_index_in_group();
     if (table_index < m_most_recently_created_object.size()) {
-        m_newly_created_object = m_most_recently_created_object[table_index] == key;
+        return m_most_recently_created_object[table_index] == key;
     }
-    else {
-        m_newly_created_object = false;
+    return false;
+}
+
+bool Replication::do_select_obj(ObjKey key, const Table* table)
+{
+    bool newly_created = check_for_newly_created_object(key, table);
+    if (!newly_created) {
+        select_table(table);
+        m_selected_obj = key;
+        m_selected_obj_is_newly_created = false;
+        m_selected_collection = CollectionId();
     }
 
     if (auto logger = would_log(LogLevel::debug)) {
-        auto class_name = m_selected_table->get_class_name();
-        if (m_selected_table->get_primary_key_column()) {
-            auto pk = m_selected_table->get_primary_key(key);
+        auto class_name = table->get_class_name();
+        if (table->get_primary_key_column()) {
+            auto pk = table->get_primary_key(key);
             logger->log(LogCategory::object, LogLevel::debug, "Mutating object '%1' with primary key %2", class_name,
                         pk);
         }
-        else if (m_selected_table->is_embedded()) {
-            auto obj = m_selected_table->get_object(key);
+        else if (table->is_embedded()) {
+            auto obj = table->get_object(key);
             logger->log(LogCategory::object, LogLevel::debug, "Mutating object '%1' with path '%2'", class_name,
                         obj.get_id());
         }
@@ -238,26 +245,21 @@ void Replication::do_select_obj(ObjKey key)
             logger->log(LogCategory::object, LogLevel::debug, "Mutating anonymous object '%1'[%2]", class_name, key);
         }
     }
+    return newly_created;
 }
 
 void Replication::do_select_collection(const CollectionBase& coll)
 {
-    select_table(coll.get_table().unchecked_ptr());
-    ColKey col_key = coll.get_col_key();
-    ObjKey key = coll.get_owner_key();
-    auto path = coll.get_stable_path();
-
-    if (select_obj(key)) {
-        m_encoder.select_collection(col_key, key, path); // Throws
+    if (select_obj(coll.get_owner_key(), coll.get_table().unchecked_ptr())) {
+        m_encoder.select_collection(coll.get_col_key(), coll.get_owner_key(), coll.get_stable_path()); // Throws
+        m_selected_collection = CollectionId(coll);
     }
-    m_selected_collection = CollectionId(coll.get_table()->get_key(), key, std::move(path));
 }
 
 void Replication::do_set(const Table* t, ColKey col_key, ObjKey key, _impl::Instruction variant)
 {
     if (variant != _impl::Instruction::instr_SetDefault) {
-        select_table(t); // Throws
-        if (select_obj(key)) {
+        if (select_obj(key, t)) {                  // Throws
             m_encoder.modify_object(col_key, key); // Throws
         }
     }
@@ -294,8 +296,7 @@ void Replication::set(const Table* t, ColKey col_key, ObjKey key, Mixed value, _
 
 void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key)
 {
-    select_table(t); // Throws
-    if (select_obj(key)) {
+    if (select_obj(key, t)) {                  // Throws
         m_encoder.modify_object(col_key, key); // Throws
     }
     if (auto logger = would_log(LogLevel::trace)) {
@@ -311,10 +312,10 @@ void Replication::add_int(const Table* t, ColKey col_key, ObjKey key, int_fast64
     }
 }
 
-Path Replication::get_prop_name(Path&& path) const
+Path Replication::get_prop_name(ConstTableRef table, Path&& path) const
 {
     auto col_key = path[0].get_col_key();
-    auto prop_name = m_selected_table->get_column_name(col_key);
+    auto prop_name = table->get_column_name(col_key);
     path[0] = PathElement(prop_name);
     return std::move(path);
 }
@@ -328,14 +329,15 @@ void Replication::log_collection_operation(const char* operation, const Collecti
 
     auto path = collection.get_short_path();
     auto col_key = path[0].get_col_key();
-    auto prop_name = m_selected_table->get_column_name(col_key);
+    ConstTableRef table = collection.get_table();
+    auto prop_name = table->get_column_name(col_key);
     path[0] = PathElement(prop_name);
     std::string position;
     if (!index.is_null()) {
         position = util::format(" at position %1", index);
     }
     if (Table::is_link_type(col_key.get_type()) && value.is_type(type_Link)) {
-        auto target_table = m_selected_table->get_opposite_table(col_key);
+        auto target_table = table->get_opposite_table(col_key);
         if (target_table->is_embedded()) {
             logger->log(LogCategory::object, LogLevel::trace, "   %1 embedded object '%2' in %3%4 ", operation,
                         target_table->get_class_name(), path, position);
@@ -381,7 +383,7 @@ void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
     }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Erase '%1' at position %2",
-                    get_prop_name(list.get_short_path()), link_ndx);
+                    get_prop_name(list.get_table(), list.get_short_path()), link_ndx);
     }
 }
 
@@ -392,7 +394,7 @@ void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, si
     }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Move %1 to %2 in '%3'", from_link_ndx, to_link_ndx,
-                    get_prop_name(list.get_short_path()));
+                    get_prop_name(list.get_table(), list.get_short_path()));
     }
 }
 
@@ -417,7 +419,8 @@ void Replication::list_clear(const CollectionBase& list)
         m_encoder.collection_clear(list.size()); // Throws
     }
     if (auto logger = would_log(LogLevel::trace)) {
-        logger->log(LogCategory::object, LogLevel::trace, "   Clear '%1'", get_prop_name(list.get_short_path()));
+        logger->log(LogCategory::object, LogLevel::trace, "   Clear '%1'",
+                    get_prop_name(list.get_table(), list.get_short_path()));
     }
 }
 
@@ -428,7 +431,7 @@ void Replication::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
     }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Nullify '%1' position %2",
-                    m_selected_table->get_column_name(list.get_col_key()), link_ndx);
+                    list.get_table()->get_column_name(list.get_col_key()), link_ndx);
     }
 }
 
@@ -455,7 +458,7 @@ void Replication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed
     }
     if (auto logger = would_log(LogLevel::trace)) {
         logger->log(LogCategory::object, LogLevel::trace, "   Erase %1 from '%2'", key,
-                    get_prop_name(dict.get_short_path()));
+                    get_prop_name(dict.get_table(), dict.get_short_path()));
     }
 }
 
@@ -465,6 +468,7 @@ void Replication::dictionary_clear(const CollectionBase& dict)
         m_encoder.collection_clear(dict.size());
     }
     if (auto logger = would_log(LogLevel::trace)) {
-        logger->log(LogCategory::object, LogLevel::trace, "   Clear '%1'", get_prop_name(dict.get_short_path()));
+        logger->log(LogCategory::object, LogLevel::trace, "   Clear '%1'",
+                    get_prop_name(dict.get_table(), dict.get_short_path()));
     }
 }

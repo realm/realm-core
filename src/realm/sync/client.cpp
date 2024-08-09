@@ -1655,7 +1655,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    auto has_pending_reset = PendingResetStore::has_pending_reset(m_db->start_frozen());
+    auto has_pending_reset = PendingResetStore::has_pending_reset(*m_db->start_frozen());
     if (!has_pending_reset) {
         return; // nothing to do
     }
@@ -1678,7 +1678,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
             logger.debug(util::LogCategory::reset, "Server has acknowledged %1", pending_reset);
 
             auto tr = self->m_db->start_write();
-            auto cur_pending_reset = PendingResetStore::has_pending_reset(tr);
+            auto cur_pending_reset = PendingResetStore::has_pending_reset(*tr);
             if (!cur_pending_reset) {
                 logger.debug(util::LogCategory::reset, "Client reset cycle detection tracker already removed.");
                 return;
@@ -1689,7 +1689,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
             else {
                 logger.info(util::LogCategory::reset, "Found new %1", cur_pending_reset);
             }
-            PendingResetStore::clear_pending_reset(tr);
+            PendingResetStore::clear_pending_reset(*tr);
             tr->commit();
         });
 }

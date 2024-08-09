@@ -714,7 +714,7 @@ void ClientHistory::set_reciprocal_transform(version_type version, BinaryData da
     std::size_t index = size_t(version - m_sync_history_base_version) - 1;
     REALM_ASSERT(index < sync_history_size());
 
-    if (data.is_null()) {
+    if (data.size() == 0) {
         m_arrays->reciprocal_transforms.set(index, BinaryData{"", 0}); // Throws
         return;
     }
