@@ -15,7 +15,7 @@
 * Fixed issues loading the native Realm libraries on Linux ARMv7 systems when they linked against our bundled OpenSSL resulting in errors like `unexpected reloc type 0x03`. ([#7947](https://github.com/realm/realm-core/issues/7947), since v14.1.0)
 
 ### Breaking changes
-* None.
+* Progress notifications that would previously report transferrable and transferred values of 0 are no longer being reported. ([PR #7971](https://github.com/realm/realm-core/pull/7971))
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
