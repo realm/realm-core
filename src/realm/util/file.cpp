@@ -1774,7 +1774,7 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
 #ifndef _WIN32
     char* extension_start_addr = (char*)m_addr + m_size;
     size_t extension_size = size - m_size;
-    size_t extension_start_offset = m_offset + m_size;
+    size_t extension_start_offset = static_cast<size_t>(m_offset) + m_size;
 #if REALM_ENABLE_ENCRYPTION
     if (m_encrypted_mapping) {
         void* got_addr = ::mmap(extension_start_addr, extension_size, PROT_READ | PROT_WRITE,

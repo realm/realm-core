@@ -880,7 +880,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
     SECTION("flx streaming notifiers") {
         // clang-format off
         TestValues test_values = GENERATE(
-            // resgisters at the begining and should see all entries.
+            // registers at the begining and should see all entries.
             TestValues{{
                 TestInputValue{TestInputValue::IsRegistration{}},
                 TestInputValue{0, 0, 0, 0},
@@ -903,6 +903,7 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
                 ProgressEntry{900, 1000, 0.6},
                 ProgressEntry{1000, 1000, 1},
             }, 1},
+            // registers in the middle of the initial download
             TestValues{{
                 TestInputValue{1, 0.2, 300, 600},
                 TestInputValue{1, 0.4, 400, 600},
@@ -924,6 +925,28 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             }, {
                 ProgressEntry{900, 900, 1},
                 ProgressEntry{1000, 1000, 1},
+            }, 1},
+            // new subscription is added after registration which results in more data being downloaded
+            TestValues{{
+                TestInputValue{2, 1, 900, 900},
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{3, 0, 900, 1000},
+                TestInputValue{3, 1, 1000, 1000}
+            }, {
+                ProgressEntry{900, 900, 1},
+                ProgressEntry{900, 1000, 0},
+                ProgressEntry{1000, 1000, 1},
+            }, 1},
+            // new subscription is added after registration which doesn't result in more data being downloaded
+            TestValues{{
+                TestInputValue{2, 1, 900, 900},
+                TestInputValue{TestInputValue::IsRegistration{}},
+                TestInputValue{3, 0, 900, 900},
+                TestInputValue{3, 1, 900, 900}
+            }, {
+                ProgressEntry{900, 900, 1},
+                ProgressEntry{900, 900, 0},
+                ProgressEntry{900, 900, 1},
             }, 1}
         );
         // clang-format on
@@ -987,7 +1010,6 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             // registers for a notifier for a later query version - should only see notifications
             // for downloads greater than the requested query version
             TestValues{{
-
                 TestInputValue{TestInputValue::IsRegistration{}},
                 TestInputValue{1, 0.8, 700, 700},
                 TestInputValue{1, 1, 700, 700},
@@ -1171,22 +1193,7 @@ TEMPLATE_TEST_CASE("progress notifications fire immediately when fully caught up
         auto async_open_task = Realm::get_synchronized_realm(config);
         auto async_open_progress = util::make_bind<WaitableProgress>(logger, "async open non-streaming progress ");
         async_open_task->register_download_progress_notifier(async_open_progress->make_cb());
-        auto [promise, future] = util::make_promise_future<ThreadSafeReference>();
-        async_open_task->start(
-            [promise = std::move(promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
-                if (ouch) {
-                    try {
-                        std::rethrow_exception(ouch);
-                    }
-                    catch (...) {
-                        promise.set_error(exception_to_status());
-                    }
-                }
-                else {
-                    promise.emplace_value(std::move(ref));
-                }
-            });
-
+        auto future = async_open_task->start();
         auto realm = Realm::get_shared_realm(std::move(future).get());
         auto noop_download_progress = util::make_bind<WaitableProgress>(logger, "non-streaming download ");
         auto noop_token = realm->sync_session()->register_progress_notifier(
@@ -1294,6 +1301,261 @@ TEMPLATE_TEST_CASE("sync progress: upload progress", "[sync][baas][progress]", P
     streaming_entries = streaming_progress->wait_for_full_sync();
     REQUIRE_THAT(streaming_entries, ProgressIncreasesMatcher{ProgressIncreasesMatcher::ByteCountOnly});
     REQUIRE(non_streaming_progress->empty());
+}
+
+namespace {
+struct EstimatesAreValid : Catch::Matchers::MatcherGenericBase {
+    size_t initial_object_count = 0;
+    EstimatesAreValid(size_t initial_count = 0)
+        : initial_object_count(initial_count)
+    {
+    }
+
+    bool match(std::vector<double> const& entries) const
+    {
+        // Download progress should always end with an estimate of 1
+        if (entries.empty() || entries.back() != 1)
+            return false;
+
+        // All estimates should be between 0 and 1
+        for (double estimate : entries) {
+            if (estimate < 0 || estimate > 1)
+                return false;
+        }
+
+        // The server will sometimes send us the final non-empty DOWNLOAD with
+        // an estimate of 0.9999 and then an empty DOWNLOAD with 1. We can use
+        // exact equality here because it's a specific sentinel value and not
+        // the result of a computation.
+        size_t size = entries.size();
+        if (size >= 2 && entries[size - 2] == 0.9999)
+            --size;
+        if (size == 1)
+            return true;
+
+        // The actual progress for the first message should be the number of
+        // objects downloaded divided by the total number of objects, but in
+        // practice the server starts with a lower estimate so that's only an
+        // upper bound.
+        double expected_first = double(initial_object_count + 1) / (initial_object_count + size);
+        if (entries.front() > expected_first + .01)
+            return false;
+
+        // As each of our DOWNLOAD messages have a fixed size, the progress
+        // estimate should go up by the same amount each time.
+        double expected_step = (1.0 - entries.front()) / (size - 1);
+        for (size_t i = 1; i < size; ++i) {
+            double expected = entries.front() + i * expected_step;
+            if (!WithinRel(entries[i], 0.1).match(expected)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    std::string describe() const override
+    {
+        return "estimated progress must progress from non-1 to 1 in fixed-size non-zero steps";
+    }
+};
+} // namespace
+
+TEST_CASE("sync progress: flx download progress", "[sync][baas][progress]") {
+    static std::optional<FLXSyncTestHarness> harness;
+
+    std::unique_ptr<char[]> buffer;
+    const auto create_object = [&](const std::shared_ptr<Realm>& realm, int id) {
+        const size_t padding_size = 1024 * 1024;
+        if (!buffer)
+            buffer = std::make_unique<char[]>(padding_size);
+        auto table = realm->read_group().get_table("class_object");
+        auto obj = table->create_object_with_primary_key(ObjectId::gen());
+        obj.set("int", id);
+        // ensure that each object is large enough that it'll be sent in
+        // a separate DOWNLOAD message
+        obj.set("padding", BinaryData(buffer.get(), padding_size));
+    };
+
+    if (!harness) {
+        Schema schema{
+            {"object",
+             {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+              {"int", PropertyType::Int | PropertyType::Nullable},
+              {"padding", PropertyType::Data}}},
+        };
+        realm::app::FLXSyncTestHarness::ServerSchema server_schema{std::move(schema), {"int"}};
+        harness.emplace("flx_download_progress", std::move(server_schema));
+        harness->load_initial_data([&](const std::shared_ptr<Realm>& realm) {
+            for (int i = 0; i < 5; ++i)
+                create_object(realm, i);
+        });
+    }
+
+    SyncTestFile config = harness->make_test_file();
+
+    SECTION("async open with no subscriptions") {
+        auto task = Realm::get_synchronized_realm(config);
+        std::vector<double> estimates;
+        task->register_download_progress_notifier([&](uint64_t, uint64_t, double estimate) {
+            // Note that no locking is needed here despite this being called on
+            // a background thread as the test provides the required synchronization.
+            // We register the notifier at a point where no notifications should
+            // be in process, and then wait on a Future which should be fulfilled
+            // after the final progress update is sent. If tsan complains about
+            // this, it means that progress updates are being sent at a time
+            // outside of the expected window and that's the bug to fix.
+            estimates.push_back(estimate);
+        });
+        task->start().get();
+        // A download happens for the schema, but we now don't report that
+        REQUIRE(estimates.size() == 0);
+    }
+
+    SECTION("async open with initial subscriptions") {
+        config.sync_config->subscription_initializer = [](const std::shared_ptr<Realm>& realm) {
+            subscribe_to_all(*realm);
+        };
+        auto task = Realm::get_synchronized_realm(config);
+        std::vector<double> estimates;
+        task->register_download_progress_notifier([&](uint64_t, uint64_t, double estimate) {
+            // See above about the lack of locking
+            estimates.push_back(estimate);
+        });
+        task->start().get();
+
+        // Since our objects are larger than the server's soft limit for batching
+        // (1 MB), we expect to receive a separate DOWNLOAD message for each
+        // object. We also happen to get an empty DOWNLOAD at the end, but we
+        // don't want to require that.
+        REQUIRE(estimates.size() >= 5);
+        REQUIRE_THAT(estimates, EstimatesAreValid());
+    }
+
+    SECTION("multiple subscription updates which each trigger some downloads") {
+        auto realm = successfully_async_open_realm(config);
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("int");
+
+        std::vector<double> estimates;
+        realm->sync_session()->register_progress_notifier(
+            [&](uint64_t, uint64_t, double estimate) {
+                // See above about the lack of locking
+                estimates.push_back(estimate);
+            },
+            SyncSession::ProgressDirection::download, true);
+
+        for (int i = 4; i > -2; i -= 2) {
+            auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
+            sub_set.insert_or_assign(table->where().greater(col, i));
+            sub_set.commit().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+
+            // We get a variable number of DOWNLOAD messages per update but it should always be at least one
+            REQUIRE(estimates.size() >= 1);
+            REQUIRE_THAT(estimates, EstimatesAreValid());
+
+            estimates.clear();
+        }
+    }
+
+    SECTION("add subscription which doesn't add new objects") {
+        auto realm = successfully_async_open_realm(config);
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("int");
+
+        std::vector<double> estimates;
+        realm->sync_session()->register_progress_notifier(
+            [&](uint64_t, uint64_t, double estimate) {
+                // See above about the lack of locking
+                estimates.push_back(estimate);
+            },
+            SyncSession::ProgressDirection::download, true);
+
+        {
+            auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
+            sub_set.insert_or_assign(table->where().less(col, 5));
+            sub_set.commit().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
+        estimates.clear();
+
+        // This subscription change should not actually result in any new objects
+        {
+            auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
+            sub_set.insert_or_assign(table->where().less(col, 10));
+            sub_set.commit().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
+        // We expect just a single update with progress_estimate=1, but the
+        // server could legally send us multiple empty DOWNLOADs
+        REQUIRE(estimates.size() >= 1);
+        REQUIRE_THAT(estimates, EstimatesAreValid());
+    }
+
+    SECTION("add new objects while in the steady state") {
+        config.sync_config->subscription_initializer = [](const std::shared_ptr<Realm>& realm) {
+            subscribe_to_all(*realm);
+        };
+        auto online_realm = successfully_async_open_realm(config);
+
+        SyncTestFile config2 = harness->make_test_file();
+        config2.sync_config->subscription_initializer = config.sync_config->subscription_initializer;
+        auto suspended_realm = successfully_async_open_realm(config2);
+
+        std::vector<double> online_estimates;
+        online_realm->sync_session()->register_progress_notifier(
+            [&](uint64_t, uint64_t, double estimate) {
+                // See above about the lack of locking
+                online_estimates.push_back(estimate);
+            },
+            SyncSession::ProgressDirection::download, true);
+
+        std::vector<double> suspended_estimates;
+        suspended_realm->sync_session()->register_progress_notifier(
+            [&](uint64_t, uint64_t, double estimate) {
+                // See above about the lack of locking
+                suspended_estimates.push_back(estimate);
+            },
+            SyncSession::ProgressDirection::download, true);
+
+        // We should get the initial notification that downloads are already complete
+        wait_for_download(*online_realm);
+        wait_for_download(*suspended_realm);
+        REQUIRE(online_estimates == std::vector{1.0});
+        REQUIRE(suspended_estimates == std::vector{1.0});
+
+        online_estimates.clear();
+        suspended_estimates.clear();
+        suspended_realm->sync_session()->pause();
+
+        harness->do_with_new_realm([&](const std::shared_ptr<Realm>& realm) {
+            subscribe_to_all(*realm);
+            for (int i = 5; i < 10; ++i) {
+                realm->begin_transaction();
+                create_object(realm, i);
+                realm->commit_transaction();
+                wait_for_upload(*realm);
+
+                // The currently connected Realm should receive exactly one
+                // download message telling it that the download is complete as
+                // it's always staying up to date
+                wait_for_download(*online_realm);
+                REQUIRE(online_estimates == std::vector{1.0});
+                online_estimates.clear();
+            }
+        });
+
+        // Once it reconnects, the offline Realm should receive at least five
+        // separate DOWNLOAD messages, each of which should include actual
+        // progress information towards completion
+        suspended_realm->sync_session()->resume();
+        wait_for_download(*suspended_realm);
+        REQUIRE(suspended_estimates.size() >= 5);
+        REQUIRE_THAT(suspended_estimates, EstimatesAreValid(5));
+    }
+
+    SECTION("cleanup") {
+        harness.reset();
+    }
 }
 
 #endif

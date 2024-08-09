@@ -423,7 +423,7 @@ void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, DownloadableProgress downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
     util::Logger& logger, const TransactionRef& transact,
-    util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr)
+    util::UniqueFunction<void(const Transaction&, util::Span<Changeset>)> run_in_write_tr)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
     REALM_ASSERT(
@@ -502,7 +502,7 @@ void ClientHistory::integrate_server_changesets(
             update_sync_progress(progress, downloadable_bytes); // Throws
         }
         if (run_in_write_tr) {
-            run_in_write_tr(transact, changesets_for_cb);
+            run_in_write_tr(*transact, changesets_for_cb);
         }
 
         // The reason we can use the `origin_timestamp`, and the `origin_file_ident`
@@ -610,14 +610,13 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
 }
 
 
-void ClientHistory::get_upload_download_state(DB& db, std::uint_fast64_t& downloaded_bytes,
+void ClientHistory::get_upload_download_state(Transaction& rt, Allocator& alloc, std::uint_fast64_t& downloaded_bytes,
                                               DownloadableProgress& downloadable_bytes,
                                               std::uint_fast64_t& uploaded_bytes,
                                               std::uint_fast64_t& uploadable_bytes,
                                               std::uint_fast64_t& snapshot_version, version_type& uploaded_version)
 {
-    TransactionRef rt = db.start_read(); // Throws
-    version_type current_client_version = rt->get_version();
+    version_type current_client_version = rt.get_version();
 
     downloaded_bytes = 0;
     downloadable_bytes = uint64_t(0);
@@ -627,11 +626,11 @@ void ClientHistory::get_upload_download_state(DB& db, std::uint_fast64_t& downlo
     uploaded_version = 0;
 
     using gf = _impl::GroupFriend;
-    ref_type ref = gf::get_history_ref(*rt);
+    ref_type ref = gf::get_history_ref(rt);
     if (!ref)
         return;
 
-    Array root(db.get_alloc());
+    Array root(alloc);
     root.init_from_ref(ref);
     downloaded_bytes = root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int();
     downloadable_bytes = root.get_as_ref_or_tagged(s_progress_downloadable_bytes_iip).get_as_int();
@@ -642,9 +641,9 @@ void ClientHistory::get_upload_download_state(DB& db, std::uint_fast64_t& downlo
     if (uploaded_version == current_client_version)
         return;
 
-    BinaryColumn changesets(db.get_alloc());
+    BinaryColumn changesets(alloc);
     changesets.init_from_ref(root.get_as_ref(s_changesets_iip));
-    IntegerBpTree origin_file_idents(db.get_alloc());
+    IntegerBpTree origin_file_idents(alloc);
     origin_file_idents.init_from_ref(root.get_as_ref(s_origin_file_idents_iip));
 
     // `base_version` is the oldest version we have history for. If this is
@@ -953,6 +952,18 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, Downloada
     trim_sync_history(); // Throws
 }
 
+void ClientHistory::set_download_progress(Transaction& tr, DownloadableProgress p)
+{
+    using gf = _impl::GroupFriend;
+    ref_type ref = gf::get_history_ref(tr);
+    REALM_ASSERT(ref);
+    Array root(gf::get_alloc(tr));
+    root.init_from_ref(ref);
+    gf::set_history_parent(tr, root);
+    REALM_ASSERT(root.size() > s_progress_uploadable_bytes_iip);
+    root.set(s_progress_downloadable_bytes_iip,
+             RefOrTagged::make_tagged(p.as_bytes())); // Throws
+}
 
 void ClientHistory::trim_ct_history()
 {

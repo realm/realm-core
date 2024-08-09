@@ -252,11 +252,21 @@ public:
         const SyncProgress& progress, DownloadableProgress downloadable_bytes,
         util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
         util::Logger&, const TransactionRef& transact,
-        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr);
+        util::UniqueFunction<void(const Transaction&, util::Span<Changeset>)> run_in_write_tr = nullptr);
 
-    static void get_upload_download_state(DB&, std::uint_fast64_t&, DownloadableProgress&, std::uint_fast64_t&,
-                                          std::uint_fast64_t&, std::uint_fast64_t&, version_type&);
+    static void get_upload_download_state(Transaction&, Allocator& alloc, std::uint_fast64_t&, DownloadableProgress&,
+                                          std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
+                                          version_type&);
     static void get_upload_download_state(DB*, std::uint_fast64_t&, std::uint_fast64_t&);
+
+    /// Record the current download progress.
+    ///
+    /// This is used when storing FLX bootstraps to make the progress available
+    /// to other processes which are observing the file. It must be called
+    /// inside of a write transaction. The data stored here is only meaningful
+    /// until the next call of integrate_server_changesets(), which will
+    /// overwrite it.
+    static void set_download_progress(Transaction& tr, DownloadableProgress);
 
     // Overriding member functions in realm::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override;

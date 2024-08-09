@@ -210,12 +210,27 @@ SharedApp App::get_app(CacheMode mode, const AppConfig& config) NO_THREAD_SAFETY
         std::lock_guard lock(s_apps_mutex);
         auto& app = s_apps_cache[config.app_id][base_url_from_app_config(config)];
         if (!app) {
-            app = std::make_shared<App>(Private(), config);
+            app = App::make_app(config);
         }
         return app;
     }
     REALM_ASSERT(mode == CacheMode::Disabled);
+    return App::make_app(config);
+}
+
+SharedApp App::make_app(const AppConfig& config)
+{
+#ifdef __EMSCRIPTEN__
+    if (!config.transport) {
+        // Make a copy and provide a default transport if not provided
+        AppConfig config_copy = config;
+        config_copy.transport = std::make_shared<_impl::EmscriptenNetworkTransport>();
+        return std::make_shared<App>(Private(), config_copy);
+    }
     return std::make_shared<App>(Private(), config);
+#else
+    return std::make_shared<App>(Private(), config);
+#endif
 }
 
 SharedApp App::get_cached_app(const std::string& app_id, const std::optional<std::string>& base_url)
@@ -257,11 +272,6 @@ App::App(Private, const AppConfig& config)
     , m_metadata_store(create_metadata_store(config, *m_file_manager))
     , m_sync_manager(SyncManager::create(config.sync_client_config))
 {
-#ifdef __EMSCRIPTEN__
-    if (!m_config.transport) {
-        m_config.transport = std::make_shared<_impl::EmscriptenNetworkTransport>();
-    }
-#endif
     REALM_ASSERT(m_config.transport);
 
     // if a base url is provided, then verify the value
@@ -835,8 +845,14 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 return completion(nullptr,
                                   AppError(ErrorCodes::BadToken, "Could not log in user: received malformed JWT"));
             }
-            switch_user(user);
-            get_profile(user, std::move(completion));
+
+            get_profile(user, [this, completion = std::move(completion)](const std::shared_ptr<User>& user,
+                                                                         Optional<AppError> error) {
+                if (!error) {
+                    switch_user(user);
+                }
+                completion(user, error);
+            });
         },
         false);
 }

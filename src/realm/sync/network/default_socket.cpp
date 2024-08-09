@@ -120,32 +120,9 @@ private:
         else {
             error = WebSocketError::websocket_fatal_error;
             was_clean = false;
-            if (!body.empty()) {
-                std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
-                auto i = body.find(identifier);
-                if (i != std::string_view::npos) {
-                    std::string_view rest = body.substr(i + identifier.size());
-                    // FIXME: Use std::string_view::begins_with() in C++20.
-                    auto begins_with = [](std::string_view string, std::string_view prefix) {
-                        return (string.size() >= prefix.size() &&
-                                std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
-                    };
-                    if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                        error = WebSocketError::websocket_client_too_old;
-                    }
-                    else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                        error = WebSocketError::websocket_client_too_new;
-                    }
-                    else {
-                        // Other more complicated forms of mismatch
-                        error = WebSocketError::websocket_protocol_mismatch;
-                    }
-                    was_clean = true;
-                }
-            }
         }
 
-        websocket_error_and_close_handler(was_clean, error, ec.message());
+        websocket_error_and_close_handler(was_clean, error, body.empty() ? ec.message() : body);
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {

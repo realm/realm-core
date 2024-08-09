@@ -449,6 +449,8 @@ public:
 private:
     const AppConfig m_config;
 
+    static SharedApp make_app(const AppConfig& config);
+
     util::CheckedMutex m_route_mutex;
     // The following variables hold the different paths to Atlas, depending on the
     // request being performed

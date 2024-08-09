@@ -6,7 +6,6 @@
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
@@ -20,8 +19,6 @@
 #include <realm/util/to_string.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/version.hpp>
-
-#include <realm/sync/network/websocket.hpp> // Only for websocket::Error TODO remove
 
 #include <system_error>
 #include <sstream>
@@ -138,8 +135,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 }
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::session, std::move(config.logger))}
-    , logger{*logger_ptr}
+    : logger(std::make_shared<util::CategoryLogger>(util::LogCategory::session, std::move(config.logger)))
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
     , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
@@ -150,7 +146,6 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_disable_upload_activation_delay{config.disable_upload_activation_delay}
     , m_dry_run{config.dry_run}
     , m_enable_default_port_hack{config.enable_default_port_hack}
-    , m_disable_upload_compaction{config.disable_upload_compaction}
     , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_socket_provider{std::move(config.socket_provider)}
@@ -184,8 +179,6 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.pong_keepalive_timeout); // Throws
     logger.debug("Config param: fast_reconnect_limit = %1 ms",
                  config.fast_reconnect_limit); // Throws
-    logger.debug("Config param: disable_upload_compaction = %1",
-                 config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
     logger.debug(
@@ -592,15 +585,6 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             close_due_to_client_side_error(
                 Status(ErrorCodes::TlsHandshakeFailed, util::format("TLS handshake failed: %1", msg)), IsFatal{false},
                 ConnectionTerminationReason::ssl_certificate_rejected); // Throws
-            break;
-        }
-        case WebSocketError::websocket_client_too_old:
-            [[fallthrough]];
-        case WebSocketError::websocket_client_too_new:
-            [[fallthrough]];
-        case WebSocketError::websocket_protocol_mismatch: {
-            close_due_to_client_side_error({ErrorCodes::SyncProtocolNegotiationFailed, msg}, IsFatal{true},
-                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_fatal_error: {
@@ -1238,6 +1222,14 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
 
+    if (!m_appservices_coid.empty()) {
+        m_appservices_coid.clear();
+        logger.base_logger = make_logger(m_ident, std::nullopt, get_client().logger.base_logger);
+        for (auto& [ident, sess] : m_sessions) {
+            sess->logger.base_logger = Session::make_logger(ident, logger.base_logger);
+        }
+    }
+
     report_connection_state_change(ConnectionState::disconnected, info); // Throws
     initiate_reconnect_wait();                                           // Throws
 }
@@ -1370,13 +1362,8 @@ void Connection::receive_query_error_message(int raw_error_code, std::string_vie
                                             "Received a FLX query error message on a non-FLX sync connection"});
     }
 
-    Session* sess = find_and_validate_session(session_ident, "QUERY_ERROR");
-    if (REALM_UNLIKELY(!sess)) {
-        return;
-    }
-
-    if (auto status = sess->receive_query_error_message(raw_error_code, message, query_version); !status.is_ok()) {
-        close_due_to_protocol_error(std::move(status));
+    if (Session* sess = find_and_validate_session(session_ident, "QUERY_ERROR")) {
+        sess->receive_query_error_message(raw_error_code, message, query_version);
     }
 }
 
@@ -1451,36 +1438,35 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
 void Connection::receive_server_log_message(session_ident_type session_ident, util::Logger::Level level,
                                             std::string_view message)
 {
-    std::string prefix;
-    if (REALM_LIKELY(!m_appservices_coid.empty())) {
-        prefix = util::format("Server[%1]", m_appservices_coid);
-    }
-    else {
-        prefix = "Server";
-    }
-
     if (session_ident != 0) {
         if (auto sess = get_session(session_ident)) {
-            sess->logger.log(LogCategory::session, level, "%1 log: %2", prefix, message);
+            sess->logger.log(LogCategory::session, level, "Server log: %1", message);
             return;
         }
 
-        logger.log(util::LogCategory::session, level, "%1 log for unknown session %2: %3", prefix, session_ident,
+        logger.log(util::LogCategory::session, level, "Server log for unknown session %1: %2", session_ident,
                    message);
         return;
     }
 
-    logger.log(level, "%1 log: %2", prefix, message);
+    logger.log(level, "Server log: %1", message);
 }
 
 
 void Connection::receive_appservices_request_id(std::string_view coid)
 {
-    // Only set once per connection
-    if (!coid.empty() && m_appservices_coid.empty()) {
-        m_appservices_coid = coid;
-        logger.log(util::LogCategory::session, util::LogCategory::Level::info,
-                   "Connected to app services with request id: \"%1\"", m_appservices_coid);
+    if (coid.empty() || !m_appservices_coid.empty()) {
+        return;
+    }
+    m_appservices_coid = coid;
+    logger.log(util::LogCategory::session, util::LogCategory::Level::info,
+               "Connected to app services with request id: \"%1\". Further log entries for this connection will be "
+               "prefixed with \"Connection[%2:%1]\" instead of \"Connection[%2]\"",
+               m_appservices_coid, m_ident);
+    logger.base_logger = make_logger(m_ident, m_appservices_coid, get_client().logger.base_logger);
+
+    for (auto& [ident, sess] : m_sessions) {
+        sess->logger.base_logger = Session::make_logger(ident, logger.base_logger);
     }
 }
 
@@ -1526,6 +1512,16 @@ void Session::cancel_resumption_delay()
 
     if (unbind_process_complete())
         initiate_rebind(); // Throws
+
+    try {
+        process_pending_flx_bootstrap(); // throws
+    }
+    catch (const IntegrationException& error) {
+        on_integration_failure(error);
+    }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
 
     m_conn.one_more_active_unsuspended_session(); // Throws
     if (m_try_again_activation_timer) {
@@ -1583,7 +1579,7 @@ void Session::integrate_changesets(const SyncProgress& progress, std::uint_fast6
     auto transact = get_db()->start_read();
     history.integrate_server_changesets(
         progress, downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
-        [&](const TransactionRef&, util::Span<Changeset> changesets) {
+        [&](const Transaction&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
         }); // Throws
     if (received_changesets.size() == 1) {
@@ -1670,14 +1666,13 @@ Session::~Session()
 }
 
 
-std::string Session::make_logger_prefix(session_ident_type ident)
+std::shared_ptr<util::Logger> Session::make_logger(session_ident_type ident,
+                                                   std::shared_ptr<util::Logger> base_logger)
 {
-    std::ostringstream out;
-    out.imbue(std::locale::classic());
-    out << "Session[" << ident << "]: "; // Throws
-    return out.str();                    // Throws
+    auto prefix = util::format("Session[%1]: ", ident);
+    return std::make_shared<util::PrefixLogger>(util::LogCategory::session, std::move(prefix),
+                                                std::move(base_logger));
 }
-
 
 void Session::activate()
 {
@@ -1715,7 +1710,7 @@ void Session::activate()
     m_conn.one_more_active_unsuspended_session(); // Throws
 
     try {
-        process_pending_flx_bootstrap();
+        process_pending_flx_bootstrap(); // throws
     }
     catch (const IntegrationException& error) {
         on_integration_failure(error);
@@ -1806,18 +1801,19 @@ void Session::send_message()
     if (!m_bind_message_sent)
         return send_bind_message(); // Throws
 
-    if (!m_ident_message_sent) {
-        if (have_client_file_ident())
-            send_ident_message(); // Throws
-        return;
-    }
-
+    // Pending test commands can be sent any time after the BIND message is sent
     const auto has_pending_test_command = std::any_of(m_pending_test_commands.begin(), m_pending_test_commands.end(),
                                                       [](const PendingTestCommand& command) {
                                                           return command.pending;
                                                       });
     if (has_pending_test_command) {
         return send_test_command_message();
+    }
+
+    if (!m_ident_message_sent) {
+        if (have_client_file_ident())
+            send_ident_message(); // Throws
+        return;
     }
 
     if (m_error_to_send)
@@ -1979,6 +1975,7 @@ void Session::send_ident_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_ident_message_sent = true;
+    call_debug_hook(SyncClientHookEvent::IdentMessageSent);
 
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
@@ -2028,17 +2025,21 @@ void Session::send_upload_message()
         target_upload_version = m_pending_flx_sub_set->snapshot_version;
     }
 
+    bool server_version_to_ack =
+        m_upload_progress.last_integrated_server_version < m_download_progress.server_version;
+
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
     get_history().find_uploadable_changesets(m_upload_progress, target_upload_version, uploadable_changesets,
                                              locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
-        // Nothing more to upload right now
-        // If we need to limit upload up to some version other than the last client version available and there are no
-        // changes to upload, then there is no need to send an empty message.
-        if (m_pending_flx_sub_set) {
-            logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
+        // Nothing more to upload right now if:
+        //  1. We need to limit upload up to some version other than the last client version
+        //     available and there are no changes to upload
+        //  2. There are no changes to upload and no server version(s) to acknowledge
+        if (m_pending_flx_sub_set || !server_version_to_ack) {
+            logger.trace("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
                          m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
             // Other messages may be waiting to be sent
             return enlist_to_send(); // Throws
@@ -2054,11 +2055,12 @@ void Session::send_upload_message()
     version_type progress_server_version = m_upload_progress.last_integrated_server_version;
 
     if (!upload_messages_allowed()) {
-        logger.debug("UPLOAD not allowed: upload progress(progress_client_version=%1, progress_server_version=%2, "
+        logger.trace("UPLOAD not allowed (progress_client_version=%1, progress_server_version=%2, "
                      "locked_server_version=%3, num_changesets=%4)",
                      progress_client_version, progress_server_version, locked_server_version,
                      uploadable_changesets.size()); // Throws
-        return;
+        // Other messages may be waiting to be sent
+        return enlist_to_send(); // Throws
     }
 
     logger.debug("Sending: UPLOAD(progress_client_version=%1, progress_server_version=%2, "
@@ -2101,35 +2103,6 @@ void Session::send_upload_message()
 #endif
         }
 
-#if 0 // Upload log compaction is currently not implemented
-        if (!get_client().m_disable_upload_compaction) {
-            ChangesetEncoder::Buffer encode_buffer;
-
-            {
-                // Upload compaction only takes place within single changesets to
-                // avoid another client seeing inconsistent snapshots.
-                ChunkedBinaryInputStream stream{uc.changeset};
-                Changeset changeset;
-                parse_changeset(stream, changeset); // Throws
-                // FIXME: What is the point of setting these? How can compaction care about them?
-                changeset.version = uc.progress.client_version;
-                changeset.last_integrated_remote_version = uc.progress.last_integrated_server_version;
-                changeset.origin_timestamp = uc.origin_timestamp;
-                changeset.origin_file_ident = uc.origin_file_ident;
-
-                compact_changesets(&changeset, 1);
-                encode_changeset(changeset, encode_buffer);
-
-                logger.debug(util::LogCategory::changeset, "Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
-                             encode_buffer.size()); // Throws
-            }
-
-            upload_message_builder.add_changeset(
-                uc.progress.client_version, uc.progress.last_integrated_server_version, uc.origin_timestamp,
-                uc.origin_file_ident, BinaryData{encode_buffer.data(), encode_buffer.size()}); // Throws
-        }
-        else
-#endif
         {
             upload_message_builder.add_changeset(uc.progress.client_version,
                                                  uc.progress.last_integrated_server_version, uc.origin_timestamp,
@@ -2258,13 +2231,10 @@ bool Session::client_reset_if_needed()
     Status cr_status = client_reset_config->error;
     ProtocolErrorInfo::Action cr_action = client_reset_config->action;
 
-    auto on_flx_version_complete = [this](int64_t version) {
-        this->on_flx_sync_version_complete(version);
-    };
     try {
         // The file ident from the fresh realm will be copied over to the local realm
         bool did_reset = client_reset::perform_client_reset(logger, *get_db(), std::move(*client_reset_config),
-                                                            get_flx_subscription_store(), on_flx_version_complete);
+                                                            get_flx_subscription_store());
 
         call_debug_hook(SyncClientHookEvent::ClientResetMergeComplete);
         if (!did_reset) {
@@ -2310,8 +2280,6 @@ bool Session::client_reset_if_needed()
 
     // Checks if there is a pending client reset
     handle_pending_client_reset_acknowledgement();
-
-    update_subscription_version_info();
 
     // If a migration or rollback is in progress, mark it complete when client reset is completed.
     if (auto migration_store = get_migration_store()) {
@@ -2376,22 +2344,16 @@ Status Session::receive_download_message(const DownloadMessage& message)
     if (!is_flx || query_version > 0)
         enable_progress_notifications();
 
-    // If this is a PBS connection, then every download message is its own complete batch.
-    bool last_in_batch = is_flx ? *message.last_in_batch : true;
-    auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
-    if (is_steady_state_download_message(batch_state, query_version))
-        batch_state = DownloadBatchState::SteadyState;
-
     auto&& progress = message.progress;
     if (is_flx) {
         logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                      "latest_server_version=%3, latest_server_version_salt=%4, "
                      "upload_client_version=%5, upload_server_version=%6, progress_estimate=%7, "
-                     "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
+                     "batch_state=%8, query_version=%9, num_changesets=%10, ...)",
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     message.downloadable.as_estimate(), last_in_batch, query_version,
+                     message.downloadable.as_estimate(), message.batch_state, query_version,
                      message.changesets.size()); // Throws
     }
     else {
@@ -2436,6 +2398,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
                                  changeset.remote_version, server_version, progress.download.server_version)};
         }
         server_version = changeset.remote_version;
+
         // Check that per-changeset last integrated client version is "weakly"
         // increasing.
         bool good_client_version =
@@ -2461,22 +2424,22 @@ Status Session::receive_download_message(const DownloadMessage& message)
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
-                                       batch_state, message.changesets.size());
+                                       message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    if (process_flx_bootstrap_message(progress, batch_state, query_version, message.changesets)) {
+    if (process_flx_bootstrap_message(message)) {
         clear_resumption_delay_state();
         return Status::OK();
     }
 
-    initiate_integrate_changesets(message.downloadable.as_bytes(), batch_state, progress,
+    initiate_integrate_changesets(message.downloadable.as_bytes(), message.batch_state, progress,
                                   message.changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                  batch_state, message.changesets.size());
+                                  message.batch_state, message.changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
         return Status::OK();
     }
@@ -2551,16 +2514,10 @@ Status Session::receive_unbound_message()
 }
 
 
-Status Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
+void Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
 {
     logger.info("Received QUERY_ERROR \"%1\" (error_code=%2, query_version=%3)", message, error_code, query_version);
-    // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm and SessionWrapper must
-    // not be accessed any longer.
-    if (m_state == Active) {
-        on_flx_sync_error(query_version, message); // throws
-    }
-    return Status::OK();
+    on_flx_sync_error(query_version, message); // throws
 }
 
 // The caller (Connection) must discard the session if the session has become
@@ -2586,7 +2543,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     // Can't process debug hook actions once the Session is undergoing deactivation, since
     // the SessionWrapper may not be available
     if (m_state == Active) {
-        auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+        auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, &info);
         if (debug_action == SyncClientHookAction::EarlyReturn) {
             return Status::OK();
         }
@@ -2646,7 +2603,7 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
+        call_debug_hook(SyncClientHookEvent::SessionSuspended, &info);
         m_conn.one_less_active_unsuspended_session(); // Throws
         on_suspended(info);                           // Throws
     }

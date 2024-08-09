@@ -195,8 +195,23 @@ public:
     static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
     static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
 
-    const std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    class ForwardingLogger : public util::Logger {
+    public:
+        ForwardingLogger(std::shared_ptr<util::Logger> logger)
+            : Logger(logger->get_category(), *logger)
+            , base_logger(std::move(logger))
+        {
+        }
+
+        void do_log(const util::LogCategory& cat, Level level, const std::string& msg) final
+        {
+            Logger::do_log(*base_logger, cat, level, msg);
+        }
+
+        std::shared_ptr<util::Logger> base_logger;
+    };
+
+    ForwardingLogger logger;
 
     ClientImpl(ClientConfig);
     ~ClientImpl();
@@ -246,7 +261,6 @@ private:
     const bool m_disable_upload_activation_delay;
     const bool m_dry_run; // For testing purposes only
     const bool m_enable_default_port_hack;
-    const bool m_disable_upload_compaction;
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
@@ -392,8 +406,7 @@ public:
     using ReconnectInfo = ClientImpl::ReconnectInfo;
     using DownloadMessage = ClientProtocol::DownloadMessage;
 
-    std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    ForwardingLogger logger;
 
     ClientImpl& get_client() noexcept;
     ReconnectInfo get_reconnect_info() const noexcept;
@@ -574,7 +587,9 @@ private:
     Session* find_and_validate_session(session_ident_type session_ident, std::string_view message) noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
-    static std::string make_logger_prefix(connection_ident_type);
+    static std::shared_ptr<util::Logger> make_logger(connection_ident_type ident,
+                                                     std::optional<std::string_view> coid,
+                                                     std::shared_ptr<util::Logger> base_logger);
 
     void report_connection_state_change(ConnectionState, util::Optional<SessionErrorInfo> error_info = util::none);
 
@@ -694,7 +709,6 @@ private:
     std::string m_signed_access_token;
 };
 
-
 /// A synchronization session between a local and a remote Realm file.
 ///
 /// All use of session objects, including construction and destruction, must
@@ -704,8 +718,7 @@ public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
     using DownloadMessage = ClientProtocol::DownloadMessage;
 
-    std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    ForwardingLogger logger;
 
     ClientImpl& get_client() noexcept;
     Connection& get_connection() noexcept;
@@ -771,10 +784,6 @@ public:
     /// \brief Gets the migration store associated with this Session.
     MigrationStore* get_migration_store();
 
-    /// Update internal client state when a flx subscription becomes complete outside
-    /// of the normal sync process. This can happen during client reset.
-    void on_flx_sync_version_complete(int64_t version);
-
     /// If this session is currently suspended, resume it immediately.
     ///
     /// It is an error to call this function before activation of the session,
@@ -784,7 +793,7 @@ public:
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
     void integrate_changesets(const SyncProgress&, std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
-                              VersionInfo&, DownloadBatchState last_in_batch);
+                              VersionInfo&, DownloadBatchState batch_state);
 
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
@@ -915,21 +924,17 @@ private:
     //@}
 
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
-    void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
     // Processes an FLX download message, if it's a bootstrap message. If it's not a bootstrap
     // message then this is a noop and will return false. Otherwise this will return true
     // and no further processing of the download message should take place.
-    bool process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
-                                       int64_t query_version, const ReceivedChangesets& received_changesets);
+    bool process_flx_bootstrap_message(const DownloadMessage& message);
 
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
     bool client_reset_if_needed();
     void handle_pending_client_reset_acknowledgement();
-
-    void update_subscription_version_info();
 
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 
@@ -1060,7 +1065,7 @@ private:
     request_ident_type m_last_pending_test_command_ident = 0;
     std::list<PendingTestCommand> m_pending_test_commands;
 
-    static std::string make_logger_prefix(session_ident_type);
+    static std::shared_ptr<util::Logger> make_logger(session_ident_type, std::shared_ptr<util::Logger> base_logger);
 
     Session(SessionWrapper& wrapper, Connection&, session_ident_type);
 
@@ -1103,7 +1108,7 @@ private:
     Status receive_mark_message(request_ident_type);
     Status receive_unbound_message();
     Status receive_error_message(const ProtocolErrorInfo& info);
-    Status receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
+    void receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
     Status receive_test_command_response(request_ident_type, std::string_view body);
 
     void initiate_rebind();
@@ -1115,11 +1120,8 @@ private:
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
-    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo* = nullptr);
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
-    SyncClientHookAction call_debug_hook(SyncClientHookEvent event);
-
-    bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
     void init_progress_handler();
     void enable_progress_notifications();
@@ -1319,11 +1321,10 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
 
     bool resume_upload = do_recognize_sync_version(version);
     if (REALM_LIKELY(resume_upload)) {
-        // Since the deactivation process has not been initiated, the UNBIND
-        // message cannot have been sent unless the session was suspended due to
-        // an error.
-        REALM_ASSERT_3(m_suspended, ||, !m_unbind_message_sent);
-        if (m_ident_message_sent && !m_suspended)
+        // Don't attempt to send any updates before the IDENT message has been
+        // sent or after the UNBIND message has been sent or an error message
+        // was received.
+        if (m_ident_message_sent && !m_error_message_received && !m_unbind_message_sent)
             ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1347,9 +1348,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
 }
 
 inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::session, make_logger_prefix(ident),
-                                                      conn.logger_ptr)} // Throws
-    , logger{*logger_ptr}
+    : logger{make_logger(ident, conn.logger.base_logger)} // Throws
     , m_conn{conn}
     , m_ident{ident}
     , m_try_again_delay_info(conn.get_client().m_reconnect_backoff_info, conn.get_client().get_random())
@@ -1394,6 +1393,10 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
         // Request download completion notification
         ++m_target_download_mark;
     }
+
+    // Notify the debug hook of the SessionConnected event before sending
+    // the bind messsage
+    call_debug_hook(SyncClientHookEvent::SessionConnected);
 
     if (!m_suspended) {
         // Ready to send BIND message
@@ -1473,6 +1476,10 @@ inline void ClientImpl::Session::initiate_rebind()
 
     reset_protocol_state();
 
+    // Notify the debug hook of the SessionResumed event before sending
+    // the bind messsage
+    call_debug_hook(SyncClientHookEvent::SessionResumed);
+
     // Ready to send BIND message
     enlist_to_send(); // Throws
 }
@@ -1488,6 +1495,7 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_error_message_received = false;
     m_unbound_message_received = false;
     m_client_error = util::none;
+    m_pending_compensating_write_errors.clear();
 
     m_upload_progress = m_progress.upload;
     m_last_download_mark_sent = m_last_download_mark_received;
