@@ -4,12 +4,10 @@
 
 const char* legend =
     "Simple tool to output the JSON representation of a Realm:\n"
-    "  realm2json [--link-depth N] [--output-mode N] <.realm file>\n"
+    "  realm2json [--output-mode N] <.realm file>\n"
     "\n"
     "Options:\n"
     " --schema: Just output the schema of the realm\n"
-    " --link-depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
-    "for more details. Defaults to 0.\n"
     " --output-mode: Optional formatting for the output \n"
     "      0 - JSON Object\n"
     "      1 - MongoDB Extended JSON (XJSON)\n"
