@@ -536,6 +536,13 @@ void DescriptorOrdering::append_filter(FilterDescriptor filter)
     }
 }
 
+void DescriptorOrdering::append_knn(SemanticSearchDescriptor knn)
+{
+    if (knn.is_valid()) {
+        m_descriptors.emplace_back(new SemanticSearchDescriptor(std::move(knn)));
+    }
+}
+
 void DescriptorOrdering::append(const DescriptorOrdering& other)
 {
     for (const auto& d : other.m_descriptors) {
@@ -592,6 +599,14 @@ bool DescriptorOrdering::will_apply_filter() const
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc->is_valid());
         return desc->get_type() == DescriptorType::Filter;
+    });
+}
+
+bool DescriptorOrdering::will_apply_knn() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc->is_valid());
+        return desc->get_type() == DescriptorType::Knn;
     });
 }
 
@@ -661,5 +676,90 @@ void DescriptorOrdering::get_versions(const Group* group, TableVersions& version
     for (auto table_key : m_dependencies) {
         REALM_ASSERT_DEBUG(group);
         versions.emplace_back(table_key, group->get_table(table_key)->get_content_version());
+    }
+}
+
+std::string SemanticSearchDescriptor::get_description(ConstTableRef) const
+{
+    return "KNN()";
+}
+
+void SemanticSearchDescriptor::execute(const Table& table, KeyValues& key_values, const BaseDescriptor*) const
+{
+    using DistResult = std::pair<float, ObjKey>;
+    class PrioQueue : public std::vector<DistResult> {
+    public:
+        void insert(float dist, ObjKey key)
+        {
+            auto it = std::lower_bound(begin(), end(), dist, [](const DistResult& elem, float value) {
+                return elem.first < value;
+            });
+            emplace(it, dist, key);
+        }
+        auto top()
+        {
+            return back();
+        }
+        void pop()
+        {
+            pop_back();
+        }
+    };
+
+    PrioQueue top_results;
+    size_t dim = m_query_data.size();
+    hnswlib::DISTFUNC<float> fstdistfunc = m_sp.get_dist_func();
+    void* dist_func_param = m_sp.get_dist_func_param();
+    std::vector<float> buf(dim);
+
+    // Calculate the distance between the two vectors (embeddings)
+    auto dist_knn = [&](ObjKey obj_key) -> std::optional<float> {
+        if (Obj o = table.try_get_object(obj_key)) {
+            Lst<float> lst = o.get_list<float>(m_column);
+            if (lst.size() != dim)
+                throw IllegalOperation("Knn distance can only be calculated on lists of matching length");
+
+            // Create sequential buffer of list values
+            for (size_t i = 0; i < dim; i++) {
+                buf[i] = lst.get(i);
+            }
+
+            float dist = fstdistfunc(m_query_data.data(), buf.data(), dist_func_param);
+            return dist;
+        }
+        return {};
+    };
+
+    // Collect the k closest matches by distance
+    size_t n = std::min(m_k, key_values.size());
+    if (n > 0) {
+        for (size_t i = 0; i < n; i++) {
+            ObjKey r = key_values.get(i);
+            float dist = *dist_knn(r);
+            top_results.insert(dist, r);
+        }
+        float lastdist = top_results.empty() ? std::numeric_limits<float>::max() : top_results.top().first;
+        for (size_t i = m_k; i < key_values.size(); i++) {
+            ObjKey r = key_values.get(i);
+
+            if (auto opt_dist = dist_knn(r)) {
+                float dist = *opt_dist;
+                if (dist <= lastdist) {
+                    top_results.insert(dist, r);
+                    if (top_results.size() > m_k)
+                        top_results.pop();
+
+                    if (!top_results.empty()) {
+                        lastdist = top_results.top().first;
+                    }
+                }
+            }
+        }
+    }
+
+    // set result to the matches, in order of closest match first
+    key_values.clear();
+    for (auto tr : top_results) {
+        key_values.add(tr.second);
     }
 }

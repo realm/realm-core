@@ -1660,7 +1660,7 @@ size_t Query::count(const DescriptorOrdering& descriptor) const
 
     size_t limit = size_t(-1);
 
-    if (!descriptor.will_apply_distinct() && !descriptor.will_apply_filter()) {
+    if (!descriptor.will_apply_distinct() && !descriptor.will_apply_filter() && !descriptor.will_apply_knn()) {
         if (bool(min_limit)) {
             limit = *min_limit;
         }

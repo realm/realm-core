@@ -3666,6 +3666,93 @@ TEST_CASE("results: snapshots", "[results]") {
     }
 }
 
+TEST_CASE("results: knnsearch", "[results]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema(
+        {{"object", {{"id", PropertyType::Int}, {"embedding", PropertyType::Array | PropertyType::Float}}}});
+
+    auto table = r->read_group().get_table("class_object");
+    ColKey col_id = table->get_column_key("id");
+    ColKey col_lst = table->get_column_key("embedding");
+
+    r->begin_transaction();
+    {
+        Obj o1 = table->create_object();
+        o1.set(col_id, 1);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.003f);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.100f);
+        lst.add(0.010f);
+    }
+
+    {
+        Obj o1 = table->create_object();
+        o1.set(col_id, 2);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.001f);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.100f);
+        lst.add(0.010f);
+    }
+
+    {
+        Obj o1 = table->create_object();
+        o1.set(col_id, 3);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.001f);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.100f);
+        lst.add(0.010f);
+    }
+
+    {
+        Obj o1 = table->create_object();
+        o1.set(col_id, 4);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.010f);
+        lst.add(0.025f);
+        lst.add(0.100f);
+    }
+
+    {
+        Obj o1 = table->create_object();
+        o1.set(col_id, 5);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.003f);
+        lst.add(0.007f);
+        lst.add(0.008f);
+        lst.add(0.020f);
+        lst.add(0.100f);
+    }
+    r->commit_transaction();
+
+    SECTION("Single knn query") {
+        Results results(r, table->where());
+        auto v = results.knn_search(col_lst, {0.003f, 0.005f, 0.010f, 0.020f, 0.100f}, 2);
+        REQUIRE(v.size() == 2);
+        REQUIRE(v.get(0).get<Int>(col_id) == 4);
+        REQUIRE(v.get(1).get<Int>(col_id) == 5);
+    }
+
+    SECTION("Knn combined with regular query") {
+        Results results(r, table->where().less(col_id, 5));
+        auto v2 = results.knn_search(col_lst, {0.003f, 0.005f, 0.010f, 0.020f, 0.100f}, 2);
+        REQUIRE(v2.size() == 2);
+        REQUIRE(v2.get(0).get<Int>(col_id) == 4);
+        REQUIRE(v2.get(1).get<Int>(col_id) == 1);
+    }
+}
+
 TEST_CASE("results: distinct", "[results]") {
     const int N = 10;
     InMemoryTestFile config;
