@@ -21,7 +21,6 @@
 
 #include <realm/db.hpp>
 #include <realm/util/functional.hpp>
-#include <realm/util/function_ref.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/config.hpp>
@@ -39,8 +38,7 @@ std::string get_fresh_path_for(const std::string& realm_path);
 bool is_fresh_path(const std::string& realm_path);
 
 bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& reset_config,
-                          sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
-                          util::FunctionRef<void(int64_t)> on_flx_version);
+                          sync::SubscriptionStore* sub_store);
 
 } // namespace realm::_impl::client_reset
 

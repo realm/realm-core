@@ -120,7 +120,7 @@ public:
     template <typename Func>
     void load_initial_data(Func&& func)
     {
-        SyncTestFile config(m_test_session.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
+        auto config = make_test_file();
         auto realm = Realm::get_shared_realm(config);
         subscribe_to_all_and_bootstrap(*realm);
 

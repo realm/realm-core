@@ -27,6 +27,8 @@
 #include <vector>
 
 namespace realm {
+class Group;
+class Status;
 class Transaction;
 using TransactionRef = std::shared_ptr<Transaction>;
 } // namespace realm
@@ -121,8 +123,9 @@ struct SyncMetadataTable {
 };
 
 
-void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
-void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
+void create_sync_metadata_schema(Group& g, std::vector<SyncMetadataTable>* tables);
+void load_sync_metadata_schema(const Group& g, std::vector<SyncMetadataTable>* tables);
+Status try_load_sync_metadata_schema(const Group& g, std::vector<SyncMetadataTable>* tables);
 
 class SyncMetadataSchemaVersionsReader {
 public:

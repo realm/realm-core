@@ -373,12 +373,12 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                                                        field_name, table_name, col.get_type(), mixed_ptr->get_type());
                     }
                 }
-                else if (const auto obj_val_ptr = mpark::get_if<Instruction::Payload::ObjectValue>(&arg)) {
+                else if (mpark::get_if<Instruction::Payload::ObjectValue>(&arg)) {
                     if (obj.is_null(col)) {
                         obj.create_and_set_linked_object(col);
                     }
                 }
-                else if (const auto erase_ptr = mpark::get_if<Instruction::Payload::Erased>(&arg)) {
+                else if (mpark::get_if<Instruction::Payload::Erased>(&arg)) {
                     m_applier->bad_transaction_log("Update: Dictionary erase at object field");
                 }
                 else if (mpark::get_if<Instruction::Payload::Dictionary>(&arg)) {

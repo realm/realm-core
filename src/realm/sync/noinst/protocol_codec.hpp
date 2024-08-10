@@ -403,8 +403,8 @@ public:
 
     struct DownloadMessage {
         SyncProgress progress;
-        std::optional<int64_t> query_version;
-        std::optional<bool> last_in_batch;
+        std::optional<int64_t> query_version; // FLX sync only
+        sync::DownloadBatchState batch_state = sync::DownloadBatchState::SteadyState;
         sync::DownloadableProgress downloadable;
         ReceivedChangesets changesets;
     };
@@ -436,10 +436,15 @@ private:
         if (is_flx) {
             message.query_version = msg.read_next<int64_t>();
             if (message.query_version < 0)
-                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version",
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version: %1",
                                     message.query_version);
-
-            message.last_in_batch = msg.read_next<bool>();
+            int batch_state = msg.read_next<int>();
+            if (batch_state != static_cast<int>(sync::DownloadBatchState::MoreToCome) &&
+                batch_state != static_cast<int>(sync::DownloadBatchState::LastInBatch) &&
+                batch_state != static_cast<int>(sync::DownloadBatchState::SteadyState)) {
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad batch state: %1", batch_state);
+            }
+            message.batch_state = static_cast<sync::DownloadBatchState>(batch_state);
 
             double progress_estimate = msg.read_next<double>();
             if (progress_estimate < 0 || progress_estimate > 1)

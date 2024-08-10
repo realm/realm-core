@@ -1653,6 +1653,43 @@ TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
         // Check that the data also exists in the new realm
         REQUIRE(local_realm2->read_group().get_table("class_object")->size() == 1);
     }
+
+    SECTION("synced realm must be fully uploaded") {
+        auto realm = Realm::get_shared_realm(sync_config1);
+        realm->sync_session()->pause();
+        realm->begin_transaction();
+        realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        realm->commit_transaction();
+
+        SyncTestFile sync_config2(tsm, "default");
+        sync_config2.schema = schema;
+        REQUIRE_EXCEPTION(realm->convert(sync_config2), IllegalOperation,
+                          "All client changes must be integrated in server before writing copy");
+
+        realm->sync_session()->resume();
+        wait_for_upload(*realm);
+        REQUIRE_NOTHROW(realm->convert(sync_config2));
+    }
+
+    SECTION("can convert synced realm from within upload complete callback") {
+        auto realm = Realm::get_shared_realm(sync_config1);
+        realm->sync_session()->pause();
+        realm->begin_transaction();
+        realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        realm->commit_transaction();
+
+        SyncTestFile sync_config2(tsm, "default");
+        sync_config2.schema = schema;
+        auto pf = util::make_promise_future();
+        realm->sync_session()->wait_for_upload_completion([&](Status) {
+            sync_config1.scheduler = util::Scheduler::make_dummy();
+            auto realm = Realm::get_shared_realm(sync_config1);
+            REQUIRE_NOTHROW(realm->convert(sync_config2));
+            pf.promise.emplace_value();
+        });
+        realm->sync_session()->resume();
+        pf.future.get();
+    }
 }
 
 TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embedded objects]") {

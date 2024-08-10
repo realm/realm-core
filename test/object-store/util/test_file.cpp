@@ -368,6 +368,12 @@ TestAppSession::TestAppSession(AppSession session, Config config, DeleteApp dele
     // down sync clients immediately.
     app_config.sync_client_config.timeouts.connection_linger_time = 0;
     app_config.sync_client_config.socket_provider = m_config.socket_provider;
+    if (m_config.logger) {
+        app_config.sync_client_config.logger_factory = [logger = m_config.logger](util::Logger::Level) {
+            return logger;
+        };
+    }
+
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
 
     // initialize sync client

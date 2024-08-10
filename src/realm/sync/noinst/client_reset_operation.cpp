@@ -52,8 +52,7 @@ bool is_fresh_path(const std::string& path)
 }
 
 bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& reset_config,
-                          sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
-                          util::FunctionRef<void(int64_t)> on_flx_version)
+                          sync::SubscriptionStore* sub_store)
 {
     REALM_ASSERT(reset_config.mode != ClientResyncMode::Manual);
     REALM_ASSERT(reset_config.fresh_copy);
@@ -98,8 +97,7 @@ bool perform_client_reset(util::Logger& logger, DB& db, sync::ClientReset&& rese
     if (notify_after) {
         previous_state = db.start_frozen(frozen_before_state_version);
     }
-    bool did_recover = client_reset::perform_client_reset_diff(db, reset_config, new_file_ident, logger, sub_store,
-                                                               on_flx_version); // throws
+    bool did_recover = client_reset::perform_client_reset_diff(db, reset_config, logger, sub_store); // throws
 
     if (notify_after) {
         notify_after(previous_state->get_version_of_current_transaction(), did_recover);

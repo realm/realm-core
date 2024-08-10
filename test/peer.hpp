@@ -31,7 +31,6 @@
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
-#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/util/file.hpp>
 
@@ -225,11 +224,6 @@ public:
         m_current_time += amount;
     }
 
-    void set_disable_compaction(bool b)
-    {
-        m_disable_compaction = b;
-    }
-
     std::map<TableKey, std::unordered_map<GlobalKey, ObjKey>> m_optimistic_object_id_collisions;
 
     ShortCircuitHistory(file_ident_type local_file_ident, TestDirNameGenerator* changeset_dump_dir_gen);
@@ -271,7 +265,6 @@ private:
     std::vector<HistoryEntry> m_entries;
     std::vector<std::unique_ptr<char[]>> m_entries_data_owner;
     std::map<version_type, std::map<file_ident_type, std::string>> m_reciprocal_transforms;
-    bool m_disable_compaction = false;
 
     ChunkedBinaryData get_reciprocal_transform(file_ident_type remote_file_ident, version_type version) const
     {
@@ -471,10 +464,6 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     for (size_t i = 0; i < num_changesets; ++i) {
         REALM_ASSERT(incoming_changesets[i].last_integrated_local_version <= local_version);
         sync::parse_remote_changeset(incoming_changesets[i], changesets[i]); // Throws
-    }
-
-    if (!m_disable_compaction) {
-        _impl::compact_changesets(changesets.data(), changesets.size());
     }
 
     TransformHistoryImpl transform_hist{*this, remote_file_ident};

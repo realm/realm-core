@@ -631,7 +631,7 @@ fill_data_fields:
       subtype = *(iter->raw + iter->d2);
 
       if (subtype == BSON_SUBTYPE_BINARY_DEPRECATED) {
-         int32_t binary_len;
+         uint32_t binary_len;
 
          if (l < 4) {
             iter->err_off = o;

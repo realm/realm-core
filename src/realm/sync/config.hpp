@@ -123,17 +123,28 @@ enum class ClientResyncMode : unsigned char {
     RecoverOrDiscard,
 };
 
+// clang-format off
+#define REALM_FOR_EACH_SYNC_CLIENT_HOOK_EVENT(X) \
+    X(DownloadMessageReceived),                  \
+    X(DownloadMessageIntegrated),                \
+    X(BootstrapMessageProcessed),                \
+    X(BootstrapProcessed),                       \
+    X(ErrorMessageReceived),                     \
+    X(SessionActivating),                        \
+    X(SessionSuspended),                         \
+    X(SessionConnected),                         \
+    X(SessionResumed),                           \
+    X(BindMessageSent),                          \
+    X(IdentMessageSent),                         \
+    X(ClientResetMergeComplete),                 \
+    X(BootstrapBatchAboutToProcess),             \
+    X(UploadMessageSent)
+// clang-format on
+
 enum class SyncClientHookEvent {
-    DownloadMessageReceived,
-    DownloadMessageIntegrated,
-    BootstrapMessageProcessed,
-    BootstrapProcessed,
-    ErrorMessageReceived,
-    SessionActivating,
-    SessionSuspended,
-    BindMessageSent,
-    ClientResetMergeComplete,
-    BootstrapBatchAboutToProcess,
+#define REALM_DECLARE_SYNC_CLIENT_HOOK_EVENT(X) X
+    REALM_FOR_EACH_SYNC_CLIENT_HOOK_EVENT(REALM_DECLARE_SYNC_CLIENT_HOOK_EVENT)
+#undef REALM_DECLARE_SYNC_CLIENT_HOOK_EVENT
 };
 
 enum class SyncClientHookAction {

@@ -47,6 +47,13 @@
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
+#if REALM_ENABLE_SYNC
+#define REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT(X) realm::SyncClientHookEvent::X
+CATCH_REGISTER_ENUM(realm::SyncClientHookEvent,
+                    REALM_FOR_EACH_SYNC_CLIENT_HOOK_EVENT(REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT))
+#undef REALM_REGISTER_SYNC_CLIENT_HOOK_EVENT
+#endif
+
 namespace realm {
 
 void timed_wait_for(util::FunctionRef<bool()> condition,
@@ -139,6 +146,7 @@ const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shar
 
 std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
+sync::SubscriptionSet subscribe_to_all(Realm& realm);
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
 #if REALM_APP_SERVICES
@@ -357,8 +365,12 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<app::User> user, const 
 void wait_for_num_objects_in_atlas(std::shared_ptr<app::User> user, const AppSession& app_session,
                                    const std::string& schema_name, size_t expected_size);
 
+std::pair<util::Future<ClientResyncMode>, std::function<void(SharedRealm, ThreadSafeReference, bool)>>
+make_client_reset_handler();
+
 void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session);
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC

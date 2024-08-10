@@ -644,7 +644,7 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     auto tmp = prop->visit(drv);
     const ObjPropertyBase* obj_prop = dynamic_cast<const ObjPropertyBase*>(tmp.get());
-    if (obj_prop) {
+    if (obj_prop && !obj_prop->links_exist()) {
         if (tmp->get_type() == type_Int) {
             auto min_val = min->visit(drv, type_Int);
             auto max_val = max->visit(drv, type_Int);

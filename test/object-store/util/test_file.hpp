@@ -332,6 +332,7 @@ public:
         std::optional<std::string> storage_path;
         // If user_creds are supplied, caller must explicitly call log_in_user() after TestAppSession creation
         std::optional<realm::app::AppCredentials> user_creds;
+        std::shared_ptr<realm::util::Logger> logger = nullptr;
     };
 
     TestAppSession();

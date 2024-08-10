@@ -62,20 +62,15 @@ namespace _impl::client_reset {
 void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger,
                     bool allow_schema_additions);
 
-ClientResyncMode reset_precheck_guard(const TransactionRef& wt_local, ClientResyncMode mode,
-                                      sync::ProtocolErrorInfo::Action action, const std::optional<Status>& error,
-                                      util::Logger& logger);
-
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_fresh' as the source of truth.
 // If the fresh path is not provided, discard mode is assumed and all data in the local
 // Realm is removed.
 // If the fresh path is provided, the local Realm is changed such that its state is equal
 // to the fresh Realm. Then the local Realm will have its client file ident set to
-// 'client_file_ident'
-bool perform_client_reset_diff(DB& db, sync::ClientReset& reset_config, sync::SaltedFileIdent client_file_ident,
-                               util::Logger& logger, sync::SubscriptionStore* sub_store,
-                               util::FunctionRef<void(int64_t)> on_flx_version_complete);
+// the file ident from the fresh realm
+bool perform_client_reset_diff(DB& db, sync::ClientReset& reset_config, util::Logger& logger,
+                               sync::SubscriptionStore* sub_store);
 
 } // namespace _impl::client_reset
 } // namespace realm
