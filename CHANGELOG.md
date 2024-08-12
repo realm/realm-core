@@ -18,6 +18,7 @@
 
 ### Internals
 * Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
+* Added definitions for missing protocol errors reported by the server. ([PR #7982](https://github.com/realm/realm-core/pull/7982))
 
 ----------------------------------------------
 
