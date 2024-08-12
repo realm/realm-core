@@ -2158,7 +2158,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]")
         Mixed{target_id},
     };
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session(app_session, {}, DeleteApp{false});
         SyncTestFile config(test_session.app()->current_user(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -2222,7 +2222,7 @@ TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
     Decimal128 large_significand = Decimal128(70) / Decimal128(1.09);
     auto obj_id = ObjectId::gen();
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session(app_session, {}, DeleteApp{false});
         SyncTestFile config(test_session.app()->current_user(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -2646,7 +2646,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport<>>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session(session.app_session(), {transport}, DeleteApp{false});
         auto app = hooked_session.app();
         std::shared_ptr<User> user = app->current_user();
         REQUIRE(user);
@@ -2704,7 +2704,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport<>>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session(session.app_session(), {transport}, DeleteApp{false});
         auto app = hooked_session.app();
         std::shared_ptr<User> user = app->current_user();
         REQUIRE(user);
@@ -3306,8 +3306,9 @@ TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
 
     auto in_mem_logger = std::make_shared<InMemoryLogger>();
     in_mem_logger->set_level_threshold(InMemoryLogger::Level::all);
-    TestAppSession app_session(get_runtime_app_session(), nullptr, DeleteApp{false}, ReconnectMode::normal, nullptr,
-                               in_mem_logger);
+    TestAppSession::Config session_config;
+    session_config.logger = in_mem_logger;
+    TestAppSession app_session(get_runtime_app_session(), session_config, DeleteApp{false});
 
     const auto partition = random_string(100);
     SyncTestFile config(app_session.app()->current_user(), partition, util::none);
@@ -4521,7 +4522,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     auto server_app_config = minimal_app_config("full_text", schema);
     auto app_session = create_app(server_app_config);
     const auto partition = random_string(100);
-    TestAppSession test_session(app_session, nullptr);
+    TestAppSession test_session(app_session);
     SyncTestFile config(test_session.app()->current_user(), partition, schema);
     SharedRealm realm;
     SECTION("sync open") {

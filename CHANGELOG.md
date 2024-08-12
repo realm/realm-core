@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
 
 ----------------------------------------------
 

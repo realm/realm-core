@@ -6412,7 +6412,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
     auto user_data = new TestTransportUserData();
     auto http_transport = realm_http_transport_new(send_request_to_server, user_data, user_data_free);
     auto app_session = get_runtime_app_session();
-    TestAppSession session(app_session, *http_transport, DeleteApp{false});
+    TestAppSession session(app_session, {*http_transport}, DeleteApp{false});
     realm_app app(session.app());
 
     SECTION("remove_user integration") {
