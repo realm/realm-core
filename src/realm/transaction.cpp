@@ -533,7 +533,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 24, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 25, target_file_format_version);
 
     // DB::do_open() must ensure that only supported version are allowed.
     // It does that by asking backup if the current file format version is
@@ -582,6 +582,11 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             // avoid upgrading them because it affects a small niche case. Instead, there is a
             // workaround in the String Index search code for not relying on items being ordered.
             t->migrate_col_keys();
+        }
+    }
+    if (current_file_format_version < 25) {
+        for (auto k : table_keys) {
+            get_table(k);
         }
     }
     // NOTE: Additional future upgrade steps go here.

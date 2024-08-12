@@ -764,6 +764,9 @@ private:
     ///     Backlinks in BPlusTree
     ///     Sort order of Strings changed (affects sets and the string index)
     ///
+    ///  25 Enhanced layout of NodeHeader to support compression.
+    ///     Integer arrays are stored in a compressed format.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
@@ -771,7 +774,7 @@ private:
     /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
     /// file formats and the version deletion list residing in "backup_restore.cpp"
 
-    static constexpr int g_current_file_format_version = 24;
+    static constexpr int g_current_file_format_version = 25;
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
