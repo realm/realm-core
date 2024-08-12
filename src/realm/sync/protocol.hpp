@@ -425,6 +425,8 @@ enum class ProtocolError {
     revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
     bad_schema_version           = RLM_SYNC_ERR_SESSION_BAD_SCHEMA_VERSION,         // Client tried to open a session with an invalid schema version (BIND)
     schema_version_changed       = RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_CHANGED,     // Client opened a session with a new valid schema version - migrate client to use new schema version (BIND)
+    relaxed_schema_mode_changed  = RLM_SYNC_ERR_SESSION_RELAXED_SCHEMA_MODE_CHANGED, // Client attempted to change their relaxed schema mode for an existing client file - requires client reset (IDENT)
+    relaxed_schema_not_suppored  = RLM_SYNC_ERR_SESSION_RELAXED_SCHEMA_NOT_SUPPORTED, // Client attempted to connect to an app that does not support relaxed schema with a client that is using relaxed schema (BIND)
 
     // clang-format on
 };

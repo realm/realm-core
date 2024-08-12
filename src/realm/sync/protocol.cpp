@@ -128,6 +128,12 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::schema_version_changed:
             return "Client opened a session with a new valid schema version - migrating client to use new schema "
                    "version (BIND)";
+        case ProtocolError::relaxed_schema_mode_changed:
+            return "Client attempted to change their relaxed schema mode for an existing client file - "
+                   "requires client reset";
+        case ProtocolError::relaxed_schema_not_suppored:
+            return "Client using a relax schema attempted to connect to an app that does not support "
+                   "relaxed schema";
     }
     return nullptr;
 }
@@ -223,6 +229,10 @@ Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
                 [[fallthrough]];
             case ProtocolError::schema_version_changed:
                 return ErrorCodes::SyncSchemaMigrationError;
+            case ProtocolError::relaxed_schema_mode_changed:
+                [[fallthrough]];
+            case ProtocolError::relaxed_schema_not_suppored:
+                return ErrorCodes::SyncRelaxedSchemaError;
 
             case ProtocolError::limits_exceeded:
                 [[fallthrough]];

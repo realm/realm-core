@@ -5656,6 +5656,10 @@ TEST(Sync_Mixed)
     auto db_1 = DB::create(make_client_replication(), db_1_path, options);
     auto db_2 = DB::create(make_client_replication(), db_2_path, options);
 
+    // Flexible schema should be disabled by default
+    CHECK_NOT(db_1->flexible_schema_allowed());
+    CHECK_NOT(db_2->flexible_schema_allowed());
+
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
@@ -6214,6 +6218,10 @@ TEST(Sync_AdditionalProperties)
     SHARED_GROUP_TEST_PATH(db_2_path);
     auto db_1 = DB::create(make_client_replication(), db_1_path, options);
     auto db_2 = DB::create(make_client_replication(), db_2_path, options);
+
+    // Flexible schema is allowed
+    CHECK(db_1->flexible_schema_allowed());
+    CHECK(db_2->flexible_schema_allowed());
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};

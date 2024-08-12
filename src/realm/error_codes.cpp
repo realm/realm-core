@@ -63,6 +63,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case SyncWriteNotAllowed:
         case SyncLocalClockBeforeEpoch:
         case SyncSchemaMigrationError:
+        case SyncRelaxedSchemaError:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_error);
 
         case SyncConnectFailed:
@@ -396,6 +397,7 @@ static const constexpr MapElem string_to_error_code[] = {
     {"SyncPermissionDenied", ErrorCodes::SyncPermissionDenied},
     {"SyncProtocolInvariantFailed", ErrorCodes::SyncProtocolInvariantFailed},
     {"SyncProtocolNegotiationFailed", ErrorCodes::SyncProtocolNegotiationFailed},
+    {"SyncRelaxedSchemaError", ErrorCodes::SyncRelaxedSchemaError},
     {"SyncServerPermissionsChanged", ErrorCodes::SyncServerPermissionsChanged},
     {"SyncUserMismatch", ErrorCodes::SyncUserMismatch},
     {"SyncWriteNotAllowed", ErrorCodes::SyncWriteNotAllowed},

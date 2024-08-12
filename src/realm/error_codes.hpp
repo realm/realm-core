@@ -128,6 +128,7 @@ public:
         SyncWriteNotAllowed = RLM_ERR_SYNC_WRITE_NOT_ALLOWED,
         SyncLocalClockBeforeEpoch = RLM_ERR_SYNC_LOCAL_CLOCK_BEFORE_EPOCH,
         SyncSchemaMigrationError = RLM_ERR_SYNC_SCHEMA_MIGRATION_ERROR,
+        SyncRelaxedSchemaError = RLM_ERR_SYNC_RELAXED_SCHEMA_ERROR,
 
         SystemError = RLM_ERR_SYSTEM_ERROR,
 

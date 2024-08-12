@@ -295,6 +295,12 @@ public:
         return m_evac_stage;
     }
 
+    // Has the relaxed schema feature been enabled for this realm file?
+    bool flexible_schema_allowed() const
+    {
+        return m_allow_flexible_schema;
+    }
+
     /// Report the number of distinct versions stored in the database at the time
     /// of latest commit.
     /// Note: the database only cleans up versions as part of commit, so ending
