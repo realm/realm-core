@@ -393,6 +393,8 @@ static const constexpr MapElem string_to_error_code[] = {
     {"SyncConnectFailed", ErrorCodes::SyncConnectFailed},
     {"SyncConnectTimeout", ErrorCodes::SyncConnectTimeout},
     {"SyncInvalidSchemaChange", ErrorCodes::SyncInvalidSchemaChange},
+    {"SyncLocalClockBeforeEpoch", ErrorCodes::SyncLocalClockBeforeEpoch},
+    {"SyncSchemaMigrationError", ErrorCodes::SyncSchemaMigrationError},
     {"SyncPermissionDenied", ErrorCodes::SyncPermissionDenied},
     {"SyncProtocolInvariantFailed", ErrorCodes::SyncProtocolInvariantFailed},
     {"SyncProtocolNegotiationFailed", ErrorCodes::SyncProtocolNegotiationFailed},

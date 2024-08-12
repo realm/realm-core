@@ -425,6 +425,11 @@ enum class ProtocolError {
     revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
     bad_schema_version           = RLM_SYNC_ERR_SESSION_BAD_SCHEMA_VERSION,         // Client tried to open a session with an invalid schema version (BIND)
     schema_version_changed       = RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_CHANGED,     // Client opened a session with a new valid schema version - migrate client to use new schema version (BIND)
+    field_perms_not_supported    = RLM_SYNC_ERR_SESSION_FIELD_LVL_PERMS_NOT_SUPPORTED, // Client tried to make a read or write with a role that contains field-level permissions which are not supported on edge wireprotocol.
+    schema_version_force_upgrade = RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_FORCE_UPGRADE, // Server has forcefully bumped client's schema version because it does not support schema versioning
+
+    // Edge Server errors - not supported
+    edge_reboot                  = RLM_SYNC_ERR_EDGE_REBOOT,                        // Error used to reboot the Edge Server. This error should only be sent to the Edge Server and no other clients.
 
     // clang-format on
 };

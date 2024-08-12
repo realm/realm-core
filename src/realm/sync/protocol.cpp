@@ -128,6 +128,15 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::schema_version_changed:
             return "Client opened a session with a new valid schema version - migrating client to use new schema "
                    "version (BIND)";
+        case ProtocolError::edge_reboot:
+            return "Error used to reboot the Edge Server. This error should only be sent to the Edge Server "
+                   "and no other clients.";
+        case ProtocolError::field_perms_not_supported:
+            return "Client tried to make a read or write with a role that contains field-level permissions which "
+                   "are not supported on edge wireprotocol";
+        case ProtocolError::schema_version_force_upgrade:
+            return "Server has forcefully bumped client's schema version because it does not support schema "
+                   "versioning";
     }
     return nullptr;
 }
@@ -163,6 +172,8 @@ Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
             case ProtocolError::bad_changeset_header_syntax:
                 [[fallthrough]];
             case ProtocolError::bad_changeset_size:
+                [[fallthrough]];
+            case ProtocolError::field_perms_not_supported:
                 [[fallthrough]];
             case ProtocolError::bad_message_order:
                 return ErrorCodes::SyncProtocolInvariantFailed;
@@ -222,6 +233,8 @@ Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
             case ProtocolError::bad_schema_version:
                 [[fallthrough]];
             case ProtocolError::schema_version_changed:
+                [[fallthrough]];
+            case ProtocolError::schema_version_force_upgrade:
                 return ErrorCodes::SyncSchemaMigrationError;
 
             case ProtocolError::limits_exceeded:
@@ -247,6 +260,8 @@ Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
             case ProtocolError::user_blacklisted:
                 [[fallthrough]];
             case ProtocolError::transact_before_upload:
+                [[fallthrough]];
+            case ProtocolError::edge_reboot:
                 REALM_UNREACHABLE();
         }
         return ErrorCodes::UnknownError;
