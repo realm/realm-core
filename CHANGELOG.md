@@ -18,7 +18,8 @@
 -----------
 
 ### Internals
-* None.
+* Added support for relaxed schema errors and added the `relaxedSchema` value to the BIND json data. ([PR #7981](https://github.com/realm/realm-core/pull/7981))
+* Bumped sync protocol version to v15 for relaxed schema feature support. ([PR #7981](https://github.com/realm/realm-core/pull/7981))
 
 ----------------------------------------------
 
