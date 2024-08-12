@@ -43,18 +43,18 @@ static constexpr long date_to_julian(int y, int m, int d)
 
 static void julian_to_date(int jd, int* y, int* m, int* d)
 {
-    int L = jd + 68569;
-    int n = (4 * L) / 146097;
-    int i, j;
+    uint64_t L = jd + 68569;
+    uint64_t n = (4 * L) / 146097;
+    uint64_t i, j;
 
     L = L - (146097 * n + 3) / 4;
     i = (4000 * (L + 1)) / 1461001;
     L = L - (1461 * i) / 4 + 31;
     j = (80 * L) / 2447;
-    *d = L - (2447 * j) / 80;
+    *d = static_cast<int>(L - (2447 * j) / 80);
     L = j / 11;
-    *m = j + 2 - (12 * L);
-    *y = 100 * (n - 49) + i + L;
+    *m = static_cast<int>(j + 2 - (12 * L));
+    *y = static_cast<int>(100 * (n - 49) + i + L);
 }
 
 // Confirmed to work for all val < 16389

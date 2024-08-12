@@ -215,13 +215,16 @@ void ServerProtocol::insert_single_changeset_download_message(OutputBuffer& out,
     entry.changeset.write_to(out);
 
     if (logger.would_log(util::Logger::Level::trace)) {
+        util::AppendBuffer<char> changeset_buffer;
+        entry.changeset.copy_to(changeset_buffer);
+
         logger.trace(util::LogCategory::changeset,
                      "DOWNLOAD: insert single changeset (server_version=%1, "
                      "client_version=%2, timestamp=%3, client_file_ident=%4, "
                      "original_changeset_size=%5, changeset_size=%6, changeset='%7').",
                      changeset_info.server_version, changeset_info.client_version, entry.origin_timestamp,
                      entry.origin_file_ident, changeset_info.original_size, entry.changeset.size(),
-                     _impl::clamped_hex_dump(entry.changeset.get_first_chunk())); // Throws
+                     _impl::clamped_hex_dump(BinaryData(changeset_buffer.data(), changeset_buffer.size()))); // Throws
     }
 }
 
