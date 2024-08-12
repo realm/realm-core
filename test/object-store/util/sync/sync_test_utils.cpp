@@ -228,6 +228,25 @@ std::string get_compile_time_admin_url()
     return {};
 #endif // REALM_ADMIN_ENDPOINT
 }
+
+std::pair<util::Future<SyncError>, std::function<void(std::shared_ptr<SyncSession>, SyncError err)>>
+make_error_handler()
+{
+    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
+    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
+    auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
+        if (!error_promise) {
+            util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
+                         err.status);
+            abort();
+        }
+        error_promise->emplace_value(std::move(err));
+        error_promise.reset();
+    };
+
+    return std::make_pair(std::move(error_future), std::move(fn));
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #if REALM_APP_SERVICES

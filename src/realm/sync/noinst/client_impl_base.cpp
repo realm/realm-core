@@ -1906,8 +1906,9 @@ void Session::send_bind_message()
         auto schema_version = get_schema_version();
         // Send 0 if schema is not versioned.
         bind_json_data["schemaVersion"] = schema_version != uint64_t(-1) ? schema_version : 0;
-        // Send 0 if sync client is not using a relaxed schema
-        bind_json_data["relaxedSchema"] = get_db()->flexible_schema_allowed() ? 1 : 0;
+        // Send false if sync client is not using a relaxed schema
+        /// TODO: decide if this should be an int instead of a bool
+        bind_json_data["relaxedSchema"] = get_db()->flexible_schema_allowed() ? true : false;
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {

@@ -255,16 +255,6 @@ TEST_CASE("flx: test commands work", "[sync][flx][test command][baas]") {
     });
 }
 
-static auto make_error_handler()
-{
-    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
-    auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) {
-        error_promise->emplace_value(std::move(err));
-    };
-    return std::make_pair(std::move(error_future), std::move(fn));
-}
-
 TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
     static std::optional<FLXSyncTestHarness> harness{"error_handling"};
     create_user_and_log_in(harness->app());
@@ -1630,23 +1620,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
     create_user_and_log_in(harness->app());
     auto user = harness->app()->current_user();
-
-    auto make_error_handler = [] {
-        auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-        auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
-        auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
-            if (!error_promise) {
-                util::format(std::cerr,
-                             "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                             err.status);
-                abort();
-            }
-            error_promise->emplace_value(std::move(err));
-            error_promise.reset();
-        };
-
-        return std::make_pair(std::move(error_future), std::move(fn));
-    };
 
     auto validate_sync_error = [&](const SyncError& sync_error, Mixed expected_pk, const char* expected_object_name,
                                    const std::string& error_msg_fragment) {

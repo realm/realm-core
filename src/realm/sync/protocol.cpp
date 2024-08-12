@@ -132,7 +132,7 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "Client attempted to change their relaxed schema mode for an existing client file - "
                    "requires client reset";
         case ProtocolError::relaxed_schema_not_suppored:
-            return "Client using a relax schema attempted to connect to an app that does not support "
+            return "Client using relaxed schema mode attempted to connect to an app that does not support "
                    "relaxed schema";
     }
     return nullptr;

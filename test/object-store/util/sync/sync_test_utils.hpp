@@ -168,6 +168,10 @@ void wait_for_sessions_to_close(const TestAppSession& test_app_session);
 
 std::string get_compile_time_base_url();
 std::string get_compile_time_admin_url();
+
+std::pair<util::Future<SyncError>, std::function<void(std::shared_ptr<SyncSession>, SyncError err)>>
+make_error_handler();
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 void wait_for_advance(Realm& realm);
