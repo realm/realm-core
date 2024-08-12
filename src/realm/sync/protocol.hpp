@@ -63,6 +63,8 @@ namespace sync {
 //   14 Support for server initiated bootstraps, including bootstraps for role/
 //      permissions changes instead of performing a client reset when changed.
 //
+//   15 Support for relaxed (flexible) schemas
+//
 //  XX Changes:
 //     - TBD
 //
@@ -70,7 +72,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the "flx: verify websocket protocol number and prefixes" test
     // in flx_sync.cpp when updating this value
-    return 14;
+    return 15;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
