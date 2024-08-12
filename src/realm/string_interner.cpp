@@ -690,4 +690,46 @@ StringData StringInterner::get(StringID id)
     return {cs.m_decompressed->c_str(), cs.m_decompressed->size()};
 }
 
+void StringInterner::init_trimming()
+{
+    m_stringID_reassign_map.resize(m_decompressed_strings.size());
+}
+
+void StringInterner::done_trimming()
+{
+    m_stringID_reassign_map.clear();
+}
+
+void StringInterner::trim_stringIDs()
+{
+    StringID new_id = 1;
+    StringID old_id = 1;
+    std::vector<std::string> all_strings;
+    for (auto& e : m_stringID_reassign_map) {
+        if (e) {
+            e = new_id++;
+            all_strings.push_back(get(old_id));
+        }
+        old_id++;
+    }
+    // Discard old string storage
+    m_data.truncate_and_destroy_children(0);
+    m_data.update_parent(); // needed?
+    // Discard old hash-to-ID tree
+    m_hash_map.truncate_and_destroy_children(0);
+    m_hash_map.update_parent(); // needed?
+    // OPTIONAL TODO: re-init compressor/optimize compression
+    // Discard stale internal state
+    m_compressed_leafs.clear();
+    m_decompressed_strings.clear();
+    m_in_memory_strings.clear();
+    m_current_long_string_node.detach();
+    m_current_string_leaf.detach();
+    // Rebuild!
+    rebuild_internal();
+    for (auto& e : all_strings) {
+        intern(e);
+    }
+}
+
 } // namespace realm

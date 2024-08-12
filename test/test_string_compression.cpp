@@ -247,3 +247,22 @@ TEST(StringInterner_VerifyExpansionFromSmallStringToLongString)
     CHECK_EQUAL(stored_id, id);
     CHECK(interner.compare(StringData(long_string), *stored_id) == 0);
 }
+
+ONLY(StringInterner_Table_Optimize)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db = DB::create(*hist_w, path);
+    TransactionRef writer = db->start_write();
+    TableRef t = writer->add_table("hygge");
+    auto col = t->add_column(type_String, "col_string");
+    auto o = t->create_object().set(col, "abe");
+    REALM_ASSERT(o.get<String>(col) == "abe");
+    writer->commit_and_continue_as_read();
+    writer->promote_to_write();
+    t->optimize_string_column(col);
+    writer->commit_and_continue_as_read();
+    // This should fail, but doesnt!
+    REALM_ASSERT(o.get<String>(col) == "abe");
+    // Destruction then reveals memory corruption
+}

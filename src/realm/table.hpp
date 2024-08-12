@@ -212,6 +212,7 @@ public:
         if (REALM_UNLIKELY(!valid_column(col_key)))
             throw InvalidColumnKey();
     }
+    void optimize_string_column(ColKey col_key);
     // Change the type of a table. Only allowed to switch to/from TopLevel from/to Embedded.
     void set_table_type(Type new_type, bool handle_backlinks = false);
     //@}

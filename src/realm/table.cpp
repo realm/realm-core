@@ -3494,3 +3494,13 @@ StringInterner* Table::get_string_interner(ColKey::Idx idx) const
     REALM_ASSERT(interner);
     return interner;
 }
+
+void Table::optimize_string_column(ColKey col_key)
+{
+    auto interner = get_string_interner(col_key);
+    interner->init_trimming();
+    // TODO: Mark
+    interner->trim_stringIDs();
+    // TODO: Reassign all leaf StringIDs
+    interner->done_trimming();
+}

@@ -69,6 +69,28 @@ public:
     // To be used only in a non-concurrent setting:
     StringID intern(StringData);
 
+    // To be used before trimming StringIDs (and before collecting live references)
+    void init_trimming();
+
+    // To be used when walking an entire column to collect live references
+    // as a precursor to trimming:
+    void mark_alive(StringID);
+
+    // To be used after all live StringIDs have been marked alive using 'mark_alive'
+    // - following call to trim_stringIDs, all StringIDs in the interner is reassigned.
+    // - subsequently all StringID references (in column leaf data) must be reassigned
+    //   correspondingly, using get_new() declared below.
+    void trim_stringIDs();
+
+    // To be used to find the new stringID to use instead of an old one.
+    // - Only valid after trim_stringIDs().
+    // - All stringIDs in a column must be reassigned before other access to that column.
+    // - We will want to lift this restriction later, allowing concurrent trimming and access.
+    StringID get_new(StringID);
+
+    // Call to allow interner to release resources used for trimming:
+    void done_trimming();
+
     // The following four methods can be used in a concurrent setting with each other,
     // but not concurrently with any of the above methods.
     std::optional<StringID> lookup(StringData);
@@ -111,7 +133,24 @@ private:
     // only used in single threaded contexts so don't need them. For now, we don't
     // distinguish, assuming that locking is sufficiently low in both scenarios.
     std::mutex m_mutex;
+    // Temporary state for trimming the StringIDs.
+    std::vector<StringID> m_stringID_reassign_map;
 };
+
+inline StringID StringInterner::get_new(StringID id)
+{
+    if (id == 0)
+        return 0;
+    return m_stringID_reassign_map[id - 1];
+}
+
+inline void StringInterner::mark_alive(StringID id)
+{
+    if (id != 0) {
+        m_stringID_reassign_map[id - 1] = 1;
+    }
+}
+
 } // namespace realm
 
 #endif
