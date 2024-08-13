@@ -409,6 +409,7 @@ static const constexpr MapElem string_to_error_code[] = {
     {"TwilioError", ErrorCodes::TwilioError},
     {"TypeMismatch", ErrorCodes::TypeMismatch},
     {"UnexpectedPrimaryKey", ErrorCodes::UnexpectedPrimaryKey},
+    // UnknownError intentionally left out of list
     {"UnsupportedFileFormatVersion", ErrorCodes::UnsupportedFileFormatVersion},
     {"UserAlreadyConfirmed", ErrorCodes::UserAlreadyConfirmed},
     {"UserAppDomainMismatch", ErrorCodes::UserAppDomainMismatch},

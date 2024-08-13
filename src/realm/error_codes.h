@@ -266,15 +266,11 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_REVERT_TO_PBS = 234,
     RLM_SYNC_ERR_SESSION_BAD_SCHEMA_VERSION = 235,
     RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_CHANGED = 236,
-    RLM_SYNC_ERR_SESSION_FIELD_LVL_PERMS_NOT_SUPPORTED = 238,
+    // Error code 237 is not used by the client
+    // Error code 238 is not used by the sync protocol
     RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_FORCE_UPGRADE = 239,
     // Error code 299 is reserved as an "unknown session error" in tests
 } realm_sync_errno_session_e;
-
-// These errors are intended for the edge server and are an error if received by a sync client
-typedef enum realm_sync_errno_edge_e {
-    RLM_SYNC_ERR_EDGE_REBOOT = 237,
-} realm_sync_errno_edge;
 
 typedef enum realm_web_socket_errno {
     RLM_ERR_WEBSOCKET_OK = 1000,
