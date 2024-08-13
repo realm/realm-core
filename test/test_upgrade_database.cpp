@@ -36,6 +36,7 @@
 #include <realm/version.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "util/compare_groups.hpp"
 
 #include <external/json/json.hpp>
 
@@ -273,8 +274,8 @@ TEST(Upgrade_Database_11)
     TableRef foo = g.add_table_with_primary_key("foo", type_Int, "id", false);
     TableRef bar = g.add_table_with_primary_key("bar", type_String, "name", false);
     TableRef o = g.add_table("origin");
-    auto col1 = o->add_column_link(type_Link, "link1", *foo);
-    auto col2 = o->add_column_link(type_Link, "link2", *bar);
+    auto col1 = o->add_column(*foo, "link1");
+    auto col2 = o->add_column(*bar, "link2");
 
     for (auto id : ids) {
         auto obj = foo->create_object_with_primary_key(id);
@@ -884,4 +885,107 @@ TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+
+TEST_IF(Upgrade_Database_24, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_24.realm";
+
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history();
+    DBOptions options;
+    options.logger = test_context.logger;
+    auto sg = DB::create(*hist, temp_copy, options);
+    auto wt = sg->start_write();
+    // rt->to_json(std::cout);
+    wt->verify();
+
+    SHARED_GROUP_TEST_PATH(path2);
+    wt->write(path2);
+    auto db2 = DB::create(path2);
+    auto wt2 = db2->start_write();
+    CHECK(test_util::compare_groups(*wt, *wt2));
+#else
+    // NOTE: This code must be executed from an old file-format-version 24
+    // core in order to create a file-format-version 25 test file!
+
+    const size_t cnt = 10 * REALM_MAX_BPNODE_SIZE;
+
+    std::vector<StringData> string_values{
+        "white", "yellow", "red", "orange", "green", "blue", "grey", "violet", "purple", "black",
+    };
+
+    StringData long_string(R"(1. Jeg ved en lærkerede,
+jeg siger ikke mer;
+den findes på en hede,
+et sted som ingen ser.
+
+2. I reden er der unger,
+og ungerne har dun.
+De pipper de har tunger,
+og reden er så lun.
+
+3. Og de to gamle lærker,
+de flyver tæt omkring.
+Jeg tænker nok de mærker,
+jeg gør dem ingenting.
+
+4. Jeg lurer bag en slåen.
+Der står jeg ganske nær.
+Jeg rækker mig på tåen
+og holder på mit vejr.
+
+5. For ræven han vil bide
+og drengen samle bær.
+men ingen skal få vide,
+hvor lærkereden er.
+)");
+    StringData dict_value(
+        R"({"Seven":7, "Six":6, "Points": [1.25, 4.5, 6.75], "Attributes": {"Height": 202, "Weight": 92}})");
+
+    Timestamp now(std::chrono::system_clock::now());
+    auto now_seconds = now.get_seconds();
+
+    Group g;
+
+    TableRef t = g.add_table_with_primary_key("table", type_ObjectId, "_id", false);
+    auto col_int = t->add_column(type_Int, "int");
+    auto col_optint = t->add_column(type_Int, "optint", true);
+    /* auto col_bool = */ t->add_column(type_Bool, "bool");
+    auto col_string = t->add_column(type_String, "string");
+    /* auto col_binary = */ t->add_column(type_Binary, "binary");
+    auto col_mixed = t->add_column(type_Mixed, "any");
+    auto col_date = t->add_column(type_Timestamp, "date");
+    /* auto col_float = */ t->add_column(type_Float, "float");
+    /* auto col_double = */ t->add_column(type_Double, "double");
+    /* auto col_decimal = */ t->add_column(type_Decimal, "decimal");
+    /* auto col_uuid = */ t->add_column(type_UUID, "uuid");
+
+    TableRef target = g.add_table_with_primary_key("target", type_Int, "_id", false);
+    auto col_link = t->add_column(*target, "link");
+
+    auto target_key = target->create_object_with_primary_key(1).get_key();
+    for (size_t i = 0; i < cnt; i++) {
+
+        auto o = t->create_object_with_primary_key(ObjectId::gen());
+        o.set(col_int, uint64_t(0xffff) + i);
+        o.set(col_optint, uint64_t(0xffff) + (i % 10));
+        o.set(col_string, string_values[i % string_values.size()]);
+        o.set(col_date, Timestamp(now_seconds + i, 0));
+        o.set(col_link, target_key);
+    }
+    auto obj = t->create_object_with_primary_key(ObjectId::gen());
+    obj.set_json(col_mixed, dict_value);
+    obj.set(col_string, long_string);
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
 #endif // TEST_GROUP

@@ -305,23 +305,24 @@ functions:
           fi
 
           # NOTE: These two values will be ANDed together for matching tests
-          TEST_FLAGS=
+          TEST_FLAGS="--no-tests=error ${test_flags|} "
           if [[ -n "${test_label}" ]]; then
-              TEST_FLAGS="-L ${test_label} "
+              TEST_FLAGS+="-L ${test_label} "
           fi
           if [[ -n "${test_filter}" ]]; then
               TEST_FLAGS+="-R ${test_filter} "
           fi
 
           if [[ -n "${verbose_test_output}" ]]; then
-              TEST_FLAGS="$TEST_FLAGS -VV"
               export UNITTEST_THREADS=1
               export UNITTEST_LOG_LEVEL="${test_logging_level|debug}"
+              TEST_FLAGS+="-VV "
+              if [[ "$UNITTEST_LOG_LEVEL" = "all" ]]; then
+                TEST_FLAGS+="-O $(./evergreen/abspath.sh test_${task_id}.log) -Q "
+              fi
           else
-              TEST_FLAGS="$TEST_FLAGS -V"
+              TEST_FLAGS+="-V "
           fi
-
-          TEST_FLAGS="--no-tests=error $TEST_FLAGS ${test_flags|}"
 
           if [[ -n "${disable_tests_against_baas|}" ]]; then
               unset BAASAAS_API_KEY
@@ -331,9 +332,18 @@ functions:
 
           if [[ -n "${c_compiler}" && "$(basename ${c_compiler})" = "clang" && -f "$(dirname ${c_compiler})/llvm-symbolizer" ]]; then
               LLVM_SYMBOLIZER="$(dirname ${c_compiler})/llvm-symbolizer"
+              # we don't want to put all of the llvm bin-dir onto the path, so make a new directory, as-needed,
+              # and put a symlink to llvm-symbolizer in it. This is for ubsan, which doesn't have an
+              # environment variable to specify the path to the llvm-symbolizer.
+              if [[ ! ./llvm_symbolizer_bindir/llvm-symbolizer -ef "$LLVM_SYMBOLIZER" ]]; then
+                mkdir llvm_symbolizer_bindir
+                ln -s "$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)" llvm_symbolizer_bindir/llvm-symbolizer
+              fi
+              export PATH="$(./evergreen/abspath.sh llvm_symbolizer_bindir)":$PATH
               export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
               export TSAN_OPTIONS="external_symbolizer_path=$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
           fi
+
           if [[ -n "${enable_llvm_coverage}" ]]; then
               if [[ -z "${test_executable_name}" ]]; then
                 echo "Missing executable name"
@@ -375,16 +385,12 @@ functions:
           fi
 
           cd build
-          if ! "$CTEST" -C ${cmake_build_type|Debug} $TEST_FLAGS; then
-            BAAS_PID=$(pgrep baas_server)
-            if [[ -n "$BAAS_PID" ]]; then
-              echo "Dumping baas to log file"
-              kill -3 $BAAS_PID
-              sleep 15
-            fi
-            exit 1
-          fi
+          "$CTEST" -C ${cmake_build_type|Debug} $TEST_FLAGS
 
+          if [[ -f ../test_${task_id}.log ]]; then
+            # If the test succeeded, then we don't need to save any trace level logs.
+            rm ../test_${task_id}.log
+          fi
   "upload test results":
   - command: attach.results
     params:
@@ -476,6 +482,17 @@ functions:
       permissions: public-read
       content_type: text/plain
       display_name: baas proxy logs
+      optional: true
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/test_${task_id}.log'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/test.log'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: trace level test logs
       optional: true
 
   "upload fuzzer results":
@@ -1984,6 +2001,21 @@ buildvariants:
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     compress: On
     cmake_build_type: Debug
+  tasks:
+  - name: compile_test
+
+- name: ubuntu-trace-logging
+  display_name: "Ubuntu (Trace Logging Enabled)"
+  run_on: ubuntu2204-arm64-large
+  allowed_requesters: [ "patch", "ad_hoc" ]
+  expansions:
+    fetch_missing_dependencies: On
+    cmake_build_type: Debug 
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    test_logging_level: all
+    enable_ubsan: On
+    verbose_test_output: true
   tasks:
   - name: compile_test
 

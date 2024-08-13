@@ -13,12 +13,40 @@
 * None.
 
 ### Compatibility
-* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+* Fileformat: Generates files with format v25. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
 -----------
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 14.12.0 Release notes
+
+### Enhancements
+* Improve sync bootstrap performance by reducing the number of table selections in the replication logs for embedded objects. ([#7945](https://github.com/realm/realm-core/issues/7945))
+* Released a read lock which was pinned for the duration of a mutable subscription even after commit. This frees resources earlier, and may improve performance of sync bootstraps where the starting state is large. ([#7946](https://github.com/realm/realm-core/issues/7946))
+* Client reset cycle detection now checks if the previous recovery attempt was made by the same core version, and if not attempts recovery again ([PR #7944](https://github.com/realm/realm-core/pull/7944)).
+* Updated bundled OpenSSL version to 3.3.1. (PR [#7947](https://github.com/realm/realm-core/pull/7947))
+
+### Fixed
+* Fixed an "invalid column key" exception when using a RQL "BETWEEN" query on an int or timestamp property across links. ([#7935](https://github.com/realm/realm-core/issues/7935), since v14.10.1)
+* Fixed conflict resolution bug related to ArrayErase and Clear instructions, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization ([#7893](https://github.com/realm/realm-core/issues/7893), since v14.8.0).
+* Fixed bug which would prevent eventual consistency during conflict resolution. Affected clients would experience data divergence and potentially consistency errors as a result. ([PR #7955](https://github.com/realm/realm-core/pull/7955), since v14.8.0)
+* Fixed issues loading the native Realm libraries on Linux ARMv7 systems when they linked against our bundled OpenSSL resulting in errors like `unexpected reloc type 0x03`. ([#7947](https://github.com/realm/realm-core/issues/7947), since v14.1.0)
+* `Realm::convert()` would sometimes incorrectly throw an exception claiming that there were unuploaded local changes when the source Realm is a synchronized Realm ([#7966](https://github.com/realm/realm-core/issues/7966), since v10.7.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Reverted the bfd linker override in the Linux-armv7 toolchain file because the upstream OpenSSL issue it was working around was resolved.
 
 ----------------------------------------------
 

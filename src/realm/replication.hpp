@@ -392,33 +392,34 @@ private:
     util::Logger* m_logger = nullptr;
     const Table* m_selected_table = nullptr;
     ObjKey m_selected_obj;
+    bool m_selected_obj_is_newly_created = false;
     CollectionId m_selected_collection;
     // The ObjKey of the most recently created object for each table (indexed
     // by the Table's index in the group). Most insertion patterns will only
     // ever update the most recently created object, so this is almost as
     // effective as tracking all newly created objects but much cheaper.
     std::vector<ObjKey> m_most_recently_created_object;
-    // When true, the currently selected object was created in this transaction
-    // and we don't need to emit instructions for mutations on it
-    bool m_newly_created_object = false;
 
     void unselect_all() noexcept;
     void select_table(const Table*); // unselects link list and obj
-    bool select_obj(ObjKey key);
-    bool select_collection(const CollectionBase&);
+    [[nodiscard]] bool select_obj(ObjKey key, const Table*);
+    [[nodiscard]] bool select_collection(const CollectionBase&);
 
     void do_select_table(const Table*);
-    void do_select_obj(ObjKey key);
-    void do_select_collection(const CollectionBase&);
+    [[nodiscard]] bool do_select_obj(ObjKey key, const Table*);
+    void do_select_collection(const CollectionBase& coll);
+    // When true, the currently selected object was created in this transaction
+    // and we don't need to emit instructions for mutations on it
+    bool check_for_newly_created_object(ObjKey key, const Table* table);
 
     // Mark this ObjKey as being a newly created object that should not emit
     // mutation instructions
-    void track_new_object(ObjKey);
+    void track_new_object(const Table*, ObjKey);
 
     void do_set(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant = _impl::instr_Set);
     void log_collection_operation(const char* operation, const CollectionBase& collection, Mixed value,
                                   Mixed index) const;
-    Path get_prop_name(Path&&) const;
+    Path get_prop_name(ConstTableRef, Path&&) const;
     size_t transact_log_size();
 };
 
@@ -463,7 +464,7 @@ inline void Replication::unselect_all() noexcept
 {
     m_selected_table = nullptr;
     m_selected_collection = CollectionId();
-    m_newly_created_object = false;
+    m_selected_obj_is_newly_created = false;
 }
 
 inline void Replication::select_table(const Table* table)
@@ -474,18 +475,20 @@ inline void Replication::select_table(const Table* table)
 
 inline bool Replication::select_collection(const CollectionBase& coll)
 {
+    bool newly_created_object =
+        check_for_newly_created_object(coll.get_owner_key(), coll.get_table().unchecked_ptr());
     if (CollectionId(coll) != m_selected_collection) {
         do_select_collection(coll); // Throws
     }
-    return !m_newly_created_object;
+    return !newly_created_object;
 }
 
-inline bool Replication::select_obj(ObjKey key)
+inline bool Replication::select_obj(ObjKey key, const Table* table)
 {
-    if (key != m_selected_obj) {
-        do_select_obj(key);
+    if (key != m_selected_obj || table != m_selected_table) {
+        return !do_select_obj(key, table);
     }
-    return !m_newly_created_object;
+    return !m_selected_obj_is_newly_created;
 }
 
 inline void Replication::rename_class(TableKey table_key, StringData)

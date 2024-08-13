@@ -420,6 +420,7 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
         case 0:
             file_format_ok = (top_ref == 0);
             break;
+        case 24:
         case g_current_file_format_version:
             file_format_ok = true;
             break;
