@@ -24,6 +24,7 @@
 #include <realm/util/file.hpp>
 
 #include <cstring>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <utility>
