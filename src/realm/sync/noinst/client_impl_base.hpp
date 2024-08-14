@@ -1398,6 +1398,16 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
     // the bind messsage
     call_debug_hook(SyncClientHookEvent::SessionConnected);
 
+    try {
+        process_pending_flx_bootstrap(); // throws
+    }
+    catch (const IntegrationException& error) {
+        on_integration_failure(error);
+    }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
+
     if (!m_suspended) {
         // Ready to send BIND message
         enlist_to_send(); // Throws
