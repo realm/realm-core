@@ -4,7 +4,7 @@
 
 const char* legend =
     "Simple tool to output the JSON representation of a Realm:\n"
-    "  realm2json [--output-mode N] <.realm file>\n"
+    "  realm2json [--output-mode N] [--filter <filterexpr>] <.realm file>\n"
     "\n"
     "Options:\n"
     " --schema: Just output the schema of the realm\n"
@@ -12,6 +12,7 @@ const char* legend =
     "      0 - JSON Object\n"
     "      1 - MongoDB Extended JSON (XJSON)\n"
     "      2 - An extension of XJSON that adds wrappers for embdded objects, links, dictionaries, etc\n"
+    " --filter: Only output objects matching the filter. Filter syntax: '<table name>:<RQL filter expression>'"
     "\n";
 
 template <typename FormatStr>
