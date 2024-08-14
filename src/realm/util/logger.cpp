@@ -25,8 +25,9 @@
 namespace realm::util {
 
 namespace {
-auto& s_logger_mutex = *new std::mutex;
+auto& s_default_logger_mutex = *new std::mutex;
 std::shared_ptr<util::Logger> s_default_logger;
+auto s_stderr_log_mutex = std::make_shared<std::mutex>();
 } // anonymous namespace
 
 size_t LogCategory::s_next_index = 0;
@@ -82,7 +83,7 @@ void LogCategory::set_default_level_threshold(Level level)
     for (auto c : m_children) {
         c->set_default_level_threshold(level);
     }
-    std::lock_guard lock(s_logger_mutex);
+    std::lock_guard lock(s_default_logger_mutex);
     if (s_default_logger)
         set_default_level_threshold(s_default_logger.get());
 }
@@ -110,13 +111,13 @@ void LogCategory::set_default_level_threshold(Logger* root) const
 
 void Logger::set_default_logger(std::shared_ptr<util::Logger> logger) noexcept
 {
-    std::lock_guard lock(s_logger_mutex);
+    std::lock_guard lock(s_default_logger_mutex);
     s_default_logger = logger;
 }
 
 std::shared_ptr<util::Logger>& Logger::get_default_logger() noexcept
 {
-    std::lock_guard lock(s_logger_mutex);
+    std::lock_guard lock(s_default_logger_mutex);
     if (!s_default_logger) {
         s_default_logger = std::make_shared<StderrLogger>();
     }
@@ -175,10 +176,15 @@ const std::string_view Logger::level_to_string(Level level) noexcept
     return "";
 }
 
+StderrLogger::StderrLogger() noexcept
+    : m_log_mutex(s_stderr_log_mutex)
+{
+}
+
 void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string& message)
 {
-    static Mutex mutex;
-    LockGuard l(mutex);
+    REALM_ASSERT(m_log_mutex);
+    std::lock_guard l(*m_log_mutex.get());
     // std::cerr is unbuffered, so no need to flush
     std::cerr << cat.get_name() << " - " << get_level_prefix(level) << message << '\n'; // Throws
 }

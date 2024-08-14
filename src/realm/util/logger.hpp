@@ -344,7 +344,7 @@ std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 /// level threshold.
 class StderrLogger : public Logger {
 public:
-    StderrLogger() noexcept = default;
+    StderrLogger() noexcept;
 
     StderrLogger(Level level) noexcept
         : Logger()
@@ -354,6 +354,9 @@ public:
 
 protected:
     void do_log(const LogCategory& category, Level, const std::string&) final;
+
+private:
+    std::shared_ptr<std::mutex> m_log_mutex;
 };
 
 
