@@ -6100,6 +6100,41 @@ TEST(Parser_Between)
     CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
 }
 
+TEST(Test_Between_OverLinks)
+{
+    Group g;
+    TableRef parent = g.add_table("Parent");
+    TableRef child = g.add_table("Child");
+
+    ColKey ck_child = parent->add_column(*child, "child");
+    ColKey ck_int = child->add_column(type_Int, "int");
+    ColKey ck_timestamp = child->add_column(type_Timestamp, "timestamp");
+
+    constexpr size_t num_children = 100;
+    for (size_t i = 0; i < num_children; ++i) {
+        auto obj = child->create_object();
+        obj.set(ck_int, (int)i);
+        obj.set(ck_timestamp, Timestamp{int64_t(i), 0});
+        parent->create_object().set(ck_child, obj.get_key());
+        parent->create_object().set(ck_child, obj.get_key());
+    }
+    parent->create_object(); // null link
+
+    verify_query(test_context, child, "int BETWEEN {0, 100}", 100);
+    verify_query(test_context, child, "timestamp BETWEEN {$0, $1}", {Timestamp{0, 0}, Timestamp{100, 0}}, 100);
+    verify_query(test_context, child, "int BETWEEN {1, 2}", 2);
+    verify_query(test_context, child, "timestamp BETWEEN {$0, $1}", {Timestamp{1, 0}, Timestamp{2, 0}}, 2);
+    verify_query(test_context, child, "int BETWEEN {-1, -2}", 0);
+    verify_query(test_context, child, "timestamp BETWEEN {$0, $1}", {Timestamp{-1, 0}, Timestamp{-2, 0}}, 0);
+
+    verify_query(test_context, parent, "child.int BETWEEN {0, 100}", 200);
+    verify_query(test_context, parent, "child.timestamp BETWEEN {$0, $1}", {Timestamp{0, 0}, Timestamp{100, 0}}, 200);
+    verify_query(test_context, parent, "child.int BETWEEN {1, 2}", 4);
+    verify_query(test_context, parent, "child.timestamp BETWEEN {$0, $1}", {Timestamp{1, 0}, Timestamp{2, 0}}, 4);
+    verify_query(test_context, parent, "child.int BETWEEN {-1, -2}", 0);
+    verify_query(test_context, parent, "child.timestamp BETWEEN {$0, $1}", {Timestamp{-1, 0}, Timestamp{-2, 0}}, 0);
+}
+
 TEST(Parser_PrimaryKey)
 {
     UUID u1("3b241101-e2bb-4255-8caf-4136c566a961");

@@ -1464,16 +1464,22 @@ TEST_CASE("Synchronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     std::mutex mutex;
 
     // Create the app session and get the logged in user identity
-    auto server_app_config = minimal_app_config("autoopen-realm", schema);
-    TestAppSession session(create_app(server_app_config), transport, DeleteApp{true}, realm::ReconnectMode::normal,
-                           socket_provider);
-    auto user = session.app()->current_user();
-    std::string identity = user->user_id();
-    REQUIRE(user->is_logged_in());
-    REQUIRE(!identity.empty());
-    // Reopen the App instance and retrieve the cached user
-    session.reopen(false);
-    user = session.app()->get_existing_logged_in_user(identity);
+    auto app_session = create_app(minimal_app_config("autoopen-realm", schema));
+    std::string identity;
+    TestAppSession::Config tas_config;
+    {
+        // Keep the app and realm storage
+        TestAppSession session(app_session, {transport, realm::ReconnectMode::normal, socket_provider},
+                               DeleteApp{false}, false);
+        auto user = session.current_user();
+        REQUIRE(user);
+        REQUIRE(user->is_logged_in());
+        identity = user->user_id();
+        tas_config = session.config(); // get config with storage path and user creds populated
+    }
+    REQUIRE_FALSE(identity.empty());
+    TestAppSession session(app_session, tas_config);
+    auto user = session.app()->get_existing_logged_in_user(identity);
 
     SyncTestFile config(user, partition, schema);
     config.sync_config->cancel_waits_on_nonfatal_error = true;
@@ -1646,6 +1652,43 @@ TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
 
         // Check that the data also exists in the new realm
         REQUIRE(local_realm2->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("synced realm must be fully uploaded") {
+        auto realm = Realm::get_shared_realm(sync_config1);
+        realm->sync_session()->pause();
+        realm->begin_transaction();
+        realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        realm->commit_transaction();
+
+        SyncTestFile sync_config2(tsm, "default");
+        sync_config2.schema = schema;
+        REQUIRE_EXCEPTION(realm->convert(sync_config2), IllegalOperation,
+                          "All client changes must be integrated in server before writing copy");
+
+        realm->sync_session()->resume();
+        wait_for_upload(*realm);
+        REQUIRE_NOTHROW(realm->convert(sync_config2));
+    }
+
+    SECTION("can convert synced realm from within upload complete callback") {
+        auto realm = Realm::get_shared_realm(sync_config1);
+        realm->sync_session()->pause();
+        realm->begin_transaction();
+        realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        realm->commit_transaction();
+
+        SyncTestFile sync_config2(tsm, "default");
+        sync_config2.schema = schema;
+        auto pf = util::make_promise_future();
+        realm->sync_session()->wait_for_upload_completion([&](Status) {
+            sync_config1.scheduler = util::Scheduler::make_dummy();
+            auto realm = Realm::get_shared_realm(sync_config1);
+            REQUIRE_NOTHROW(realm->convert(sync_config2));
+            pf.promise.emplace_value();
+        });
+        realm->sync_session()->resume();
+        pf.future.get();
     }
 }
 

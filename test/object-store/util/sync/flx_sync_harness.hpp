@@ -84,16 +84,17 @@ public:
     };
 
     explicit FLXSyncTestHarness(Config&& config)
-        : m_test_session(make_app_from_server_schema(config.test_name, config.server_schema), config.transport, true,
-                         config.reconnect_mode, config.custom_socket_provider)
+        : m_test_session(make_app_from_server_schema(config.test_name, config.server_schema),
+                         {config.transport, config.reconnect_mode, config.custom_socket_provider}, DeleteApp{true})
         , m_schema(std::move(config.server_schema.schema))
     {
     }
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema(),
                        std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>,
                        std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr)
-        : m_test_session(make_app_from_server_schema(test_name, server_schema), std::move(transport), true,
-                         realm::ReconnectMode::normal, custom_socket_provider)
+        : m_test_session(make_app_from_server_schema(test_name, server_schema),
+                         {std::move(transport), realm::ReconnectMode::normal, custom_socket_provider},
+                         DeleteApp{true})
         , m_schema(std::move(server_schema.schema))
     {
     }
