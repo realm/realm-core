@@ -67,7 +67,7 @@ struct DictionaryNotificationsCallback {
 std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_path_array)
 {
     std::optional<KeyPathArray> ret;
-    if (key_path_array && key_path_array->size()) {
+    if (key_path_array) {
         ret.emplace(std::move(*key_path_array));
     }
     return ret;
