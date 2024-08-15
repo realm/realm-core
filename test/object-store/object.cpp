@@ -312,6 +312,7 @@ TEST_CASE("object") {
     };
 
     SECTION("add_notification_callback()") {
+        bool first;
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
         std::vector<int64_t> pks = {3, 4, 7, 9, 10, 21, 24, 34, 42, 50};
@@ -345,7 +346,7 @@ TEST_CASE("object") {
         };
 
         auto require_no_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
-            bool first = true;
+            first = true;
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet) {
                     REQUIRE(first);
@@ -817,6 +818,7 @@ TEST_CASE("object") {
                 r->commit_transaction();
 
                 KeyPathArray kpa_to_depth_5 = r->create_key_path_array("table2", {"link2.link2.link2.link2.value"});
+                KeyPathArray kpa_wildcard_wildcard = r->create_key_path_array("table2", {"*.*"});
                 KeyPathArray kpa_to_depth_6 =
                     r->create_key_path_array("table2", {"link2.link2.link2.link2.link2.value"});
 
@@ -831,6 +833,16 @@ TEST_CASE("object") {
                     REQUIRE_INDICES(change.modifications, 0);
                     REQUIRE(change.columns.size() == 1);
                     REQUIRE_INDICES(change.columns[col_origin_link2.value], 0);
+                }
+
+                SECTION("modifying table 'table2', property 'link2' 5 levels deep "
+                        "while observing table 'table2', property '*.*'"
+                        "-> DOES NOT send a notification") {
+                    auto token = require_no_change(object_depth1, kpa_wildcard_wildcard);
+
+                    write([&] {
+                        object_depth5.set_column_value("value", 555);
+                    });
                 }
 
                 SECTION("modifying table 'table2', property 'link2' 6 depths deep "

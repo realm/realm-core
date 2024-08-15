@@ -404,13 +404,13 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
         auto last_column_key = last_key_path_element.second;
         if (last_column_key.get_type() == col_type_BackLink) {
             auto iterator = m_info.tables.find(table.get_key());
-            auto table_has_changed = [iterator] {
-                return !iterator->second.insertions_empty() || !iterator->second.modifications_empty() ||
-                       !iterator->second.deletions_empty();
-            };
-            if (iterator != m_info.tables.end() && table_has_changed()) {
-                ColKey root_column_key = key_path[0].second;
-                changed_columns.push_back(root_column_key);
+            if (iterator != m_info.tables.end()) {
+                auto changes = iterator->second;
+                if (changes.modifications_contains(object_key, {last_column_key}) ||
+                    changes.insertions_contains(object_key)) {
+                    ColKey root_column_key = key_path[0].second;
+                    changed_columns.push_back(root_column_key);
+                }
             }
         }
 
