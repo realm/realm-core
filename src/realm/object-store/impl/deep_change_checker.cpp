@@ -396,24 +396,6 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
 
     if (depth >= key_path.size()) {
         // We've reached the end of the key path.
-
-        // For the special case of having a backlink at the end of a key path we need to check this level too.
-        // Modifications to a backlink are found via the insertions on the origin table (which we are in right
-        // now).
-        auto last_key_path_element = key_path[key_path.size() - 1];
-        auto last_column_key = last_key_path_element.second;
-        if (last_column_key.get_type() == col_type_BackLink) {
-            auto iterator = m_info.tables.find(table.get_key());
-            auto table_has_changed = [iterator] {
-                return !iterator->second.insertions_empty() || !iterator->second.modifications_empty() ||
-                       !iterator->second.deletions_empty();
-            };
-            if (iterator != m_info.tables.end() && table_has_changed()) {
-                ColKey root_column_key = key_path[0].second;
-                changed_columns.push_back(root_column_key);
-            }
-        }
-
         return;
     }
 
@@ -421,15 +403,17 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
 
     // Check for a change on the current depth level.
     auto iterator = m_info.tables.find(table_key);
-    if (iterator != m_info.tables.end() && (iterator->second.modifications_contains(object_key, {column_key}) ||
-                                            iterator->second.insertions_contains(object_key))) {
-        // If an object linked to the root object was changed we only mark the
-        // property of the root objects as changed.
-        // This is also the reason why we can return right after doing so because we would only mark the same root
-        // property again in case we find another change deeper down the same path.
-        auto root_column_key = key_path[0].second;
-        changed_columns.push_back(root_column_key);
-        return;
+    if (iterator != m_info.tables.end()) {
+        auto& changes = iterator->second;
+        if (changes.modifications_contains(object_key, {column_key}) || changes.insertions_contains(object_key)) {
+            // If an object linked to the root object was changed we only mark the
+            // property of the root objects as changed.
+            // This is also the reason why we can return right after doing so because we would only mark the same root
+            // property again in case we find another change deeper down the same path.
+            auto root_column_key = key_path[0].second;
+            changed_columns.push_back(root_column_key);
+            return;
+        }
     }
 
     // Only continue for any kind of link.
@@ -448,11 +432,12 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             auto target_table_key = mixed_object.get_link().get_table_key();
             Group* group = table.get_parent_group();
             auto target_table = group->get_table(target_table_key);
-            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, object_key);
+            find_changed_columns(changed_columns, key_path, depth, *target_table, object_key);
         }
     };
 
     // Advance one level deeper into the key path.
+    depth++;
     auto object = table.get_object(object_key);
     if (column_key.is_list()) {
         if (column_type == col_type_Mixed) {
@@ -468,7 +453,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < list.size(); i++) {
                 auto target_object = list.get(i);
-                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object);
+                find_changed_columns(changed_columns, key_path, depth, *target_table, target_object);
             }
         }
     }
@@ -484,7 +469,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             auto set = object.get_linkset(column_key);
             auto target_table = table.get_link_target(column_key);
             for (auto& target_object : set) {
-                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object);
+                find_changed_columns(changed_columns, key_path, depth, *target_table, target_object);
             }
         }
     }
@@ -505,7 +490,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             return;
         }
         auto target_table = table.get_link_target(column_key);
-        find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object);
+        find_changed_columns(changed_columns, key_path, depth, *target_table, target_object);
     }
     else if (column_type == col_type_BackLink) {
         // A backlink can have multiple origin objects. We need to iterate over all of them.
@@ -514,7 +499,23 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
         size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
         for (size_t i = 0; i < backlink_count; i++) {
             auto origin_object = object.get_backlink(*origin_table, origin_column_key, i);
-            find_changed_columns(changed_columns, key_path, depth + 1, *origin_table, origin_object);
+            if (depth == key_path.size()) {
+                // For the special case of having a backlink at the end of a key path we need to check this level too.
+                // Modifications to a backlink are found via the insertions on the origin table (which we are in right
+                // now).
+                auto iterator = m_info.tables.find(origin_table->get_key());
+                if (iterator != m_info.tables.end()) {
+                    auto& changes = iterator->second;
+                    if (changes.modifications_contains(origin_object, {origin_column_key}) ||
+                        changes.insertions_contains(origin_object)) {
+                        ColKey root_column_key = key_path[0].second;
+                        changed_columns.push_back(root_column_key);
+                    }
+                }
+            }
+            else {
+                find_changed_columns(changed_columns, key_path, depth, *origin_table, origin_object);
+            }
         }
     }
     else {
