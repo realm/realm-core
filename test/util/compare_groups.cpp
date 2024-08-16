@@ -943,7 +943,7 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
 
 bool compare_groups(const Transaction& group_1, const Transaction& group_2)
 {
-    util::StderrLogger logger(util::Logger::Level::off);
+    util::NullLogger logger{};
     return compare_groups(group_1, group_2, logger);
 }
 

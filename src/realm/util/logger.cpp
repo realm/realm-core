@@ -27,7 +27,6 @@ namespace realm::util {
 namespace {
 auto& s_default_logger_mutex = *new std::mutex;
 std::shared_ptr<util::Logger> s_default_logger;
-auto s_stderr_log_mutex = std::make_shared<std::mutex>();
 } // anonymous namespace
 
 size_t LogCategory::s_next_index = 0;
@@ -176,17 +175,25 @@ const std::string_view Logger::level_to_string(Level level) noexcept
     return "";
 }
 
+std::shared_ptr<std::mutex> StderrLogger::m_stderr_log_mutex = std::make_shared<std::mutex>();
+
 StderrLogger::StderrLogger() noexcept
-    : m_log_mutex(s_stderr_log_mutex)
+    : m_log_mutex(StderrLogger::m_stderr_log_mutex)
 {
 }
 
 void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string& message)
 {
+    do_write(util::format("%1 - %2%3", cat.get_name(), get_level_prefix(level), message));
+}
+
+void StderrLogger::do_write(std::string&& output)
+{
     REALM_ASSERT(m_log_mutex);
+    // Lock the mutex to avoid comingling the logger output messages
     std::lock_guard l(*m_log_mutex.get());
     // std::cerr is unbuffered, so no need to flush
-    std::cerr << cat.get_name() << " - " << get_level_prefix(level) << message << '\n'; // Throws
+    std::cerr << output << std::endl; // Throws
 }
 
 void StreamLogger::do_log(const LogCategory&, Level level, const std::string& message)

@@ -9,7 +9,7 @@
 namespace realm {
 namespace util {
 
-class TimestampStderrLogger : public Logger {
+class TimestampStderrLogger : public StderrLogger {
 public:
     using Precision = TimestampFormatter::Precision;
     using Config = TimestampFormatter::Config;
@@ -17,7 +17,7 @@ public:
     explicit TimestampStderrLogger(Config = {}, Level = LogCategory::realm.get_default_level_threshold());
 
 protected:
-    void do_log(const LogCategory& category, Logger::Level, const std::string& message) final;
+    void do_log(const LogCategory& category, Logger::Level, const std::string& message) override;
 
 private:
     TimestampFormatter m_formatter;
