@@ -21,11 +21,12 @@
 #include <iostream>
 #include <mutex>
 #include <map>
+#include <sstream>
 
 namespace realm::util {
 
 namespace {
-auto& s_default_logger_mutex = *new std::mutex;
+auto& s_logger_mutex = *new std::mutex;
 std::shared_ptr<util::Logger> s_default_logger;
 } // anonymous namespace
 
@@ -82,7 +83,7 @@ void LogCategory::set_default_level_threshold(Level level)
     for (auto c : m_children) {
         c->set_default_level_threshold(level);
     }
-    std::lock_guard lock(s_default_logger_mutex);
+    std::lock_guard lock(s_logger_mutex);
     if (s_default_logger)
         set_default_level_threshold(s_default_logger.get());
 }
@@ -110,13 +111,13 @@ void LogCategory::set_default_level_threshold(Logger* root) const
 
 void Logger::set_default_logger(std::shared_ptr<util::Logger> logger) noexcept
 {
-    std::lock_guard lock(s_default_logger_mutex);
+    std::lock_guard lock(s_logger_mutex);
     s_default_logger = logger;
 }
 
 std::shared_ptr<util::Logger>& Logger::get_default_logger() noexcept
 {
-    std::lock_guard lock(s_default_logger_mutex);
+    std::lock_guard lock(s_logger_mutex);
     if (!s_default_logger) {
         s_default_logger = std::make_shared<StderrLogger>();
     }
@@ -175,25 +176,12 @@ const std::string_view Logger::level_to_string(Level level) noexcept
     return "";
 }
 
-std::shared_ptr<std::mutex> StderrLogger::m_stderr_log_mutex = std::make_shared<std::mutex>();
-
-StderrLogger::StderrLogger() noexcept
-    : m_log_mutex(StderrLogger::m_stderr_log_mutex)
-{
-}
-
 void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string& message)
 {
-    do_write(util::format("%1 - %2%3", cat.get_name(), get_level_prefix(level), message));
-}
-
-void StderrLogger::do_write(std::string&& output)
-{
-    REALM_ASSERT(m_log_mutex);
-    // Lock the mutex to avoid comingling the logger output messages
-    std::lock_guard l(*m_log_mutex.get());
-    // std::cerr is unbuffered, so no need to flush
-    std::cerr << output << std::endl; // Throws
+    std::stringstream ss;
+    ss << cat.get_name() << " - " << get_level_prefix(level) << message << "\n";
+    // A single call to std::cerr is thread safe, so locking is not needed
+    std::cerr << ss.str();
 }
 
 void StreamLogger::do_log(const LogCategory&, Level level, const std::string& message)

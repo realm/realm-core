@@ -52,6 +52,13 @@ using namespace std::string_literals;
 using Catch::Matchers::StartsWith;
 using nlohmann::json;
 
+static auto audit_logger =
+#ifdef AUDIT_LOG_LEVEL
+    std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL);
+#else
+    std::make_shared<util::NullLogger>();
+#endif
+
 namespace {
 
 struct AuditEvent {
@@ -295,7 +302,7 @@ TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     config.audit_config->base_file_path = test_session.base_file_path();
     auto serializer = std::make_shared<CustomSerializer>();
     config.audit_config->serializer = serializer;
-    config.audit_config->logger = util::Logger::get_default_logger();
+    config.audit_config->logger = audit_logger;
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1497,7 +1504,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     };
     config.audit_config = std::make_shared<AuditConfig>();
     config.audit_config->base_file_path = test_session.base_file_path();
-    config.audit_config->logger = util::Logger::get_default_logger();
+    config.audit_config->logger = audit_logger;
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1601,7 +1608,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         // Open a different Realm with the same user and audit prefix
         SyncTestFile config(test_session, "other");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = util::Logger::get_default_logger();
+        config.audit_config->logger = audit_logger;
         config.audit_config->base_file_path = test_session.base_file_path();
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
@@ -1630,7 +1637,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         SyncTestFile config(test_session, "parent");
         config.audit_config = std::make_shared<AuditConfig>();
         config.audit_config->base_file_path = test_session.base_file_path();
-        config.audit_config->logger = util::Logger::get_default_logger();
+        config.audit_config->logger = audit_logger;
         config.audit_config->partition_value_prefix = "other";
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
@@ -1688,7 +1695,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     config.automatic_change_notifications = false;
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
-    config.audit_config->logger = util::Logger::get_default_logger();
+    config.audit_config->logger = audit_logger;
     config.audit_config->base_file_path = session.app()->config().base_file_path;
 
     auto expect_error = [&](auto&& config, auto&& fn) -> SyncError {
