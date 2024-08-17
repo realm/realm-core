@@ -180,7 +180,7 @@ void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string
 {
     // fprintf is supposedly faster than cerr and MacOS TSAN doesn't complain when it
     // is used in a multi-threaded context.
-    std::fprintf(stderr, "%s - %s%s", cat.get_name().c_str(), get_level_prefix(level), message.c_str());
+    std::fprintf(stderr, "%s - %s%s\n", cat.get_name().c_str(), get_level_prefix(level), message.c_str());
 }
 
 void StreamLogger::do_log(const LogCategory&, Level level, const std::string& message)
