@@ -19,6 +19,7 @@
 #include <realm/util/logger.hpp>
 
 #include <iostream>
+#include <cstdio>
 #include <mutex>
 #include <map>
 #include <sstream>
@@ -178,10 +179,9 @@ const std::string_view Logger::level_to_string(Level level) noexcept
 
 void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string& message)
 {
-    std::stringstream ss;
-    ss << cat.get_name() << " - " << get_level_prefix(level) << message << "\n";
-    // A single call to std::cerr is thread safe, so locking is not needed
-    std::cerr << ss.str();
+    // fprintf is supposedly faster than cerr and MacOS TSAN doesn't complain when it
+    // is used in a multi-threaded context.
+    std::fprintf(stderr, "%s - %s%s", cat.get_name().c_str(), get_level_prefix(level), message.c_str());
 }
 
 void StreamLogger::do_log(const LogCategory&, Level level, const std::string& message)
