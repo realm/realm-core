@@ -2630,6 +2630,12 @@ TEST_CASE("C API - properties", "[c_api]") {
                     CHECK(strings.get() != list2.get());
                 }
 
+                SECTION("get_by_name") {
+                    auto list2 = cptr_checked(realm_get_list_by_name(obj2.get(), "strings"));
+                    CHECK(realm_equals(strings.get(), list2.get()));
+                    CHECK(strings.get() != list2.get());
+                }
+
                 SECTION("insert, then get") {
                     write([&]() {
                         CHECK(checked(realm_list_insert(strings.get(), 0, a)));
@@ -3735,6 +3741,12 @@ TEST_CASE("C API - properties", "[c_api]") {
 
                 SECTION("realm_clone()") {
                     auto dict2 = clone_cptr(strings.get());
+                    CHECK(realm_equals(strings.get(), dict2.get()));
+                    CHECK(strings.get() != dict2.get());
+                }
+
+                SECTION("get by name") {
+                    auto dict2 = cptr_checked(realm_get_dictionary_by_name(obj1.get(), "nullable_string_dict"));
                     CHECK(realm_equals(strings.get(), dict2.get()));
                     CHECK(strings.get() != dict2.get());
                 }
@@ -5836,6 +5848,94 @@ TEST_CASE("C API: convert", "[c_api]") {
             REQUIRE(realm_convert_with_config(realm, dest_config.get(), merge_with_existing));
         }
     }
+    realm_close(realm);
+    REQUIRE(realm_is_closed(realm));
+    realm_release(realm);
+}
+
+TEST_CASE("C API: flexible schema", "[c_api]") {
+    TestFile test_file;
+    ObjectSchema object_schema = {"Foo", {{"_id", PropertyType::Int, Property::IsPrimary{true}}}};
+
+    auto config = make_config(test_file.path.c_str(), false);
+    config->schema = Schema{object_schema};
+    config->schema_version = 0;
+    config->flexible_schema = 1;
+    auto realm = realm_open(config.get());
+    realm_class_info_t class_foo;
+    bool found = false;
+    CHECK(checked(realm_find_class(realm, "Foo", &found, &class_foo)));
+    REQUIRE(found);
+
+    SECTION("Simple set/get/delete") {
+        checked(realm_begin_write(realm));
+
+        realm_value_t pk = rlm_int_val(42);
+        auto obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+        checked(realm_set_value_by_name(obj1.get(), "age", rlm_int_val(23)));
+        const char* prop_names[10];
+        size_t actual;
+        realm_get_additional_properties(obj1.get(), prop_names, 10, &actual);
+        REQUIRE(actual == 1);
+        CHECK(prop_names[0] == std::string_view("age"));
+        realm_has_property(obj1.get(), "age", &found);
+        REQUIRE(found);
+        realm_has_property(obj1.get(), "_id", &found);
+        REQUIRE(found);
+        realm_has_property(obj1.get(), "weight", &found);
+        REQUIRE(!found);
+
+        realm_value_t value;
+        CHECK(checked(realm_get_value_by_name(obj1.get(), "age", &value)));
+        CHECK(value.type == RLM_TYPE_INT);
+        CHECK(value.integer == 23);
+
+        checked(realm_erase_additional_property(obj1.get(), "age"));
+        realm_get_additional_properties(obj1.get(), nullptr, 0, &actual);
+        REQUIRE(actual == 0);
+        realm_commit(realm);
+    }
+
+    SECTION("Set/get nested list") {
+        checked(realm_begin_write(realm));
+
+        realm_value_t pk = rlm_int_val(42);
+        auto obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+        auto list = cptr_checked(realm_set_list_by_name(obj1.get(), "scores"));
+        REQUIRE(list);
+        realm_has_property(obj1.get(), "scores", &found);
+        REQUIRE(found);
+
+        realm_value_t value;
+        CHECK(checked(realm_get_value_by_name(obj1.get(), "scores", &value)));
+        CHECK(value.type == RLM_TYPE_LIST);
+
+        auto list1 = cptr_checked(realm_get_list_by_name(obj1.get(), "scores"));
+        REQUIRE(list1);
+
+        realm_commit(realm);
+    }
+
+    SECTION("Set/get nested dictionary") {
+        checked(realm_begin_write(realm));
+
+        realm_value_t pk = rlm_int_val(42);
+        auto obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+        auto dict = cptr_checked(realm_set_dictionary_by_name(obj1.get(), "properties"));
+        REQUIRE(dict);
+        realm_has_property(obj1.get(), "properties", &found);
+        REQUIRE(found);
+
+        realm_value_t value;
+        CHECK(checked(realm_get_value_by_name(obj1.get(), "properties", &value)));
+        CHECK(value.type == RLM_TYPE_DICTIONARY);
+
+        auto dict1 = cptr_checked(realm_get_dictionary_by_name(obj1.get(), "properties"));
+        REQUIRE(dict1);
+
+        realm_commit(realm);
+    }
+
     realm_close(realm);
     REQUIRE(realm_is_closed(realm));
     realm_release(realm);

@@ -42,6 +42,11 @@ Collection::Collection(const Object& parent_obj, const Property* prop)
 {
 }
 
+Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, const StringData prop_name)
+    : Collection(std::shared_ptr(r), parent_obj.get_collection_ptr(prop_name), PropertyType::Mixed)
+{
+}
+
 Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
     : Collection(std::move(r), parent_obj.get_collection_ptr(col),
                  ObjectSchema::from_core_type(col) & ~PropertyType::Collection)

@@ -106,6 +106,9 @@ struct DBOptions {
     /// will clear and reinitialize the file.
     bool clear_on_invalid_file = false;
 
+    /// Allow setting properties not supported by a specific column on an object
+    bool allow_flexible_schema = false;
+
     /// sys_tmp_dir will be used if the temp_dir is empty when creating DBOptions.
     /// It must be writable and allowed to create pipe/fifo file on it.
     /// set_sys_tmp_dir is not a thread-safe call and it is only supposed to be called once

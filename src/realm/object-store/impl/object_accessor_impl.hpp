@@ -70,15 +70,15 @@ public:
     // value present. The property is identified both by the name of the
     // property and its index within the ObjectScehma's persisted_properties
     // array.
-    util::Optional<std::any> value_for_property(std::any& dict, const Property& prop,
+    util::Optional<std::any> value_for_property(std::any& dict, const std::string& name,
                                                 size_t /* property_index */) const
     {
 #if REALM_ENABLE_GEOSPATIAL
         if (auto geo = std::any_cast<Geospatial>(&dict)) {
-            if (prop.name == Geospatial::c_geo_point_type_col_name) {
+            if (name == Geospatial::c_geo_point_type_col_name) {
                 return geo->get_type_string();
             }
-            else if (prop.name == Geospatial::c_geo_point_coords_col_name) {
+            else if (name == Geospatial::c_geo_point_coords_col_name) {
                 std::vector<std::any> coords;
                 auto&& point = geo->get<GeoPoint>(); // throws
                 coords.push_back(point.longitude);
@@ -88,11 +88,11 @@ public:
                 }
                 return coords;
             }
-            REALM_ASSERT_EX(false, prop.name); // unexpected property type
+            REALM_ASSERT_EX(false, name); // unexpected property type
         }
 #endif
         auto const& v = util::any_cast<AnyDict&>(dict);
-        auto it = v.find(prop.name);
+        auto it = v.find(name);
         return it == v.end() ? util::none : util::make_optional(it->second);
     }
 
@@ -118,6 +118,20 @@ public:
     template <typename Func>
     void enumerate_dictionary(std::any& value, Func&& fn)
     {
+#if REALM_ENABLE_GEOSPATIAL
+        if (auto geo = std::any_cast<Geospatial>(&value)) {
+            fn(Geospatial::c_geo_point_type_col_name, std::any(geo->get_type_string()));
+            std::vector<std::any> coords;
+            auto&& point = geo->get<GeoPoint>(); // throws
+            coords.push_back(point.longitude);
+            coords.push_back(point.latitude);
+            if (point.has_altitude()) {
+                coords.push_back(*point.get_altitude());
+            }
+            fn(Geospatial::c_geo_point_coords_col_name, std::any(coords));
+            return;
+        }
+#endif
         for (auto&& v : util::any_cast<AnyDict&>(value))
             fn(v.first, v.second);
     }
