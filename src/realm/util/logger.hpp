@@ -23,11 +23,12 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 
+#include <array>
 #include <cstring>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <utility>
-#include <array>
 
 namespace realm::util {
 
