@@ -92,6 +92,7 @@ set(UTIL_SOURCES
     util/terminate.cpp
     util/time.cpp
     util/timestamp_formatter.cpp
+    util/timestamp_logger.cpp
     util/thread.cpp
     util/to_string.cpp
     util/demangle.cpp
@@ -282,6 +283,7 @@ set(REALM_NOINST_HEADERS
     util/thread_exec_guard.hpp
     util/time.hpp
     util/timestamp_formatter.hpp
+    util/timestamp_logger.hpp
     util/value_reset_guard.hpp
 ) # REALM_NOINST_HEADERS
 

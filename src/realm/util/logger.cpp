@@ -19,7 +19,6 @@
 #include <realm/util/logger.hpp>
 
 #include <iostream>
-#include <cstdio>
 #include <mutex>
 #include <map>
 
@@ -27,6 +26,7 @@ namespace realm::util {
 
 namespace {
 auto& s_logger_mutex = *new std::mutex;
+auto& s_stderr_logger_mutex = *new std::mutex;
 std::shared_ptr<util::Logger> s_default_logger;
 } // anonymous namespace
 
@@ -176,11 +176,16 @@ const std::string_view Logger::level_to_string(Level level) noexcept
     return "";
 }
 
+StderrLogger::StderrLogger() noexcept
+    : m_mutex(s_stderr_logger_mutex)
+{
+}
+
 void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string& message)
 {
-    // fprintf is supposedly faster than cerr and MacOS TSAN doesn't complain when it
-    // is used in a multi-threaded context.
-    std::fprintf(stderr, "%s - %s%s\n", cat.get_name().c_str(), get_level_prefix(level), message.c_str());
+    std::lock_guard l(m_mutex);
+    // std::cerr is unbuffered, so no need to flush
+    std::cerr << cat.get_name() << " - " << get_level_prefix(level) << message << '\n'; // Throws
 }
 
 void StreamLogger::do_log(const LogCategory&, Level level, const std::string& message)

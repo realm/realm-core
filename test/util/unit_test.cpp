@@ -28,6 +28,7 @@
 #include <thread>
 
 #include <realm/util/thread.hpp>
+#include <realm/util/timestamp_logger.hpp>
 
 #include <external/json/json.hpp>
 
@@ -517,7 +518,15 @@ bool TestList::run(Config config)
         shared_logger = config.logger;
     }
     else {
-        shared_logger = util::Logger::get_default_logger(); // Throws
+        if (config.log_timestamps) {
+            util::TimestampStderrLogger::Config config;
+            config.precision = util::TimestampStderrLogger::Precision::milliseconds;
+            config.format = "%FT%T";
+            shared_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
+        }
+        else {
+            shared_logger = util::Logger::get_default_logger(); // Throws
+        }
     }
 
     Reporter fallback_reporter;
