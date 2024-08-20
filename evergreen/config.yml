@@ -88,14 +88,6 @@ functions:
               set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh "${cxx_compiler}")
           fi
 
-          if [[ -z "${disable_tests_against_baas|}" && -z "${no_tests|}" ]]; then
-              scheme="http"
-              set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
-              if [ -n "${baas_admin_port|}" ]; then
-                set_cmake_var baas_vars REALM_ADMIN_ENDPOINT STRING "$scheme://localhost:${baas_admin_port}"
-              fi
-          fi
-
           if [ -n "${enable_asan|}" ]; then
               set_cmake_var realm_vars REALM_ASAN BOOL On
           fi
@@ -117,20 +109,12 @@ functions:
               set_cmake_var realm_vars REALM_LIBFUZZER BOOL On
           fi
 
-          if [ -z "${disable_sync|}" ]; then
-              set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
-          fi
-
           if [ -n "${use_system_openssl|}" ]; then
               set_cmake_var realm_vars REALM_USE_SYSTEM_OPENSSL BOOL On
           fi
 
           if [ -n "${long_running_test_duration|}" ]; then
               set_cmake_var realm_vars REALM_TEST_DURATION STRING "${long_running_test_duration}"
-          fi
-
-          if [ -n "${disable_sync_multiplexing|}" ]; then
-              set_cmake_var realm_vars REALM_SYNC_MULTIPLEXING BOOL Off
           fi
 
           if [ -n "${enable_llvm_coverage|}" ]; then
@@ -274,11 +258,6 @@ functions:
       params:
         working_dir: realm-core
         shell: bash
-        env:
-          BAASAAS_API_KEY: "${baasaas_api_key}"
-          # BAAS_VERSION and VERSION_TYPE are set by realm-core/dependencies.yml
-          BAASAAS_REF_SPEC: "${BAAS_VERSION}"
-          BAASAAS_START_MODE: "${BAAS_VERSION_TYPE|githash}"
         script: |-
           set -o errexit
           set -o verbose
@@ -316,12 +295,6 @@ functions:
               TEST_FLAGS+="-V "
           fi
 
-          if [[ -n "${disable_tests_against_baas|}" ]]; then
-              unset BAASAAS_API_KEY
-              unset BAASAAS_REF_SPEC
-              unset BAASAAS_START_MODE
-          fi
-
           if [[ -n "${c_compiler}" && "$(basename ${c_compiler})" = "clang" && -f "$(dirname ${c_compiler})/llvm-symbolizer" ]]; then
               LLVM_SYMBOLIZER="$(dirname ${c_compiler})/llvm-symbolizer"
               # we don't want to put all of the llvm bin-dir onto the path, so make a new directory, as-needed,
@@ -356,12 +329,6 @@ functions:
               fi
           fi
 
-          # on later MacOS's the system curl is built against an old version of openssl that
-          # can't talk to baasaas over TLS.
-          if [[ "$(uname -s)" = "Darwin" ]]; then
-            export CURL_SSL_BACKEND=Secure-Transport
-          fi
-
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           if [[ -n "$UNITTEST_EVERGREEN_TEST_RESULTS" && -f "$UNITTEST_EVERGREEN_TEST_RESULTS" ]]; then
               rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
@@ -372,11 +339,7 @@ functions:
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 $TSAN_OPTIONS"
           export UBSAN_OPTIONS="print_stacktrace=1"
 
-          if [[ -n "${enable_baas_redirector}" ]]; then
-            export ENABLE_BAAS_REDIRECTOR=On
-          fi
-
-          cd build
+           cd build
           "$CTEST" -C ${cmake_build_type|Debug} $TEST_FLAGS
 
           if [[ -f ../test_${task_id}.log ]]; then
@@ -387,105 +350,6 @@ functions:
   - command: attach.results
     params:
       file_location: realm-core/${task_name}_results.json
-
-  "upload baas artifacts":
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o pipefail
-        set -o verbose
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          exit 0
-        fi
-
-        # Copy the baas_server log from the remote baas host if it exists
-        if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
-          echo "Skipping - no remote baas host or remote baas host definitions not found"
-          exit 0
-        fi
-
-        BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
-        export BAAS_HOST_NAME
-
-        ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
-        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
-
-        # Copy the baas_server.log, mongod.log and (optionally) baas_proxy.log files from the remote baas host
-        REMOTE_PATH=/data/baas-remote
-        REMOTE_BAAS_PATH="$REMOTE_PATH/baas-work-dir"
-        REMOTE_BAAS_DB_PATH="$REMOTE_BAAS_PATH/mongodb-dbpath"
-        REMOTE_PROXY_PATH="$REMOTE_PATH/baas-proxy-dir"
-
-        LOCAL_BAAS_PATH=./baas-work-dir
-        LOCAL_BAAS_DB_PATH="$LOCAL_BAAS_PATH/mongodb-dbpath"
-        LOCAL_PROXY_PATH=./baas-proxy-dir
-
-        mkdir -p "$LOCAL_BAAS_PATH/"
-        mkdir -p "$LOCAL_BAAS_DB_PATH/"
-        mkdir -p "$LOCAL_PROXY_PATH/"
-        scp $ssh_options $ssh_user:"$REMOTE_BAAS_PATH/baas_server.log" "$LOCAL_BAAS_PATH/baas_server.log" || true
-        scp $ssh_options $ssh_user:"$REMOTE_BAAS_DB_PATH/mongod.log" "$LOCAL_BAAS_DB_PATH/mongod.log" || true
-        scp $ssh_options $ssh_user:"$REMOTE_PROXY_PATH/baas_proxy.log" "$LOCAL_PROXY_PATH/baas_proxy.log" || true
-
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/baas-work-dir/baas_server.log'
-      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/baas_server.log'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: baas server logs
-      optional: true
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/install_baas_output.log'
-      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/install_baas_output.log'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: install baas output
-      optional: true
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/baas-work-dir/mongodb-dbpath/mongod.log'
-      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/mongod.log'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: mongod logs
-      optional: true
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/baas-proxy-dir/baas_proxy.log'
-      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/baas_proxy.log'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: baas proxy logs
-      optional: true
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/test_${task_id}.log'
-      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/test.log'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: trace level test logs
-      optional: true
 
   "upload fuzzer results":
   - command: shell.exec
@@ -627,149 +491,6 @@ functions:
         fi
 
         python $HANG_ANALYZER_PATH
-
-  "launch remote baas":
-  - command: host.create
-    params:
-      provider: ec2
-      distro: ubuntu2004-medium
-  - command: host.list
-    params:
-      num_hosts: 1
-      path: realm-core/baas_host.yml
-      timeout_seconds: 600
-      wait: true
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      # Do NOT use verbose for this script since it would reveal the values of secrets
-      script: |-
-        set -o errexit
-        set -o pipefail
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          echo "Should not be using remote baas if the tests are not being used"
-          exit 0
-        fi
-
-        # Save the remote host ssh key and details to files
-        echo "${__project_aws_ssh_key_value}" > .baas_ssh_key
-        chmod 600 .baas_ssh_key
-
-        BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
-
-        # Github SSH host key updated 06/26/2023
-        # Use 'github_known_hosts' expansion for GITHUB_KNOWN_HOSTS below once EVG-20410 has been implemented
-        cat >baas_host_vars.sh <<EOF
-        export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
-        export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
-        export BAAS_HOST_NAME="$BAAS_HOST_NAME"
-        export GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
-        EOF
-
-        chmod 700 baas_host_vars.sh
-        echo "baas remote host created: $BAAS_HOST_NAME"
-
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      background: true
-      script: |-
-        set -o errexit
-        set -o pipefail
-        set -o verbose
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          exit 0
-        fi
-
-        BAAS_USER=ubuntu
-
-        OPT_BAAS_BRANCH=
-        OPT_BAAS_PROXY=
-        OPT_BAAS_DIRECT=
-
-        if [ -n "${baas_branch}" ]; then
-            OPT_BAAS_BRANCH="-b ${baas_branch}"
-        fi
-        if [ -n "${baas_proxy}" ]; then
-            OPT_BAAS_PROXY="-t"
-            if [ -n "${baas_admin_port}" ]; then
-                OPT_BAAS_DIRECT="-d ${baas_admin_port}"
-            fi
-        fi
-
-        # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
-        # Add -v to this command for verbose script logging
-        ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH $OPT_BAAS_PROXY \
-            $OPT_BAAS_DIRECT -i ./.baas_ssh_key ./baas_host_vars.sh 2>&1 | tee install_baas_output.log
-
-  "wait for baas to start":
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o verbose
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          exit 0
-        fi
-
-        # Don't print out the tail of the log file
-        ./evergreen/wait_for_baas.sh -s -w ./baas-work-dir -l ""
-
-        echo "Baas is started!"
-
-  "wait for remote baas to start":
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o verbose
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          exit 0
-        fi
-
-        # Don't print out the tail of the log file
-        ./evergreen/wait_for_remote_baas.sh -i ./.baas_ssh_key ./baas_host_vars.sh  ./.baas_ssh_key
-
-        echo "Baas is started!"
-
-  "setup proxy parameters":
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o pipefail
-        set -o verbose
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          echo "Error: Baas is disabled for network tests"
-          exit 1
-        fi
-
-        if [[ -z "${proxy_toxics_file|}" ]]; then
-          echo "Error: Baas proxy toxics config file was not provided"
-          exit 1
-        fi
-
-        if [[ -n "${proxy_toxics_randoms|}" ]]; then
-          PROXY_RANDOMS="-r ${proxy_toxics_randoms}"
-        fi
-
-        # Configure the toxics for the baas proxy
-        evergreen/configure_baas_proxy.sh $PROXY_RANDOMS "${proxy_toxics_file}"
-        # Display the list of configured toxics
-        curl --silent http://localhost:8474/proxies/baas_proxy/toxics
 
   "check branch state":
   - command: shell.exec
@@ -969,26 +690,6 @@ tasks:
     vars:
       benchmark_name: crud
 
-- name: benchmark-sync
-  exec_timeout_secs: 1800
-  tags: [ "benchmark" ]
-  commands:
-  - func: "run benchmark"
-    vars:
-      benchmark_name: sync
-
-- name: sync-tests
-  tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 1800
-  commands:
-  - func: "compile"
-    vars:
-      target_to_build: "SyncTests"
-  - func: "run tests"
-    vars:
-      test_filter: SyncTests
-      test_executable_name: "realm-sync-tests"
-
 # These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
   tags: [ "for_pull_requests", "test_suite" ]
@@ -1003,46 +704,6 @@ tasks:
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
       disable_tests_against_baas: true
-  - func: "check branch state"
-
-# These are baas object store tests that run against baas running on a remote host
-- name: baas-integration-tests
-  tags: [ "test_suite", "for_pull_requests", "requires_baas" ]
-  exec_timeout_secs: 3600
-  commands:
-  - func: "compile"
-    vars:
-      target_to_build: ObjectStoreTests
-  - func: "run tests"
-    vars:
-      test_label: objstore-baas
-      test_executable_name: "realm-object-store-tests"
-      verbose_test_output: true
-  - func: "check branch state"
-
-- name: baas-network-tests
-  # Uncomment once tests are passing
-  tags: [ "disabled" ]
-  # tags: [ "for_nightly_tests" ]
-  # These tests can be manually requested for patches and pull requests
-  allowed_requesters: [ "ad_hoc", "patch", "github_pr" ]
-  # The network tests can take a really long time, so we give the test up to 4
-  # hours to complete
-  exec_timeout_secs: 14400
-  commands:
-  - func: "launch remote baas"
-    vars:
-      baas_proxy: On
-  - func: "compile"
-    vars:
-      target_to_build: ObjectStoreTests
-  - func: "wait for baas to start"
-  - func: "setup proxy parameters"
-  - func: "run tests"
-    vars:
-      test_label: objstore-baas
-      test_executable_name: "realm-object-store-tests"
-      verbose_test_output: true
   - func: "check branch state"
 
 - name: process_coverage_data
@@ -1237,55 +898,6 @@ tasks:
             'io.realm.CombinedTests' \
             $TEST_RESULTS_FILE
 
-- name: generate-sync-corpus
-  tags: [ "for_nightly_tests" ]
-  exec_timeout_secs: 1800
-  commands:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      target_to_build: "SyncTests"
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-          set -o errexit
-          set -o verbose
-
-          if [[ -n "${c_compiler}" && "$(basename ${c_compiler})" = "clang" && -f "$(dirname ${c_compiler})/llvm-symbolizer" ]]; then
-              LLVM_SYMBOLIZER="$(dirname ${c_compiler})/llvm-symbolizer"
-              export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
-              export TSAN_OPTIONS="external_symbolizer_path=$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
-          fi
-
-          export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
-          if [[ -n "$UNITTEST_EVERGREEN_TEST_RESULTS" && -f "$UNITTEST_EVERGREEN_TEST_RESULTS" ]]; then
-              rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
-          fi
-          export UNITTEST_PROGRESS=1
-          export UNITTEST_FILTER="Array_Example Transform_* EmbeddedObjects_*"
-          export UNITTEST_DUMP_TRANSFORM="changeset_dump"
-
-          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 $TSAN_OPTIONS"
-          export UBSAN_OPTIONS="print_stacktrace=1"
-
-          ./build/test/${cmake_build_type}/realm-sync-tests
-
-          CHANGESET_DUMP_DIR="$(find . -type d -name changeset_dump -print -quit)"
-          mv "$CHANGESET_DUMP_DIR" changeset_dump
-          tar -czvf changeset_dump.tgz changeset_dump
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/changeset_dump.tgz'
-      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/changeset_dump.tgz'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      display_name: changeset dump tarball
 
 task_groups:
 - name: core_tests_group
@@ -1309,7 +921,6 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
-  - func: "upload baas artifacts"
   timeout:
   - func: "run hang analyzer"
   tasks:
@@ -1330,21 +941,6 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - ".test_suite !.requires_baas"
-
-# Runs only the baas integration tests
-- name: only_baas_integration_tests
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - ".requires_baas"
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
@@ -1355,7 +951,6 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
-  - func: "upload baas artifacts"
   timeout:
   - func: "run hang analyzer"
   tasks:
@@ -1371,22 +966,6 @@ task_groups:
   tasks:
   - compile-emscripten
 
-# Runs object-store-tests against baas running on remote host and runs
-# the network simulation tests as a separate task for nightly builds
-- name: network_tests
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  - func: "upload baas artifacts"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - baas-network-tests
-
 # Runs object-store-tests against baas running on remote host
 - name: compile_test_coverage
   max_hosts: 1
@@ -1396,7 +975,6 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
-  - func: "upload baas artifacts"
   timeout:
   - func: "run hang analyzer"
   tasks:
@@ -1499,28 +1077,6 @@ buildvariants:
   - name: compile_test
   - name: lint
 
-- name: ubuntu-no-session-multiplexing
-  display_name: "Ubuntu (Sync Multiplexing Disabled)"
-  run_on: ubuntu2204-arm64-large
-  expansions:
-    fetch_missing_dependencies: On
-    c_compiler: "/opt/clang+llvm/bin/clang"
-    cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    disable_sync_multiplexing: On
-  tasks:
-  - name: compile_test
-
-- name: ubuntu-with-redirects
-  display_name: "Ubuntu (Baas Redirector Enabled)"
-  run_on: ubuntu2204-arm64-large
-  expansions:
-    fetch_missing_dependencies: On
-    c_compiler: "/opt/clang+llvm/bin/clang"
-    cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    enable_baas_redirector: On
-  tasks:
-  - name: only_baas_integration_tests
-
 - name: ubuntu-no-geospatial
   display_name: "Ubuntu (Geospatial Disabled)"
   run_on: ubuntu2204-arm64-large
@@ -1595,23 +1151,6 @@ buildvariants:
 # TODO RCORE-2085 ubuntu2004-release/ubuntu2004-arm64 build variants are here until we've established
 # a new baseline for the updated ubuntu 2204/clang 18 builders and to generate artifacts for the baas
 # team.
-- name: ubuntu2004-release
-  display_name: "Ubuntu 20.04 x86_64 (Clang 11 release benchmarks/baas artifacts)"
-  run_on: ubuntu2004-large
-  expansions:
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    clang_sha256_sum: "829f5fb0ebda1d8716464394f97d5475d465ddc7bea2879c0601316b611ff6db"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    cmake_build_type: RelWithDebInfo
-    fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    python3: /opt/mongodbtoolchain/v3/bin/python3
-  tasks:
-  - name: compile_test_and_package
-  - name: benchmarks
-  - name: generate-sync-corpus
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64 (GCC 9 release benchmarks)"

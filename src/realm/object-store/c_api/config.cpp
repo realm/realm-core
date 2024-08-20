@@ -173,16 +173,6 @@ RLM_API void realm_config_set_disable_format_upgrade(realm_config_t* config, boo
     config->disable_format_upgrade = b;
 }
 
-RLM_API bool realm_config_get_force_sync_history(const realm_config_t* config)
-{
-    return config->force_sync_history;
-}
-
-RLM_API void realm_config_set_force_sync_history(realm_config_t* config, bool b)
-{
-    config->force_sync_history = b;
-}
-
 RLM_API bool realm_config_get_automatic_change_notifications(const realm_config_t* config)
 {
     return config->automatic_change_notifications;

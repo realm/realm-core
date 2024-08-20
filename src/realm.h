@@ -855,21 +855,6 @@ RLM_API void realm_config_set_scheduler(realm_config_t*, const realm_scheduler_t
 RLM_API void realm_config_set_sync_config(realm_config_t*, realm_sync_config_t*);
 
 /**
- * Get whether the realm file should be forcibly initialized as a synchronized.
- *
- * This function cannot fail.
- */
-RLM_API bool realm_config_get_force_sync_history(const realm_config_t*);
-
-/**
- * Force the realm file to be initialized as a synchronized realm, even if no
- * sync config is provided (default: false).
- *
- * This function cannot fail.
- */
-RLM_API void realm_config_set_force_sync_history(realm_config_t*, bool);
-
-/**
  * Set the audit interface for the realm (unimplemented).
  */
 RLM_API bool realm_config_set_audit_factory(realm_config_t*, void*);

@@ -43,51 +43,6 @@ endif()
 
 file(GLOB RESOURCES "*.realm" "../*.pem")
 
-if(REALM_ENABLE_AUTH_TESTS)
-    list(APPEND SOURCES util/sync/baas_admin_api.cpp)
-endif()
-
-if(REALM_ENABLE_SYNC)
-    list(APPEND HEADERS
-        util/sync/baas_admin_api.hpp
-        util/sync/session_util.hpp
-        util/sync/sync_test_utils.hpp
-    )
-    list(APPEND SOURCES
-        bson.cpp
-        sync/file.cpp
-        sync/session/connection_change_notifications.cpp
-        sync/session/progress_notifications.cpp
-        sync/session/session.cpp
-        sync/session/wait_for_completion.cpp
-        sync/sync_manager.cpp
-        util/sync/sync_test_utils.cpp
-    )
-
-    if (REALM_APP_SERVICES)
-        list(APPEND HEADERS
-            util/sync/flx_sync_harness.hpp
-            util/unit_test_transport.hpp
-        )
-        list(APPEND SOURCES
-            sync/app.cpp
-            sync/client_reset.cpp
-            sync/flx_migration.cpp
-            sync/flx_role_change.cpp
-            sync/flx_schema_migration.cpp
-            sync/flx_sync.cpp
-            sync/metadata.cpp
-            sync/migration_store_test.cpp
-            sync/remote_mongo_tests.cpp
-            util/unit_test_transport.cpp
-        )
-    endif()
-
-    if(APPLE)
-        list(APPEND SOURCES audit.cpp)
-    endif()
-endif()
-
 set_property(DIRECTORY PROPERTY TEST_RESOURCES "${RESOURCES}")
 
 add_library(ObjectStoreTestLib OBJECT ${SOURCES} ${HEADERS} ${RESOURCES})
@@ -115,63 +70,6 @@ create_coverage_target(generate-coverage ObjectStoreTests)
 
 # add_bundled_test(ObjectStoreTests)
 add_labeled_test(ObjectStoreTests-local objstore-local ObjectStoreTests "~[baas]")
-
-# Baas server and custom tests are only allowed when REALM_ENABLE_AUTH_TESTS is set
-if(REALM_ENABLE_SYNC)
-    if(REALM_ENABLE_AUTH_TESTS)
-        set(OBJSTORE_TESTS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/objstore-tests.do-not-commit")
-        # Rebuild cmake config if the tests file changes
-        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OBJSTORE_TESTS_FILE})
-        # Extract the list of entries from the tests file
-        parse_list_file("${OBJSTORE_TESTS_FILE}" OBJSTORE_TEST_LIST)
-        # Convert the list from tests file, if any, to object store tests for each line
-        if (OBJSTORE_TEST_LIST)
-            # Copy the tests file to the build directory to indicate custom tests are set
-            file(COPY ${OBJSTORE_TESTS_FILE} DESTINATION ${CMAKE_BINARY_DIR})
-            set(_test_cnt 1)
-            foreach(_test_item ${OBJSTORE_TEST_LIST})
-                message(STATUS "Adding ObjectStoreTests-${_test_cnt}: 'realm-object-store-tests ${_test_item}'")
-                separate_arguments(_test_args NATIVE_COMMAND "${_test_item}")
-                add_labeled_test("ObjectStoreTests-${_test_cnt}" "objstore-baas" ObjectStoreTests ${_test_args})
-                MATH(EXPR _test_cnt "${_test_cnt}+1")
-            endforeach()
-        else()
-            add_labeled_test(ObjectStoreTests-baas objstore-baas ObjectStoreTests "[baas]")
-        endif()
-    endif()
-endif()
-
-if(REALM_ENABLE_SYNC)
-    target_link_libraries(ObjectStoreTestLib SyncServer)
-    option(REALM_ENABLE_AUTH_TESTS "" OFF)
-    if(REALM_ENABLE_AUTH_TESTS)
-        if (NOT REALM_APP_SERVICES)
-            message(SEND_ERROR "Unsupported configuration: REALM_ENABLE_AUTH_TESTS=ON and REALM_APP_SERVICES=OFF")
-        endif()
-
-        target_compile_definitions(ObjectStoreTestLib PRIVATE
-            REALM_ENABLE_AUTH_TESTS=1
-        )
-
-        if(REALM_MONGODB_ENDPOINT)
-          message(STATUS "Auth tests enabled: ${REALM_MONGODB_ENDPOINT}")
-          target_compile_definitions(ObjectStoreTestLib PRIVATE
-              REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
-          )
-        endif()
-
-        if(REALM_ADMIN_ENDPOINT)
-            message(STATUS "BAAS admin endpoint: ${REALM_ADMIN_ENDPOINT}")
-            target_compile_definitions(ObjectStoreTests PRIVATE
-                REALM_ADMIN_ENDPOINT="${REALM_ADMIN_ENDPOINT}"
-            )
-        endif()
-
-        find_package(CURL REQUIRED)
-        target_link_libraries(ObjectStoreTestLib "${CURL_LIBRARY}")
-        target_include_directories(ObjectStoreTestLib PRIVATE "${CURL_INCLUDE_DIRS}")
-    endif()
-endif()
 
 if(REALM_TEST_LOGGING)
     target_compile_definitions(ObjectStoreTestLib PRIVATE

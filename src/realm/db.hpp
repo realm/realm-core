@@ -190,9 +190,6 @@ public:
         return m_logger.get();
     }
 
-    void create_new_history(Replication& repl) REQUIRES(!m_mutex);
-    void create_new_history(std::unique_ptr<Replication> repl) REQUIRES(!m_mutex);
-
     const std::string& get_path() const noexcept
     {
         return m_db_path;

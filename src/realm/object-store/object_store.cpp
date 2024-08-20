@@ -29,10 +29,6 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/sync/instruction_replication.hpp>
-#endif // REALM_ENABLE_SYNC
-
 #include <string.h>
 #include <unordered_set>
 
@@ -189,11 +185,6 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     TableRef table = group.get_table(name);
 
     for (auto const& prop : object_schema.persisted_properties) {
-#if REALM_ENABLE_SYNC
-        // The sync::create_table* functions create the PK column for us.
-        if (prop.is_primary)
-            continue;
-#endif // REALM_ENABLE_SYNC
         add_column(group, *table, prop);
     }
 }

@@ -38,11 +38,6 @@
 #include <realm/group.hpp>
 #include <realm/query_expression.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/sync_manager.hpp>
-#include <realm/object-store/sync/sync_session.hpp>
-#endif
-
 #include <random>
 
 namespace realm {
@@ -1421,55 +1416,6 @@ TEST_CASE("notifications: TableView delivery", "[notifications]") {
     }
 }
 
-
-#if REALM_ENABLE_SYNC
-TEST_CASE("notifications: sync", "[sync][pbs][notifications]") {
-    _impl::RealmCoordinator::assert_no_open_realms();
-
-    TestSyncManager init_sync_manager({}, {false});
-    auto& server = init_sync_manager.sync_server();
-
-    SyncTestFile config(init_sync_manager, "test");
-    config.schema = Schema{
-        {"object",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
-         }},
-    };
-
-    SECTION("sync progress commits do not distrupt notifications") {
-        auto r = Realm::get_shared_realm(config);
-        auto wait_realm = Realm::get_shared_realm(config);
-
-        Results results(r, r->read_group().get_table("class_object"));
-        Results wait_results(wait_realm, wait_realm->read_group().get_table("class_object"));
-        auto token1 = results.add_notification_callback([&](CollectionChangeSet) {});
-        auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet) {});
-
-        // Add an object to the Realm so that notifications are needed
-        {
-            auto write_realm = Realm::get_shared_realm(config);
-            write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
-            write_realm->commit_transaction();
-        }
-
-        // Wait for the notifications to become ready for the new version
-        wait_realm->refresh();
-
-        // Start the server and wait for the Realm to be uploaded so that sync
-        // makes some writes to the Realm and bumps the version
-        server.start();
-        wait_for_upload(*r);
-
-        // Make sure that the notifications still get delivered rather than
-        // waiting forever due to that we don't get a commit notification from
-        // the commits sync makes to store the upload progress
-        r->refresh();
-    }
-}
-#endif
 
 TEST_CASE("notifications: results", "[notifications][results]") {
     _impl::RealmCoordinator::assert_no_open_realms();

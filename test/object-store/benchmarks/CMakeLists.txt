@@ -15,27 +15,12 @@ set(SOURCES
     ../util/test_utils.cpp
 )
 
-
-if(REALM_ENABLE_SYNC)
-    list(APPEND HEADERS
-        ../util/sync/sync_test_utils.hpp
-        ../util/sync/session_util.hpp
-    )
-    list(APPEND SOURCES
-        ../util/sync/sync_test_utils.cpp
-        client_reset.cpp
-    )
-endif()
-
 add_executable(object-store-benchmarks ${SOURCES} ${HEADERS})
 
 target_include_directories(object-store-benchmarks PRIVATE 
     ..
 )
 
-if(REALM_ENABLE_SYNC)
-    target_link_libraries(object-store-benchmarks SyncServer)
-endif()
 enable_stdfilesystem(object-store-benchmarks)
 target_link_libraries(object-store-benchmarks ObjectStore TestUtil Catch2::Catch2)
 

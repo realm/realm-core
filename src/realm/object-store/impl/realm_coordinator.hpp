@@ -67,21 +67,6 @@ public:
     // if the source Realm has caching enabled.
     std::shared_ptr<Realm> freeze_realm(const Realm& source_realm) REQUIRES(!m_realm_mutex);
 
-#if REALM_ENABLE_SYNC
-    // Get a thread-local shared Realm with the given configuration
-    // If the Realm is not already present, it will be fully downloaded before being returned.
-    // If the Realm is already on disk, it will be fully synchronized before being returned.
-    // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
-    std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config)
-        REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-
-    std::shared_ptr<SyncSession> sync_session() REQUIRES(!m_realm_mutex)
-    {
-        util::CheckedLockGuard lock(m_realm_mutex);
-        return m_sync_session;
-    }
-#endif
-
     // Get the existing cached Realm if it exists for the specified scheduler or config.scheduler
     std::shared_ptr<Realm> get_cached_realm(Realm::Config const& config,
                                             std::shared_ptr<util::Scheduler> scheduler = nullptr)
@@ -261,10 +246,6 @@ private:
     std::shared_ptr<Transaction> m_notifier_handover_transaction;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
-
-#if REALM_ENABLE_SYNC
-    std::shared_ptr<SyncSession> m_sync_session;
-#endif
 
     std::shared_ptr<AuditInterface> m_audit_context;
 

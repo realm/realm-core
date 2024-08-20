@@ -15,7 +15,6 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_INSTALL_LIBEXECDIR", to: ""),
     .define("REALM_ENABLE_ASSERTIONS", to: "1"),
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
-    .define("REALM_ENABLE_SYNC", to: "1"),
     .define("REALM_ENABLE_GEOSPATIAL", to: "1"),
     .define("REALM_APP_SERVICES", to: "1"),
 

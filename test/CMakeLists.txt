@@ -24,7 +24,6 @@ endif()
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 add_subdirectory(benchmark-larger)
-add_subdirectory(benchmark-sync)
 # FIXME: Add other benchmarks
 
 set(CORE_TEST_SOURCES
@@ -193,78 +192,9 @@ target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_bundled_test(CoreTests)
 
-# SyncTests
-if(REALM_ENABLE_SYNC)
-    set(SYNC_TESTS
-        test_array_sync.cpp
-        test_changeset_encoding.cpp
-        test_client_reset.cpp
-        test_crypto.cpp
-        test_embedded_objects.cpp
-        test_instruction_replication.cpp
-        test_lang_bind_helper_sync.cpp
-        test_noinst_server_dir.cpp
-        test_stable_ids.cpp
-        test_sync.cpp
-        test_sync_auth.cpp
-        test_sync_history_migration.cpp
-        test_sync_protocol_codec.cpp
-        test_sync_subscriptions.cpp
-        test_sync_pending_bootstraps.cpp
-        test_sync_error_backoff.cpp
-        test_transform_collections_mixed.cpp
-        test_transform.cpp
-        test_util_buffer_stream.cpp
-        test_util_circular_buffer.cpp
-        test_util_http.cpp
-        test_util_json_parser.cpp
-        test_util_network.cpp
-        test_util_network_ssl.cpp
-        test_util_uri.cpp
-        test_util_websocket.cpp
-    )
-
-    set(SYNC_TEST_HEADERS
-        test.hpp
-        test_all.hpp
-        fuzz_tester.hpp
-        peer.hpp
-        sync_fixtures.hpp
-    )
-
-    file(GLOB SYNC_TEST_RESOURCES
-        *.json *.pem
-        ../certificate-authority/certs/*
-        ../certificate-authority/root-ca/*.pem
-        resources/*.realm
-        resources/history_migration/*.realm
-        test_flx_metadata_tables_v1.realm)
-
-    if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-        # Embed the manifest on Windows. The manifest allows very long paths (>255).
-        list(APPEND SYNC_TESTS test.manifest)
-    endif()
-
-    add_library(SyncTestLib OBJECT ${SYNC_TESTS} ${SYNC_TEST_HEADERS} ${SYNC_TEST_RESOURCES})
-    enable_stdfilesystem(SyncTestLib)
-    target_link_libraries(SyncTestLib Sync SyncServer Storage)
-
-    add_executable(SyncTests main.cpp test_all.cpp ${SYNC_TEST_RESOURCES})
-    set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
-    set_target_resources(SyncTests "${SYNC_TEST_RESOURCES}")
-    enable_stdfilesystem(SyncTests)
-    target_link_libraries(SyncTests SyncTestLib TestUtil)
-    add_bundled_test(SyncTests)
-
-    if(UNIX AND NOT APPLE)
-        # This enables symbols in backtraces
-        target_link_libraries(SyncTests "-rdynamic")
-    endif()
-endif()
-
 # CombinedTests
 get_directory_property(OS_TEST_RESOURCES DIRECTORY object-store TEST_RESOURCES)
-set(COMBINED_RESOURCES "${REQUIRED_TEST_FILES};${SYNC_TEST_RESOURCES};${OS_TEST_RESOURCES}")
+set(COMBINED_RESOURCES "${REQUIRED_TEST_FILES};${OS_TEST_RESOURCES}")
 
 add_executable(CombinedTests combined_tests.cpp test_all.cpp ${COMBINED_RESOURCES})
 set_target_resources(CombinedTests "${COMBINED_RESOURCES}")
@@ -278,11 +208,7 @@ if(WINDOWS_STORE)
     target_sources(CombinedTests PRIVATE ${UWP_SOURCES})
 endif()
 
-if(REALM_ENABLE_SYNC)
-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib TestUtil)
-else()
-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib TestUtil)
-endif()
+target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib TestUtil)
 
 enable_stdfilesystem(CombinedTests)
 

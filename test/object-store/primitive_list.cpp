@@ -808,55 +808,6 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             REQUIRE(change.deletions.count() == values.size());
         }
     }
-
-#if REALM_ENABLE_SYNC && REALM_HAVE_SYNC_STABLE_IDS
-    SECTION("sync compatibility") {
-        if (!util::EventLoop::has_implementation())
-            return;
-
-        TestSyncManager init_sync_manager({}, {false});
-        auto& server = init_sync_manager.sync_server();
-        SyncTestFile sync_config(init_sync_manager, "shared");
-        sync_config.schema = Schema{
-            {"object",
-             {{"value", PropertyType::Array | TestType::property_type},
-              {"_id", PropertyType::Int, Property::IsPrimary{true}}}},
-        };
-        sync_config.schema_version = 0;
-        server.start();
-
-        {
-            auto r = Realm::get_shared_realm(sync_config);
-            r->begin_transaction();
-
-            CppContext ctx(r);
-            auto obj = Object::create(ctx, r, *r->schema().find("object"), std::any(AnyDict{{"_id", INT64_C(5)}}));
-            auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
-            list.add(static_cast<T>(values[0]));
-
-            r->commit_transaction();
-            wait_for_upload(*r);
-            wait_for_download(*r);
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        util::File::remove(sync_config.path);
-
-        {
-            auto r = Realm::get_shared_realm(sync_config);
-            auto table = r->read_group().get_table("class_object");
-
-            util::EventLoop::main().run_until([&] {
-                return table->size() == 1;
-            });
-
-            CppContext ctx(r);
-            Object obj(r, "object", 0);
-            auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
-            REQUIRE(list.get<T>(0) == values[0]);
-        }
-    }
-#endif
 }
 
 TEST_CASE("list of mixed links", "[primitives]") {

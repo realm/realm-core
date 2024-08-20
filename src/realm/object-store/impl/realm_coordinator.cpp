@@ -31,20 +31,10 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/async_open_task.hpp>
-#include <realm/object-store/sync/sync_manager.hpp>
-#include <realm/object-store/sync/sync_session.hpp>
-#include <realm/object-store/sync/sync_user.hpp>
-#include <realm/sync/history.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#endif
-
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/fifo_helper.hpp>
-#include <realm/sync/config.hpp>
 
 #include <algorithm>
 #include <unordered_map>
@@ -89,9 +79,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
 {
     if (config.encryption_key.data() && config.encryption_key.size() != 64)
         throw InvalidEncryptionKey();
-    if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
-        throw InvalidArgument(ErrorCodes::IllegalCombination,
-                              "Synchronized Realms cannot be opened in immutable mode");
     if ((config.schema_mode == SchemaMode::AdditiveDiscovered ||
          config.schema_mode == SchemaMode::AdditiveExplicit) &&
         config.migration_function)
@@ -125,19 +112,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     }
     // ResetFile also won't use the migration function, but specifying one is
     // allowed to simplify temporarily switching modes during development
-
-#if REALM_ENABLE_SYNC
-    if (config.sync_config) {
-        if (config.sync_config->flx_sync_requested && !config.sync_config->partition_value.empty()) {
-            throw InvalidArgument(ErrorCodes::IllegalCombination,
-                                  "Cannot specify a partition value when flexible sync is enabled");
-        }
-        if (!config.sync_config->user) {
-            throw InvalidArgument(ErrorCodes::IllegalCombination,
-                                  "A user must be provided to open a synchronized Realm.");
-        }
-    }
-#endif
 
     bool no_existing_realm =
         std::all_of(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [](auto& notifier) {
@@ -176,33 +150,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
                 util::format("Realm at path '%1' already opened with different schema version.", config.path));
         }
 
-#if REALM_ENABLE_SYNC
-        if (bool(m_config.sync_config) != bool(config.sync_config)) {
-            throw LogicError(
-                ErrorCodes::MismatchedConfig,
-                util::format("Realm at path '%1' already opened with different sync configurations.", config.path));
-        }
-
-        if (config.sync_config) {
-            auto old_user = m_config.sync_config->user;
-            auto new_user = config.sync_config->user;
-            if (old_user != new_user) {
-                throw LogicError(
-                    ErrorCodes::MismatchedConfig,
-                    util::format("Realm at path '%1' already opened with different sync user.", config.path));
-            }
-            if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
-                throw LogicError(
-                    ErrorCodes::MismatchedConfig,
-                    util::format("Realm at path '%1' already opened with different partition value.", config.path));
-            }
-            if (m_config.sync_config->flx_sync_requested != config.sync_config->flx_sync_requested) {
-                throw LogicError(ErrorCodes::MismatchedConfig,
-                                 util::format("Realm at path '%1' already opened in a different synchronization mode",
-                                              config.path));
-            }
-        }
-#endif
         // Mixing cached and uncached Realms is allowed
         m_config.cache = config.cache;
 
@@ -321,22 +268,9 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 }
 
 void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>& realm,
-                                    util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock,
-                                    bool first_time_open)
+                                    util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock, bool)
 {
-    const auto db_created = open_db();
-#ifdef REALM_ENABLE_SYNC
-    SyncConfig::SubscriptionInitializerCallback subscription_function = nullptr;
-    bool rerun_on_open = false;
-    if (config.sync_config && config.sync_config->flx_sync_requested &&
-        config.sync_config->subscription_initializer) {
-        subscription_function = config.sync_config->subscription_initializer;
-        rerun_on_open = config.sync_config->rerun_init_subscription_on_open;
-    }
-#else
-    static_cast<void>(first_time_open);
-    static_cast<void>(db_created);
-#endif
+    open_db();
 
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
@@ -346,20 +280,8 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
-#ifdef REALM_ENABLE_SYNC
-    if (m_sync_session && m_sync_session->user()->is_logged_in())
-        m_sync_session->revive_if_needed();
-
-    if (realm->config().audit_config) {
-        if (m_audit_context)
-            m_audit_context->update_metadata(realm->config().audit_config->metadata);
-        else
-            m_audit_context = make_audit_context(m_db, realm->config());
-    }
-#else
     if (realm->config().audit_config)
         REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
-#endif
 
     // Cached frozen Realms need to initialize their schema before releasing
     // the lock as otherwise they could be read from the cache on another thread
@@ -375,29 +297,6 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
                              std::move(initialization_function));
     }
-
-#ifdef REALM_ENABLE_SYNC
-    // run subscription initializer if the SDK has instructed core to do so. The subscription callback will be run if:
-    // 1. this is the first time we are creating the realm file
-    // 2. the database was already created, but this is the first time we are opening the db and the flag
-    // rerun_on_open was set
-    if (subscription_function) {
-        const auto current_subscription = realm->get_latest_subscription_set();
-        const auto subscription_version = current_subscription.version();
-        // in case we are hitting this check while during a normal open, we need to take in
-        // consideration if the db was created during this call. Since this may be the first time
-        // we are actually creating a realm. For async open this does not apply, in fact db_created
-        // will always be false.
-        if (!first_time_open)
-            first_time_open = db_created;
-        if (subscription_version == 0 || (first_time_open && rerun_on_open)) {
-            bool was_in_read = realm->is_in_read_transaction();
-            subscription_function(realm);
-            if (!was_in_read)
-                realm->invalidate();
-        }
-    }
-#endif
 }
 
 void RealmCoordinator::bind_to_context(Realm& realm)
@@ -412,45 +311,11 @@ void RealmCoordinator::bind_to_context(Realm& realm)
     REALM_TERMINATE("Invalid Realm passed to bind_to_context()");
 }
 
-#if REALM_ENABLE_SYNC
-std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
-{
-    if (!config.sync_config)
-        throw LogicError(ErrorCodes::IllegalOperation,
-                         "This method is only available for fully synchronized Realms.");
-
-    util::CheckedLockGuard lock(m_realm_mutex);
-    set_config(config);
-    const auto db_open_first_time = open_db();
-    return std::make_shared<AsyncOpenTask>(AsyncOpenTask::Private(), shared_from_this(), m_sync_session,
-                                           db_open_first_time);
-}
-
-#endif
-
 bool RealmCoordinator::open_db()
 {
     if (m_db)
         return false;
 
-#if REALM_ENABLE_SYNC
-    if (m_config.sync_config) {
-        REALM_ASSERT(m_config.sync_config->user);
-        // If we previously opened this Realm, we may have a lingering sync
-        // session which outlived its RealmCoordinator. If that happens we
-        // want to reuse it instead of creating a new DB.
-        if (auto sync_manager = m_config.sync_config->user->sync_manager()) {
-            m_sync_session = sync_manager->get_existing_session(m_config.path);
-        }
-        if (m_sync_session) {
-            m_db = SyncSession::Internal::get_db(*m_sync_session);
-            init_external_helpers();
-            return false;
-        }
-    }
-#endif
-
-    bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
     bool schema_mode_reset_file =
         m_config.schema_mode == SchemaMode::SoftResetFile || m_config.schema_mode == SchemaMode::HardResetFile;
     try {
@@ -459,15 +324,7 @@ bool RealmCoordinator::open_db()
             return true;
         }
         std::unique_ptr<Replication> history;
-        if (server_synchronization_mode) {
-#if REALM_ENABLE_SYNC
-            bool apply_server_changes = !m_config.sync_config || m_config.sync_config->apply_server_changes;
-            history = std::make_unique<sync::ClientReplication>(apply_server_changes);
-#else
-            REALM_TERMINATE("Realm was not built with sync enabled");
-#endif
-        }
-        else if (!m_config.immutable()) {
+        if (!m_config.immutable()) {
             history = make_in_realm_history();
         }
 
@@ -542,21 +399,6 @@ void RealmCoordinator::init_external_helpers()
     // where sync commits notify ECH and other commits notify sync via ECH. This
     // happens on background threads, so to avoid needing locking on every access
     // we have to wire things up in a specific order.
-#if REALM_ENABLE_SYNC
-    // We may have reused an existing sync session that outlived its original
-    // RealmCoordinator. If not, we need to create a new one now.
-    if (m_config.sync_config && !m_sync_session) {
-        if (!m_config.sync_config->user || m_config.sync_config->user->state() == SyncUser::State::Removed) {
-            throw app::AppError(
-                ErrorCodes::ClientUserNotFound,
-                util::format("Cannot start a sync session for user '%1' because this user has been removed.",
-                             m_config.sync_config->user->user_id()));
-        }
-        if (auto sync_manager = m_config.sync_config->user->sync_manager()) {
-            m_sync_session = sync_manager->get_session(m_db, m_config);
-        }
-    }
-#endif
 
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
         try {
@@ -881,14 +723,6 @@ void RealmCoordinator::on_commit(DB::version_type)
 
 void RealmCoordinator::on_change()
 {
-#if REALM_ENABLE_SYNC
-    // Invoke realm sync if another process has notified for a change
-    if (m_sync_session) {
-        auto version = m_db->get_version_of_latest_snapshot();
-        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
-    }
-#endif
-
     {
         util::CheckedUniqueLock lock(m_running_notifiers_mutex);
         run_async_notifiers();

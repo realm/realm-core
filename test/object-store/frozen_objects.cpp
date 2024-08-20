@@ -37,10 +37,6 @@
 #include <realm/db.hpp>
 #include <realm/query_expression.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/async_open_task.hpp>
-#endif
-
 #include <realm/util/scope_exit.hpp>
 
 using namespace realm;
