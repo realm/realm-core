@@ -606,7 +606,7 @@ void Table::print_columns(const Group& group) const
 {
     std::cout << "        <" << m_table_type << ">\n";
     for (unsigned i = 0; i < m_column_names.size(); i++) {
-        auto type = realm::ColumnType(m_column_types.get_val(i) & 0xFFFF);
+        auto type = m_column_types.get_val(i) & 0xFFFF;
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
         std::string type_str;
         realm::ColKey col_key;
@@ -614,8 +614,12 @@ void Table::print_columns(const Group& group) const
             // core6
             col_key = realm::ColKey(m_column_colkeys.get_val(i));
         }
+        if (type == 13) {
+            // type_LinkList == 13
+            type = 12;
+        }
 
-        if (type == realm::col_type_Link) {
+        if (type == 12) {
             size_t target_table_ndx;
             if (col_key) {
                 // core6
