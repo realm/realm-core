@@ -606,7 +606,7 @@ void Table::print_columns(const Group& group) const
 {
     std::cout << "        <" << m_table_type << ">\n";
     for (unsigned i = 0; i < m_column_names.size(); i++) {
-        auto type = m_column_types.get_val(i) & 0xFFFF;
+        int type = int(m_column_types.get_val(i) & 0xFFFF);
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
         std::string type_str;
         realm::ColKey col_key;
