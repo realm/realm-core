@@ -23,12 +23,11 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 
-#include <array>
 #include <cstring>
-#include <mutex>
 #include <ostream>
 #include <string>
 #include <utility>
+#include <array>
 
 namespace realm::util {
 
@@ -345,19 +344,16 @@ std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 /// level threshold.
 class StderrLogger : public Logger {
 public:
-    StderrLogger() noexcept;
+    StderrLogger() noexcept = default;
 
     StderrLogger(Level level) noexcept
-        : StderrLogger()
+        : Logger()
     {
         set_level_threshold(level);
     }
 
 protected:
     void do_log(const LogCategory& category, Level, const std::string&) final;
-
-private:
-    std::mutex& m_mutex;
 };
 
 
