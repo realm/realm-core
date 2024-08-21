@@ -3456,9 +3456,9 @@ ColKey Table::find_opposite_column(ColKey col_key) const
     return ColKey();
 }
 
-ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
+ref_type Table::typed_write(_impl::ArrayWriterBase& out) const
 {
-    REALM_ASSERT(ref == m_top.get_mem().get_ref());
+    auto ref = m_top.get_ref();
     if (out.only_modified && m_alloc.is_read_only(ref))
         return ref;
     out.table = this;

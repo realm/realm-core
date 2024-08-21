@@ -943,19 +943,17 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out) const
     ref_type ref = m_top.get_as_ref(1);
     if (out.only_modified && m_alloc.is_read_only(ref))
         return ref;
-    Array a(m_alloc);
-    a.init_from_ref(ref);
-    REALM_ASSERT_DEBUG(a.has_refs());
-    TempArray dest(a.size());
-    for (unsigned j = 0; j < a.size(); ++j) {
-        RefOrTagged rot = a.get_as_ref_or_tagged(j);
+    auto num_tables = m_tables.size();
+    TempArray dest(num_tables);
+    for (unsigned j = 0; j < num_tables; ++j) {
+        RefOrTagged rot = m_tables.get_as_ref_or_tagged(j);
         if (rot.is_tagged()) {
             dest.set(j, rot);
         }
         else {
             auto table = do_get_table(j);
             REALM_ASSERT_DEBUG(table);
-            dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out));
+            dest.set_as_ref(j, table->typed_write(out));
         }
     }
     return dest.write(out);

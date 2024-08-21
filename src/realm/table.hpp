@@ -687,7 +687,7 @@ public:
         Replication* const* m_repl;
     };
 
-    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const;
+    ref_type typed_write(_impl::ArrayWriterBase& out) const;
 
 private:
     enum LifeCycleCookie {
