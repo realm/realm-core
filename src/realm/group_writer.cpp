@@ -647,6 +647,7 @@ ref_type GroupWriter::write_group()
 {
     ALLOC_DBG_COUT("Commit nr " << m_current_version << "   ( from " << m_oldest_reachable_version << " )"
                                 << std::endl);
+    // m_group.typed_print("");
 
     read_in_freelist();
     // Now, 'm_size_map' holds all free elements candidate for recycling
@@ -710,7 +711,7 @@ ref_type GroupWriter::write_group()
             top.set_as_ref(Group::s_evacuation_point_ndx, ref);
         }
         else if (ref) {
-            Array::destroy(ref, m_alloc);
+            Array::destroy(ref_type(ref), m_alloc);
             top.set(Group::s_evacuation_point_ndx, 0);
         }
     }
@@ -788,7 +789,9 @@ ref_type GroupWriter::write_group()
             top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
             auto ref = top.get_as_ref(Group::s_evacuation_point_ndx);
             REALM_ASSERT(ref);
-            Array::destroy(ref, m_alloc);
+            Array destroy_array(m_alloc);
+            destroy_array.init_from_ref(ref);
+            destroy_array.destroy();
             top.set(Group::s_evacuation_point_ndx, 0);
             m_evacuation_limit = 0;
 

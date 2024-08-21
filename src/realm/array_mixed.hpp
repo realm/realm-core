@@ -64,6 +64,15 @@ public:
     {
         Array::set_parent(parent, ndx_in_parent);
     }
+    bool need_string_interner() const override
+    {
+        return true;
+    }
+    virtual void set_string_interner(StringInterner* interner) const override
+    {
+        m_strings.set_string_interner(interner);
+    }
+
     void init_from_parent()
     {
         ref_type ref = get_ref_from_parent();
@@ -88,6 +97,7 @@ public:
     {
         return m_composite.get(ndx) == 0;
     }
+    std::optional<StringID> get_string_id(size_t ndx) const;
 
     void clear();
     void erase(size_t ndx);

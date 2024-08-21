@@ -46,17 +46,6 @@ endif()
 
 target_link_libraries(ClickQuery Storage)
 
-add_executable(RealmEnumerate realm_enumerate.cpp)
-set_target_properties(RealmEnumerate PROPERTIES
-    OUTPUT_NAME "realm-enumerate"
-    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
-)
-target_link_libraries(RealmEnumerate ObjectStore)
-# FIXME can be fixed for others, but requires link and install fixes for libuv target
-if (NOT APPLE)
-    set_target_properties(RealmEnumerate PROPERTIES EXCLUDE_FROM_ALL TRUE)
-endif()
-
 add_executable(RealmDecrypt realm_decrypt.cpp)
 set_target_properties(RealmDecrypt PROPERTIES
     OUTPUT_NAME "realm-decrypt"

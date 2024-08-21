@@ -294,7 +294,7 @@ void Array::set_type(Type type)
     set_hasrefs_in_header(init_has_refs, header);
 }
 
-void Array::destroy_children(size_t offset) noexcept
+void Array::destroy_children(size_t offset, bool ro_only) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
@@ -310,21 +310,9 @@ void Array::destroy_children(size_t offset) noexcept
             continue;
 
         ref_type ref = to_ref(value);
-        destroy_deep(ref, m_alloc);
+        destroy_deep(ref, m_alloc, ro_only);
     }
 }
-
-// size_t Array::get_byte_size() const noexcept
-//{
-//     const auto header = get_header();
-//     auto num_bytes = get_byte_size_from_header(header);
-//     auto read_only = m_alloc.is_read_only(m_ref) == true;
-//     auto capacity = get_capacity_from_header(header);
-//     auto bytes_ok = num_bytes <= capacity;
-//     REALM_ASSERT(read_only || bytes_ok);
-//     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-//     return num_bytes;
-// }
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {

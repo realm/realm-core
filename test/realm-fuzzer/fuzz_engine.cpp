@@ -151,9 +151,6 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
             else if (instr == Remove_Recursive && group.size() > 0) {
                 fuzzer.remove_recursive(group, log, state);
             }
-            else if (instr == Enumerate_Column && group.size() > 0) {
-                fuzzer.enumerate_column(group, log, state);
-            }
             else if (instr == Commit) {
                 fuzzer.commit(shared_realm, log);
             }

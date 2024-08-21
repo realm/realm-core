@@ -916,53 +916,6 @@ TEST(Group_Close)
     Group from_mem(buffer);
 }
 
-TEST(Group_Serialize_Optimized)
-{
-    // Create group with one table
-    Group to_mem;
-    TableRef table = to_mem.add_table("test");
-    test_table_add_columns(table);
-
-    for (size_t i = 0; i < 5; ++i) {
-        table->create_object().set_all("abd", 1, true, int(Mon));
-        table->create_object().set_all("eftg", 2, true, int(Tue));
-        table->create_object().set_all("hijkl", 5, true, int(Wed));
-        table->create_object().set_all("mnopqr", 8, true, int(Thu));
-        table->create_object().set_all("stuvxyz", 9, true, int(Fri));
-    }
-
-    ColKey col_string = table->get_column_keys()[0];
-    table->enumerate_string_column(col_string);
-
-#ifdef REALM_DEBUG
-    to_mem.verify();
-#endif
-
-    // Serialize to memory (we now own the buffer)
-    BinaryData buffer = to_mem.write_to_mem();
-
-    // Load the table
-    Group from_mem(buffer);
-    TableRef t = from_mem.get_table("test");
-
-    CHECK_EQUAL(4, t->get_column_count());
-
-    // Verify that original values are there
-    CHECK(*table == *t);
-
-    // Add a row with a known (but unique) value
-    auto k = table->create_object().set_all("search_target", 9, true, int(Fri)).get_key();
-
-    const auto res = table->find_first_string(col_string, "search_target");
-    CHECK_EQUAL(k, res);
-
-#ifdef REALM_DEBUG
-    to_mem.verify();
-    from_mem.verify();
-#endif
-}
-
-
 TEST(Group_Serialize_All)
 {
     // Create group with one table
@@ -2508,5 +2461,172 @@ TEST(Group_ArrayCompression_Correctness_Random_Input)
 #endif
 }
 
+TEST(Group_ArrayCompression_Strings)
+{
+    GROUP_TEST_PATH(path);
+
+    // create a bunch of string related properties that are going to be compressed and verify write/read machinery
+    // and string correctness.
+    Group to_disk;
+    TableRef table = to_disk.add_table("test");
+    auto col_key_string = table->add_column(type_String, "string");
+    auto col_key_list_string = table->add_column_list(type_String, "list_strings");
+    auto col_key_set_string = table->add_column_set(type_String, "set_strings");
+    auto col_key_dict_string = table->add_column_dictionary(type_String, "dict_strings");
+    auto obj = table->create_object();
+
+
+    obj.set_any(col_key_string, {"Test"});
+    auto list_s = obj.get_list<String>(col_key_list_string);
+    auto set_s = obj.get_set<String>(col_key_set_string);
+    auto dictionary_s = obj.get_dictionary(col_key_dict_string);
+
+    std::string tmp{"aabbbcccaaaaddfwregfgklnjytojfs"};
+    for (size_t i = 0; i < 10; ++i) {
+        list_s.add({tmp + std::to_string(i)});
+    }
+    for (size_t i = 0; i < 10; ++i) {
+        set_s.insert({tmp + std::to_string(i)});
+    }
+    for (size_t i = 0; i < 10; ++i) {
+        const auto key_value = tmp + std::to_string(i);
+        dictionary_s.insert({key_value}, {key_value});
+    }
+
+    CHECK(list_s.size() == 10);
+    CHECK(set_s.size() == 10);
+    CHECK(dictionary_s.size() == 10);
+
+    // Serialize to disk (compression should happen when the proper leaf array is serialized to disk)
+    to_disk.write(path, crypt_key());
+
+#ifdef REALM_DEBUG
+    to_disk.verify();
+#endif
+
+    // Load the tables
+    Group from_disk(path, crypt_key());
+    TableRef read_table = from_disk.get_table("test");
+    auto obj1 = read_table->get_object(0);
+
+    auto list_s1 = obj.get_list<String>("list_strings");
+    auto set_s1 = obj.get_set<String>("set_strings");
+    auto dictionary_s1 = obj.get_dictionary("dict_strings");
+
+    CHECK(obj1.get_any("string") == obj.get_any("string"));
+
+
+    CHECK(list_s1.size() == list_s.size());
+    CHECK(set_s1.size() == set_s.size());
+    CHECK(dictionary_s1.size() == dictionary_s.size());
+
+    CHECK(*read_table == *table);
+
+    for (size_t i = 0; i < list_s1.size(); ++i) {
+        CHECK_EQUAL(list_s1.get_any(i), list_s.get_any(i));
+    }
+
+    for (size_t i = 0; i < set_s1.size(); ++i) {
+        CHECK_EQUAL(set_s1.get_any(i), set_s.get_any(i));
+    }
+
+    for (size_t i = 0; i < dictionary_s1.size(); ++i) {
+        CHECK_EQUAL(dictionary_s1.get_key(i), dictionary_s.get_key(i));
+        CHECK_EQUAL(dictionary_s1.get_any(i), dictionary_s.get_any(i));
+    }
+
+#ifdef REALM_DEBUG
+    from_disk.verify();
+#endif
+}
+
+TEST(Test_Commit_Compression_Strings)
+{
+    auto generate_random_str_len = []() {
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_int_distribution<> distribution(1, 100);
+        return distribution(generator);
+    };
+
+    auto generate_random_string = [](size_t length) {
+        const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv"
+                                     "wxyz0123456789";
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_int_distribution<> distribution(0, (int)alphabet.size() - 1);
+
+        std::string random_str;
+        for (size_t i = 0; i < length; ++i)
+            random_str += alphabet[distribution(generator)];
+
+        return random_str;
+    };
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+    ColKey col_key_string, col_key_list_string, col_key_set_string, col_key_dict_string;
+    ObjKey obj_key;
+    TableKey table_key;
+
+    auto rt = db->start_read();
+    {
+        WriteTransaction wt(db);
+        auto table = wt.add_table("test");
+        table_key = table->get_key();
+        col_key_string = table->add_column(type_String, "string");
+        col_key_list_string = table->add_column_list(type_String, "list_strings");
+        col_key_set_string = table->add_column_set(type_String, "set_strings");
+        col_key_dict_string = table->add_column_dictionary(type_String, "dict_strings");
+        Obj obj = table->create_object();
+        obj_key = obj.get_key();
+        wt.commit();
+    }
+    // check verify that columns have been created
+    rt->advance_read();
+    rt->verify();
+
+    // commit random strings in all the string based columns and verify interner updates
+
+    for (size_t i = 0; i < 50; ++i) {
+
+        // some string
+        const auto str = generate_random_string(generate_random_str_len());
+
+        rt = db->start_read();
+        {
+            WriteTransaction wt(db);
+            auto table = wt.get_table(table_key);
+            auto obj = table->get_object(obj_key);
+
+            obj.set_any(col_key_string, {str});
+            auto list_s = obj.get_list<String>(col_key_list_string);
+            auto set_s = obj.get_set<String>(col_key_set_string);
+            auto dictionary_s = obj.get_dictionary(col_key_dict_string);
+
+            list_s.add({str});
+            set_s.insert({str});
+            dictionary_s.insert({str}, {str});
+
+            wt.commit();
+        }
+        rt->advance_read();
+        rt->verify();
+
+        auto table = rt->get_table(table_key);
+        auto obj = table->get_object(obj_key);
+        const auto current_str = obj.get_any(col_key_string).get_string();
+        CHECK_EQUAL(current_str, str);
+
+        auto list_s = obj.get_list<String>(col_key_list_string);
+        auto set_s = obj.get_set<String>(col_key_set_string);
+        auto dictionary_s = obj.get_dictionary(col_key_dict_string);
+
+        CHECK_EQUAL(list_s.get_any(i), str);
+        CHECK_NOT_EQUAL(set_s.find_any(str), not_found);
+        CHECK_NOT_EQUAL(dictionary_s.find_any(str), not_found);
+    }
+}
 
 #endif // TEST_GROUP

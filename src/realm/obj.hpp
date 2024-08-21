@@ -117,6 +117,11 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
+    std::optional<StringID> get_string_id(ColKey) const;
+    std::optional<StringID> get_string_id(StringData col_name) const
+    {
+        return get_string_id(get_column_key(col_name));
+    }
     Mixed get_any(ColKey col_key) const;
     Mixed get_any(StringData col_name) const
     {
@@ -391,7 +396,7 @@ private:
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key) &&;
     template <class T>
-    inline void set_spec(T&, ColKey);
+    inline void set_string_interner(T&, ColKey);
     template <class ValueType>
     inline void nullify_single_link(ColKey col, ValueType target);
 

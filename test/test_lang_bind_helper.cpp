@@ -521,7 +521,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->verify();
     CHECK_EQUAL(0, rt->size());
 
-    // Create a table via the other SharedGroup
+    // Create a table in a separate transaction
     ObjKey k0;
     {
         WriteTransaction wt(sg);
@@ -542,7 +542,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(0, foo->get_object(k0).get<int64_t>(cols[0]));
     uint_fast64_t version = foo->get_content_version();
 
-    // Modify the table via the other SharedGroup
+    // Modify the table in a separate transaction
     ObjKey k1;
     {
         WriteTransaction wt(sg);
@@ -988,54 +988,6 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
     rt->verify();
 }
 
-
-TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist;
-    DBRef sg = DB::create(hist, path, DBOptions(crypt_key()));
-    ColKey c0, c1, c2;
-
-    // Start a read transaction (to be repeatedly advanced)
-    auto rt = sg->start_read();
-    CHECK_EQUAL(0, rt->size());
-
-    // Create 3 string columns, one primed for conversion to "unique string
-    // enumeration" representation
-    {
-        WriteTransaction wt(sg);
-        TableRef table_w = wt.add_table("t");
-        c0 = table_w->add_column(type_String, "a");
-        c1 = table_w->add_column(type_String, "b");
-        c2 = table_w->add_column(type_String, "c");
-        for (int i = 0; i < 1000; ++i) {
-            std::ostringstream out;
-            out << i;
-            std::string str = out.str();
-            table_w->create_object(ObjKey{}, {{c0, str}, {c1, "foo"}, {c2, str}});
-        }
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    ConstTableRef table = rt->get_table("t");
-    CHECK_EQUAL(0, table->get_num_unique_values(c0));
-    CHECK_EQUAL(0, table->get_num_unique_values(c1)); // Not yet "optimized"
-    CHECK_EQUAL(0, table->get_num_unique_values(c2));
-
-    // Optimize
-    {
-        WriteTransaction wt(sg);
-        TableRef table_w = wt.get_table("t");
-        table_w->enumerate_string_column(c1);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(0, table->get_num_unique_values(c0));
-    CHECK_NOT_EQUAL(0, table->get_num_unique_values(c1)); // Must be "optimized" now
-    CHECK_EQUAL(0, table->get_num_unique_values(c2));
-}
 
 NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_supports_spawn_process)
 {
@@ -5593,28 +5545,6 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
 }
 
 
-TEST(LangBindHelper_RollbackOptimize)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
-    std::unique_ptr<Replication> hist_w(make_in_realm_history());
-    DBRef sg_w = DB::create(*hist_w, path, DBOptions(key));
-    auto g = sg_w->start_write();
-
-    auto table = g->add_table("t0");
-    auto col = table->add_column(type_String, "str_col_0", true);
-    g->commit_and_continue_as_read();
-    g->verify();
-    g->promote_to_write();
-    g->verify();
-    std::vector<ObjKey> keys;
-    table->create_objects(198, keys);
-    table->enumerate_string_column(col);
-    g->rollback_and_continue_as_read();
-    g->verify();
-}
-
-
 TEST(LangBindHelper_BinaryReallocOverMax)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5665,33 +5595,6 @@ TEST(LangBindHelper_OpenAsEncrypted)
     }
 }
 #endif
-
-
-// Test case generated in [realm-core-4.0.4] on Mon Dec 18 13:33:24 2017.
-// Adding 0 rows to a StringEnumColumn would add the default value to the keys
-// but not the indexes creating an inconsistency.
-TEST(LangBindHelper_EnumColumnAddZeroRows)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = nullptr;
-    std::unique_ptr<Replication> hist(make_in_realm_history());
-    DBRef sg = DB::create(*hist, path, DBOptions(key));
-    auto g = sg->start_write();
-    auto g_r = sg->start_read();
-    auto table = g->add_table("");
-
-    auto col = table->add_column(DataType(2), "table", false);
-    table->enumerate_string_column(col);
-    g->commit_and_continue_as_read();
-    g->verify();
-    g->promote_to_write();
-    g->verify();
-    table->create_object();
-    g->commit_and_continue_as_read();
-    g_r->advance_read();
-    g_r->verify();
-    g->verify();
-}
 
 
 TEST(LangBindHelper_RemoveObject)

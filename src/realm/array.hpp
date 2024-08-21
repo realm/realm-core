@@ -117,7 +117,7 @@ public:
     /// pointer.
     void init_from_mem(MemRef) noexcept;
 
-    /// Same as `init_from_ref(get_ref_from_parent())`.
+    /// Same as `init_from_ref(ref_from_parent())`.
     void init_from_parent() noexcept
     {
         ref_type ref = get_ref_from_parent();
@@ -362,7 +362,8 @@ public:
     /// state (as if calling detach()), then free the allocated memory. If this
     /// accessor is already in the detached state, this function has no effect
     /// (idempotency).
-    void destroy_deep() noexcept;
+    /// If 'ro_only', only free space in read-only memory (the file)
+    void destroy_deep(bool ro_only = false) noexcept;
 
     /// check if the array is encoded (in B format)
     inline bool is_compressed() const;
@@ -377,13 +378,13 @@ public:
     bool try_decompress();
 
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
-    static void destroy_deep(ref_type ref, Allocator& alloc) noexcept;
+    static void destroy_deep(ref_type ref, Allocator& alloc, bool ro_only = false) noexcept;
 
     /// Destroy the specified array node and all of its children, recursively.
     ///
     /// This is done by freeing the specified array node after calling
     /// destroy_deep() for every contained 'ref' element.
-    static void destroy_deep(MemRef, Allocator&) noexcept;
+    static void destroy_deep(MemRef, Allocator&, bool ro_only = false) noexcept;
 
     // Clone deep
     static MemRef clone(MemRef, Allocator& from_alloc, Allocator& target_alloc);
@@ -544,7 +545,7 @@ protected:
     // Overriding method in ArrayParent
     ref_type get_child_ref(size_t) const noexcept override;
 
-    void destroy_children(size_t offset = 0) noexcept;
+    void destroy_children(size_t offset = 0, bool ro_only = false) noexcept;
 
 protected:
     // Getters and Setters for adaptive-packed arrays
@@ -916,16 +917,17 @@ inline void Array::set_context_flag(bool value) noexcept
     }
 }
 
-inline void Array::destroy_deep() noexcept
+inline void Array::destroy_deep(bool ro_only) noexcept
 {
     if (!is_attached())
         return;
 
     if (m_has_refs)
-        destroy_children();
+        destroy_children(0, ro_only);
 
     char* header = get_header_from_data(m_data);
-    m_alloc.free_(m_ref, header);
+    if (!ro_only || is_read_only())
+        m_alloc.free_(m_ref, header);
     m_data = nullptr;
 }
 
@@ -968,20 +970,21 @@ inline void Array::clear_and_destroy_children()
     truncate_and_destroy_children(0);
 }
 
-inline void Array::destroy_deep(ref_type ref, Allocator& alloc) noexcept
+inline void Array::destroy_deep(ref_type ref, Allocator& alloc, bool ro_only) noexcept
 {
-    destroy_deep(MemRef(ref, alloc), alloc);
+    destroy_deep(MemRef(ref, alloc), alloc, ro_only);
 }
 
-inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
+inline void Array::destroy_deep(MemRef mem, Allocator& alloc, bool ro_only) noexcept
 {
     if (!get_hasrefs_from_header(mem.get_addr())) {
-        alloc.free_(mem);
+        if (!ro_only || alloc.is_read_only(mem.get_ref()))
+            alloc.free_(mem);
         return;
     }
     Array array(alloc);
     array.init_from_mem(mem);
-    array.destroy_deep();
+    array.destroy_deep(ro_only);
 }
 
 

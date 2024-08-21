@@ -66,9 +66,18 @@ public:
         {
             return index_in_view < other.index_in_view;
         }
+        ObjKey get_key() const
+        {
+            return key_for_object;
+        }
+        Mixed get_value() const
+        {
+            return cached_value;
+        }
         ObjKey key_for_object;
         size_t index_in_view;
         Mixed cached_value;
+        bool compressed = false;
     };
     class IndexPairs : public std::vector<BaseDescriptor::IndexPair> {
     public:
@@ -115,6 +124,16 @@ public:
         struct ObjCache {
             ObjKey key;
             Mixed value;
+            bool compressed = false;
+
+            ObjKey get_key() const
+            {
+                return key;
+            }
+            Mixed get_value() const
+            {
+                return value;
+            }
         };
         using TableCache = std::vector<ObjCache>;
         mutable std::vector<TableCache> m_cache;

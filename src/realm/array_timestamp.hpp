@@ -76,7 +76,8 @@ public:
     Timestamp get(size_t ndx) const
     {
         util::Optional<int64_t> seconds = m_seconds.get(ndx);
-        return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
+        int32_t nano = (int32_t)m_nanoseconds.get(ndx);
+        return seconds ? Timestamp(*seconds, nano) : Timestamp{};
     }
     Mixed get_any(size_t ndx) const final
     {

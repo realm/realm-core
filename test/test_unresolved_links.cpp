@@ -870,6 +870,7 @@ TEST(Unresolved_PerformanceLinkList)
     tr->commit_and_continue_as_read();
     CHECK(t2 > t1);
     tr->promote_to_write();
+    // fails in compressed format because of unsigned/signed interpretation.
     tr->verify();
 }
 

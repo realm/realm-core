@@ -329,11 +329,13 @@ See TEST(StringData_Substrings) for more unit tests for null, isolated to using 
 columns or queries involved
 */
 
-
-TEST(Query_NextGen_StringConditions)
+TEST_TYPES(Query_NextGen_StringConditions, std::true_type, std::false_type)
 {
-    Group group;
-    TableRef table1 = group.add_table("table1");
+    SHARED_GROUP_TEST_PATH(path);
+
+    auto db = DB::create(make_in_realm_history(), path);
+    auto wt = db->start_write();
+    TableRef table1 = wt->add_table("table1");
     auto col_str1 = table1->add_column(type_String, "str1");
     auto col_str2 = table1->add_column(type_String, "str2");
 
@@ -341,6 +343,11 @@ TEST(Query_NextGen_StringConditions)
     ObjKey key_1_0 = table1->create_object().set_all("foo", "F").get_key();
     table1->create_object().set_all("!", "x").get_key();
     ObjKey key_1_2 = table1->create_object().set_all("bar", "r").get_key();
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     ObjKey m;
     // Equal
@@ -433,7 +440,7 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, null_key);
 
     // Test various compare operations with null
-    TableRef table2 = group.add_table("table2");
+    TableRef table2 = wt->add_table("table2");
     auto col_str3 = table2->add_column(type_String, "str3", true);
 
     ObjKey key_2_0 = table2->create_object().set(col_str3, "foo").get_key();
@@ -441,6 +448,11 @@ TEST(Query_NextGen_StringConditions)
     ObjKey key_2_2 = table2->create_object().get_key(); // null
     ObjKey key_2_3 = table2->create_object().set(col_str3, "bar").get_key();
     ObjKey key_2_4 = table2->create_object().set(col_str3, "").get_key();
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     size_t cnt;
     cnt = table2->column<String>(col_str3).contains(StringData("")).count();
@@ -522,6 +534,12 @@ TEST(Query_NextGen_StringConditions)
         }
     };
 
+    // not equal
+    check_results((table2->column<String>(col_str3) != StringData("")), {StringData(), "foo", "bar", "!"});
+    check_results((table2->column<String>(col_str3) != StringData()), {"", "foo", "bar", "!"});
+    check_results((table2->column<String>(col_str3) != StringData("foo")), {StringData(), "", "bar", "!"});
+    check_results((table2->column<String>(col_str3) != StringData("barr")), {StringData(), "", "foo", "bar", "!"});
+
     // greater
     check_results((table2->column<String>(col_str3) > StringData("")), {"foo", "bar", "!"});
     check_results((table2->column<String>(col_str3) > StringData("b")), {"foo", "bar"});
@@ -553,7 +571,7 @@ TEST(Query_NextGen_StringConditions)
     check_results((table2->column<String>(col_str3) <= StringData("barrrr")), {"bar", "", "!", StringData()});
     check_results((table2->column<String>(col_str3) <= StringData("z")), {"foo", "bar", "", "!", StringData()});
 
-    TableRef table3 = group.add_table(StringData("table3"));
+    TableRef table3 = wt->add_table(StringData("table3"));
     auto col_link1 = table3->add_column(*table2, "link1");
 
     table3->create_object().set(col_link1, key_2_0);
@@ -561,6 +579,11 @@ TEST(Query_NextGen_StringConditions)
     table3->create_object().set(col_link1, key_2_2);
     table3->create_object().set(col_link1, key_2_3);
     table3->create_object().set(col_link1, key_2_4);
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     cnt = table3->link(col_link1).column<String>(col_str3).contains(StringData("")).count();
     CHECK_EQUAL(cnt, 4);
@@ -638,7 +661,13 @@ TEST(Query_NextGen_StringConditions)
                             "This is a long search string that does not contain the word being searched for!, "
                             "This is a long search string that does not contain the word being searched for!, "
                             "needle";
+
     table2->create_object().set(col_str3, long_string).get_key();
+
+    if (TEST_TYPE::value) {
+        wt->commit_and_continue_as_read();
+        wt->promote_to_write();
+    }
 
     cnt = table2->column<String>(col_str3).contains(search_1, false).count();
     CHECK_EQUAL(cnt, 1);
@@ -2124,15 +2153,12 @@ TEST_TYPES(Query_ListOfPrimitives_MinMax, int64_t, float, double, Decimal128, Ti
         validate_aggregate_results<T>(test_context, table, col, value, max);
 }
 
-TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
+TEST(Query_StringIndexCommonPrefix)
 {
     Group group;
     TableRef table = group.add_table("test");
     auto col_str = table->add_column(type_String, "first");
     table->add_search_index(col_str);
-    if (TEST_TYPE::value == true) {
-        table->enumerate_string_column(col_str);
-    }
 
     auto test_prefix_find = [&](std::string prefix) {
         std::string prefix_b = prefix + "b";
@@ -2822,8 +2848,6 @@ TEST(Query_Huge)
         for (size_t t = 0; t < 4; t++) {
 
             if (t == 1) {
-                tt.enumerate_string_column(col_str0);
-                tt.enumerate_string_column(col_str1);
             }
             else if (t == 2) {
                 tt.add_search_index(col_str0);
@@ -3007,8 +3031,6 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_key(t));
 
-        ttt.enumerate_string_column(col_str);
-
         // Linear scan over enum, plus linear integer column scan
         v = ttt.where().equal(col_str, "AA").equal(col_int, 0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
@@ -3059,34 +3081,6 @@ TEST(Query_StrIndex2)
     CHECK_EQUAL(0, s);
 }
 
-TEST(Query_StrEnum)
-{
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    Table ttt;
-    ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
-
-    int aa;
-    int64_t s;
-
-    for (int i = 0; i < 100; ++i) {
-        ttt.clear();
-        aa = 0;
-        for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE * 2; ++t) {
-            if (random.chance(1, 3)) {
-                ttt.create_object().set_all(1, "AA");
-                ++aa;
-            }
-            else {
-                ttt.create_object().set_all(1, "BB");
-            }
-        }
-        ttt.enumerate_string_column(col_str);
-        s = ttt.where().equal(col_str, "AA").count();
-        CHECK_EQUAL(aa, s);
-    }
-}
-
 TEST(Query_StrIndex)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -3118,10 +3112,6 @@ TEST(Query_StrIndex)
             }
         }
 
-        s = ttt.where().equal(str_col, "AA").count();
-        CHECK_EQUAL(aa, s);
-
-        ttt.enumerate_string_column(str_col);
         s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
 
@@ -3210,49 +3200,6 @@ TEST(Query_StrIndexUpdating)
     tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
     CHECK_EQUAL(tv_ins.size(), 0);
-}
-
-TEST(Query_GA_Crash)
-{
-    GROUP_TEST_PATH(path);
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    {
-        Group g;
-        TableRef t = g.add_table("firstevents");
-        auto col_str0 = t->add_column(type_String, "1");
-        auto col_str1 = t->add_column(type_String, "2");
-        auto col_str2 = t->add_column(type_String, "3");
-        t->add_column(type_Int, "4");
-        t->add_column(type_Int, "5");
-
-        for (size_t i = 0; i < 100; ++i) {
-            int64_t r1 = random.draw_int_mod(100);
-            int64_t r2 = random.draw_int_mod(100);
-
-            t->create_object().set_all("10", "US", "1.0", r1, r2);
-        }
-        t->enumerate_string_column(col_str0);
-        t->enumerate_string_column(col_str1);
-        t->enumerate_string_column(col_str2);
-        g.write(path);
-    }
-
-    Group g(path);
-    TableRef t = g.get_table("firstevents");
-    auto col_str1 = t->get_column_key("2");
-
-    Query q = t->where().equal(col_str1, "US");
-
-    size_t c1 = 0;
-    for (size_t i = 0; i < 100; ++i)
-        c1 += t->count_string(col_str1, "US");
-
-    size_t c2 = 0;
-    for (size_t i = 0; i < 100; ++i)
-        c2 += q.count();
-
-    CHECK_EQUAL(c1, t->size() * 100);
-    CHECK_EQUAL(c1, c2);
 }
 
 TEST(Query_Float3)
@@ -3563,7 +3510,7 @@ TEST(Query_DoubleCoordinates)
 }
 
 
-TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
+TEST(Query_StrIndexed)
 {
     Table ttt;
     auto col_int = ttt.add_column(type_Int, "1");
@@ -3576,10 +3523,6 @@ TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
         ttt.create_object().set_all(10, "a");
         ttt.create_object().set_all(1, "b");
         ttt.create_object().set_all(4, "c");
-    }
-
-    if (TEST_TYPE::value == true) {
-        ttt.enumerate_string_column(col_str);
     }
 
     ttt.add_search_index(col_str);
@@ -4163,7 +4106,6 @@ TEST(Query_LinkChainSortErrors)
                       ErrorCodes::InvalidSortDescriptor);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), ErrorCodes::InvalidSortDescriptor);
 }
-
 
 TEST(Query_EmptyDescriptors)
 {
@@ -5563,6 +5505,7 @@ TEST(Query_LinkToDictionary)
 {
     Group g;
     auto target = g.add_table("target");
+    target->add_column(type_Int, "dummy"); // Ensure that dict_col get index 1
     auto dict_col = target->add_column_dictionary(type_String, "string", true);
     auto source = g.add_table("source");
     auto link_col = source->add_column(*target, "link");
@@ -5826,6 +5769,341 @@ TEST_TYPES(Query_IntCompressed, Equal, NotEqual, Less, LessEqual, Greater, Great
         char query_str[20];
         snprintf(query_str, 20, "id %s %d", c.description().c_str(), val);
         CHECK_EQUAL(t->query(query_str).count(), num_matches);
+    }
+}
+
+// Many of our tests just test the correctness of sorting strings.
+// For compressed strings we can use the string ids to perform the
+// same task. We just need to commit first and then run the query.
+// These tests are mainly verifying the following:
+//
+//  1. Store N strings inside a Mixed. Commit and sort.
+//  2. Store inside a Mixed integers and Strings. Commit and sort
+//  3. Store N strings in compressed format inside a Mixed property, store another N strings uncompressed in another
+//  column. Sort using both columns.
+//  4. Store N compressed strings inside a table, linked by another table. Sort over links.
+
+// Note: Strings and Mixed use the same logic for compressing strings. Thus these tests are solely using Mixed
+// columns.
+
+
+static int gen_random_int(int min = 1, int max = 100)
+{
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<> distribution(min, max);
+    return distribution(generator);
+}
+
+static std::string gen_random_string(size_t length)
+{
+    const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv"
+                                 "wxyz0123456789";
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<> distribution(0, (int)alphabet.size() - 1);
+
+    std::string random_str;
+    for (size_t i = 0; i < length; ++i)
+        random_str += alphabet[distribution(generator)];
+
+    return random_str;
+}
+
+TEST_TYPES(CompressedStrings_Sort, std::true_type, std::false_type)
+{
+    constexpr size_t N = 10;
+    using type = typename TEST_TYPE::type;
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
+
+    auto commit = [&sg](auto f) {
+        WriteTransaction wt(sg);
+        f(wt);
+        wt.commit();
+    };
+
+    commit([&](auto& wt) {
+        auto t = wt.add_table("Table");
+        t->add_column(type_Mixed, "any");
+    });
+    rt->advance_read();
+
+    std::vector<std::string> strings;
+    for (size_t i = 0; i < N; ++i) {
+        const auto size = gen_random_int();
+        strings.push_back(gen_random_string(size));
+    }
+
+    commit([&](auto& wt) {
+        TableRef t = wt.get_table("Table");
+        ColKey col = t->get_column_key("any");
+        for (auto& s : strings) {
+            t->create_object().set(col, Mixed{s});
+        }
+    });
+    rt->advance_read();
+
+    // sort and verify
+    TableRef table = rt->get_table("Table");
+    ColKey col_key = table->get_column_key("any");
+    bool ascending = type::value;
+
+    auto cmp = [&ascending](auto& s1, auto& s2) {
+        Mixed m1{s1};
+        Mixed m2{s2};
+        return ascending ? m1 < m2 : m1 > m2;
+    };
+
+    std::sort(strings.begin(), strings.end(), cmp);
+
+    TableView tv = table->where().find_all();
+    tv.sort(col_key, ascending);
+    CHECK(tv.size() == strings.size());
+    for (size_t i = 0; i < N; ++i) {
+        CHECK_EQUAL(tv[i].get_any(col_key), strings[i]);
+    }
+}
+
+TEST_TYPES(CompressedStringsAndOtherMixed_Sort, std::true_type, std::false_type)
+{
+    constexpr size_t N = 10;
+    using type = typename TEST_TYPE::type;
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
+
+    auto commit = [&sg](auto f) {
+        WriteTransaction wt(sg);
+        f(wt);
+        wt.commit();
+    };
+
+    commit([&](auto& wt) {
+        auto t = wt.add_table("Table");
+        t->add_column(type_Mixed, "any");
+    });
+    rt->advance_read();
+
+    std::vector<std::string> strings;
+    std::vector<int> ints;
+    for (size_t i = 0; i < N; ++i) {
+        const auto size = gen_random_int();
+        ints.push_back(size);
+        strings.push_back(gen_random_string(size));
+    }
+
+    commit([&](auto& wt) {
+        TableRef t = wt.get_table("Table");
+        ColKey col_any = t->get_column_key("any");
+        for (auto& s : strings) {
+            Obj obj = t->create_object();
+            obj.set(col_any, Mixed{s});
+        }
+        for (auto i : ints) {
+            Obj obj = t->create_object();
+            obj.set(col_any, Mixed{i});
+        }
+    });
+    rt->advance_read();
+
+    // sort and verify
+    TableRef table = rt->get_table("Table");
+    ColKey col_key = table->get_column_key("any");
+    bool ascending = type::value;
+
+    auto cmp = [&ascending](Mixed m1, Mixed m2) {
+        return ascending ? m1 < m2 : m1 > m2;
+    };
+
+    std::vector<Mixed> data;
+    for (auto& str : strings)
+        data.push_back(Mixed{str});
+    for (auto i : ints)
+        data.push_back(Mixed{i});
+
+    std::sort(data.begin(), data.end(), cmp);
+
+    TableView tv = table->where().find_all();
+    tv.sort(col_key, ascending);
+    CHECK(tv.size() == data.size());
+    for (size_t i = 0; i < N; ++i) {
+        CHECK_EQUAL(tv[i].get_any(col_key), data[i]);
+    }
+}
+
+TEST_TYPES(CompressedStrings_CompressedAndUncompressedStringColumns, std::true_type, std::false_type)
+{
+    constexpr size_t N = 10;
+    using type = typename TEST_TYPE::type;
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
+
+    auto commit = [&sg](auto f) {
+        WriteTransaction wt(sg);
+        f(wt);
+        wt.commit();
+    };
+
+    commit([&](auto& wt) {
+        auto t = wt.add_table("Table");
+        t->add_column(type_Mixed, "any_compressed");
+        t->add_column(type_Mixed, "any_uncompressed");
+    });
+    rt->advance_read();
+
+    std::vector<std::string> strings;
+    for (size_t i = 0; i < N; ++i) {
+        const auto size = gen_random_int();
+        strings.push_back(gen_random_string(size));
+    }
+
+    commit([&](auto& wt) {
+        TableRef t = wt.get_table("Table");
+        ColKey col = t->get_column_key("any_compressed");
+        for (auto& s : strings) {
+            t->create_object().set(col, Mixed{s});
+        }
+    });
+    // any_compressed Mixed is now using compressed strings
+
+    rt->advance_read();
+
+    commit([&](auto& wt) {
+        TableRef t = wt.get_table("Table");
+        ColKey col_compressed = t->get_column_key("any_compressed");
+        ColKey col_uncompressed = t->get_column_key("any_uncompressed");
+
+        // add N new objects but as long as we don't commit these strings
+        // will be in uncompressed format
+        for (auto& s : strings) {
+            t->create_object().set(col_uncompressed, Mixed{s});
+        }
+
+        // sort and verify both columns
+        bool ascending = type::value;
+        auto cmp = [&ascending](auto& s1, auto& s2) {
+            Mixed m1{s1};
+            Mixed m2{s2};
+            return ascending ? m1 < m2 : m1 > m2;
+        };
+        std::sort(strings.begin(), strings.end(), cmp);
+
+        TableView tv = t->where().find_all();
+
+        tv.sort(SortDescriptor({{col_compressed}, {col_uncompressed}}, {ascending, ascending}));
+
+        CHECK(tv.size() == strings.size() * 2);
+        for (size_t i = 0; i < 2 * N; ++i) {
+            auto compressed_str = tv[i].get_any(col_compressed);
+            auto uncompressed_str = tv[i].get_any(col_uncompressed);
+            if (!compressed_str.is_null()) {
+                CHECK_EQUAL(compressed_str, strings[i % N]);
+            }
+            if (!uncompressed_str.is_null()) {
+                CHECK_EQUAL(uncompressed_str, strings[i % N]);
+            }
+        }
+    });
+    // after this point both columns will be in compressed format
+}
+
+TEST_TYPES(CompressedStrings_SortOverLinks, std::true_type, std::false_type)
+{
+    constexpr size_t N = 10;
+    using type = typename TEST_TYPE::type;
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
+
+    auto commit = [&sg](auto f) {
+        WriteTransaction wt(sg);
+        f(wt);
+        wt.commit();
+    };
+
+    commit([&](auto& wt) {
+        auto t = wt.add_table("Table");
+        auto o = wt.add_table("Other");
+        // store N ints in T.any
+        t->add_column(type_Mixed, "any");
+        // link O to T
+        t->add_column(*o, "link");
+        // store N compressed strings in O.any
+        o->add_column(type_Mixed, "any");
+    });
+    rt->advance_read();
+
+    std::vector<int> ints;
+    std::vector<std::string> strings;
+    for (size_t i = 0; i < N; ++i) {
+        const auto size = gen_random_int();
+        ints.push_back(size);
+        strings.push_back(gen_random_string(size));
+    }
+
+    commit([&](auto& wt) {
+        // store N strings in O
+        TableRef table = wt.get_table("Other");
+        ColKey col = table->get_column_key("any");
+        for (const auto& s : strings) {
+            table->create_object().set(col, Mixed{s});
+        }
+    });
+
+    rt->advance_read();
+
+    commit([&](auto& wt) {
+        TableRef table = wt.get_table("Table");
+        TableRef other = wt.get_table("Other");
+
+        ColKey col = table->get_column_key("any");
+        ColKey link = table->get_column_key("link");
+
+        // set N ints
+        for (auto i : ints)
+            table->create_object().set(col, Mixed{i});
+
+        // set N links to Other's objects storing compressed strings.
+        size_t i = 0;
+        for (Obj o : *other)
+            table->get_object(i++).set(link, o.get_key());
+    });
+    // any Mixed that contains strings is now pointing to a compressed string
+    rt->advance_read();
+
+    std::vector<std::pair<Mixed, Mixed>> data;
+    for (size_t i = 0; i < N; ++i) {
+        auto p = std::make_pair(Mixed{ints[i]}, Mixed{strings[i]});
+        data.push_back(p);
+    }
+
+    bool ascending = type::value;
+    auto cmp = [&ascending](auto& p1, auto& p2) {
+        // sort based on strings
+        Mixed m1 = p1.second;
+        Mixed m2 = p2.second;
+        return ascending ? m1 < m2 : m1 > m2;
+    };
+    std::sort(data.begin(), data.end(), cmp);
+
+    TableRef table = rt->get_table("Table");
+    TableRef other = rt->get_table("Other");
+    ColKey t_any = table->get_column_key("any");
+    ColKey link = table->get_column_key("link");
+    ColKey o_any = other->get_column_key("any");
+
+    TableView tv = table->where().find_all();
+    tv.sort(SortDescriptor({{link, o_any}}, {ascending}));
+    CHECK(tv.size() == data.size());
+    for (size_t i = 0; i < N; ++i) {
+        CHECK_EQUAL(tv[i].get_any(t_any), data[i].first);
     }
 }
 

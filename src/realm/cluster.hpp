@@ -314,7 +314,6 @@ public:
     size_t get_ndx(RowKey key, size_t ndx) const noexcept override;
     size_t erase(RowKey k, CascadeState& state) override;
     void nullify_incoming_links(RowKey key, CascadeState& state) override;
-    void upgrade_string_to_enum(ColKey col, ArrayString& keys);
 
     void init_leaf(ColKey col, ArrayPayload* leaf) const;
     void add_leaf(ColKey col, ref_type ref);
@@ -366,6 +365,8 @@ private:
     void do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_value, ObjKey origin_key);
     template <class T>
     void set_spec(T&, ColKey::Idx) const;
+    template <class T>
+    void set_string_interner(T&, ColKey) const;
     template <class ArrayType>
     void verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const;
 };

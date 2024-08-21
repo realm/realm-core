@@ -22,6 +22,7 @@
 #include <realm/array_string_short.hpp>
 #include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
+#include <realm/string_interner.hpp>
 
 namespace realm {
 
@@ -66,14 +67,17 @@ public:
     {
         m_arr->set_parent(p, n);
     }
-    bool need_spec() const override
+    bool need_string_interner() const override
     {
         return true;
     }
-    void set_spec(Spec* spec, size_t col_ndx) const override
+    void set_string_interner(StringInterner* string_interner) const override
     {
-        m_spec = spec;
-        m_col_ndx = col_ndx;
+        m_string_interner = string_interner;
+    }
+    bool is_compressed() const
+    {
+        return m_type == Type::interned_strings;
     }
 
     void update_parent()
@@ -100,7 +104,7 @@ public:
     }
     void insert(size_t ndx, StringData value);
     StringData get(size_t ndx) const;
-    StringData get_legacy(size_t ndx) const;
+    std::optional<StringID> get_string_id(size_t ndx) const;
     Mixed get_any(size_t ndx) const override;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
@@ -108,6 +112,9 @@ public:
     void clear();
 
     size_t find_first(StringData value, size_t begin, size_t end) const noexcept;
+
+    /// Special version for searching in an array or compressed strings.
+    size_t find_first(StringData value, size_t begin, size_t end, std::optional<StringID>) const noexcept;
 
     size_t lower_bound(StringData value);
 
@@ -118,6 +125,8 @@ public:
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
     void verify() const;
+    template <class T>
+    static ref_type typed_write(ref_type ref, T& out, Allocator& alloc);
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
@@ -127,18 +136,16 @@ private:
     static constexpr size_t storage_size =
         std::max({sizeof(ArrayStringShort), sizeof(ArraySmallBlobs), sizeof(ArrayBigBlobs), sizeof(Array)});
 
-    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
+    enum class Type { small_strings, medium_strings, big_strings, interned_strings };
 
     Type m_type = Type::small_strings;
 
     Allocator& m_alloc;
     alignas(storage_alignment) std::byte m_storage[storage_size];
     Array* m_arr;
-    mutable Spec* m_spec = nullptr;
-    mutable size_t m_col_ndx = realm::npos;
     bool m_nullable = true;
-
     std::unique_ptr<ArrayString> m_string_enum_values;
+    mutable StringInterner* m_string_interner = nullptr;
 
     Type upgrade_leaf(size_t value_size);
 };
