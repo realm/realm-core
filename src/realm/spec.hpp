@@ -81,7 +81,6 @@ public:
     void destroy() noexcept;
 
     size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(size_t) noexcept;
 
     void verify() const;
 
@@ -175,11 +174,6 @@ inline void Spec::destroy() noexcept
 inline size_t Spec::get_ndx_in_parent() const noexcept
 {
     return m_top.get_ndx_in_parent();
-}
-
-inline void Spec::set_ndx_in_parent(size_t ndx) noexcept
-{
-    m_top.set_ndx_in_parent(ndx);
 }
 
 inline ref_type Spec::get_ref() const noexcept
