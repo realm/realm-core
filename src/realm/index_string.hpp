@@ -241,6 +241,7 @@ private:
     // B-Tree functions
     void TreeInsert(ObjKey obj_key, key_type, size_t offset, StringData index_data, const Mixed& value);
     NodeChange do_insert(ObjKey, key_type, size_t offset, StringData index_data, const Mixed& value);
+    void new_node(const NodeChange&);
     /// Returns true if there is room or it can join existing entries
     bool leaf_insert(ObjKey obj_key, key_type, size_t offset, StringData index_data, const Mixed& value,
                      bool noextend = false);
