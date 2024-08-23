@@ -2,13 +2,8 @@
 
 #include "realm/binary_data.hpp"
 #include "realm/object-store/object_store.hpp"
-#include "realm/object-store/sync/mongo_collection.hpp"
-#include "realm/object-store/sync/sync_session.hpp"
 #include "realm/object_id.hpp"
 #include "realm/query.hpp"
-#include "realm/sync/client_base.hpp"
-#include "realm/sync/protocol.hpp"
-#include "realm/sync/subscriptions.hpp"
 #include "realm/util/base64.hpp"
 #include "realm/util/file.hpp"
 #include "realm/util/logger.hpp"
@@ -28,10 +23,7 @@
 #include <realm/object-store/impl/object_notifier.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
-#include <realm/object-store/sync/app_user.hpp>
-#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/util/functional.hpp>
 #include <string_view>
 #include <system_error>
@@ -149,28 +141,6 @@ struct Helpers {
         realm->m_binding_context = std::make_unique<TheBindingContext>(realm, std::move(methods));
     }
 
-    // This requires the ability to implement interfaces.
-    // This is planned, but for now, providing a helper unlocks sync.
-    template <typename F>
-    static std::shared_ptr<app::GenericNetworkTransport> make_network_transport(F&& runRequest)
-    {
-
-        class Impl final : public app::GenericNetworkTransport {
-        public:
-            Impl(F&& runRequest)
-                : runRequest(FWD(runRequest))
-            {
-            }
-            void send_request_to_server(const app::Request& request,
-                                        util::UniqueFunction<void(const app::Response&)>&& completionBlock) override
-            {
-                runRequest(std::move(request), std::move(completionBlock));
-            }
-            std::decay_t<F> runRequest;
-        };
-        return std::make_shared<Impl>(FWD(runRequest));
-    }
-
     static void delete_data_for_object(const SharedRealm& realm, StringData object_type)
     {
         auto& group = realm->read_group();
@@ -221,18 +191,6 @@ struct Helpers {
         return std::make_shared<MyLogger>(logger);
     }
 
-    static void simulate_sync_error(SyncSession& session, const int& code, const std::string& message,
-                                    const std::string& type, bool is_fatal)
-    {
-        sync::SessionErrorInfo error(Status{type == "realm::sync::ProtocolError" ? ErrorCodes::SyncClientResetRequired
-                                                                                 : ErrorCodes::UnknownError,
-                                            message},
-                                     sync::IsFatal(is_fatal));
-        error.server_requests_action =
-            code == 211 ? sync::ProtocolErrorInfo::Action::ClientReset : sync::ProtocolErrorInfo::Action::Warning;
-        SyncSession::OnlyForTesting::handle_error(session, std::move(error));
-    }
-
     // This is entirely because ThreadSafeReference is a move-only type, and those are hard to expose to JS.
     // Instead, we are exposing a function that takes a mutable lvalue reference and moves from it.
     static SharedRealm consume_thread_safe_reference_to_shared_realm(ThreadSafeReference& tsr)
@@ -245,20 +203,6 @@ struct Helpers {
         return realm::util::File::exists(path);
     }
 
-    static bool erase_subscription(sync::MutableSubscriptionSet& subs, const sync::Subscription& sub_to_remove)
-    {
-        auto it = std::find_if(subs.begin(), subs.end(), [&](const auto& sub) {
-            return sub.id == sub_to_remove.id;
-        });
-
-        if (it == subs.end()) {
-            return false;
-        }
-        subs.erase(it);
-
-        return true;
-    }
-
     static std::string get_results_description(const Results& results)
     {
         const auto& query = results.get_query();
@@ -266,34 +210,9 @@ struct Helpers {
         return query.get_description() + ' ' + results.get_descriptor_ordering().get_description(query.get_table());
     }
 
-    static void feed_buffer(app::WatchStream& ws, BinaryData buffer)
-    {
-        ws.feed_buffer({buffer.data(), buffer.size()});
-    }
-
-    static auto make_ssl_verify_callback(std::function<bool(const std::string& server_address, int server_port,
-                                                            std::string_view pem_data, int preverify_ok, int depth)>
-                                             callback)
-    {
-        return [callback = std::move(callback)](const std::string& server_address, uint16_t server_port,
-                                                const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
-            return callback(server_address, server_port, std::string_view(pem_data, pem_size), preverify_ok, depth);
-        };
-    }
-
     static bool needs_file_format_upgrade(const RealmConfig& config)
     {
         return config.needs_file_format_upgrade();
-    }
-
-    static std::shared_ptr<app::User> sync_user_as_app_user(std::shared_ptr<SyncUser> sync_user)
-    {
-        return std::dynamic_pointer_cast<app::User>(sync_user);
-    }
-
-    static std::shared_ptr<SyncUser> app_user_as_sync_user(std::shared_ptr<app::User> app_user)
-    {
-        return std::dynamic_pointer_cast<SyncUser>(app_user);
     }
 };
 
