@@ -38,8 +38,6 @@ public:
     static const std::pair<const std::string, std::string>*
     find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map);
     static bool is_success_status_code(int status_code);
-    static bool is_redirect_status_code(int status_code);
-    static std::optional<std::string> extract_redir_location(const std::map<std::string, std::string>& headers);
 };
 
 } // namespace realm::app
