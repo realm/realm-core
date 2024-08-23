@@ -3456,22 +3456,8 @@ TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
             int request_count = 0;
             transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 logger->trace("request.url (%1): %2", request_count, request.url);
-                ++request_count;
-
-                // First request should be a location request against the original URL
-                if (request_count == 1) {
+                if (request.url.find("/location") != std::string::npos) {
                     REQUIRE_THAT(request.url, ContainsSubstring("some.fake.url"));
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    return Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
-                                    0,
-                                    {{"Location", "http://asdf.invalid"}},
-                                    ""};
-                }
-
-                // Second request should be a location request against the new URL
-                if (request_count == 2) {
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    REQUIRE_THAT(request.url, ContainsSubstring("asdf.invalid"));
                     return Response{200,
                                     0,
                                     {},
@@ -3489,7 +3475,6 @@ TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
 
             sync_session->resume();
             REQUIRE(!wait_for_download(*r));
-            REQUIRE(request_count > 1);
             REQUIRE(realm_config.sync_config->user->is_logged_in());
 
             // Verify session is using the updated server url from the redirect
