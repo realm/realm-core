@@ -302,6 +302,10 @@ if (REALM_ENABLE_GEOSPATIAL)
     )
 
     list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:s2geometry>)
+
+    install(FILES ../external/mpark/variant.hpp
+        DESTINATION include/external/mpark
+        COMPONENT devel)
 endif()
 
 add_library(Storage STATIC
