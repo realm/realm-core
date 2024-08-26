@@ -423,7 +423,7 @@ void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, DownloadableProgress downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
     util::Logger& logger, const TransactionRef& transact,
-    util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr)
+    util::UniqueFunction<void(const Transaction&, util::Span<Changeset>)> run_in_write_tr)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
     REALM_ASSERT(
@@ -502,7 +502,7 @@ void ClientHistory::integrate_server_changesets(
             update_sync_progress(progress, downloadable_bytes); // Throws
         }
         if (run_in_write_tr) {
-            run_in_write_tr(transact, changesets_for_cb);
+            run_in_write_tr(*transact, changesets_for_cb);
         }
 
         // The reason we can use the `origin_timestamp`, and the `origin_file_ident`
@@ -610,14 +610,13 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
 }
 
 
-void ClientHistory::get_upload_download_state(DB& db, std::uint_fast64_t& downloaded_bytes,
+void ClientHistory::get_upload_download_state(Transaction& rt, Allocator& alloc, std::uint_fast64_t& downloaded_bytes,
                                               DownloadableProgress& downloadable_bytes,
                                               std::uint_fast64_t& uploaded_bytes,
                                               std::uint_fast64_t& uploadable_bytes,
                                               std::uint_fast64_t& snapshot_version, version_type& uploaded_version)
 {
-    TransactionRef rt = db.start_read(); // Throws
-    version_type current_client_version = rt->get_version();
+    version_type current_client_version = rt.get_version();
 
     downloaded_bytes = 0;
     downloadable_bytes = uint64_t(0);
@@ -627,11 +626,11 @@ void ClientHistory::get_upload_download_state(DB& db, std::uint_fast64_t& downlo
     uploaded_version = 0;
 
     using gf = _impl::GroupFriend;
-    ref_type ref = gf::get_history_ref(*rt);
+    ref_type ref = gf::get_history_ref(rt);
     if (!ref)
         return;
 
-    Array root(db.get_alloc());
+    Array root(alloc);
     root.init_from_ref(ref);
     downloaded_bytes = root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int();
     downloadable_bytes = root.get_as_ref_or_tagged(s_progress_downloadable_bytes_iip).get_as_int();
@@ -642,9 +641,9 @@ void ClientHistory::get_upload_download_state(DB& db, std::uint_fast64_t& downlo
     if (uploaded_version == current_client_version)
         return;
 
-    BinaryColumn changesets(db.get_alloc());
+    BinaryColumn changesets(alloc);
     changesets.init_from_ref(root.get_as_ref(s_changesets_iip));
-    IntegerBpTree origin_file_idents(db.get_alloc());
+    IntegerBpTree origin_file_idents(alloc);
     origin_file_idents.init_from_ref(root.get_as_ref(s_origin_file_idents_iip));
 
     // `base_version` is the oldest version we have history for. If this is
@@ -715,7 +714,7 @@ void ClientHistory::set_reciprocal_transform(version_type version, BinaryData da
     std::size_t index = size_t(version - m_sync_history_base_version) - 1;
     REALM_ASSERT(index < sync_history_size());
 
-    if (data.is_null()) {
+    if (data.size() == 0) {
         m_arrays->reciprocal_transforms.set(index, BinaryData{"", 0}); // Throws
         return;
     }
@@ -1065,7 +1064,12 @@ void ClientHistory::trim_sync_history()
 bool ClientHistory::no_pending_local_changes(version_type version) const
 {
     ensure_updated(version);
-    for (size_t i = 0; i < sync_history_size(); i++) {
+    size_t base_version = 0;
+    auto upload_client_version =
+        version_type(m_arrays->root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int());
+    if (upload_client_version > m_sync_history_base_version)
+        base_version = size_t(upload_client_version - m_sync_history_base_version);
+    for (size_t i = base_version; i < sync_history_size(); i++) {
         if (m_arrays->origin_file_idents.get(i) == 0) {
             std::size_t pos = 0;
             BinaryData chunk = m_arrays->changesets.get_at(i, pos);

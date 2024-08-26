@@ -3130,6 +3130,7 @@ TEST_CASE("C API - properties", "[c_api]") {
                     SECTION("Embedded objects") {
                         realm_property_info_t info;
                         bool found = false;
+                        bool to_be_called = true;
                         realm_key_path_array_t* key_path_array = nullptr;
                         realm_find_property(realm, class_bar.key, "sub", &found, &info);
                         auto bar_sub_key = info.key;
@@ -3140,11 +3141,14 @@ TEST_CASE("C API - properties", "[c_api]") {
                             embedded = cptr_checked(realm_set_embedded(obj2.get(), bar_sub_key));
                         });
 
+                        SECTION("using empty keypath") {
+                            const char* bar_strings[1] = {""};
+                            key_path_array = realm_create_key_path_array(realm, class_bar.key, 0, bar_strings);
+                            to_be_called = false;
+                        }
                         SECTION("using valid nesting") {
-
                             const char* bar_strings[1] = {"sub.int"};
                             key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
-                            REQUIRE(key_path_array);
                         }
                         SECTION("using star notation") {
                             const char* bar_strings[1] = {"*.int"};
@@ -3160,12 +3164,14 @@ TEST_CASE("C API - properties", "[c_api]") {
                         checked(realm_refresh(realm, nullptr));
 
                         state.called = false;
+                        state.changes = nullptr;
                         write([&]() {
                             checked(realm_set_value(embedded.get(), embedded_int_key, rlm_int_val(999), false));
                         });
-                        REQUIRE(state.called);
+                        REQUIRE(state.called == to_be_called);
                         CHECK(!state.error);
-                        CHECK(state.changes);
+                        if (to_be_called)
+                            CHECK(state.changes);
                     }
                     SECTION("using backlink") {
                         const char* bar_strings[1] = {"linking_objects.public_int"};
@@ -6412,7 +6418,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
     auto user_data = new TestTransportUserData();
     auto http_transport = realm_http_transport_new(send_request_to_server, user_data, user_data_free);
     auto app_session = get_runtime_app_session();
-    TestAppSession session(app_session, *http_transport, DeleteApp{false});
+    TestAppSession session(app_session, {*http_transport}, DeleteApp{false});
     realm_app app(session.app());
 
     SECTION("remove_user integration") {

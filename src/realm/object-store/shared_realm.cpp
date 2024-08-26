@@ -1601,14 +1601,15 @@ bool KeyPathResolver::_resolve(PropId& current, const char* path)
                              current.origin_prop->public_name, m_full_path));
         }
         // Check if the rest of the path is stars. If not, we should exclude this property
+        auto tmp = path;
         do {
-            auto p = find_chr(path, '.');
-            StringData property(path, p - path);
-            path = p;
+            auto p = find_chr(tmp, '.');
+            StringData property(tmp, p - tmp);
+            tmp = p;
             if (property != "*") {
                 return false;
             }
-        } while (*path++ == '.');
+        } while (*tmp++ == '.');
         return true;
     }
     // Target schema exists - proceed

@@ -472,7 +472,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
         general_role.document_filters.read = {{"role", "employee"}};
         general_role.document_filters.write = {{"role", "employee"}};
 
-        test_rules["roles"][0] = {transform_service_role(general_role)};
+        test_rules["roles"][0] = transform_service_role(general_role);
         harness->do_with_new_realm([&](SharedRealm new_realm) {
             set_up_realm(new_realm, num_total);
 
@@ -527,7 +527,7 @@ TEST_CASE("flx: role change bootstraps", "[sync][flx][baas][role change][bootstr
             user1_role_2.document_filters.read = {{"role", {{"$in", {"employee", "manager"}}}}};
             user1_role_2.document_filters.write = {{"role", {{"$in", {"employee", "manager"}}}}};
             // Update the first rule for user 1 and verify the data after the rule is applied
-            test_rules["roles"][0] = {transform_service_role(user1_role_2)};
+            test_rules["roles"][0] = transform_service_role(user1_role_2);
             // Realm 1 should receive a role change bootstrap which updates the data to employee
             // and manager records. It doesn't matter what type of bootstrap occurs
             update_perms_and_verify(*harness, realm_1, test_rules,
@@ -957,7 +957,10 @@ TEST_CASE("flx: role changes during client resets complete successfully",
                                                                 const SyncClientHookData& data) {
                 bool is_fresh_path;
                 auto session = weak_session.lock();
-                REQUIRE(session); // Should always be valid
+                if (!session) {
+                    // Session is being closed while this function was called
+                    return SyncClientHookAction::NoAction;
+                }
                 is_fresh_path = _impl::client_reset::is_fresh_path(session->path());
 
                 client_reset_state.transition_with(

@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <util/sync/baas_admin_api.hpp>
+#include <util/sync/redirect_server.hpp>
 
 #include <realm/object-store/sync/app_credentials.hpp>
 
@@ -515,7 +516,13 @@ public:
         util::File::remove(lock_file.get_path());
     }
 
-    const std::string& http_endpoint()
+    const std::string admin_endpoint()
+    {
+        poll();
+        return m_http_endpoint;
+    }
+
+    std::string http_endpoint()
     {
         poll();
         return m_http_endpoint;
@@ -583,6 +590,24 @@ private:
     std::string m_http_endpoint;
     std::string m_mongo_endpoint;
 };
+
+static std::optional<sync::RedirectingHttpServer>& get_redirector(const std::string& base_url)
+{
+    static std::optional<sync::RedirectingHttpServer> redirector;
+    auto redirector_enabled = [&] {
+        const static auto enabled_values = {"On", "on", "1"};
+        auto enable_redirector = getenv_sv("ENABLE_BAAS_REDIRECTOR");
+        return std::any_of(enabled_values.begin(), enabled_values.end(), [&](const auto val) {
+            return val == enable_redirector;
+        });
+    };
+
+    if (redirector_enabled() && !redirector && !base_url.empty()) {
+        redirector.emplace(base_url, util::Logger::get_default_logger());
+    }
+
+    return redirector;
+}
 
 class BaasaasLauncher : public Catch::EventListenerBase {
 public:
@@ -653,6 +678,10 @@ public:
 
     void testRunEnded(Catch::TestRunStats const&) override
     {
+        if (auto& redirector = get_redirector({})) {
+            redirector = std::nullopt;
+        }
+
         if (auto& baasaas_holder = get_baasaas_holder()) {
             baasaas_holder->stop();
         }
@@ -1175,10 +1204,16 @@ bool AdminAPISession::is_sync_terminated(const std::string& app_id) const
     return state_result["state"].get<std::string>().empty();
 }
 
-bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
+bool AdminAPISession::is_initial_sync_complete(const std::string& app_id, bool is_flx_sync) const
 {
     auto progress_endpoint = apps()[app_id]["sync"]["progress"];
     auto progress_result = progress_endpoint.get_json();
+    if (is_flx_sync) {
+        // accepting_clients key is only true in FLX after the first initial sync has completed
+        auto it = progress_result.find("accepting_clients");
+        return it != progress_result.end() && it->is_boolean() && it->get<bool>();
+    }
+
     if (auto it = progress_result.find("progress"); it != progress_result.end() && it->is_object() && !it->empty()) {
         for (auto& elem : *it) {
             auto is_complete = elem["complete"];
@@ -1251,6 +1286,17 @@ realm::Schema get_default_schema()
 
 std::string get_base_url()
 {
+    auto base_url = get_real_base_url();
+
+    auto& redirector = get_redirector(base_url);
+    if (redirector) {
+        return redirector->base_url();
+    }
+    return base_url;
+}
+
+std::string get_real_base_url()
+{
     if (auto baas_url = getenv_sv("BAAS_BASE_URL"); !baas_url.empty()) {
         return std::string{baas_url};
     }
@@ -1261,6 +1307,7 @@ std::string get_base_url()
     return get_compile_time_base_url();
 }
 
+
 std::string get_admin_url()
 {
     if (auto baas_admin_url = getenv_sv("BAAS_ADMIN_URL"); !baas_admin_url.empty()) {
@@ -1269,8 +1316,11 @@ std::string get_admin_url()
     if (auto compile_url = get_compile_time_admin_url(); !compile_url.empty()) {
         return compile_url;
     }
+    if (auto& baasaas_holder = BaasaasLauncher::get_baasaas_holder(); baasaas_holder.has_value()) {
+        return baasaas_holder->admin_endpoint();
+    }
 
-    return get_base_url();
+    return get_real_base_url();
 }
 
 std::string get_mongodb_server()
@@ -1659,7 +1709,7 @@ AppSession create_app(const AppCreateConfig& config)
         // Increasing timeout due to occasional slow startup of the translator on baasaas
         timed_sleeping_wait_for(
             [&] {
-                return session.is_initial_sync_complete(app_id);
+                return session.is_initial_sync_complete(app_id, config.flx_sync_config.has_value());
             },
             std::chrono::seconds(60), std::chrono::seconds(1));
     }

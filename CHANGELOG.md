@@ -6,7 +6,9 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Using an empty KeyPath in C API would result in no filtering being done ([#7805](https://github.com/realm/realm-core/issues/7805), since 13.24.0)
+* Filtering notifications with backlink columns as last element could sometimes give wrong results ([#7530](https://github.com/realm/realm-core/issues/7530), since 11.1.0)
+* Fix crash during client app shutdown when Logger log level is set higher than Info. ([#7969](https://github.com/realm/realm-core/issues/7969), since v13.23.3)
 
 ### Breaking changes
 * None.
@@ -17,9 +19,82 @@
 -----------
 
 ### Internals
+* Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
 * Added second optional `scheduler` parameter to `EventLoopDispatcher`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
 * (bindgen) Added second optional `scheduler` parameter to `schedulerWrapBlockingFunction`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
 * (bindgen) Exposing optional `scheduler` property on `RealmConfig`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
+
+----------------------------------------------
+
+# 14.12.0 Release notes
+
+### Enhancements
+* Improve sync bootstrap performance by reducing the number of table selections in the replication logs for embedded objects. ([#7945](https://github.com/realm/realm-core/issues/7945))
+* Released a read lock which was pinned for the duration of a mutable subscription even after commit. This frees resources earlier, and may improve performance of sync bootstraps where the starting state is large. ([#7946](https://github.com/realm/realm-core/issues/7946))
+* Client reset cycle detection now checks if the previous recovery attempt was made by the same core version, and if not attempts recovery again ([PR #7944](https://github.com/realm/realm-core/pull/7944)).
+* Updated bundled OpenSSL version to 3.3.1. (PR [#7947](https://github.com/realm/realm-core/pull/7947))
+
+### Fixed
+* Fixed an "invalid column key" exception when using a RQL "BETWEEN" query on an int or timestamp property across links. ([#7935](https://github.com/realm/realm-core/issues/7935), since v14.10.1)
+* Fixed conflict resolution bug related to ArrayErase and Clear instructions, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization ([#7893](https://github.com/realm/realm-core/issues/7893), since v14.8.0).
+* Fixed bug which would prevent eventual consistency during conflict resolution. Affected clients would experience data divergence and potentially consistency errors as a result. ([PR #7955](https://github.com/realm/realm-core/pull/7955), since v14.8.0)
+* Fixed issues loading the native Realm libraries on Linux ARMv7 systems when they linked against our bundled OpenSSL resulting in errors like `unexpected reloc type 0x03`. ([#7947](https://github.com/realm/realm-core/issues/7947), since v14.1.0)
+* `Realm::convert()` would sometimes incorrectly throw an exception claiming that there were unuploaded local changes when the source Realm is a synchronized Realm ([#7966](https://github.com/realm/realm-core/issues/7966), since v10.7.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Reverted the bfd linker override in the Linux-armv7 toolchain file because the upstream OpenSSL issue it was working around was resolved.
+
+----------------------------------------------
+
+# 14.11.2 Release notes
+
+### Enhancements
+* Sync log statements now include the app services connection id in their prefix (e.g `Connection[1:<connection id>] Session[1]: log message`) to make correlating sync activity to server logs easier during troubleshooting ((PR #7849)[https://github.com/realm/realm-core/pull/7849]).
+
+### Fixed
+* Sync client may report duplicate compensating write errors ([#7708](https://github.com/realm/realm-core/issues/7708), since v14.8.0).
+* String serialization of timestamps with a sufficiently large timestamp value could overflow an int causing undefined behavior, causing potentially bad values for the month/day/year values in stringified dates. ([PR #7934](https://github.com/realm/realm-core/pull/7934)).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Fix emscripten build and add emscripten debug/release compile tasks to evergreen. ([PR #7916](https://github.com/realm/realm-core/pull/7916))
+* Subscription set state change notifications now work in a multiprocess-compatible manner ([PR #7862](https://github.com/realm/realm-core/pull/7862)).
+
+----------------------------------------------
+
+# 14.11.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* App subscription callback was getting fired before the user profile was retrieved on login, leading to an empty user profile when using the callback. ([#7889](https://github.com/realm/realm-core/issues/7889), since v14.7.0)
+
+### Breaking changes
+* The websocket error codes `websocket_client_too_old`, `websocket_client_too_new`, and `websocket_protocol_mismatch` along with their C API constants were removed. These corresponded to errors the legacy C++ server could have sent, but the baas sync server never did. Any platform networking implementations that surfaced these errors can report a `websocket_fatal_error` instead if an unknown error occurs during the websocket handshake. If a client connects that is too old or too new, it will finish the websocket handshake and then receive an in-band sync `ERROR` message that will be handled by the sync error handler. [PR #7917](https://github.com/realm/realm-core/pull/7917)
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* None.
 
 ----------------------------------------------
 
@@ -127,7 +202,7 @@
 
 ### Enhancements
 * It is no longer an error to set a base url for an App with a trailing slash - for example, `https://services.cloud.mongodb.com/` instead of `https://services.cloud.mongodb.com` - before this change that would result in a 404 error from the server ([PR #7791](https://github.com/realm/realm-core/pull/7791)).
-* Performance has been improved for range queries on integers and timestamps. Requires that you use the "BETWEEN" operation in MQL or the Query::between() method when you build the query. (PR [#7785](https://github.com/realm/realm-core/pull/7785))
+* Performance has been improved for range queries on integers and timestamps. Requires that you use the "BETWEEN" operation in RQL or the Query::between() method when you build the query. (PR [#7785](https://github.com/realm/realm-core/pull/7785))
 * Expose `Obj::add_int()` in the bindgen spec. ([PR #7797](https://github.com/realm/realm-core/pull/7797)).
 
 ### Fixed

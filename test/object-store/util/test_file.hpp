@@ -323,12 +323,28 @@ private:
 using DeleteApp = realm::util::TaggedBool<struct DeleteAppTag>;
 class TestAppSession {
 public:
+    struct Config {
+        std::shared_ptr<realm::app::GenericNetworkTransport> transport;
+        realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal;
+        std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider;
+        realm::app::AppConfig::MetadataMode metadata_mode = realm::app::AppConfig::MetadataMode::NoEncryption;
+        std::optional<std::string> base_url;
+        std::optional<std::string> storage_path;
+        // If user_creds are supplied, caller must explicitly call log_in_user() after TestAppSession creation
+        std::optional<realm::app::AppCredentials> user_creds;
+        std::shared_ptr<realm::util::Logger> logger = nullptr;
+    };
+
     TestAppSession();
-    TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
-                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal,
-                   std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr);
+    TestAppSession(realm::AppSession);
+    TestAppSession(realm::AppSession, Config, DeleteApp = true, bool delete_storage = true);
+
     ~TestAppSession();
 
+    const Config& config() const noexcept
+    {
+        return m_config;
+    }
     std::shared_ptr<realm::app::App> app() const noexcept
     {
         return m_app;
@@ -339,7 +355,7 @@ public:
     }
     realm::app::GenericNetworkTransport* transport()
     {
-        return m_transport.get();
+        return m_config.transport.get();
     }
     const std::shared_ptr<realm::SyncManager>& sync_manager() const
     {
@@ -347,23 +363,25 @@ public:
         return m_app->sync_manager();
     }
 
-    // Close the app instance (or tear down the TestAppSession)
-    void close(bool tear_down = false);
-    // Re-open the app instance using app_config
-    void reopen(bool log_in = false);
-
-    realm::app::AppConfig app_config;
+    std::shared_ptr<realm::app::User> current_user() const
+    {
+        REALM_ASSERT(m_app);
+        return m_app->current_user();
+    }
+    realm::StatusWith<realm::app::AppCredentials> create_user_and_log_in();
+    // The user_creds from the Config structure will be used if not provided
+    realm::StatusWith<std::shared_ptr<realm::SyncUser>>
+    log_in_user(std::optional<realm::app::AppCredentials> user_creds = std::nullopt);
 
     std::vector<realm::bson::BsonDocument> get_documents(realm::app::User& user, const std::string& object_type,
                                                          size_t expected_count) const;
 
 private:
-    std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;
-    std::string m_base_file_path;
-    bool m_delete_app = true;
-    std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
-    realm::app::AppCredentials user_creds;
+    Config m_config;
+    bool m_delete_app;
+    bool m_delete_storage;
+    std::shared_ptr<realm::app::App> m_app;
 };
 #endif // REALM_ENABLE_AUTH_TESTS
 
