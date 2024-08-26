@@ -941,6 +941,7 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
+  - .test_suite
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
