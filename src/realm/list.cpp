@@ -136,7 +136,7 @@ void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, JSONOutputMode outp
         if (i > 0)
             out << ",";
         Mixed val = get_any(i);
-        if (val.is_type(type_TypedLink)) {
+        if (val.is_type(type_Link, type_TypedLink)) {
             fn(val);
         }
         else {
@@ -503,10 +503,12 @@ void Lst<Mixed>::remove(size_t from, size_t to)
 
 void Lst<Mixed>::clear()
 {
-    if (size() > 0) {
-        if (Replication* repl = Base::get_replication()) {
-            repl->list_clear(*this);
-        }
+    auto sz = size();
+    Replication* repl = Base::get_replication();
+    if (repl && (sz > 0 || !m_col_key.is_collection() || m_level > 1)) {
+        repl->list_clear(*this);
+    }
+    if (sz > 0) {
         CascadeState state;
         bool recurse = remove_backlinks(state);
 
@@ -874,9 +876,6 @@ bool Lst<Mixed>::clear_backlink(size_t ndx, CascadeState& state) const
     if (value.is_type(type_TypedLink, type_Dictionary, type_List)) {
         if (value.is_type(type_TypedLink)) {
             auto link = value.get<ObjLink>();
-            if (link.get_obj_key().is_unresolved()) {
-                state.m_mode = CascadeState::Mode::All;
-            }
             return Base::remove_backlink(m_col_key, link, state);
         }
         else if (value.is_type(type_List)) {
@@ -951,19 +950,9 @@ void LnkLst::remove_all_target_rows()
     }
 }
 
-void LnkLst::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const
+void LnkLst::to_json(std::ostream& out, JSONOutputMode mode, util::FunctionRef<void(const Mixed&)> fn) const
 {
-    out << "[";
-
-    auto sz = m_list.size();
-    for (size_t i = 0; i < sz; i++) {
-        if (i > 0)
-            out << ",";
-        Mixed val(m_list.get(i));
-        fn(val);
-    }
-
-    out << "]";
+    m_list.to_json(out, mode, fn);
 }
 
 void LnkLst::replace_link(ObjKey old_val, ObjKey new_val)

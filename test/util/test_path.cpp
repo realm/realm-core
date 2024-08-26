@@ -134,7 +134,7 @@ bool initialize_test_path(int argc, const char* argv[])
     }
     PathCchRemoveFileSpec(path, MAX_PATH);
     SetCurrentDirectory(path);
-    g_path_prefix = std::filesystem::path(path).u8string();
+    g_path_prefix = std::string(reinterpret_cast<const char*>(std::filesystem::path(path).u8string().c_str()));
     g_resource_path = g_path_prefix + "\\resources\\";
 #else
     char executable[PATH_MAX];
@@ -148,7 +148,7 @@ bool initialize_test_path(int argc, const char* argv[])
         return false;
     }
     g_resource_path = File::resolve("resources", directory) + "/";
-    g_path_prefix = directory;
+    g_path_prefix = std::string(directory) + "/";
 #endif
 
     if (argc > 0) {

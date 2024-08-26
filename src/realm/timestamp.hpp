@@ -205,6 +205,12 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 }
 // LCOV_EXCL_STOP
 
+template <>
+inline bool is_null(const Timestamp& t)
+{
+    return t.is_null();
+}
+
 } // namespace realm
 
 namespace std {

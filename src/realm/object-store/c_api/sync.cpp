@@ -40,11 +40,6 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
-realm_app_user_subscription_token::~realm_app_user_subscription_token()
-{
-    user->unsubscribe(token);
-}
-
 namespace realm::c_api {
 
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL);
@@ -118,6 +113,10 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Su
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
               RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
 
+static_assert(realm_sync_file_action(SyncFileAction::DeleteRealm) == RLM_SYNC_FILE_ACTION_DELETE_REALM);
+static_assert(realm_sync_file_action(SyncFileAction::BackUpThenDeleteRealm) ==
+              RLM_SYNC_FILE_ACTION_BACK_UP_THEN_DELETE_REALM);
+
 } // namespace
 
 
@@ -129,10 +128,12 @@ static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrde
     return realm_query;
 }
 
+#if !REALM_APP_SERVICES
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
 {
     return new realm_sync_client_config_t;
 }
+#endif // !REALM_APP_SERVICES
 
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,
                                                          realm_sync_client_reconnect_mode_e mode) noexcept
@@ -837,7 +838,7 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
     REALM_ASSERT(session);
     SyncSession::OnlyForTesting::handle_error(
         *session->get(),
-        sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str}, !is_fatal});
+        sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str}, is_fatal});
 }
 
 } // namespace realm::c_api

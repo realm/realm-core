@@ -1,0 +1,72 @@
+name: "Make Release"
+
+# This runs automatically after a release PR is merged
+# See github.com/realm/realm-core/doc/development/how-to-release.md
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  finish_release:
+    if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/automated_v')
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: ${{ steps.publish-github-release.outputs.html_url }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: false
+    - name: Read version
+      id: get-version
+      run: |
+        realm_version=$(sed -rn 's/^VERSION: (.*)/\1/p' < "dependencies.yml")
+        echo "version=$realm_version" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Extract Release Notes Section
+      run: |
+        awk '/^#.*Release notes/{if(++i>1)exit} i' CHANGELOG.md > extracted_changelog.md
+      shell: bash
+    - name: Make Tag and Publish Github Release
+      uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5 #! 1.14.0
+      id: publish-github-release
+      with:
+        bodyFile: extracted_changelog.md
+        name: Realm Core v${{ steps.get-version.outputs.version }}
+        commit: ${{ github.base_ref }}
+        tag: v${{ steps.get-version.outputs.version }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: false
+    - name: Update Changelog
+      run: |
+        cat "doc/CHANGELOG_template.md" "CHANGELOG.md" > temp_file.md; mv temp_file.md "CHANGELOG.md"
+      shell: bash
+    - name: Create vNext PR
+      id: vnext-pr
+      uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e #! 6.0.5
+      with:
+        branch: prepare-vnext
+        title: Prepare for vNext
+        body: Update Changelog for vNext
+        delete-branch: true
+        draft: false
+        base: ${{ github.base_ref }}
+        labels: no-jira-ticket
+        add-paths: CHANGELOG.md
+        commit-message: New changelog section to prepare for vNext
+    - name: 'Post to #appx-releases'
+      uses: realm/ci-actions/release-to-slack@fa20eb972b9f018654fdb4e2c7afb52b0532f907
+      with:
+        changelog: extracted_changelog.md
+        sdk: Core
+        webhook-url: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
+        version: ${{ steps.get-version.outputs.version }}
+    - name: Output PR URL
+      run: |
+        echo "Prepare vNext PR created: $VNEXT_PR_URL" >> $GITHUB_STEP_SUMMARY
+      shell: bash
+      env:
+        VNEXT_PR_URL: ${{ steps.vnext-pr.outputs.pull-request-url }}

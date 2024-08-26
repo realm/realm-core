@@ -587,10 +587,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     ObjLink old_link;
     if (old_entry) {
         Mixed old_value = m_values->get(ndx);
+        if (old_value.is_type(type_TypedLink)) {
+            old_link = old_value.get<ObjLink>();
+        }
         if (!value.is_same_type(old_value) || value != old_value) {
-            if (old_value.is_type(type_TypedLink)) {
-                old_link = old_value.get<ObjLink>();
-            }
             m_values->set(ndx, value);
         }
         else {
@@ -823,10 +823,12 @@ size_t Dictionary::find_first(Mixed value) const
 
 void Dictionary::clear()
 {
-    if (size() > 0) {
-        if (Replication* repl = get_replication()) {
-            repl->dictionary_clear(*this);
-        }
+    auto sz = size();
+    Replication* repl = Base::get_replication();
+    if (repl && (sz > 0 || !m_col_key.is_collection() || m_level > 1)) {
+        repl->dictionary_clear(*this);
+    }
+    if (sz > 0) {
         CascadeState cascade_state(CascadeState::Mode::Strong);
         bool recurse = remove_backlinks(cascade_state);
 

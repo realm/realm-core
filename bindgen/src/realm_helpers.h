@@ -290,6 +290,11 @@ struct Helpers {
     {
         return std::dynamic_pointer_cast<app::User>(sync_user);
     }
+
+    static std::shared_ptr<SyncUser> app_user_as_sync_user(std::shared_ptr<app::User> app_user)
+    {
+        return std::dynamic_pointer_cast<SyncUser>(app_user);
+    }
 };
 
 struct ObjectChangeSet {

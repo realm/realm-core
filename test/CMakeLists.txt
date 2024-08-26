@@ -68,7 +68,6 @@ set(CORE_TEST_SOURCES
     test_list.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
-    test_optional.cpp
     test_priority_queue.cpp
     test_replication.cpp
     test_safe_int_ops.cpp
@@ -200,7 +199,6 @@ if(REALM_ENABLE_SYNC)
         test_array_sync.cpp
         test_changeset_encoding.cpp
         test_client_reset.cpp
-        test_compact_changesets.cpp
         test_crypto.cpp
         test_embedded_objects.cpp
         test_instruction_replication.cpp

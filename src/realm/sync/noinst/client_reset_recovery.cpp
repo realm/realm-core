@@ -129,15 +129,11 @@ struct ListPath {
             ColumnKey,
         } type;
 
-        bool operator==(const Element& other) const noexcept;
-        bool operator!=(const Element& other) const noexcept;
         bool operator<(const Element& other) const noexcept;
     };
 
     void append(const Element& item);
     bool operator<(const ListPath& other) const noexcept;
-    bool operator==(const ListPath& other) const noexcept;
-    bool operator!=(const ListPath& other) const noexcept;
     std::string path_to_string(Transaction& remote, const InterningBuffer& buffer);
 
     using const_iterator = typename std::vector<Element>::const_iterator;
@@ -176,21 +172,23 @@ private:
     struct RecoveryResolver : public InstructionApplier::PathResolver {
         RecoveryResolver(RecoverLocalChangesetsHandler* applier, Instruction::PathInstruction& instr,
                          const std::string_view& instr_name);
-        void on_property(Obj&, ColKey) override;
+        Status on_property(Obj&, ColKey) override;
         void on_list(LstBase&) override;
         Status on_list_index(LstBase&, uint32_t) override;
         void on_dictionary(Dictionary&) override;
         Status on_dictionary_key(Dictionary&, Mixed) override;
         void on_set(SetBase&) override;
         void on_error(const std::string&) override;
+        Status on_mixed_type_changed(const std::string&) override;
         void on_column_advance(ColKey) override;
         void on_dict_key_advance(StringData) override;
         Status on_list_index_advance(uint32_t) override;
         Status on_null_link_advance(StringData, StringData) override;
+        Status on_dict_key_not_found(StringData, StringData, StringData) override;
         Status on_begin(const util::Optional<Obj>&) override;
         void on_finish() override {}
 
-        void set_last_path_index(uint32_t ndx);
+        void update_path_index(uint32_t ndx);
 
         ListPath m_list_path;
         Instruction::PathInstruction& m_mutable_instr;
@@ -418,26 +416,6 @@ ListPath::Element::Element(ColKey key)
 {
 }
 
-bool ListPath::Element::operator==(const Element& other) const noexcept
-{
-    if (type == other.type) {
-        switch (type) {
-            case Type::InternKey:
-                return intern_key == other.intern_key;
-            case Type::ListIndex:
-                return index == other.index;
-            case Type::ColumnKey:
-                return col_key == other.col_key;
-        }
-    }
-    return false;
-}
-
-bool ListPath::Element::operator!=(const Element& other) const noexcept
-{
-    return !(operator==(other));
-}
-
 bool ListPath::Element::operator<(const Element& other) const noexcept
 {
     if (type < other.type) {
@@ -473,24 +451,6 @@ bool ListPath::operator<(const ListPath& other) const noexcept
         return true;
     }
     return std::lexicographical_compare(m_path.begin(), m_path.end(), other.m_path.begin(), other.m_path.end());
-}
-
-bool ListPath::operator==(const ListPath& other) const noexcept
-{
-    if (m_table_key == other.m_table_key && m_obj_key == other.m_obj_key && m_path.size() == other.m_path.size()) {
-        for (size_t i = 0; i < m_path.size(); ++i) {
-            if (m_path[i] != other.m_path[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-    return false;
-}
-
-bool ListPath::operator!=(const ListPath& other) const noexcept
-{
-    return !(operator==(other));
 }
 
 std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer& buffer)
@@ -536,7 +496,7 @@ REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::strin
     std::string full_message =
         util::format("Unable to automatically recover local changes during client reset: '%1'", message);
     m_logger.error(util::LogCategory::reset, full_message.c_str());
-    throw realm::_impl::client_reset::ClientResetFailed(full_message);
+    throw realm::sync::ClientResetFailed(full_message);
 }
 
 util::AppendBuffer<char> RecoverLocalChangesetsHandler::process_changeset(const ChunkedBinaryData& changeset)
@@ -600,13 +560,11 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
             ConstTableRef remote_table = remote_list.get_table();
             ColKey local_col_key = local_list.get_col_key();
             ColKey remote_col_key = remote_list.get_col_key();
-            Obj local_obj = local_list.get_obj();
-            Obj remote_obj = remote_list.get_obj();
             InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
                                                      &embedded_object_tracker);
             m_logger.debug(util::LogCategory::reset, "Recovery overwrites list for '%1' size: %2 -> %3", path_str,
                            remote_list.size(), local_list.size());
-            value_converter.copy_value(local_obj, remote_obj, nullptr);
+            value_converter.copy_list(local_list, remote_list);
             embedded_object_tracker.process_pending();
         });
         if (did_translate) {
@@ -626,89 +584,88 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
 bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
                                                  util::UniqueFunction<void(LstBase&, LstBase&)> callback)
 {
+    DictionaryPtr local_dict, remote_dict;
     for (auto it = path.begin(); it != path.end();) {
         if (!remote_obj || !local_obj) {
             return false;
         }
-        REALM_ASSERT(it->type == ListPath::Element::Type::ColumnKey);
-        ColKey col = it->col_key;
-        REALM_ASSERT(col);
-        if (col.is_list()) {
-            auto remote_list = get_list_from_path(remote_obj, col);
-            ColKey local_col = local_obj.get_table()->get_column_key(remote_obj.get_table()->get_column_name(col));
-            REALM_ASSERT(local_col);
-            auto local_list = get_list_from_path(local_obj, local_col);
-            ++it;
-            if (it == path.end()) {
+        REALM_ASSERT(it->type != ListPath::Element::Type::ListIndex);
+
+        if (it->type == ListPath::Element::Type::InternKey) {
+            StringData dict_key = m_intern_keys.get_key(it->intern_key);
+            // At least one dictionary does not contain the key.
+            if (!local_dict->contains(dict_key) || !remote_dict->contains(dict_key))
+                return false;
+            auto local_any = local_dict->get(dict_key);
+            auto remote_any = remote_dict->get(dict_key);
+            // Type mismatch.
+            if (local_any != remote_any)
+                return false;
+            if (local_any.is_type(type_Link, type_TypedLink)) {
+                local_obj = local_dict->get_object(dict_key);
+                remote_obj = remote_dict->get_object(dict_key);
+            }
+            else if (local_any.is_type(type_Dictionary)) {
+                local_dict = local_dict->get_dictionary(dict_key);
+                remote_dict = remote_dict->get_dictionary(dict_key);
+            }
+            else if (local_any.is_type(type_List)) {
+                ++it;
+                REALM_ASSERT(it == path.end());
+                auto local_list = local_dict->get_list(dict_key);
+                auto remote_list = remote_dict->get_list(dict_key);
                 callback(*remote_list, *local_list);
                 return true;
             }
             else {
-                REALM_ASSERT(it->type == ListPath::Element::Type::ListIndex);
-                REALM_ASSERT(it != path.end());
-                size_t stable_index_id = it->index;
-                REALM_ASSERT(stable_index_id != realm::npos);
-                // This code path could be implemented, but because it is currently not possible to
-                // excercise in tests, it is marked unreachable. The assumption here is that only the
-                // first embedded object list would ever need to be copied over. If the first embedded
-                // list is allowed then all sub objects are allowed, and likewise if the first embedded
-                // list is copied, then this implies that all embedded children are also copied over.
-                // Therefore, we should never have a situtation where a secondary embedded list needs copying.
-                REALM_UNREACHABLE();
-            }
-        }
-        else if (col.is_dictionary()) {
-            ++it;
-            REALM_ASSERT(it != path.end());
-            REALM_ASSERT(it->type == ListPath::Element::Type::InternKey);
-            Dictionary remote_dict = remote_obj.get_dictionary(col);
-            Dictionary local_dict = local_obj.get_dictionary(remote_obj.get_table()->get_column_name(col));
-            StringData dict_key = m_intern_keys.get_key(it->intern_key);
-            if (remote_dict.contains(dict_key) && local_dict.contains(dict_key)) {
-                remote_obj = remote_dict.get_object(dict_key);
-                local_obj = local_dict.get_object(dict_key);
-                ++it;
-            }
-            else {
                 return false;
             }
+            ++it;
+            continue;
+        }
+
+        REALM_ASSERT(it->type == ListPath::Element::Type::ColumnKey);
+        ColKey col = it->col_key;
+        REALM_ASSERT(col);
+        ColKey local_col = local_obj.get_table()->get_column_key(remote_obj.get_table()->get_column_name(col));
+        REALM_ASSERT(local_col);
+        if (col.is_list()) {
+            ++it;
+            // A list is copied verbatim when there is an operation on an ambiguous index
+            // (includes accessing elements). An index is considered ambiguous if it was
+            // not just inserted.
+            // Once the list is marked to be copied, any access to nested collections
+            // or embedded objects through that list is stopped.
+            REALM_ASSERT(it == path.end());
+            auto remote_list = remote_obj.get_listbase_ptr(col);
+            auto local_list = local_obj.get_listbase_ptr(local_col);
+            callback(*remote_list, *local_list);
+            return true;
+        }
+        else if (col.is_dictionary()) {
+            remote_dict = remote_obj.get_dictionary_ptr(col);
+            local_dict = local_obj.get_dictionary_ptr(local_col);
+            ++it;
         }
         else if (col.get_type() == col_type_Mixed) {
-            StringData col_name = remote_obj.get_table()->get_column_name(col);
-            auto local_any = local_obj.get_any(col_name);
+            auto local_any = local_obj.get_any(local_col);
             auto remote_any = remote_obj.get_any(col);
 
             if (local_any.is_type(type_List) && remote_any.is_type(type_List)) {
                 ++it;
-                if (it == path.end()) {
-                    auto local_col = local_obj.get_table()->get_column_key(col_name);
-                    Lst<Mixed> local_list{local_obj, local_col};
-                    Lst<Mixed> remote_list{remote_obj, col};
-                    callback(remote_list, local_list);
-                    return true;
-                }
-                else {
-                    // same as above.
-                    REALM_UNREACHABLE();
-                }
+                REALM_ASSERT(it == path.end());
+                Lst<Mixed> local_list{local_obj, local_col};
+                Lst<Mixed> remote_list{remote_obj, col};
+                callback(remote_list, local_list);
+                return true;
             }
             else if (local_any.is_type(type_Dictionary) && remote_any.is_type(type_Dictionary)) {
+                remote_dict = remote_obj.get_dictionary_ptr(col);
+                local_dict = local_obj.get_dictionary_ptr(local_col);
                 ++it;
-                REALM_ASSERT(it != path.end());
-                REALM_ASSERT(it->type == ListPath::Element::Type::InternKey);
-                StringData col_name = remote_obj.get_table()->get_column_name(col);
-                auto local_col = local_obj.get_table()->get_column_key(col_name);
-                Dictionary remote_dict{remote_obj, col};
-                Dictionary local_dict{local_obj, local_col};
-                StringData dict_key = m_intern_keys.get_key(it->intern_key);
-                if (remote_dict.contains(dict_key) && local_dict.contains(dict_key)) {
-                    remote_obj = remote_dict.get_object(dict_key);
-                    local_obj = local_dict.get_object(dict_key);
-                    ++it;
-                }
-                else {
-                    return false;
-                }
+            }
+            else {
+                return false;
             }
         }
         else {
@@ -756,9 +713,11 @@ RecoverLocalChangesetsHandler::RecoveryResolver::RecoveryResolver(RecoverLocalCh
 {
 }
 
-void RecoverLocalChangesetsHandler::RecoveryResolver::on_property(Obj&, ColKey)
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_property(Obj&, ColKey)
 {
     m_recovery_applier->handle_error(util::format("Invalid path for %1 (object, column)", m_instr_name));
+    return Status::DidNotResolve;
 }
 
 void RecoverLocalChangesetsHandler::RecoveryResolver::on_list(LstBase&)
@@ -795,6 +754,16 @@ void RecoverLocalChangesetsHandler::RecoveryResolver::on_error(const std::string
     m_recovery_applier->handle_error(err_msg);
 }
 
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_mixed_type_changed(const std::string& err_msg)
+{
+    std::string full_message =
+        util::format("Discarding a local %1 made to a collection which no longer exists along path. Error: %2",
+                     m_instr_name, err_msg);
+    m_recovery_applier->m_logger.warn(full_message.c_str());
+    return Status::DidNotResolve; // discard the instruction because the type of a property of collection item changed
+}
+
 void RecoverLocalChangesetsHandler::RecoveryResolver::on_column_advance(ColKey col)
 {
     m_list_path.append(ListPath::Element(col));
@@ -817,11 +786,12 @@ RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index_advance(uint32_t 
         }
         REALM_ASSERT(cross_ndx->remote != uint32_t(-1));
 
-        set_last_path_index(cross_ndx->remote); // translate the index of the path
+        update_path_index(cross_ndx->remote); // translate the index of the path
 
-        // At this point, the first part of an embedded object path has been allowed.
-        // This implies that all parts of the rest of the path are also allowed so the index translation is
-        // not necessary because instructions are operating on local only operations.
+        // At this point, the first part of a path has been allowed.
+        // This implies that all parts of the rest of the path are also allowed
+        // so the index translation is not necessary because instructions are
+        // operating on local only operations.
         return Status::Success;
     }
     // no record of this base list so far, track it for verbatim copy
@@ -840,6 +810,17 @@ RecoverLocalChangesetsHandler::RecoveryResolver::on_null_link_advance(StringData
 }
 
 RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_dict_key_not_found(StringData table_name, StringData field_name,
+                                                                       StringData key)
+{
+    m_recovery_applier->m_logger.warn(
+        util::LogCategory::reset,
+        "Discarding a local %1 because the key '%2' does not exist in a dictionary along path '%2.%3'", m_instr_name,
+        key, table_name, field_name);
+    return Status::DidNotResolve; // discard this instruction as its path cannot be resolved
+}
+
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
 RecoverLocalChangesetsHandler::RecoveryResolver::on_begin(const util::Optional<Obj>& obj)
 {
     if (!obj) {
@@ -851,7 +832,7 @@ RecoverLocalChangesetsHandler::RecoveryResolver::on_begin(const util::Optional<O
     return Status::Pending;
 }
 
-void RecoverLocalChangesetsHandler::RecoveryResolver::set_last_path_index(uint32_t ndx)
+void RecoverLocalChangesetsHandler::RecoveryResolver::update_path_index(uint32_t ndx)
 {
     REALM_ASSERT(m_it_begin != m_path_instr.path.begin());
     size_t distance = (m_it_begin - m_path_instr.path.begin()) - 1;
@@ -934,18 +915,18 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
-            util::Optional<ListTracker::CrossListIndex> cross_index;
-            cross_index = m_recovery_applier->m_lists.at(m_list_path).update(index);
-            if (cross_index) {
-                m_instr.prior_size = static_cast<uint32_t>(list.size());
-                m_instr.path.back() = cross_index->remote;
-            }
-            else {
+            auto cross_index = m_recovery_applier->m_lists.at(m_list_path).update(index);
+            if (!cross_index) {
                 return Status::DidNotResolve;
             }
+            m_instr.prior_size = static_cast<uint32_t>(list.size());
+            m_instr.path.back() = cross_index->remote;
             return Status::Pending;
         }
-        void on_property(Obj&, ColKey) override {}
+        Status on_property(Obj&, ColKey) override
+        {
+            return Status::Pending;
+        }
 
     private:
         Instruction::Update& m_instr;
@@ -972,9 +953,14 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddInteger& in
             : RecoveryResolver(applier, instr, "AddInteger")
         {
         }
-        void on_property(Obj&, ColKey) override
+        Status on_property(Obj& obj, ColKey key) override
         {
             // AddInteger only applies to a property
+            auto old_value = obj.get_any(key);
+            if (old_value.is_type(type_Int) && !obj.is_null(key)) {
+                return Status::Pending;
+            }
+            return Status::DidNotResolve;
         }
     };
     Instruction::AddInteger instr_copy = instr;
@@ -989,14 +975,55 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Clear& instr)
         ClearResolver(RecoverLocalChangesetsHandler* applier, Instruction::Clear& instr)
             : RecoveryResolver(applier, instr, "Clear")
         {
+            switch (instr.collection_type) {
+                case Instruction::CollectionType::Single:
+                    break;
+                case Instruction::CollectionType::List:
+                    m_collection_type = CollectionType::List;
+                    break;
+                case Instruction::CollectionType::Dictionary:
+                    m_collection_type = CollectionType::Dictionary;
+                    break;
+                case Instruction::CollectionType::Set:
+                    m_collection_type = CollectionType::Set;
+                    break;
+            }
         }
         void on_list(LstBase&) override
         {
             m_recovery_applier->m_lists.at(m_list_path).clear();
-            // Clear.prior_size is ignored and always zero
+        }
+        Status on_list_index(LstBase&, uint32_t index) override
+        {
+            Status list_status = on_list_index_advance(index);
+            return list_status;
+            // There is no need to clear the potential list at 'index' because that's
+            // one level deeper than the current list.
         }
         void on_set(SetBase&) override {}
         void on_dictionary(Dictionary&) override {}
+        Status on_dictionary_key(Dictionary& dict, Mixed key) override
+        {
+            on_dict_key_advance(key.get_string());
+            // Create the collection if the key does not exist.
+            if (dict.find(key) == dict.end()) {
+                dict.insert_collection(key.get_string(), m_collection_type);
+            }
+            else if (m_collection_type == CollectionType::List) {
+                m_recovery_applier->m_lists.at(m_list_path).clear();
+            }
+            return Status::Pending;
+        }
+        Status on_property(Obj&, ColKey) override
+        {
+            if (m_collection_type == CollectionType::List) {
+                m_recovery_applier->m_lists.at(m_list_path).clear();
+            }
+            return Status::Pending;
+        }
+
+    private:
+        CollectionType m_collection_type;
     };
     Instruction::Clear instr_copy = instr;
     if (ClearResolver(this, instr_copy).resolve() == RecoveryResolver::Status::Success) {

@@ -1,13 +1,18 @@
 #!/bin/bash
 
-realm_version=$(sed -rn 's/^VERSION: (.*)/\1/p' < "$1")
-version_and_extra=( ${$realm_version//-/ } )
-version_only=${version_and_extra[0]}
-extra=${version_and_extra[1]}
+version=$(awk '/^VERSION:[[:space:]]*/ {print $2}' $1)
 
-semver=( ${version_only//./ } )
-major=${semver[0]}
-minor=${semver[1]}
-patch=${semver[2]}
+major=$(echo $version | cut -d '.' -f 1)
+minor=$(echo $version | cut -d '.' -f 2)
+patch=$(echo $version | cut -d '.' -f 3)
 
-sed "s/@CONFIG_VERSION_MAJOR@/$major/g; s/@CONFIG_VERSION_MINOR@/$minor/g; s/@CONFIG_VERSION_PATCH@/$patch/g; s/@CONFIG_VERSION_TWEAK@/$extra/g; s/@CONFIG_VERSION@/$VERSION/g" $2
+patch_and_suffix=$(echo $version | cut -d '.' -f 3)
+
+patch=${patch_and_suffix%%-*}
+extra=${patch_and_suffix#*-}
+
+if [[ "$extra" == "$patch_and_suffix" ]]; then
+    extra=""
+fi
+
+sed "s/@CONFIG_VERSION_MAJOR@/$major/g; s/@CONFIG_VERSION_MINOR@/$minor/g; s/@CONFIG_VERSION_PATCH@/$patch/g; s/@CONFIG_VERSION_TWEAK@/$extra/g; s/@CONFIG_VERSION@/$version/g" $2

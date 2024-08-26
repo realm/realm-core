@@ -18,6 +18,7 @@
 
 #include <realm/util/encrypted_file_mapping.hpp>
 
+#include <realm/util/backtrace.hpp>
 #include <realm/util/file_mapper.hpp>
 
 #include <sstream>
@@ -25,25 +26,22 @@
 #if REALM_ENABLE_ENCRYPTION
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/errno.hpp>
-#include <realm/utilities.hpp>
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/terminate.hpp>
+#include <realm/utilities.hpp>
 
-#include <cstdlib>
 #include <algorithm>
+#include <array>
 #include <chrono>
-#include <stdexcept>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
 #include <string_view>
-#include <system_error>
 #include <thread>
 
 #ifdef REALM_DEBUG
 #include <cstdio>
 #endif
-
-#include <array>
-#include <cstring>
-#include <iostream>
 
 #if defined(_WIN32)
 #include <Windows.h>
@@ -52,128 +50,244 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
-#include <pthread.h>
 #endif
 
 namespace realm::util {
-SharedFileInfo::SharedFileInfo(const uint8_t* key)
-    : cryptor(key)
-{
-}
-
-// We have the following constraints here:
+// When Realm's file encryption was originally designed, we had the constraint
+// that all encryption and decryption had to happen in aligned system page size
+// sized blocks due to the use of signal handlers to lazily decrypt data and
+// track where writes occurrs. This is no longer the case, but may still help
+// explain why the file layout looks the way it does.
 //
-// 1. When writing, we only know which 4k page is dirty, and not what bytes
-//    within the page are dirty, so we always have to write in 4k blocks.
-// 2. Pages being written need to be entirely within an 8k-aligned block to
-//    ensure that they're written to the hardware in atomic blocks.
-// 3. We need to store the IV used for each 4k page somewhere, so that we can
-//    ensure that we never reuse an IV (and still be decryptable).
+// Encryption is performed on 4096 byte data pages. Each group of 64 data pages
+// is arranged into a "block", which has a 4096 byte header containing the IVs
+// and HMACs for the following pages. Each page has *two* IVs and HMACs stored.
+// iv2/hmac2 contain the values which were last used to successfully decrypt
+// the page, while iv1/hmac1 is the values which were used to last encrypt the
+// page.
 //
-// Because pages need to be aligned, we can't just prepend the IV to each page,
-// or we'd have to double the size of the file (as the rest of the 4k block
-// containing the IV would not be usable). Writing the IVs to a different part
-// of the file from the data results in them not being in the same 8k block, and
-// so it is possible that only the IV or only the data actually gets updated on
-// disk. We deal with this by storing four pieces of data about each page: the
-// hash of the encrypted data, the current IV, the hash of the previous encrypted
-// data, and the previous IV. To write, we encrypt the data, hash the ciphertext,
-// then write the new IV/ciphertext hash, fsync(), and then write the new
-// ciphertext. This ensures that if an error occurs between writing the IV and
-// the ciphertext, we can still determine that we should use the old IV, since
-// the ciphertext's hash will match the old ciphertext.
+// Writing new encrypted data has the following steps:
+//
+// 1. Copy iv1/hmac1 to iv2/hmac2 in the IVTable
+// 2. Increment iv1
+// 3. Encrypt the page in memory
+// 4. Compute the hmac for the new encrypted data.
+// 5. If the hmac matches the previous hmac, goto 2 (this will not ever actually happen)
+// 6. Write the new IVTable for the page.
+// 7. fsync() (or F_BARRIERFSYNC on Apple)
+// 8. Write the new encrypted data
+//
+// If we are interrupted before #6, no i/o has happened and the data on disk is
+// fine. If we are interrupted between #6 and #8, then when we next try to read
+// the page the hmac check using hmac1 will fail, but the check using hmac2
+// will succeed and we will be able to read the old data. We then copy
+// iv2/hmac2 back to the active fields and continue as normal.
+//
+// This scheme breaks if we have a partial write of the 4k page. This is
+// impossible with SSDs, which can only write in their atomic block size, and
+// it would be extremely unusual for that to be smaller than 4k. It may be a
+// problem when running on HDDs, though.
+//
+// Reading from an encrypted file is done by creating a mapping and then
+// calling `read_barrier(addr, size)` to mark the section of the mapping which
+// needs to be populated. This decrypts each of the pages which cover that
+// range and places the plaintext into memory. If any of the pages were already
+// decrypted, this is a no-op that skips reading anything and just assumes that
+// the data was up-to-date.
+//
+// Writing is done with `read_barrier(addr, size, true)` before performing any
+// writes to mark the range as writeable, and then `write_barrier(addr, size)`
+// to mark bytes which were actually written to. `write_barrier()` eagerly
+// copies all of the written bytes to any other active mappings on the same
+// file which have those pages decrypted in memory. This is spooky
+// threading-wise, and is only made safe by Realm's MVCC semantics - if we're
+// writing to a section of the file we know that no one can be legally reading
+// those exact bytes, and we must be writing to different bytes in the same
+// page. This copying makes it so that we never have to recheck the disk; once
+// we have read and decrypted a page for a mapping, that page is forevermore
+// valid and up-to-date.
+//
+// All dirty data is kept buffered in memory until `flush()` is called.
+//
+// In multi-process scenarios (or just multiple File instances for a single
+// file in a single process, which doesn't happen when using the public API
+// normally), eagerly keeping decrypted pages up to date is impossible, and we
+// sometimes need to recheck the disk. Here we once again take advantage of
+// Realm being MVCC with discrete points where we may need to see newer
+// versions of the data on disk. When the reader view is updated, if there have
+// been any external writes to the file SlabAlloc calls
+// `mark_pages_for_iv_check()`, which puts all up-to-date pages into a
+// potentially-stale state. The next time each page is accessed, we reread the
+// IVTable for that page. If it's the same as the IVTable for the plaintext we
+// have in memory then the page is marked as being up-to-date, and if it's
+// different we reread the page.
+//
+// Another source of complexity in multiprocess scenarios is that while we
+// assume that the actual i/o is atomic in 4k chunks, writing to the in-memory
+// buffers is distinctly not atomic. One process reading from a memory mapping
+// while another process is writing to that position in the file can see
+// incomplete writes. Rather than doing page-level locking, we assume that this
+// will be very rare and perform optimistic unlocked reads. If decryption fails
+// and we are in a potentially-multiprocess scenario we retry the read several
+// times before reporting an error.
 
-// This produces a file on disk with the following layout:
-// 4k block of metadata   (up to 64 iv_table instances stored here)
-// 64 * 4k blocks of data (up to 262144 bytes of data are stored here)
-// 4k block of metadata
-// 64 * 4k blocks of data
-// ...
-
-struct iv_table {
+struct IVTable {
     uint32_t iv1 = 0;
     std::array<uint8_t, 28> hmac1 = {};
     uint32_t iv2 = 0;
     std::array<uint8_t, 28> hmac2 = {};
-    bool operator==(const iv_table& other) const
+    bool operator==(const IVTable& other) const
     {
         return iv1 == other.iv1 && iv2 == other.iv2 && hmac1 == other.hmac1 && hmac2 == other.hmac2;
     }
-    bool operator!=(const iv_table& other) const
+    bool operator!=(const IVTable& other) const
     {
         return !(*this == other);
     }
 };
+// We read this via memcpy and need it to be packed
+static_assert(sizeof(IVTable) == 64);
 
 namespace {
-const int aes_block_size = 16;
-const size_t block_size = 4096;
-
-const size_t metadata_size = sizeof(iv_table);
-const size_t blocks_per_metadata_block = block_size / metadata_size;
+constexpr uint8_t aes_block_size = 16;
+constexpr uint16_t encryption_page_size = 4096;
+constexpr uint8_t metadata_size = sizeof(IVTable);
+constexpr uint8_t pages_per_block = encryption_page_size / metadata_size;
 static_assert(metadata_size == 64,
               "changing the size of the metadata breaks compatibility with existing Realm files");
 
-// map an offset in the data to the actual location in the file
-template <typename Int>
-Int real_offset(Int pos)
+using SizeType = File::SizeType;
+
+template <typename To, typename From>
+To checked_cast(From from)
 {
-    REALM_ASSERT(pos >= 0);
-    const size_t index = static_cast<size_t>(pos) / block_size;
-    const size_t metadata_page_count = index / blocks_per_metadata_block + 1;
-    return Int(pos + metadata_page_count * block_size);
+    To to;
+    if (REALM_UNLIKELY(int_cast_with_overflow_detect(from, to))) {
+        throw MaximumFileSizeExceeded(util::format("File size %1 is larger than can be represented", from));
+    }
+    return to;
+}
+
+// Overflows when converting from file positions (always 64-bits) to size_t
+// (sometimes 32-bits) should all be caught by set_file_size()
+template <typename To, typename From>
+constexpr To assert_cast(From from)
+{
+    REALM_ASSERT_DEBUG(!int_cast_has_overflow<To>(from));
+    return static_cast<To>(from);
+}
+
+// Index of page which contains `data_pos`
+constexpr size_t page_index(SizeType data_pos) noexcept
+{
+    SizeType index = data_pos / encryption_page_size;
+    return assert_cast<size_t>(index);
+}
+
+// Number of pages required to store `size` bytes
+constexpr size_t page_count(SizeType size) noexcept
+{
+    return assert_cast<size_t>((size + encryption_page_size - 1) / encryption_page_size);
+}
+
+// Index of the metadata block which contains `data_pos`
+constexpr size_t block_index(SizeType data_pos) noexcept
+{
+    return page_index(data_pos) / pages_per_block;
+}
+
+// Number of metadata blocks required to store `size` bytes
+constexpr size_t block_count(SizeType data_size) noexcept
+{
+    return (page_count(data_size) + pages_per_block - 1) / pages_per_block;
+}
+
+// map an offset in the data to the actual location in the file
+SizeType data_pos_to_file_pos(SizeType data_pos)
+{
+    REALM_ASSERT(data_pos >= 0);
+    return data_pos + (block_index(data_pos) + 1) * encryption_page_size;
 }
 
 // map a location in the file to the offset in the data
-template <typename Int>
-Int fake_offset(Int pos)
+SizeType file_pos_to_data_pos(SizeType file_pos)
 {
-    REALM_ASSERT(pos >= 0);
-    const size_t index = static_cast<size_t>(pos) / block_size;
-    const size_t metadata_page_count = (index + blocks_per_metadata_block) / (blocks_per_metadata_block + 1);
-    return pos - metadata_page_count * block_size;
+    REALM_ASSERT(file_pos >= 0);
+    const size_t metadata_page_count = (page_index(file_pos) + pages_per_block) / (pages_per_block + 1);
+    return file_pos - metadata_page_count * encryption_page_size;
 }
 
-// get the location of the iv_table for the given data (not file) position
-off_t iv_table_pos(off_t pos)
+// get the location of the IVTable for the given data (not file) position
+SizeType iv_table_pos(SizeType data_pos)
 {
-    REALM_ASSERT(pos >= 0);
-    const size_t index = static_cast<size_t>(pos) / block_size;
-    const size_t metadata_block = index / blocks_per_metadata_block;
-    const size_t metadata_index = index & (blocks_per_metadata_block - 1);
-    return off_t(metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size);
+    REALM_ASSERT(data_pos >= 0);
+    const size_t index = page_index(data_pos);
+    const size_t metadata_block = block_index(data_pos);
+    const size_t metadata_index = index & (pages_per_block - 1);
+    return metadata_block * (pages_per_block + 1) * encryption_page_size + metadata_index * metadata_size;
 }
 
-void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
+// get the file location of the IVTable block for the given data (not file) position
+SizeType iv_table_block_pos(SizeType data_pos)
 {
-    uint64_t orig = File::get_file_pos(fd);
-    File::seek_static(fd, pos);
-    File::write_static(fd, static_cast<const char*>(data), len);
-    File::seek_static(fd, orig);
+    REALM_ASSERT(data_pos >= 0);
+    return block_index(data_pos) * (pages_per_block + 1) * encryption_page_size;
 }
 
-size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
+constexpr size_t iv_table_size(SizeType data_pos)
 {
-    uint64_t orig = File::get_file_pos(fd);
-    File::seek_static(fd, pos);
-    size_t ret = File::read_static(fd, static_cast<char*>(dst), len);
-    File::seek_static(fd, orig);
-    return ret;
+    return block_count(data_pos) * pages_per_block;
+}
+
+// not actually checked any more
+size_t check_read(FileDesc fd, SizeType pos, void* dst)
+{
+    return File::read_static(fd, pos, static_cast<char*>(dst), encryption_page_size);
+}
+
+// first block is iv data, second page is data
+static_assert(c_min_encrypted_file_size == 2 * encryption_page_size,
+              "chaging the block size breaks encrypted file portability");
+
+template <class T, size_t N, std::size_t... I>
+constexpr std::array<T, N> to_array_impl(const T* ptr, std::index_sequence<I...>)
+{
+    return {{ptr[I]...}};
+}
+template <class T, size_t N>
+constexpr auto to_array(const T* ptr)
+{
+    return to_array_impl<T, N>(ptr, std::make_index_sequence<N>{});
+}
+
+void memcpy_if_changed(void* dst, const void* src, size_t n)
+{
+#if REALM_SANITIZE_THREAD
+    // Because our copying is page-level granularity, we have some benign races
+    // where the byte ranges in each page that weren't modified get overwritten
+    // with the same values as they already had. TSan correctly reports this as
+    // a data race, so when using TSan do (much slower) byte-level checking for
+    // modifications and only write the ones which changed. Unlike suppressing
+    // the warning entirely, this will still produce tsan errors if we actually
+    // change any bytes that another thread is reading.
+    auto dst_2 = static_cast<char*>(dst);
+    auto src_2 = static_cast<const char*>(src);
+    for (size_t i = 0; i < n; ++i) {
+        if (dst_2[i] != src_2[i])
+            dst_2[i] = src_2[i];
+    }
+#else
+    memcpy(dst, src, n);
+#endif
 }
 
 } // anonymous namespace
 
-// first block is iv data, second page is data
-static_assert(c_min_encrypted_file_size == 2 * block_size,
-              "chaging the block size breaks encrypted file portability");
-
-AESCryptor::AESCryptor(const uint8_t* key)
-    : m_rw_buffer(new char[block_size])
-    , m_dst_buffer(new char[block_size])
+AESCryptor::AESCryptor(const char* key)
+    : m_key(to_array<uint8_t, 64>(reinterpret_cast<const uint8_t*>(key)))
+    , m_rw_buffer(new char[encryption_page_size])
+    , m_dst_buffer(new char[encryption_page_size])
 {
-    memcpy(m_aesKey.data(), key, 32);
-    memcpy(m_hmacKey.data(), key + 32, 32);
-
 #if REALM_PLATFORM_APPLE
     // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
     // each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to
@@ -214,278 +328,232 @@ AESCryptor::~AESCryptor() noexcept
 #endif
 }
 
-void AESCryptor::check_key(const uint8_t* key)
-{
-    if (memcmp(m_aesKey.data(), key, 32) != 0 || memcmp(m_hmacKey.data(), key + 32, 32) != 0)
-        throw DecryptionFailed();
-}
-
 void AESCryptor::handle_error()
 {
     throw std::runtime_error("Error occurred in encryption layer");
 }
 
-void AESCryptor::set_file_size(off_t new_size)
+void AESCryptor::set_data_size(SizeType new_data_size)
 {
-    REALM_ASSERT(new_size >= 0 && !int_cast_has_overflow<size_t>(new_size));
-    size_t new_size_casted = size_t(new_size);
-    size_t block_count = (new_size_casted + block_size - 1) / block_size;
-    m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
+    REALM_ASSERT(new_data_size >= 0);
+    m_iv_buffer.reserve(iv_table_size(new_data_size));
     m_iv_buffer_cache.reserve(m_iv_buffer.capacity());
+    m_iv_blocks_read.resize(m_iv_buffer.capacity() / 64);
 }
 
-iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mode) noexcept
+IVTable& AESCryptor::get_iv_table(FileDesc fd, SizeType data_pos, IVLookupMode mode) noexcept
 {
-    REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
-    size_t data_pos_casted = size_t(data_pos);
-    size_t idx = data_pos_casted / block_size;
-    if (mode == IVLookupMode::UseCache && idx < m_iv_buffer.size())
-        return m_iv_buffer[idx];
-
-    size_t block_start = std::min(m_iv_buffer.size(), (idx / blocks_per_metadata_block) * blocks_per_metadata_block);
-    size_t block_end = 1 + idx / blocks_per_metadata_block;
-    REALM_ASSERT(block_end * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
-    if (block_end * blocks_per_metadata_block > m_iv_buffer.size()) {
-        m_iv_buffer.resize(block_end * blocks_per_metadata_block);
-        m_iv_buffer_cache.resize(m_iv_buffer.size());
+    size_t idx = page_index(data_pos);
+    REALM_ASSERT(idx < m_iv_buffer.capacity()); // required space should have been preallocated
+    if (mode != IVLookupMode::UseCache || idx >= m_iv_buffer.size() || !m_iv_blocks_read[block_index(data_pos)]) {
+        read_iv_block(fd, data_pos);
     }
-
-    for (size_t i = block_start; i < block_end * blocks_per_metadata_block; i += blocks_per_metadata_block) {
-        off_t iv_pos = iv_table_pos(off_t(i * block_size));
-        size_t bytes = check_read(fd, iv_pos, &m_iv_buffer[i], block_size);
-        if (bytes < block_size)
-            break; // rest is zero-filled by resize()
-    }
-
+    m_iv_buffer_cache[idx] = m_iv_buffer[idx];
     return m_iv_buffer[idx];
 }
 
-bool AESCryptor::check_hmac(const void* src, size_t len, const std::array<uint8_t, 28>& hmac) const
+// We always read an entire block of IVTables at a time rather than just the
+// one we need as it's likely to take about the same amount of time up front
+// and greatly reduce the total number of read calls we have to make
+void AESCryptor::read_iv_block(FileDesc fd, SizeType data_pos)
 {
-    std::array<uint8_t, 224 / 8> buffer;
-    hmac_sha224(Span(reinterpret_cast<const uint8_t*>(src), len), buffer, m_hmacKey);
+    size_t idx = block_index(data_pos) * pages_per_block;
+    if (idx + pages_per_block > m_iv_buffer.size()) {
+        m_iv_buffer.resize(idx + pages_per_block);
+        m_iv_buffer_cache.resize(m_iv_buffer.size());
+    }
+    SizeType iv_pos = iv_table_block_pos(data_pos);
+    check_read(fd, iv_pos, &m_iv_buffer[idx]);
+    m_iv_blocks_read[block_index(data_pos)] = true;
+}
 
+void AESCryptor::calculate_hmac(Hmac& hmac) const
+{
+    hmac_sha224(Span(reinterpret_cast<const uint8_t*>(m_rw_buffer.get()), encryption_page_size), hmac,
+                Span(m_key).sub_span<32>());
+}
+
+bool AESCryptor::constant_time_equals(const Hmac& a, const Hmac& b) const
+{
     // Constant-time memcmp to avoid timing attacks
     uint8_t result = 0;
-    for (size_t i = 0; i < 224 / 8; ++i)
-        result |= buffer[i] ^ hmac[i];
+    for (size_t i = 0; i < a.size(); ++i)
+        result |= a[i] ^ b[i];
     return result == 0;
 }
 
-util::FlatMap<size_t, IVRefreshState>
-AESCryptor::refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected, size_t end_page_ndx_in_file)
+bool AESCryptor::refresh_iv(FileDesc fd, size_t page_ndx)
 {
-    REALM_ASSERT_EX(page_ndx_in_file_expected < end_page_ndx_in_file, page_ndx_in_file_expected,
-                    end_page_ndx_in_file);
-    // the indices returned are page indices, not block indices
-    util::FlatMap<size_t, IVRefreshState> page_states;
-
-    REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
-    size_t data_pos_casted = size_t(data_pos);
-    // the call to get_iv_table() below reads in all ivs in a chunk with size = blocks_per_metadata_block
-    // so we will know if any iv in this chunk has changed
-    const size_t block_ndx_refresh_start =
-        ((data_pos_casted / block_size) / blocks_per_metadata_block) * blocks_per_metadata_block;
-    const size_t block_ndx_refresh_end = block_ndx_refresh_start + blocks_per_metadata_block;
-    REALM_ASSERT_EX(block_ndx_refresh_end <= m_iv_buffer.size(), block_ndx_refresh_start, block_ndx_refresh_end,
-                    m_iv_buffer.size());
-
-    get_iv_table(fd, data_pos, IVLookupMode::Refetch);
-
-    size_t number_of_identical_blocks = 0;
-    size_t last_page_index = -1;
-    constexpr iv_table uninitialized_iv = {};
-    // there may be multiple iv blocks per page so all must be unchanged for a page
-    // to be considered unchanged. If any one of the ivs has changed then the entire page
-    // must be refreshed. Eg. with a page_size() of 16k and block_size of 4k, if any of
-    // the 4 ivs in that page are different, the entire page must be refreshed.
-    const size_t num_required_identical_blocks_for_page_match = page_size() / block_size;
-    for (size_t block_ndx = block_ndx_refresh_start; block_ndx < block_ndx_refresh_end; ++block_ndx) {
-        size_t page_index = block_ndx * block_size / page_size();
-        if (page_index >= end_page_ndx_in_file) {
-            break;
-        }
-        if (page_index != last_page_index) {
-            number_of_identical_blocks = 0;
-        }
-        if (m_iv_buffer_cache[block_ndx] != m_iv_buffer[block_ndx] || m_iv_buffer[block_ndx] == uninitialized_iv) {
-            page_states[page_index] = IVRefreshState::RequiresRefresh;
-            m_iv_buffer_cache[block_ndx] = m_iv_buffer[block_ndx];
-        }
-        else {
-            ++number_of_identical_blocks;
-        }
-        if (number_of_identical_blocks >= num_required_identical_blocks_for_page_match) {
-            REALM_ASSERT_EX(page_states.count(page_index) == 0, page_index, page_ndx_in_file_expected);
-            page_states[page_index] = IVRefreshState::UpToDate;
-        }
-        last_page_index = page_index;
+    REALM_ASSERT(page_ndx < m_iv_buffer.capacity());
+    if (page_ndx >= m_iv_buffer.size() || !m_iv_blocks_read[page_ndx / pages_per_block]) {
+        read_iv_block(fd, SizeType(page_ndx) * encryption_page_size);
     }
-    REALM_ASSERT_EX(page_states.count(page_ndx_in_file_expected) == 1, page_states.size(), page_ndx_in_file_expected,
-                    block_ndx_refresh_start, blocks_per_metadata_block);
-    return page_states;
+
+    if (m_iv_buffer[page_ndx] != m_iv_buffer_cache[page_ndx]) {
+        m_iv_buffer_cache[page_ndx] = m_iv_buffer[page_ndx];
+        return true;
+    }
+    return false;
 }
 
-size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer)
+void AESCryptor::invalidate_ivs() noexcept
 {
-    REALM_ASSERT_EX(size % block_size == 0, size, block_size);
-    // We need to throw DecryptionFailed if the key is incorrect or there has been a corruption in the data but
-    // not in a reader starvation scenario where a different process is writing pages and ivs faster than we can read
-    // them. We also want to optimize for a single process writer since in that case all the cached ivs are correct.
-    // To do this, we first attempt to use the cached IV, and if it is invalid, read from disk again. During reader
-    // starvation, the just read IV could already be out of date with the data page, so continue trying to read until
-    // a match is found (for up to 5 seconds before giving up entirely).
+    m_iv_blocks_read.assign(m_iv_blocks_read.size(), false);
+}
+
+AESCryptor::ReadResult AESCryptor::read(FileDesc fd, SizeType pos, char* dst, WriteObserver* observer)
+{
+    uint32_t iv = 0;
+    Hmac hmac;
+    // We're in a single-process scenario (or other processes are only reading),
+    // so we can trust our in-memory caches and never need to retry
+    if (!observer || observer->no_concurrent_writer_seen()) {
+        return attempt_read(fd, pos, dst, IVLookupMode::UseCache, iv, hmac);
+    }
+
+    // There's another process which might be trying to write to the file while
+    // we're reading from it, which means that we might see invalid data due to
+    // data races. When this happens we need to retry the read, and only throw
+    // an error if the data either hasn't changed after the timeout has expired
+    // or if we're in a reader starvation scenario where the writer is producing
+    // new data faster than we can consume it.
     size_t retry_count = 0;
-    std::pair<iv_table, size_t> last_iv_and_data_hash;
+    std::pair<uint32_t, Hmac> last_iv_and_data_hash;
     auto retry_start_time = std::chrono::steady_clock::now();
     size_t num_identical_reads = 1;
-    auto retry = [&](std::string_view page_data, const iv_table& iv, const char* debug_from) {
+    ReadResult result = ReadResult::Success;
+    while (retry_count <= 5 || (retry_count - num_identical_reads > 1 && retry_count < 20)) {
+        result =
+            attempt_read(fd, pos, dst, retry_count == 0 ? IVLookupMode::UseCache : IVLookupMode::Refetch, iv, hmac);
+        switch (result) {
+            case ReadResult::Success:
+            case ReadResult::Eof:
+            case ReadResult::Uninitialized:
+                // Consistent and valid states that may or may not actually have data
+                return result;
+            case ReadResult::InterruptedFirstWrite:
+            case ReadResult::StaleHmac:
+            case ReadResult::Failed:
+                // Inconsistent states which may change if we retry
+                break;
+        }
+
+        // Check if we've timed out, but always retry at least once in case
+        // we got suspended while another process was writing or something
         constexpr auto max_retry_period = std::chrono::seconds(5);
         auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
-        bool we_are_alone = true;
-        // not having an observer set means that we're alone. (or should mean it)
-        if (observer) {
-            we_are_alone = observer->no_concurrent_writer_seen();
-        }
-        if (we_are_alone || (retry_count > 0 && elapsed > max_retry_period)) {
-            auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2, from=%3, size=%4)",
-                                    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
-                                    debug_from, size);
+        if (retry_count > 0 && elapsed > max_retry_period) {
+            auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2)",
+                                    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count);
             // std::cerr << std::endl << "*Timeout: " << str << std::endl;
             throw DecryptionFailed(str);
         }
-        else {
-            // don't wait on the first retry as we want to optimize the case where the first read
-            // from the iv table cache didn't validate and we are fetching the iv block from disk for the first time
-            auto cur_iv_and_data_hash = std::make_pair(iv, std::hash<std::string_view>{}(page_data));
-            if (retry_count != 0) {
-                if (last_iv_and_data_hash == cur_iv_and_data_hash) {
-                    ++num_identical_reads;
-                }
-                // don't retry right away if there are potentially other external writers
-                std::this_thread::yield();
+
+        // don't wait on the first retry as we want to optimize the case where the first read
+        // from the iv table cache didn't validate and we are fetching the iv block from disk for the first time
+        std::pair cur_iv_and_data_hash(iv, hmac);
+        if (retry_count != 0) {
+            if (last_iv_and_data_hash == cur_iv_and_data_hash) {
+                ++num_identical_reads;
             }
-            last_iv_and_data_hash = cur_iv_and_data_hash;
-            ++retry_count;
+            // don't retry right away if there are potentially other external writers
+            std::this_thread::yield();
         }
-    };
+        last_iv_and_data_hash = cur_iv_and_data_hash;
+        ++retry_count;
 
-    auto should_retry = [&]() -> bool {
-        // if we don't have an observer object, we're guaranteed to be alone in the world,
-        // and retrying will not help us, since the file is not being changed.
-        if (!observer)
-            return false;
-        // if no-one is mutating the file, retrying will also not help:
-        if (observer && observer->no_concurrent_writer_seen())
-            return false;
-        // if we do not observe identical data or iv within several sequential reads then
-        // this is a multiprocess reader starvation scenario so keep trying until we get a match
-        return retry_count <= 5 || (retry_count - num_identical_reads > 1 && retry_count < 20);
-    };
-
-    size_t bytes_read = 0;
-    while (bytes_read < size) {
-        ssize_t actual = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
-
-        if (actual == 0)
-            return bytes_read;
-
-        iv_table& iv = get_iv_table(fd, pos, retry_count == 0 ? IVLookupMode::UseCache : IVLookupMode::Refetch);
-        if (iv.iv1 == 0) {
-            if (should_retry()) {
-                retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "iv1 == 0");
-                continue;
-            }
-            // This block has never been written to, so we've just read pre-allocated
-            // space. No memset() since the code using this doesn't rely on
-            // pre-allocated space being zeroed.
-            return bytes_read;
-        }
-
-        if (!check_hmac(m_rw_buffer.get(), actual, iv.hmac1)) {
-            // Either the DB is corrupted or we were interrupted between writing the
-            // new IV and writing the data
-            if (iv.iv2 == 0) {
-                if (should_retry()) {
-                    retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "iv2 == 0");
-                    continue;
-                }
-                // Very first write was interrupted
-                return bytes_read;
-            }
-
-            if (check_hmac(m_rw_buffer.get(), actual, iv.hmac2)) {
-                // Un-bump the IV since the write with the bumped IV never actually
-                // happened
-                memcpy(&iv.iv1, &iv.iv2, 32);
-            }
-            else {
-                // If the file has been shrunk and then re-expanded, we may have
-                // old hmacs that don't go with this data. ftruncate() is
-                // required to fill any added space with zeroes, so assume that's
-                // what happened if the buffer is all zeroes
-                ssize_t i;
-                for (i = 0; i < actual; ++i) {
-                    if (m_rw_buffer[i] != 0) {
-                        break;
-                    }
-                }
-                if (i != actual) {
-                    // at least one byte wasn't zero
-                    retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "i != bytes_read");
-                    continue;
-                }
-                return bytes_read;
-            }
-        }
-
-        // We may expect some adress ranges of the destination buffer of
-        // AESCryptor::read() to stay unmodified, i.e. being overwritten with
-        // the same bytes as already present, and may have read-access to these
-        // from other threads while decryption is taking place.
-        //
-        // However, some implementations of AES_cbc_encrypt(), in particular
-        // OpenSSL, will put garbled bytes as an intermediate step during the
-        // operation which will lead to incorrect data being read by other
-        // readers concurrently accessing that page. Incorrect data leads to
-        // crashes.
-        //
-        // We therefore decrypt to a temporary buffer first and then copy the
-        // completely decrypted data after.
-        crypt(mode_Decrypt, pos, m_dst_buffer.get(), m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
-        memcpy(dst, m_dst_buffer.get(), block_size);
-
-        pos += block_size;
-        dst += block_size;
-        bytes_read += block_size;
-        retry_count = 0;
+        if (observer->no_concurrent_writer_seen())
+            break;
     }
-    return bytes_read;
+
+    return result;
 }
 
-void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
+AESCryptor::ReadResult AESCryptor::attempt_read(FileDesc fd, SizeType pos, char* dst, IVLookupMode iv_mode,
+                                                uint32_t& iv_out, Hmac& hmac)
 {
-    ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
+    IVTable& iv = get_iv_table(fd, pos, iv_mode);
+    iv_out = iv.iv1;
+    if (iv.iv1 == 0) {
+        hmac.fill(0);
+        return ReadResult::Uninitialized;
+    }
+
+    size_t actual = check_read(fd, data_pos_to_file_pos(pos), m_rw_buffer.get());
+    if (actual < encryption_page_size) {
+        return ReadResult::Eof;
+    }
+
+    calculate_hmac(hmac);
+    if (!constant_time_equals(hmac, iv.hmac1)) {
+        // Either the DB is corrupted or we were interrupted between writing the
+        // new IV and writing the data
+        if (iv.iv2 == 0) {
+            return ReadResult::InterruptedFirstWrite;
+        }
+
+        if (constant_time_equals(hmac, iv.hmac2)) {
+            // Un-bump the IV since the write with the bumped IV never actually
+            // happened
+            memcpy(&iv.iv1, &iv.iv2, 32);
+        }
+        else {
+            // If the file has been shrunk and then re-expanded, we may have
+            // old hmacs that don't go with this data. ftruncate() is
+            // required to fill any added space with zeroes, so assume that's
+            // what happened if the buffer is all zeroes
+            bool all_zero = std::all_of(&m_rw_buffer[0], &m_rw_buffer[actual], [](char c) {
+                return c == 0;
+            });
+            if (all_zero)
+                return ReadResult::StaleHmac;
+            return ReadResult::Failed;
+        }
+    }
+
+    // We may expect some address ranges of the destination buffer of
+    // AESCryptor::read() to stay unmodified, i.e. being overwritten with
+    // the same bytes as already present, and may have read-access to these
+    // from other threads while decryption is taking place.
+    //
+    // However, some implementations of AES_cbc_encrypt(), in particular
+    // OpenSSL, will put garbled bytes as an intermediate step during the
+    // operation which will lead to incorrect data being read by other
+    // readers concurrently accessing that page. Incorrect data leads to
+    // crashes.
+    //
+    // We therefore decrypt to a temporary buffer first and then copy the
+    // completely decrypted data after.
+    crypt(mode_Decrypt, pos, m_dst_buffer.get(), m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
+    memcpy_if_changed(dst, m_dst_buffer.get(), encryption_page_size);
+    return ReadResult::Success;
+}
+
+void AESCryptor::try_read_block(FileDesc fd, SizeType pos, char* dst) noexcept
+{
+    size_t bytes_read = check_read(fd, data_pos_to_file_pos(pos), m_rw_buffer.get());
 
     if (bytes_read == 0) {
         std::cerr << "Read failed: 0x" << std::hex << pos << std::endl;
-        memset(dst, 0x55, block_size);
+        memset(dst, 0x55, encryption_page_size);
         return;
     }
 
-    iv_table& iv = get_iv_table(fd, pos, IVLookupMode::Refetch);
+    IVTable& iv = get_iv_table(fd, pos, IVLookupMode::Refetch);
     if (iv.iv1 == 0) {
         std::cerr << "Block never written: 0x" << std::hex << pos << std::endl;
-        memset(dst, 0xAA, block_size);
+        memset(dst, 0xAA, encryption_page_size);
         return;
     }
 
-    if (!check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac1)) {
+    Hmac hmac;
+    calculate_hmac(hmac);
+    if (!constant_time_equals(hmac, iv.hmac1)) {
         if (iv.iv2 == 0) {
             std::cerr << "First write interrupted: 0x" << std::hex << pos << std::endl;
         }
 
-        if (check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac2)) {
+        if (constant_time_equals(hmac, iv.hmac2)) {
             std::cerr << "Restore old IV: 0x" << std::hex << pos << std::endl;
             memcpy(&iv.iv1, &iv.iv2, 32);
         }
@@ -496,40 +564,38 @@ void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
     crypt(mode_Decrypt, pos, dst, m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
 }
 
-void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker) noexcept
+void AESCryptor::write(FileDesc fd, SizeType pos, const char* src, WriteMarker* marker) noexcept
 {
-    REALM_ASSERT(size % block_size == 0);
-    while (size > 0) {
-        iv_table& iv = get_iv_table(fd, pos);
+    IVTable& iv = get_iv_table(fd, pos);
 
-        memcpy(&iv.iv2, &iv.iv1, 32); // this is also copying the hmac
-        do {
+    memcpy(&iv.iv2, &iv.iv1, 32); // this is also copying the hmac
+    do {
+        ++iv.iv1;
+        // 0 is reserved for never-been-used, so bump if we just wrapped around
+        if (iv.iv1 == 0)
             ++iv.iv1;
-            // 0 is reserved for never-been-used, so bump if we just wrapped around
-            if (iv.iv1 == 0)
-                ++iv.iv1;
 
-            crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
-            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size), iv.hmac1, m_hmacKey);
-            // In the extremely unlikely case that both the old and new versions have
-            // the same hash we won't know which IV to use, so bump the IV until
-            // they're different.
-        } while (REALM_UNLIKELY(iv.hmac1 == iv.hmac2));
+        crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
+        hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), encryption_page_size), iv.hmac1,
+                    Span(m_key).sub_span<32>());
+        // In the extremely unlikely case that both the old and new versions have
+        // the same hash we won't know which IV to use, so bump the IV until
+        // they're different.
+    } while (REALM_UNLIKELY(iv.hmac1 == iv.hmac2));
 
-        if (marker)
-            marker->mark(pos);
-        check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
-        check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
-        if (marker)
-            marker->unmark();
-
-        pos += block_size;
-        src += block_size;
-        size -= block_size;
-    }
+    if (marker)
+        marker->mark(pos);
+    File::write_static(fd, iv_table_pos(pos), reinterpret_cast<const char*>(&iv), sizeof(iv));
+    // FIXME: doesn't this need a barrier? The IV table is very likely to
+    // make it to disk first due to being issued first and being earlier in
+    // the file, but not guaranteed
+    File::write_static(fd, data_pos_to_file_pos(pos), m_rw_buffer.get(), encryption_page_size);
+    if (marker)
+        marker->unmark();
+    m_iv_buffer_cache[page_index(pos)] = iv;
 }
 
-void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept
+void AESCryptor::crypt(EncryptionMode mode, SizeType pos, char* dst, const char* src, const char* stored_iv) noexcept
 {
     uint8_t iv[aes_block_size] = {0};
     memcpy(iv, stored_iv, 4);
@@ -540,31 +606,32 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     CCCryptorReset(cryptor, iv);
 
     size_t bytesEncrypted = 0;
-    CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
+    CCCryptorStatus err =
+        CCCryptorUpdate(cryptor, src, encryption_page_size, dst, encryption_page_size, &bytesEncrypted);
     REALM_ASSERT(err == kCCSuccess);
-    REALM_ASSERT(bytesEncrypted == block_size);
+    REALM_ASSERT(bytesEncrypted == encryption_page_size);
 #elif defined(_WIN32)
     ULONG cbData;
     int i;
 
     if (mode == mode_Encrypt) {
-        i = BCryptEncrypt(m_aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
-                          block_size, &cbData, 0);
+        i = BCryptEncrypt(m_aes_key_handle, (PUCHAR)src, encryption_page_size, nullptr, (PUCHAR)iv, sizeof(iv),
+                          (PUCHAR)dst, encryption_page_size, &cbData, 0);
         REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptEncrypt()", i);
-        REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptEncrypt()", cbData);
+        REALM_ASSERT_RELEASE_EX(cbData == encryption_page_size && "BCryptEncrypt()", cbData);
     }
     else if (mode == mode_Decrypt) {
-        i = BCryptDecrypt(m_aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
-                          block_size, &cbData, 0);
+        i = BCryptDecrypt(m_aes_key_handle, (PUCHAR)src, encryption_page_size, nullptr, (PUCHAR)iv, sizeof(iv),
+                          (PUCHAR)dst, encryption_page_size, &cbData, 0);
         REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptDecrypt()", i);
-        REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptDecrypt()", cbData);
+        REALM_ASSERT_RELEASE_EX(cbData == encryption_page_size && "BCryptDecrypt()", cbData);
     }
     else {
         REALM_UNREACHABLE();
     }
 
 #else
-    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey.data(), iv, mode))
+    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_key.data(), iv, mode))
         handle_error();
 
     int len;
@@ -572,7 +639,7 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     EVP_CIPHER_CTX_set_padding(m_ctx, 0);
 
     if (!EVP_CipherUpdate(m_ctx, reinterpret_cast<uint8_t*>(dst), &len, reinterpret_cast<const uint8_t*>(src),
-                          block_size))
+                          encryption_page_size))
         handle_error();
 
     // Finalize the encryption. Should not output further data.
@@ -581,374 +648,324 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
 #endif
 }
 
-EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size,
+EncryptedFile::EncryptedFile(const char* key, FileDesc fd)
+    : fd(fd)
+    , cryptor(key)
+{
+}
+
+std::unique_ptr<EncryptedFileMapping> EncryptedFile::add_mapping(SizeType file_offset, void* addr, size_t size,
+                                                                 File::AccessMode access)
+{
+    auto mapping = std::make_unique<EncryptedFileMapping>(*this, file_offset, addr, size, access);
+    CheckedLockGuard lock(mutex);
+    mappings.push_back(mapping.get());
+    return mapping;
+}
+
+EncryptedFileMapping::EncryptedFileMapping(EncryptedFile& file, SizeType file_offset, void* addr, size_t size,
                                            File::AccessMode access, util::WriteObserver* observer,
                                            util::WriteMarker* marker)
     : m_file(file)
-    , m_page_shift(log2(realm::util::page_size()))
-    , m_blocks_per_page(static_cast<size_t>(1ULL << m_page_shift) / block_size)
-    , m_num_decrypted(0)
     , m_access(access)
     , m_observer(observer)
     , m_marker(marker)
 #ifdef REALM_DEBUG
-    , m_validate_buffer(new char[static_cast<size_t>(1ULL << m_page_shift)])
+    , m_validate_buffer(new char[encryption_page_size])
 #endif
 {
-    REALM_ASSERT(m_blocks_per_page * block_size == static_cast<size_t>(1ULL << m_page_shift));
     set(addr, size, file_offset); // throws
-    file.mappings.push_back(this);
 }
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
+    CheckedLockGuard lock(m_file.mutex);
     for (auto& e : m_page_state) {
         REALM_ASSERT(is_not(e, Writable));
     }
     if (m_access == File::access_ReadWrite) {
-        flush();
-        sync();
+        do_flush();
     }
-    m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
+
+    auto it = std::find(m_file.mappings.begin(), m_file.mappings.end(), this);
+    REALM_ASSERT(it != m_file.mappings.end());
+    if (it != m_file.mappings.end()) {
+        m_file.mappings.erase(it);
+    }
 }
 
-char* EncryptedFileMapping::page_addr(size_t local_page_ndx) const noexcept
+// offset within page, not within file
+uint16_t EncryptedFileMapping::get_offset_of_address(const void* addr) const noexcept
 {
-    REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
-    return static_cast<char*>(m_addr) + (local_page_ndx << m_page_shift);
+    return reinterpret_cast<uintptr_t>(addr) & (encryption_page_size - 1);
 }
 
-void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
+size_t EncryptedFileMapping::get_local_index_of_address(const void* addr, size_t offset) const noexcept
 {
-    if (local_page_ndx >= m_page_state.size())
-        return;
-    REALM_ASSERT(is_not(m_page_state[local_page_ndx], UpToDate));
-    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Dirty));
-    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Writable));
-
-    size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
-    if (m_chunk_dont_scan[chunk_ndx])
-        m_chunk_dont_scan[chunk_ndx] = 0;
+    REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
+    return (reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) / encryption_page_size;
 }
 
-bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
+bool EncryptedFileMapping::contains_page(size_t block_in_file) const noexcept
 {
-    REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
+    return block_in_file - m_first_page < m_page_state.size();
+}
+
+char* EncryptedFileMapping::page_addr(size_t local_ndx) const noexcept
+{
+    REALM_ASSERT_DEBUG(local_ndx < m_page_state.size());
+    return static_cast<char*>(m_addr) + (local_ndx * encryption_page_size);
+}
+
+SizeType EncryptedFileMapping::page_pos(size_t local_ndx) const noexcept
+{
+    return SizeType(local_ndx + m_first_page) * encryption_page_size;
+}
+
+// If we have multiple mappings for the same part of the file, one of them may
+// already contain the page we're about to read and if so we can skip reading
+// it and instead just memcpy it.
+bool EncryptedFileMapping::copy_up_to_date_page(size_t local_ndx) noexcept
+{
+    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
     // Precondition: this method must never be called for a page which
     // is already up to date.
-    REALM_ASSERT(is_not(m_page_state[local_page_ndx], UpToDate));
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
-        size_t page_ndx_in_file = local_page_ndx + m_first_page;
-        if (m == this || !m->contains_page(page_ndx_in_file))
+    REALM_ASSERT(is_not(m_page_state[local_ndx], UpToDate));
+    size_t ndx_in_file = local_ndx + m_first_page;
+    for (auto& m : m_file.mappings) {
+        m->assert_locked();
+        if (m == this || !m->contains_page(ndx_in_file))
             continue;
 
-        size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
-        if (is(m->m_page_state[shadow_mapping_local_ndx], UpToDate)) {
-            memcpy(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx),
-                   static_cast<size_t>(1ULL << m_page_shift));
-            return true;
-        }
+        size_t other_mapping_ndx = ndx_in_file - m->m_first_page;
+        auto other_state = m->m_page_state[other_mapping_ndx];
+        if (is(other_state, Writable) || is_not(other_state, UpToDate))
+            continue;
+
+        memcpy_if_changed(page_addr(local_ndx), m->page_addr(other_mapping_ndx), encryption_page_size);
+        set(m_page_state[local_ndx], UpToDate);
+        clear(m_page_state[local_ndx], StaleIV);
+        return true;
     }
     return false;
 }
 
-void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
+// Whenever we advance our reader view of the file we mark all previously
+// up-to-date pages as being possibly stale. On the next access of the page we
+// then check if the IV for that page has changed to determine if the page has
+// actually changed or if we can just mark it as being up-to-date again.
+bool EncryptedFileMapping::check_possibly_stale_page(size_t local_ndx) noexcept
 {
-    REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
-    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Dirty));
-    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Writable));
-    char* addr = page_addr(local_page_ndx);
-
-    if (!copy_up_to_date_page(local_page_ndx)) {
-        const size_t page_ndx_in_file = local_page_ndx + m_first_page;
-        const size_t end_page_ndx_in_file = m_first_page + m_page_state.size();
-        off_t data_pos = off_t(page_ndx_in_file << m_page_shift);
-        if (is(m_page_state[local_page_ndx], StaleIV)) {
-            auto refreshed_ivs =
-                m_file.cryptor.refresh_ivs(m_file.fd, data_pos, page_ndx_in_file, end_page_ndx_in_file);
-            for (const auto& [page_ndx, state] : refreshed_ivs) {
-                size_t local_page_ndx_of_iv_change = page_ndx - m_first_page;
-                REALM_ASSERT_EX(contains_page(page_ndx), page_ndx, m_first_page, m_page_state.size());
-                if (is(m_page_state[local_page_ndx_of_iv_change], Dirty | Writable)) {
-                    continue;
-                }
-                switch (state) {
-                    case IVRefreshState::UpToDate:
-                        if (is(m_page_state[local_page_ndx_of_iv_change], StaleIV)) {
-                            set(m_page_state[local_page_ndx_of_iv_change], UpToDate);
-                            clear(m_page_state[local_page_ndx_of_iv_change], StaleIV);
-                        }
-                        break;
-                    case IVRefreshState::RequiresRefresh:
-                        clear(m_page_state[local_page_ndx_of_iv_change], StaleIV);
-                        clear(m_page_state[local_page_ndx_of_iv_change], UpToDate);
-                        break;
-                }
-            }
-            REALM_ASSERT_EX(refreshed_ivs.count(page_ndx_in_file) == 1, page_ndx_in_file, refreshed_ivs.size());
-            if (refreshed_ivs[page_ndx_in_file] == IVRefreshState::UpToDate) {
-                return;
-            }
-        }
-        size_t size = static_cast<size_t>(1ULL << m_page_shift);
-        size_t actual = m_file.cryptor.read(m_file.fd, data_pos, addr, size, m_observer);
-        if (actual < size) {
-            if (actual >= required) {
-                memset(addr + actual, 0x55, size - actual);
-            }
-            else {
-                size_t fs = to_size_t(File::get_size_static(m_file.fd));
-                throw DecryptionFailed(
-                    util::format("failed to decrypt block %1 in file of size %2", local_page_ndx + m_first_page, fs));
-            }
+    if (is_not(m_page_state[local_ndx], StaleIV))
+        return false;
+    size_t ndx_in_file = local_ndx + m_first_page;
+    bool did_change = m_file.cryptor.refresh_iv(m_file.fd, ndx_in_file);
+    // Update the page state in all mappings and not just the current one because
+    // refresh_iv() only returns true once per page per write. Deferring this
+    // until copy_up_to_date_page() almost works, but this mapping could be
+    // removed before the other mapping copies the page.
+    for (auto& m : m_file.mappings) {
+        m->assert_locked();
+        if (!m->contains_page(ndx_in_file))
+            continue;
+        auto& state = m->m_page_state[ndx_in_file - m->m_first_page];
+        if (is(state, StaleIV)) {
+            REALM_ASSERT(is_not(state, UpToDate));
+            clear(state, StaleIV);
+            if (!did_change)
+                set(state, UpToDate);
         }
     }
-    if (is_not(m_page_state[local_page_ndx], UpToDate))
-        m_num_decrypted++;
-    set(m_page_state[local_page_ndx], UpToDate);
-    clear(m_page_state[local_page_ndx], StaleIV);
+    return !did_change;
 }
 
-void EncryptedFileMapping::mark_pages_for_IV_check()
+REALM_NORETURN
+REALM_COLD
+void EncryptedFileMapping::throw_decryption_error(size_t local_ndx, std::string_view msg)
 {
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
-        for (size_t pg = m->get_start_index(); pg < m->get_end_index(); ++pg) {
-            size_t local_page_ndx = pg - m->m_first_page;
-            if (is(m->m_page_state[local_page_ndx], UpToDate) &&
-                is_not(m->m_page_state[local_page_ndx], Dirty | Writable)) {
-                REALM_ASSERT(is_not(m->m_page_state[local_page_ndx], StaleIV));
-                clear(m->m_page_state[local_page_ndx], UpToDate);
-                set(m->m_page_state[local_page_ndx], StaleIV);
-            }
+    size_t fs = to_size_t(File::get_size_static(m_file.fd));
+    throw DecryptionFailed(util::format("page %1 in file of size %2 %3", local_ndx + m_first_page, fs, msg));
+}
+
+void EncryptedFileMapping::refresh_page(size_t local_ndx, bool to_modify)
+{
+    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
+    REALM_ASSERT(is_not(m_page_state[local_ndx], Dirty));
+    REALM_ASSERT(is_not(m_page_state[local_ndx], Writable));
+    if (copy_up_to_date_page(local_ndx) || check_possibly_stale_page(local_ndx)) {
+        return;
+    }
+
+    char* addr = page_addr(local_ndx);
+    switch (m_file.cryptor.read(m_file.fd, page_pos(local_ndx), addr, m_observer)) {
+        case AESCryptor::ReadResult::Eof:
+            if (!to_modify)
+                throw_decryption_error(local_ndx, "is out of bounds");
+            break;
+        case AESCryptor::ReadResult::Uninitialized:
+            if (!to_modify)
+                throw_decryption_error(local_ndx, "has never been written to");
+            break;
+        case AESCryptor::ReadResult::InterruptedFirstWrite:
+            if (!to_modify)
+                throw_decryption_error(local_ndx, "has never been successfully written to, but a write was begun");
+            break;
+        case AESCryptor::ReadResult::StaleHmac:
+            break;
+        case AESCryptor::ReadResult::Failed:
+            throw_decryption_error(
+                local_ndx, "failed the HMAC check. Either the encryption key is incorrect or data is corrupted");
+        case AESCryptor::ReadResult::Success:
+            break;
+    }
+    set(m_page_state[local_ndx], UpToDate);
+}
+
+void EncryptedFile::mark_data_as_possibly_stale()
+{
+
+    util::CheckedLockGuard lock(mutex);
+    cryptor.invalidate_ivs();
+    for (auto& m : mappings) {
+        m->assert_locked();
+        m->mark_pages_for_iv_check();
+    }
+}
+
+void EncryptedFileMapping::mark_pages_for_iv_check()
+{
+    for (auto& state : m_page_state) {
+        if (is(state, UpToDate) && is_not(state, Dirty | Writable)) {
+            REALM_ASSERT(is_not(state, StaleIV));
+            clear(state, UpToDate);
+            set(state, StaleIV);
         }
     }
 }
 
-void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset,
-                                                size_t end_offset) noexcept
+void EncryptedFileMapping::write_and_update_all(size_t local_ndx, uint16_t offset, uint16_t size) noexcept
 {
-    REALM_ASSERT(is(m_page_state[local_page_ndx], Writable));
-    REALM_ASSERT(is(m_page_state[local_page_ndx], UpToDate));
+    REALM_ASSERT(is(m_page_state[local_ndx], Writable));
+    REALM_ASSERT(is(m_page_state[local_ndx], UpToDate));
+    REALM_ASSERT(is_not(m_page_state[local_ndx], StaleIV));
+    REALM_ASSERT(offset + size <= encryption_page_size);
     // Go through all other mappings of this file and copy changes into those mappings
-    size_t page_ndx_in_file = local_page_ndx + m_first_page;
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
-        if (m != this && m->contains_page(page_ndx_in_file)) {
-            size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
-            if (is(m->m_page_state[shadow_local_page_ndx], UpToDate) ||
-                is(m->m_page_state[shadow_local_page_ndx], StaleIV)) { // only keep up to data pages up to date
-                memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset, page_addr(local_page_ndx) + begin_offset,
-                       end_offset - begin_offset);
-                if (is(m->m_page_state[shadow_local_page_ndx], StaleIV)) {
-                    set(m->m_page_state[shadow_local_page_ndx], UpToDate);
-                    clear(m->m_page_state[shadow_local_page_ndx], StaleIV);
-                }
-            }
-            else {
-                m->mark_outdated(shadow_local_page_ndx);
-            }
+    size_t ndx_in_file = local_ndx + m_first_page;
+    for (auto& m : m_file.mappings) {
+        m->assert_locked();
+        if (m == this || !m->contains_page(ndx_in_file))
+            continue;
+
+        size_t other_local_ndx = ndx_in_file - m->m_first_page;
+        auto& state = m->m_page_state[other_local_ndx];
+        if (is(state, UpToDate)) {
+            memcpy_if_changed(m->page_addr(other_local_ndx) + offset, page_addr(local_ndx) + offset, size);
+        }
+        // If the target page is possibly stale then we need to copy the entire
+        // page and not just the bytes we just touched as other parts of the
+        // page may be out of date
+        else if (is(state, StaleIV)) {
+            memcpy_if_changed(m->page_addr(other_local_ndx), page_addr(local_ndx), encryption_page_size);
+            set(state, UpToDate);
+            clear(state, StaleIV);
         }
     }
-    set(m_page_state[local_page_ndx], Dirty);
-    clear(m_page_state[local_page_ndx], Writable);
-    clear(m_page_state[local_page_ndx], StaleIV);
-    size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
-    if (m_chunk_dont_scan[chunk_ndx])
-        m_chunk_dont_scan[chunk_ndx] = 0;
+    set(m_page_state[local_ndx], Dirty);
+    clear(m_page_state[local_ndx], Writable);
 }
 
-
-void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
+void EncryptedFileMapping::validate_page(size_t local_ndx) noexcept
 {
 #ifdef REALM_DEBUG
-    REALM_ASSERT(local_page_ndx < m_page_state.size());
-    if (is_not(m_page_state[local_page_ndx], UpToDate))
+    REALM_ASSERT(local_ndx < m_page_state.size());
+    if (is_not(m_page_state[local_ndx], UpToDate))
         return;
 
-    const size_t page_ndx_in_file = local_page_ndx + m_first_page;
-    if (!m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), m_validate_buffer.get(),
-                             static_cast<size_t>(1ULL << m_page_shift), m_observer))
-        return;
+    switch (m_file.cryptor.read(m_file.fd, page_pos(local_ndx), m_validate_buffer.get(), m_observer)) {
+        case AESCryptor::ReadResult::Eof:
+        case AESCryptor::ReadResult::Uninitialized:
+        case AESCryptor::ReadResult::InterruptedFirstWrite:
+        case AESCryptor::ReadResult::StaleHmac:
+            return;
+        case AESCryptor::ReadResult::Failed:
+            abort();
+        case AESCryptor::ReadResult::Success:
+            break;
+    }
 
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
-        size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
-        if (m != this && m->contains_page(page_ndx_in_file) && is(m->m_page_state[shadow_mapping_local_ndx], Dirty)) {
-            memcpy(m_validate_buffer.get(), m->page_addr(shadow_mapping_local_ndx),
-                   static_cast<size_t>(1ULL << m_page_shift));
+    const size_t ndx_in_file = local_ndx + m_first_page;
+    for (auto& m : m_file.mappings) {
+        m->assert_locked();
+        size_t other_local_ndx = ndx_in_file - m->m_first_page;
+        if (m != this && m->contains_page(ndx_in_file) && is(m->m_page_state[other_local_ndx], Dirty)) {
+            memcpy(m_validate_buffer.get(), m->page_addr(other_local_ndx), encryption_page_size);
             break;
         }
     }
 
-    if (memcmp(m_validate_buffer.get(), page_addr(local_page_ndx), static_cast<size_t>(1ULL << m_page_shift))) {
-        std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ")"
-                  << "page(" << local_page_ndx << "/" << m_page_state.size() << ") " << m_validate_buffer.get() << " "
-                  << page_addr(local_page_ndx) << std::endl;
+    if (memcmp(m_validate_buffer.get(), page_addr(local_ndx), encryption_page_size) != 0) {
+        util::format(std::cerr, "mismatch %1: fd(%2) page(%3/%4) %5 %6\n", this, m_file.fd, local_ndx,
+                     m_page_state.size(), m_validate_buffer.get(), page_addr(local_ndx));
         REALM_TERMINATE("");
     }
 #else
-    static_cast<void>(local_page_ndx);
+    static_cast<void>(local_ndx);
 #endif
 }
 
 void EncryptedFileMapping::validate() noexcept
 {
 #ifdef REALM_DEBUG
-    const size_t num_local_pages = m_page_state.size();
-    for (size_t local_page_ndx = 0; local_page_ndx < num_local_pages; ++local_page_ndx)
-        validate_page(local_page_ndx);
+    for (size_t i = 0; i < m_page_state.size(); ++i)
+        validate_page(i);
 #endif
 }
 
-void EncryptedFileMapping::reclaim_page(size_t page_ndx)
+void EncryptedFileMapping::do_flush(bool skip_validate) noexcept
 {
-#ifdef _WIN32
-    // On windows we don't know how to replace a page within a page range with a fresh one.
-    // instead we clear it. If the system runs with same-page-merging, this will reduce
-    // the number of used pages.
-    memset(page_addr(page_ndx), 0, static_cast<size_t>(1) << m_page_shift);
-#else
-    // On Posix compatible, we can request a new page in the middle of an already
-    // requested range, so that's what we do. This releases the backing store for the
-    // old page and gives us a shared zero-page that we can later demand-allocate, thus
-    // reducing the overall amount of used physical pages.
-    void* addr = page_addr(page_ndx);
-    void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
-    if (addr != addr2) {
-        if (addr2 == 0) {
-            int err = errno;
-            throw SystemError(err, get_errno_msg("using mmap() to clear page failed", err));
-        }
-        throw std::runtime_error("internal error in mmap()");
-    }
-#endif
-}
-
-/* This functions is a bit convoluted. It reclaims pages, but only does a limited amount of work
- * each time it's called. It saves the progress in a 'progress_ptr' so that it can resume later
- * from where it was stopped.
- *
- * The workload is composed of workunits, each unit signifying
- * 1) A scanning of the state of 4K pages
- * 2) One system call (to mmap to release a page and get a new one)
- * 3) A scanning of 1K entries in the "don't scan" array (corresponding to 4M pages)
- * Approximately
- */
-void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& work_limit) noexcept
-{
-    const auto scan_amount_per_workunit = 4096;
-    bool contiguous_scan = false;
-    size_t next_scan_payment = scan_amount_per_workunit;
-    const size_t last_index = get_end_index();
-
-    auto done_some_work = [&]() {
-        if (work_limit > 0)
-            work_limit--;
-    };
-
-    auto visit_and_potentially_reclaim = [&](size_t page_ndx) {
-        PageState& ps = m_page_state[page_ndx];
-        if (is(ps, UpToDate)) {
-            if (is_not(ps, Touched) && is_not(ps, Dirty) && is_not(ps, Writable)) {
-                clear(ps, UpToDate);
-                reclaim_page(page_ndx);
-                m_num_decrypted--;
-                done_some_work();
+    for (size_t i = 0; i < m_page_state.size(); ++i) {
+        if (is_not(m_page_state[i], Dirty)) {
+            if (!skip_validate) {
+                validate_page(i);
             }
-            contiguous_scan = false;
-        }
-        clear(ps, Touched);
-    };
-
-    auto skip_chunk_if_possible = [&](size_t& page_ndx) // update vars corresponding to skipping a chunk if possible
-    {
-        size_t chunk_ndx = page_ndx >> page_to_chunk_shift;
-        if (m_chunk_dont_scan[chunk_ndx]) {
-            // skip to end of chunk
-            page_ndx = ((chunk_ndx + 1) << page_to_chunk_shift) - 1;
-            progress_index = m_first_page + page_ndx;
-            // postpone next scan payment
-            next_scan_payment += page_to_chunk_factor;
-            return true;
-        }
-        else
-            return false;
-    };
-
-    auto is_last_page_in_chunk = [](size_t page_ndx) {
-        auto page_to_chunk_mask = page_to_chunk_factor - 1;
-        return (page_ndx & page_to_chunk_mask) == page_to_chunk_mask;
-    };
-    auto is_first_page_in_chunk = [](size_t page_ndx) {
-        auto page_to_chunk_mask = page_to_chunk_factor - 1;
-        return (page_ndx & page_to_chunk_mask) == 0;
-    };
-
-    while (work_limit > 0 && progress_index < last_index) {
-        size_t page_ndx = progress_index - m_first_page;
-        if (!skip_chunk_if_possible(page_ndx)) {
-            if (is_first_page_in_chunk(page_ndx)) {
-                contiguous_scan = true;
-            }
-            visit_and_potentially_reclaim(page_ndx);
-            // if we've scanned a full chunk contiguously, mark it as not needing scans
-            if (is_last_page_in_chunk(page_ndx)) {
-                if (contiguous_scan) {
-                    m_chunk_dont_scan[page_ndx >> page_to_chunk_shift] = 1;
-                }
-                contiguous_scan = false;
-            }
-        }
-        // account for work performed:
-        if (page_ndx >= next_scan_payment) {
-            next_scan_payment = page_ndx + scan_amount_per_workunit;
-            done_some_work();
-        }
-        ++progress_index;
-    }
-    return;
-}
-
-void EncryptedFileMapping::flush() noexcept
-{
-    const size_t num_dirty_pages = m_page_state.size();
-    for (size_t local_page_ndx = 0; local_page_ndx < num_dirty_pages; ++local_page_ndx) {
-        if (is_not(m_page_state[local_page_ndx], Dirty)) {
-            validate_page(local_page_ndx);
             continue;
         }
-
-        size_t page_ndx_in_file = local_page_ndx + m_first_page;
-        m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
-                             static_cast<size_t>(1ULL << m_page_shift), m_marker);
-        clear(m_page_state[local_page_ndx], Dirty);
+        m_file.cryptor.write(m_file.fd, page_pos(i), page_addr(i), m_marker);
+        clear(m_page_state[i], Dirty);
     }
 
-    validate();
+    // some of the tests call flush() on very small writes which results in
+    // validating on every flush being unreasonably slow
+    if (!skip_validate) {
+        validate();
+    }
+}
+
+void EncryptedFileMapping::flush(bool skip_validate) noexcept
+{
+    util::CheckedLockGuard lock(m_file.mutex);
+    do_flush(skip_validate);
+}
+
+void EncryptedFileMapping::sync() noexcept
+{
+    util::CheckedLockGuard lock(m_file.mutex);
+    do_sync();
 }
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4297) // throw in noexcept
 #endif
-void EncryptedFileMapping::sync() noexcept
+void EncryptedFileMapping::do_sync() noexcept
 {
+    do_flush();
+
 #ifdef _WIN32
     if (FlushFileBuffers(m_file.fd))
         return;
     throw std::system_error(GetLastError(), std::system_category(), "FlushFileBuffers() failed");
 #else
     fsync(m_file.fd);
-    // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
-    // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
-    //
-    // See description of fsync on iOS here:
-    // https://developer.apple.com/library/ios/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html
-    //
-    // See also
-    // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/CoreData/Articles/cdPersistentStores.html
-    // for a discussion of this related to core data.
 #endif
 }
 #ifdef _MSC_VER
@@ -957,134 +974,80 @@ void EncryptedFileMapping::sync() noexcept
 
 void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {
-    // Propagate changes to all other decrypted pages mapping the same memory
-
+    CheckedLockGuard lock(m_file.mutex);
+    REALM_ASSERT(size > 0);
     REALM_ASSERT(m_access == File::access_ReadWrite);
-    size_t first_accessed_local_page = get_local_index_of_address(addr);
-    size_t first_offset = static_cast<const char*>(addr) - page_addr(first_accessed_local_page);
-    const char* last_accessed_address = static_cast<const char*>(addr) + (size == 0 ? 0 : size - 1);
-    size_t last_accessed_local_page = get_local_index_of_address(last_accessed_address);
-    size_t pages_size = m_page_state.size();
 
-    // propagate changes to first page (update may be partial, may also be to last page)
-    if (first_accessed_local_page < pages_size) {
-        REALM_ASSERT_EX(is(m_page_state[first_accessed_local_page], UpToDate),
-                        m_page_state[first_accessed_local_page]);
-        if (first_accessed_local_page == last_accessed_local_page) {
-            size_t last_offset = last_accessed_address - page_addr(first_accessed_local_page);
-            write_and_update_all(first_accessed_local_page, first_offset, last_offset + 1);
-        }
-        else
-            write_and_update_all(first_accessed_local_page, first_offset, static_cast<size_t>(1) << m_page_shift);
-    }
-    // propagate changes to pages between first and last page (update only full pages)
-    for (size_t idx = first_accessed_local_page + 1; idx < last_accessed_local_page && idx < pages_size; ++idx) {
-        REALM_ASSERT(is(m_page_state[idx], UpToDate));
-        write_and_update_all(idx, 0, static_cast<size_t>(1) << m_page_shift);
-    }
-    // propagate changes to the last page (update may be partial)
-    if (first_accessed_local_page < last_accessed_local_page && last_accessed_local_page < pages_size) {
-        REALM_ASSERT(is(m_page_state[last_accessed_local_page], UpToDate));
-        size_t last_offset = last_accessed_address - page_addr(last_accessed_local_page);
-        write_and_update_all(last_accessed_local_page, 0, last_offset + 1);
+    size_t local_ndx = get_local_index_of_address(addr);
+    auto offset_in_page = uint16_t(static_cast<const char*>(addr) - page_addr(local_ndx));
+    size += offset_in_page;
+
+    // Propagate changes to all other decrypted pages mapping the same memory
+    while (size > 0) {
+        REALM_ASSERT(local_ndx < m_page_state.size());
+        REALM_ASSERT(is(m_page_state[local_ndx], PageState::Writable));
+        auto bytes_in_page = uint16_t(std::min<size_t>(encryption_page_size, size) - offset_in_page);
+        write_and_update_all(local_ndx, offset_in_page, bytes_in_page);
+        size -= offset_in_page + bytes_in_page;
+        offset_in_page = 0;
+        ++local_ndx;
     }
 }
 
-void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size, bool to_modify)
+void EncryptedFileMapping::read_barrier(const void* addr, size_t size, bool to_modify)
 {
-    size_t first_accessed_local_page = get_local_index_of_address(addr);
-    size_t page_size = 1ULL << m_page_shift;
-    size_t required = get_offset_of_address(addr) + size;
-    {
-        // make sure the first page is available
-        PageState& ps = m_page_state[first_accessed_local_page];
-        if (is_not(ps, Touched))
-            set(ps, Touched);
+    CheckedLockGuard lock(m_file.mutex);
+    REALM_ASSERT(size > 0);
+    size_t begin = get_local_index_of_address(addr);
+    size_t end = get_local_index_of_address(addr, size - 1);
+    for (size_t local_ndx = begin; local_ndx <= end; ++local_ndx) {
+        PageState& ps = m_page_state[local_ndx];
         if (is_not(ps, UpToDate))
-            refresh_page(first_accessed_local_page, to_modify ? 0 : required);
-        if (to_modify)
-            set(ps, Writable);
-    }
-
-    // force the page reclaimer to look into pages in this chunk:
-    size_t chunk_ndx = first_accessed_local_page >> page_to_chunk_shift;
-    if (m_chunk_dont_scan[chunk_ndx])
-        m_chunk_dont_scan[chunk_ndx] = 0;
-
-    if (header_to_size) {
-        // We know it's an array, and array headers are 8-byte aligned, so it is
-        // included in the first page which was handled above.
-        size = header_to_size(static_cast<const char*>(addr));
-        required = get_offset_of_address(addr) + size;
-    }
-
-    size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
-    size_t pages_size = m_page_state.size();
-
-    // We already checked first_accessed_local_page above, so we start the loop
-    // at first_accessed_local_page + 1 to check the following page.
-    for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < pages_size; ++idx) {
-        required -= page_size;
-        // force the page reclaimer to look into pages in this chunk
-        chunk_ndx = idx >> page_to_chunk_shift;
-        if (m_chunk_dont_scan[chunk_ndx])
-            m_chunk_dont_scan[chunk_ndx] = 0;
-
-        PageState& ps = m_page_state[idx];
-        if (is_not(ps, Touched))
-            set(ps, Touched);
-        if (is_not(ps, UpToDate))
-            refresh_page(idx, to_modify ? 0 : required);
+            refresh_page(local_ndx, to_modify);
         if (to_modify)
             set(ps, Writable);
     }
 }
 
-void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
+void EncryptedFileMapping::extend_to(SizeType offset, size_t new_size)
 {
-    REALM_ASSERT_EX(new_size % page_size() == 0, new_size, page_size());
-    size_t num_pages = new_size >> m_page_shift;
-    m_page_state.resize(num_pages, PageState::Clean);
-    m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
-    m_file.cryptor.set_file_size((off_t)(offset + new_size));
+    CheckedLockGuard lock(m_file.mutex);
+    REALM_ASSERT_EX(new_size % encryption_page_size == 0, new_size, encryption_page_size);
+    m_page_state.resize(page_count(new_size), PageState::Clean);
+    m_file.cryptor.set_data_size(offset + SizeType(new_size));
 }
 
-void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
+void EncryptedFileMapping::set(void* new_addr, size_t new_size, SizeType new_file_offset)
 {
-    REALM_ASSERT(new_file_offset % (1ULL << m_page_shift) == 0);
-    REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
+    CheckedLockGuard lock(m_file.mutex);
+    REALM_ASSERT(new_file_offset % encryption_page_size == 0);
+    REALM_ASSERT(new_size % encryption_page_size == 0);
 
     // This seems dangerous - correct operation in a setting with multiple (partial)
     // mappings of the same file would rely on ordering of individual mapping requests.
     // Currently we only ever extend the file - but when we implement continuous defrag,
     // this design should be revisited.
-    m_file.cryptor.set_file_size(off_t(new_size + new_file_offset));
+    m_file.cryptor.set_data_size(new_file_offset + SizeType(new_size));
 
-    flush();
+    do_flush();
     m_addr = new_addr;
 
-    m_first_page = new_file_offset >> m_page_shift;
-    size_t num_pages = new_size >> m_page_shift;
-
-    m_num_decrypted = 0;
+    // set_data_size() would have thrown if this cast would overflow
+    m_first_page = size_t(new_file_offset / encryption_page_size);
     m_page_state.clear();
-    m_chunk_dont_scan.clear();
-
-    m_page_state.resize(num_pages, PageState(0));
-    m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
+    m_page_state.resize(new_size / encryption_page_size, PageState::Clean);
 }
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept
+SizeType encrypted_size_to_data_size(SizeType size) noexcept
 {
-    if (size == 0)
-        return 0;
-    return fake_offset(size);
+    return size == 0 ? 0 : file_pos_to_data_pos(size);
 }
 
-File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
+SizeType data_size_to_encrypted_size(SizeType size) noexcept
 {
-    size_t ps = page_size();
-    return real_offset((size + ps - 1) & ~(ps - 1));
+    SizeType r = size % encryption_page_size;
+    size += r ? encryption_page_size - r : 0;
+    return data_pos_to_file_pos(size);
 }
 } // namespace realm::util
 #else

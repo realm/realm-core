@@ -91,6 +91,7 @@ TConditionValue:    Type of values in condition column. That is, int64_t, float,
 #include <realm/query_expression.hpp>
 #include <realm/table.hpp>
 #include <realm/unicode.hpp>
+#include <realm/util/flat_map.hpp>
 #include <realm/util/serializer.hpp>
 #include <realm/utilities.hpp>
 
@@ -406,6 +407,66 @@ protected:
 };
 
 
+template <class LeafType>
+class BetweenNode : public ColumnNodeBase {
+public:
+    using TConditionValue = typename util::RemoveOptional<typename LeafType::value_type>::type;
+
+    BetweenNode(TConditionValue from, TConditionValue to, ColKey column_key)
+        : ColumnNodeBase(column_key)
+        , m_from(std::move(from))
+        , m_to(std::move(to))
+    {
+        if (is_null(from) || is_null(to))
+            throw InvalidArgument("'from' or 'to' must not be null");
+    }
+
+    BetweenNode(const BetweenNode& from)
+        : ColumnNodeBase(from)
+        , m_from(from.m_from)
+        , m_to(from.m_to)
+    {
+    }
+
+    void cluster_changed() override
+    {
+        m_leaf.emplace(m_table.unchecked_ptr()->get_alloc());
+        m_cluster->init_leaf(this->m_condition_column_key, &*m_leaf);
+    }
+
+    void init(bool will_query_ranges) override
+    {
+        ColumnNodeBase::init(will_query_ranges);
+
+        m_dT = .25;
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        return m_leaf->find_first_in_range(m_from, m_to, start, end);
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_column(ParentNode::m_table, ColumnNodeBase::m_condition_column_key) + " between {" +
+               util::serializer::print_value(this->m_from) + ", " + util::serializer::print_value(this->m_to) + "}";
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new BetweenNode(*this));
+    }
+
+private:
+    // Search values:
+    TConditionValue m_from;
+    TConditionValue m_to;
+
+    // Leaf cache
+    std::optional<LeafType> m_leaf;
+};
+
+
 template <class LeafType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<LeafType> {
     using BaseType = IntegerNodeBase<LeafType>;
@@ -512,6 +573,13 @@ public:
             if (const int64_t* val = it->get_if<int64_t>()) {
                 m_needles.insert(*val);
             }
+            else if (const double* val = it->get_if<double>()) {
+                // JS encodes numbers as double
+                // only add this value if it represents an integer
+                if (*val == double(int64_t(*val))) {
+                    m_needles.insert(int64_t(*val));
+                }
+            }
         }
     }
 
@@ -532,11 +600,17 @@ public:
     {
         auto& other = static_cast<ThisType&>(node);
         REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
-        REALM_ASSERT(other.m_needles.empty());
         if (m_needles.empty()) {
             m_needles.insert(this->m_value);
         }
-        m_needles.insert(other.m_value);
+        if (other.m_needles.empty()) {
+            m_needles.insert(other.m_value);
+        }
+        else {
+            for (const auto& val : other.m_needles) {
+                m_needles.insert(val);
+            }
+        }
         return true;
     }
 
@@ -562,11 +636,6 @@ public:
             }
             else if (m_index_evaluator) {
                 return m_index_evaluator->do_search_index(BaseType::m_cluster, start, end);
-            }
-            else if (end - start == 1) {
-                if (this->m_leaf->get(start) == this->m_value) {
-                    s = start;
-                }
             }
             else {
                 s = this->m_leaf->template find_first<Equal>(this->m_value, start, end);
@@ -1240,18 +1309,12 @@ public:
         if (!this->m_value_is_null) {
             m_optional_value = this->m_value;
         }
-        if (m_index_evaluator && m_nb_needles == 0) {
+        if (m_nb_needles == 0 && has_search_index()) {
+            m_index_evaluator = std::make_optional(IndexEvaluator{});
             SearchIndex* index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
             m_index_evaluator->init(index, m_optional_value);
             this->m_dT = 0;
         }
-    }
-
-    void table_changed() override
-    {
-        const bool has_index =
-            this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
     }
 
     const IndexEvaluator* index_based_keys() override
@@ -1261,7 +1324,7 @@ public:
 
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1294,11 +1357,17 @@ public:
     {
         auto& other = static_cast<ThisType&>(node);
         REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
-        REALM_ASSERT(other.m_needles.empty());
         if (m_needles.empty()) {
             m_needles.insert(this->m_value_is_null ? std::nullopt : std::make_optional(this->m_value));
         }
-        m_needles.insert(other.m_value_is_null ? std::nullopt : std::make_optional(other.m_value));
+        if (other.m_needles.empty()) {
+            m_needles.insert(other.m_value_is_null ? std::nullopt : std::make_optional(other.m_value));
+        }
+        else {
+            for (const auto& val : other.m_needles) {
+                m_needles.insert(val);
+            }
+        }
         return true;
     }
 
@@ -1870,17 +1939,9 @@ public:
 
     void init(bool) override;
 
-    void table_changed() override
-    {
-        StringNodeBase::table_changed();
-        const bool has_index =
-            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
-    }
-
     bool has_search_index() const override
     {
-        return bool(m_index_evaluator);
+        return bool(m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General);
     }
 
     void cluster_changed() override

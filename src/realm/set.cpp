@@ -483,19 +483,9 @@ void LnkSet::remove_all_target_rows()
     }
 }
 
-void LnkSet::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const
+void LnkSet::to_json(std::ostream& out, JSONOutputMode mode, util::FunctionRef<void(const Mixed&)> fn) const
 {
-    out << "[";
-
-    auto sz = m_set.size();
-    for (size_t i = 0; i < sz; i++) {
-        if (i > 0)
-            out << ",";
-        Mixed val(m_set.get(i));
-        fn(val);
-    }
-
-    out << "]";
+    m_set.to_json(out, mode, fn);
 }
 
 void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)

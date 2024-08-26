@@ -75,6 +75,7 @@ cc_object {
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_string.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_2_str_tables.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid64_to_bid128.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid32_to_bid128.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_to_int64.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_quantize.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_convert_data.c",
@@ -83,6 +84,7 @@ cc_object {
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_from_int.c",
         "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_round.c",
     ],
+    vendor: true
 }
 
 cc_object {
@@ -110,6 +112,7 @@ cc_object {
         "-Wno-unused-local-typedefs",
         "-Wno-unused-parameter",
     ],
+    vendor: true
 }
 
 genrule {
@@ -135,11 +138,11 @@ cc_defaults {
     },
     shared_libs: [
         "liblog",
-        "libandroid",
         "libz",
         "libcrypto",
         "libssl",
     ],
+    vendor: true
 }
 
 cc_defaults {
@@ -153,7 +156,9 @@ cc_defaults {
         "-DREALM_ENABLE_ENCRYPTION=1",
         "-DREALM_ENABLE_SYNC=1",
         "-DREALM_ENABLE_GEOSPATIAL=1",
+        "-DREALM_APP_SERVICES=1",
         "-DREALM_HAVE_EPOLL=1",
+        "-DREALM_AOSP_VENDOR=1",
         "-Wno-non-virtual-dtor",
         "-Wno-missing-field-initializers",
     ],
@@ -193,4 +198,5 @@ cc_library_static {
         "src/realm/object-store/sync/impl/emscripten/**/*",
     ],
     export_shared_lib_headers: ["libcrypto"],
+    vendor: true
 }

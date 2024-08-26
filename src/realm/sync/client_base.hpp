@@ -62,7 +62,8 @@ class SyncSocketProvider;
 struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
-    bool recovery_is_allowed = true;
+    Status error;
+    sync::ProtocolErrorInfo::Action action = sync::ProtocolErrorInfo::Action::ClientReset;
     util::UniqueFunction<VersionID()> notify_before_client_reset;
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
@@ -188,14 +189,6 @@ struct ClientConfig {
     ///
     /// For testing purposes only.
     bool disable_upload_activation_delay = false;
-
-    /// If `disable_upload_compaction` is true, every changeset will be
-    /// compacted before it is uploaded to the server. Compaction will
-    /// reduce the size of a changeset if the same field is set multiple
-    /// times or if newly created objects are deleted within the same
-    /// transaction. Log compaction increeses CPU usage and memory
-    /// consumption.
-    bool disable_upload_compaction = false;
 
     /// The specified function will be called whenever a PONG message is
     /// received on any connection. The round-trip time in milliseconds will

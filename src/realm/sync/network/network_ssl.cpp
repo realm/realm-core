@@ -7,13 +7,15 @@
 #include <realm/sync/network/network_ssl.hpp>
 
 #if REALM_HAVE_OPENSSL
+#include <openssl/conf.h>
+#include <openssl/x509v3.h>
 #ifdef _WIN32
+using osslX509_NAME = X509_NAME; // alias this before including wincrypt.h because it gets clobbered
 #include <Windows.h>
+#include <wincrypt.h>
 #else
 #include <pthread.h>
 #endif
-#include <openssl/conf.h>
-#include <openssl/x509v3.h>
 #elif REALM_HAVE_SECURE_TRANSPORT
 #include <fstream>
 #include <vector>
@@ -64,6 +66,122 @@ void populate_cert_store_with_included_certs(X509_STORE* store, std::error_code&
 
 #endif // REALM_INCLUDE_CERTS
 
+#if REALM_HAVE_OPENSSL && _WIN32
+
+/// Allow OpenSSL to look up certificates in the Windows Trusted Root Certification Authority list by implementing the
+/// X509_LOOKUP interface.
+class CapiLookup {
+public:
+    CapiLookup()
+    {
+        // Try to open the store in all of these locations sequentially. Many of them might not exist, and the
+        // CERT_STORE_OPEN_EXISTING_FLAG flag
+        // will cause CertOpenStore to return null in which case we just move on to the next.
+        // The order is important - we go from the most likely to the least likely to optimize lookup.
+        static std::initializer_list<DWORD> store_locations{CERT_SYSTEM_STORE_CURRENT_USER,
+                                                            CERT_SYSTEM_STORE_LOCAL_MACHINE,
+                                                            CERT_SYSTEM_STORE_CURRENT_SERVICE,
+                                                            CERT_SYSTEM_STORE_SERVICES,
+                                                            CERT_SYSTEM_STORE_USERS,
+                                                            CERT_SYSTEM_STORE_CURRENT_USER_GROUP_POLICY,
+                                                            CERT_SYSTEM_STORE_LOCAL_MACHINE_GROUP_POLICY,
+                                                            CERT_SYSTEM_STORE_LOCAL_MACHINE_ENTERPRISE};
+
+        for (DWORD location : store_locations) {
+            constexpr DWORD flags =
+                CERT_STORE_READONLY_FLAG | CERT_STORE_SHARE_CONTEXT_FLAG | CERT_STORE_OPEN_EXISTING_FLAG;
+            HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, NULL, flags | location, L"ROOT");
+            if (store)
+                m_stores.push_back(store);
+        }
+    }
+
+    ~CapiLookup()
+    {
+        for (auto store : m_stores) {
+            CertCloseStore(store, 0);
+        }
+    }
+
+    int get_by_subject(X509_LOOKUP* ctx, X509_LOOKUP_TYPE type, const osslX509_NAME* name, X509_OBJECT* ret)
+    {
+        if (type != X509_LU_X509)
+            return 0;
+
+        // Convert the OpenSSL X509_NAME structure into its ASN.1 representation and construct a CAPI search parameter
+        CERT_NAME_BLOB capi_name = {0};
+        capi_name.cbData = i2d_X509_NAME(name, &capi_name.pbData);
+        int result = 0;
+
+        for (auto store : m_stores) {
+            PCCERT_CONTEXT cert =
+                CertFindCertificateInStore(store, X509_ASN_ENCODING, 0, CERT_FIND_SUBJECT_NAME, &capi_name, NULL);
+            if (!cert)
+                continue;
+
+            // Convert the ASN.1 representation of the CAPI certificate into an OpenSSL certificate and add it to the
+            // OpenSSL store
+            const unsigned char* encoded_cert_data = cert->pbCertEncoded;
+            X509* ossl_cert = d2i_X509(NULL, &encoded_cert_data, cert->cbCertEncoded);
+            result = X509_STORE_add_cert(X509_LOOKUP_get_store(ctx), ossl_cert);
+            X509_free(ossl_cert);
+            break;
+        }
+
+        OPENSSL_free(capi_name.pbData);
+
+        // if we previously added a certificate to the store we need to look it up again from the store and return
+        // that
+        if (result)
+            result = get_cached_object(ctx, type, name, ret);
+        return result;
+    }
+
+private:
+    int get_cached_object(X509_LOOKUP* ctx, X509_LOOKUP_TYPE type, const osslX509_NAME* name, X509_OBJECT* ret)
+    {
+        REALM_ASSERT_RELEASE(type == X509_LU_X509);
+
+        // Loop through the objects already in the store to find the one we just added in get_by_subject.
+        // retrieve_by_subject returns a cert with refcount 1 but set1_X509 increases it.
+        // That's why we need to free it after before returning, otherwise it will leak.
+
+        STACK_OF(X509_OBJECT)* objects = X509_STORE_get0_objects(X509_LOOKUP_get_store(ctx));
+        X509_OBJECT* tmp = X509_OBJECT_retrieve_by_subject(objects, type, name);
+        if (!tmp)
+            return 0;
+
+        X509* cert = X509_OBJECT_get0_X509(tmp);
+        int result = X509_OBJECT_set1_X509(ret, cert);
+        X509_free(cert);
+
+        return result;
+    }
+
+    std::vector<HCERTSTORE> m_stores;
+};
+
+void add_windows_certificate_store_lookup(X509_STORE* store)
+{
+    X509_LOOKUP_METHOD* capi_lookup = X509_LOOKUP_meth_new("capi");
+
+    X509_LOOKUP_meth_set_new_item(capi_lookup, [](X509_LOOKUP* ctx) {
+        auto* data = new CapiLookup();
+        return X509_LOOKUP_set_method_data(ctx, data);
+    });
+    X509_LOOKUP_meth_set_free(capi_lookup, [](X509_LOOKUP* ctx) {
+        auto* data = reinterpret_cast<CapiLookup*>(X509_LOOKUP_get_method_data(ctx));
+        delete data;
+    });
+    X509_LOOKUP_meth_set_get_by_subject(capi_lookup, [](auto ctx, auto type, auto name, auto ret) {
+        auto* data = reinterpret_cast<CapiLookup*>(X509_LOOKUP_get_method_data(ctx));
+        return data->get_by_subject(ctx, type, name, ret);
+    });
+
+    X509_STORE_add_lookup(store, capi_lookup);
+}
+
+#endif // REALM_HAVE_OPENSSL && _WIN32
 
 #if REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER))
 
@@ -207,15 +325,10 @@ std::string SecureTransportErrorCategory::message(int value) const
     const char* message = "Unknown error";
 #if REALM_HAVE_SECURE_TRANSPORT
     std::unique_ptr<char[]> buffer;
-    if (__builtin_available(iOS 11.3, macOS 10.3, tvOS 11.3, watchOS 4.3, *)) {
-        auto status = OSStatus(value);
-        void* reserved = nullptr;
-        if (auto cf_message = adoptCF(SecCopyErrorMessageString(status, reserved)))
-            message = cfstring_to_cstring(cf_message.get(), buffer);
-    }
-    else {
-        static_cast<void>(buffer);
-    }
+    auto status = OSStatus(value);
+    void* reserved = nullptr;
+    if (auto cf_message = adoptCF(SecCopyErrorMessageString(status, reserved)))
+        message = cfstring_to_cstring(cf_message.get(), buffer);
 #endif // REALM_HAVE_SECURE_TRANSPORT
 
     return util::format("SecureTransport error: %1 (%2)", message, value); // Throws
@@ -335,6 +448,9 @@ void Context::ssl_use_default_verify(std::error_code& ec)
         ec = std::error_code(int(ERR_get_error()), openssl_error_category);
         return;
     }
+#endif
+#ifdef _WIN32
+    add_windows_certificate_store_lookup(SSL_CTX_get_cert_store(m_ssl_ctx));
 #endif
     ec = std::error_code();
 }

@@ -2266,7 +2266,7 @@ TEST(Parser_list_of_primitive_ints)
         message,
         "Unsupported comparison operator 'endswith' against type 'int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
-    CHECK_EQUAL(message, "Cannot convert 'string' to a number");
+    CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'string'");
 }
 
 TEST_TYPES(Parser_list_of_primitive_strings, std::true_type, std::false_type)
@@ -3346,7 +3346,7 @@ TEST(Parser_BacklinkCount)
     std::string message;
     // backlink count requires comparison to a numeric type
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 'string'", -1), message);
-    CHECK_EQUAL(message, "Cannot convert 'string' to a number");
+    CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'string'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 2018-04-09@14:21:0", -1),
                                 message);
     CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'timestamp'");
@@ -4091,6 +4091,61 @@ TEST(Parser_OperatorIN)
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found '5.5'"));
     CHECK_THROW_EX(verify_query(test_context, t, "5.5 in fav_item.price", 1), query_parser::InvalidQueryArgError,
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
+}
+
+TEST(Parser_OrOfIn)
+{
+    Group g;
+
+    TableRef persons = g.add_table("class_Person");
+    constexpr bool nullable = true;
+    auto col_name = persons->add_column(type_String, "name", nullable);
+    persons->create_object().set(col_name, "Ani");
+    persons->create_object().set(col_name, "Teddy");
+    persons->create_object().set(col_name, "Poly");
+    persons->create_object().set(col_name, ""); // empty string
+    persons->create_object();                   // null value
+
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'}", 3);
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null}", 4);
+    verify_query(test_context, persons,
+                 "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null} OR name IN {''}", 5);
+}
+
+TEST_TYPES(Parser_7642, std::true_type, std::false_type)
+{
+    Group g;
+    auto cars = g.add_table("class_Car");
+    auto col_make = cars->add_column(type_String, "make");
+    auto col_int = cars->add_column(type_Int, "value");
+    if (TEST_TYPE::value) {
+        cars->add_search_index(col_make);
+        cars->add_search_index(col_int);
+    }
+
+    cars->create_object().set(col_make, "Tesla").set(col_int, 123);
+    cars->create_object().set(col_make, "Ford").set(col_int, 456);
+    cars->create_object().set(col_make, "Audi").set(col_int, 789);
+    cars->create_object().set(col_make, "Chevy").set(col_int, 1000);
+
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
+    // do not compare to floats, and do not compare to floats/doubles that are not an exact integer
+    float nan_f = std::numeric_limits<float>::quiet_NaN();
+    float inf_f = std::numeric_limits<float>::infinity();
+    Vec args = Vec{456, 789.0f, 123.0, 789.10, 1000.1f};
+    verify_query(test_context, cars, "value IN $0", {args}, 3);
+    args.push_back(inf_f);
+    args.push_back(nan_f);
+    verify_query_sub(test_context, cars, "value == $0", args, 1);
+    verify_query_sub(test_context, cars, "value == $1", args, 1);
+    verify_query_sub(test_context, cars, "value == $2", args, 1);
+    verify_query_sub(test_context, cars, "value == $3", args, 0);
+    verify_query_sub(test_context, cars, "value == $4", args, 0);
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $5", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
+    CHECK_THROW_EX(verify_query_sub(test_context, cars, "value == $6", args, 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "NaN not supported for int"));
 }
 
 TEST(Parser_KeyPathSubstitution)
@@ -6043,6 +6098,41 @@ TEST(Parser_Between)
     CHECK_THROW_ANY(verify_query(test_context, table, "scores between {5, 9}", 1));
     CHECK_THROW_ANY(verify_query(test_context, table, "ANY scores between {5, 9}", 1));
     CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
+}
+
+TEST(Test_Between_OverLinks)
+{
+    Group g;
+    TableRef parent = g.add_table("Parent");
+    TableRef child = g.add_table("Child");
+
+    ColKey ck_child = parent->add_column(*child, "child");
+    ColKey ck_int = child->add_column(type_Int, "int");
+    ColKey ck_timestamp = child->add_column(type_Timestamp, "timestamp");
+
+    constexpr size_t num_children = 100;
+    for (size_t i = 0; i < num_children; ++i) {
+        auto obj = child->create_object();
+        obj.set(ck_int, (int)i);
+        obj.set(ck_timestamp, Timestamp{int64_t(i), 0});
+        parent->create_object().set(ck_child, obj.get_key());
+        parent->create_object().set(ck_child, obj.get_key());
+    }
+    parent->create_object(); // null link
+
+    verify_query(test_context, child, "int BETWEEN {0, 100}", 100);
+    verify_query(test_context, child, "timestamp BETWEEN {$0, $1}", {Timestamp{0, 0}, Timestamp{100, 0}}, 100);
+    verify_query(test_context, child, "int BETWEEN {1, 2}", 2);
+    verify_query(test_context, child, "timestamp BETWEEN {$0, $1}", {Timestamp{1, 0}, Timestamp{2, 0}}, 2);
+    verify_query(test_context, child, "int BETWEEN {-1, -2}", 0);
+    verify_query(test_context, child, "timestamp BETWEEN {$0, $1}", {Timestamp{-1, 0}, Timestamp{-2, 0}}, 0);
+
+    verify_query(test_context, parent, "child.int BETWEEN {0, 100}", 200);
+    verify_query(test_context, parent, "child.timestamp BETWEEN {$0, $1}", {Timestamp{0, 0}, Timestamp{100, 0}}, 200);
+    verify_query(test_context, parent, "child.int BETWEEN {1, 2}", 4);
+    verify_query(test_context, parent, "child.timestamp BETWEEN {$0, $1}", {Timestamp{1, 0}, Timestamp{2, 0}}, 4);
+    verify_query(test_context, parent, "child.int BETWEEN {-1, -2}", 0);
+    verify_query(test_context, parent, "child.timestamp BETWEEN {$0, $1}", {Timestamp{-1, 0}, Timestamp{-2, 0}}, 0);
 }
 
 TEST(Parser_PrimaryKey)

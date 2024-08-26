@@ -25,7 +25,6 @@
 #include <realm/util/compression.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/json_parser.hpp>
-#include <realm/util/load_file.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/platform_info.hpp>
@@ -1787,17 +1786,6 @@ private:
             Formatter& formatter = misc_buffers.formatter;
             if (REALM_UNLIKELY(best_match == 0)) {
                 const char* elaboration = "No version supported by both client and server";
-                const char* identifier_hint = nullptr;
-                if (overall_client_max < server_min) {
-                    // Client is too old
-                    elaboration = "Client is too old for server";
-                    identifier_hint = "CLIENT_TOO_OLD";
-                }
-                else if (overall_client_min > server_max) {
-                    // Client is too new
-                    elaboration = "Client is too new for server";
-                    identifier_hint = "CLIENT_TOO_NEW";
-                }
                 auto format_ranges = [&](const auto& list) {
                     bool nonfirst = false;
                     for (auto range : list) {
@@ -1826,12 +1814,8 @@ private:
                 formatter << "\n";                                                     // Throws
                 formatter << "Client supports: ";                                      // Throws
                 format_ranges(protocol_version_ranges);                                // Throws
-                formatter << "\n\n";                                                   // Throws
-                formatter << "REALM_SYNC_PROTOCOL_MISMATCH";                           // Throws
-                if (identifier_hint)
-                    formatter << ":" << identifier_hint;                      // Throws
-                formatter << "\n";                                            // Throws
-                handle_400_bad_request({formatter.data(), formatter.size()}); // Throws
+                formatter << "\n";                                                     // Throws
+                handle_400_bad_request({formatter.data(), formatter.size()});          // Throws
                 return;
             }
             m_negotiated_protocol_version = best_match;
@@ -2885,7 +2869,6 @@ private:
             std::size_t accum_original_size;
             std::size_t accum_compacted_size;
             ServerProtocol& protocol = get_server_protocol();
-            bool disable_download_compaction = config.disable_download_compaction;
             bool enable_cache = (config.enable_download_bootstrap_cache && m_download_progress.server_version == 0 &&
                                  m_upload_progress.client_version == 0 && m_upload_threshold.client_version == 0);
             DownloadCache& cache = m_server_file->get_download_cache();
@@ -2918,7 +2901,7 @@ private:
                     std::uint_fast64_t cumulative_byte_size_total;
                     bool not_expired = history.fetch_download_info(
                         m_client_file_ident, download_progress, end_version, upload_progress, handler,
-                        cumulative_byte_size_current, cumulative_byte_size_total, disable_download_compaction,
+                        cumulative_byte_size_current, cumulative_byte_size_total,
                         max_download_size); // Throws
                     REALM_ASSERT(upload_progress.client_version >= download_progress.last_integrated_client_version);
                     SyncConnection& conn = get_connection();
@@ -2989,12 +2972,6 @@ private:
                 last_server_version.salt, upload_progress.client_version,
                 upload_progress.last_integrated_server_version, downloadable_bytes, num_changesets, body,
                 uncompressed_body_size, compressed_body_size, body_is_compressed, logger); // Throws
-
-            if (!disable_download_compaction) {
-                std::size_t saved = accum_original_size - accum_compacted_size;
-                double saved_2 = (accum_original_size == 0 ? 0 : std::round(saved * 100.0 / accum_original_size));
-                logger.detail("Download compaction: Saved %1 bytes (%2%%)", saved, saved_2); // Throws
-            }
 
             m_download_progress = download_progress;
             logger.debug("Setting of m_download_progress.server_version = %1",
@@ -3251,8 +3228,8 @@ void ServerFile::activate() {}
 void ServerFile::register_client_access(file_ident_type) {}
 
 
-auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file, ClientType client_type)
-    -> file_ident_request_type
+auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file,
+                                    ClientType client_type) -> file_ident_request_type
 {
     auto request = ++m_last_file_ident_request;
     m_file_ident_requests[request] = {&receiver, proxy_file, client_type}; // Throws
@@ -3883,8 +3860,6 @@ void ServerImpl::start()
         logger.warn("Testing/debugging feature 'disable sync to disk' enabled - "
                     "never do this in production!"); // Throws
     }
-    logger.info("Download compaction: %1",
-                (m_config.disable_download_compaction ? "No" : "Yes")); // Throws
     logger.info("Download bootstrap caching: %1",
                 (m_config.enable_download_bootstrap_cache ? "Yes" : "No"));                // Throws
     logger.info("Max download size: %1 bytes", m_config.max_download_size);                // Throws

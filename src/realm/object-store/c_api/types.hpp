@@ -15,14 +15,18 @@
 #include <realm/object-store/util/scheduler.hpp>
 
 #if REALM_ENABLE_SYNC
+
+#if REALM_APP_SERVICES
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_user.hpp>
-#include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
+#endif // REALM_APP_SERVICES
+
+#include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
-#endif
+#endif // REALM_ENABLE_SYNC
 
 #include <memory>
 #include <stdexcept>
@@ -570,18 +574,6 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 
 #if REALM_ENABLE_SYNC
 
-struct realm_app_user_subscription_token : realm::c_api::WrapC {
-    using Token = realm::Subscribable<realm::app::User>::Token;
-    realm_app_user_subscription_token(std::shared_ptr<realm::app::User> user, Token&& token)
-        : user(user)
-        , token(std::move(token))
-    {
-    }
-    ~realm_app_user_subscription_token();
-    std::shared_ptr<realm::app::User> user;
-    Token token;
-};
-
 struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
     realm_async_open_task_progress_notification_token(std::shared_ptr<realm::AsyncOpenTask> task, uint64_t token)
         : task(task)
@@ -625,13 +617,21 @@ struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::G
     }
 };
 
-struct realm_app_config : realm::c_api::WrapC, realm::app::AppConfig {
-    using AppConfig::AppConfig;
+#if REALM_APP_SERVICES
+// This class doesn't support realm_release() since it is only meant to be used
+// as a CAPI-compatible reference to the SyncClientConfig member variable that
+// is part of AppConfig.
+// To avoid data misalignment or other conflicts with the original SyncClientConfig,
+// do not add any additional functions or member variables to this class.
+struct realm_sync_client_config final : realm::SyncClientConfig {
+    using SyncClientConfig::SyncClientConfig;
 };
-
+#else
+// This class must be freed using realm_release()
 struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {
     using SyncClientConfig::SyncClientConfig;
 };
+#endif // REALM_APP_SERVICES
 
 struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
     using SyncConfig::SyncConfig;
@@ -639,6 +639,12 @@ struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
         : SyncConfig(c)
     {
     }
+};
+
+#if REALM_APP_SERVICES
+
+struct realm_app_config : realm::c_api::WrapC, realm::app::AppConfig {
+    using AppConfig::AppConfig;
 };
 
 struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {
@@ -661,12 +667,33 @@ struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {
     }
 };
 
+struct realm_app_user_subscription_token : realm::c_api::WrapC {
+    using Token = realm::Subscribable<realm::app::User>::Token;
+    realm_app_user_subscription_token(std::shared_ptr<realm::app::User> user, Token&& token)
+        : user(user)
+        , token(std::move(token))
+    {
+    }
+    ~realm_app_user_subscription_token();
+    std::shared_ptr<realm::app::User> user;
+    Token token;
+};
+
 struct realm_app_credentials : realm::c_api::WrapC, realm::app::AppCredentials {
     realm_app_credentials(realm::app::AppCredentials credentials)
         : realm::app::AppCredentials{std::move(credentials)}
     {
     }
 };
+
+struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollection {
+    realm_mongodb_collection(realm::app::MongoCollection collection)
+        : realm::app::MongoCollection(std::move(collection))
+    {
+    }
+};
+
+#endif // REALM_APP_SERVICES
 
 struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     realm_user(std::shared_ptr<realm::SyncUser> user)
@@ -702,6 +729,26 @@ struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSess
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_sync_session*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_sync_manager : realm::c_api::WrapC, std::shared_ptr<realm::SyncManager> {
+    realm_sync_manager(std::shared_ptr<realm::SyncManager> manager)
+        : std::shared_ptr<realm::SyncManager>{std::move(manager)}
+    {
+    }
+
+    realm_sync_manager* clone() const override
+    {
+        return new realm_sync_manager{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_manager*>(&other)) {
             return get() == ptr->get();
         }
         return false;
@@ -764,13 +811,6 @@ struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::Async
             return get() == ptr->get();
         }
         return false;
-    }
-};
-
-struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollection {
-    realm_mongodb_collection(realm::app::MongoCollection collection)
-        : realm::app::MongoCollection(std::move(collection))
-    {
     }
 };
 
@@ -842,7 +882,7 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
     }
 };
 
-struct CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
+struct CBindingThreadObserver final : public realm::BindingCallbackThreadObserver {
 public:
     CBindingThreadObserver(realm_on_object_store_thread_callback_t on_thread_create,
                            realm_on_object_store_thread_callback_t on_thread_destroy,
@@ -854,13 +894,10 @@ public:
         , m_user_data{userdata, [&free_userdata] {
                           if (free_userdata)
                               return free_userdata;
-                          else
-                              return CBindingThreadObserver::m_default_free_userdata;
+                          return CBindingThreadObserver::m_default_free_userdata;
                       }()}
     {
     }
-
-    virtual ~CBindingThreadObserver() = default;
 
     void did_create_thread() override
     {
@@ -890,25 +927,25 @@ public:
     /// {@
     /// For testing: Return the values in this CBindingThreadObserver for comparing if two objects
     /// have the same callback functions and userdata ptr values.
-    inline realm_on_object_store_thread_callback_t test_get_create_callback_func() const noexcept
+    realm_on_object_store_thread_callback_t test_get_create_callback_func() const noexcept
     {
         return m_create_callback_func;
     }
-    inline realm_on_object_store_thread_callback_t test_get_destroy_callback_func() const noexcept
+    realm_on_object_store_thread_callback_t test_get_destroy_callback_func() const noexcept
     {
         return m_destroy_callback_func;
     }
-    inline realm_on_object_store_error_callback_t test_get_error_callback_func() const noexcept
+    realm_on_object_store_error_callback_t test_get_error_callback_func() const noexcept
     {
         return m_error_callback_func;
     }
-    inline realm_userdata_t test_get_userdata_ptr() const noexcept
+    realm_userdata_t test_get_userdata_ptr() const noexcept
     {
         return m_user_data.get();
     }
     /// @}
 
-protected:
+private:
     CBindingThreadObserver() = default;
 
     static constexpr realm_free_userdata_func_t m_default_free_userdata = [](realm_userdata_t) {};

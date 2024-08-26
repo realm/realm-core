@@ -740,6 +740,7 @@ classes:
       make_ssl_verify_callback: '(callback: (server_address: const std::string&, server_port: int, pem_data: std::string_view, preverify_ok: int, depth: int) off_thread -> bool) -> SSLVerifyCallback'
       needs_file_format_upgrade: '(config: const RealmConfig&) -> bool'
       sync_user_as_app_user: '(sync_user: Nullable<std::shared_ptr<SyncUser>>) -> Nullable<std::shared_ptr<User>>'
+      app_user_as_sync_user: '(sync_user: Nullable<std::shared_ptr<User>>) -> Nullable<std::shared_ptr<SyncUser>>'
 
   LogCategoryRef:
     cppName: util::LogCategoryRef
@@ -807,6 +808,7 @@ classes:
         - sig: '(column: ColKey, value: Mixed, is_default: bool)'
           suffix: with_default
       set_collection: '(column: ColKey, type: CollectionType) -> Obj'
+      add_int: '(column: ColKey, value: int64_t) -> Obj'
       get_linked_object: '(column: ColKey) const -> Nullable<Obj>'
       to_string: () const -> std::string
       get_backlink_count: '() const -> count_t'
@@ -1208,13 +1210,13 @@ classes:
   SyncUser:
     cppName: SyncUser
     sharedPtrWrapped: SharedSyncUser
+    properties:
+      is_logged_in: bool
 
   User:
-    base: SyncUser
     cppName: app::User
     sharedPtrWrapped: SharedUser
     properties:
-      is_logged_in: bool
       user_id: std::string
       app_id: std::string
       legacy_identities: std::vector<std::string>
@@ -1236,7 +1238,6 @@ classes:
       path_for_realm: '(config: SyncConfig&, custom_file_name: std::optional<std::string>&) -> std::string'
       access_token_refresh_required: '() -> bool'
 # #      request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      request_refresh_user: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       track_realm: '(path: std::string_view)'
@@ -1296,7 +1297,7 @@ classes:
       unsubscribe: '(token: AppSubscriptionToken)'
       call_function: '(user: const SharedUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
       make_streaming_request: '(user: SharedUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
-      update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      update_base_url: '(base_url: std::string_view, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       get_base_url: '() const -> std::string'
       immediately_run_file_actions: '(realm_path: std::string) -> bool'
 

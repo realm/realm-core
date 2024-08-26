@@ -133,7 +133,6 @@ static inline auto make_callback(void (*callback)(realm_userdata_t userdata, rea
     };
 }
 
-
 RLM_API const char* realm_app_get_default_base_url(void) noexcept
 {
     return app::App::default_base_url().data();
@@ -278,6 +277,11 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
     return wrap_err([&] {
         return duplicate_string(app_credentials->serialize_as_json());
     });
+}
+
+RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t* app_config) noexcept
+{
+    return static_cast<realm_sync_client_config_t*>(&app_config->sync_client_config);
 }
 
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config)
@@ -752,34 +756,6 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
     });
 }
 
-
-RLM_API realm_app_user_subscription_token_t*
-realm_sync_user_on_state_change_register_callback(realm_user_t* user, realm_sync_on_user_state_changed_t callback,
-                                                  realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
-{
-    return with_app_user(user, [&](auto& user) {
-        auto cb = [callback,
-                   userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](const SyncUser& sync_user) {
-            callback(userdata.get(), realm_user_state_e(sync_user.state()));
-        };
-        auto token = user->subscribe(std::move(cb));
-        return new realm_app_user_subscription_token_t{user, std::move(token)};
-    });
-}
-
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
-                                                     bool* did_run) noexcept
-{
-    return wrap_err([&]() {
-        *did_run = (*realm_app)->immediately_run_file_actions(sync_path);
-        return true;
-    });
-}
-
-
-#endif // REALM_APP_SERVICES
-
-
 RLM_API char* realm_user_get_identity(const realm_user_t* user) noexcept
 {
     return duplicate_string((*user)->user_id());
@@ -808,6 +784,211 @@ RLM_API char* realm_user_get_refresh_token(const realm_user_t* user)
         return duplicate_string((*user)->refresh_token());
     });
 }
+
+RLM_API realm_app_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t* user, realm_sync_on_user_state_changed_t callback,
+                                                  realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+{
+    return with_app_user(user, [&](auto& user) {
+        auto cb = [callback,
+                   userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](const SyncUser& sync_user) {
+            callback(userdata.get(), realm_user_state_e(sync_user.state()));
+        };
+        auto token = user->subscribe(std::move(cb));
+        return new realm_app_user_subscription_token_t{user, std::move(token)};
+    });
+}
+
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) noexcept
+{
+    return wrap_err([&]() {
+        *did_run = (*realm_app)->immediately_run_file_actions(sync_path);
+        return true;
+    });
+}
+
+#endif // REALM_APP_SERVICES
+
+#if !REALM_APP_SERVICES
+
+static void cb_proxy_for_completion(realm_userdata_t userdata, const realm_app_error_t* err)
+{
+    SyncUser::CompletionHandler* cxx_cb = static_cast<SyncUser::CompletionHandler*>(userdata);
+    REALM_ASSERT(cxx_cb);
+    std::optional<AppError> cxx_err;
+    if (err) {
+        std::optional<int> additional_error_code;
+        if (err->http_status_code) {
+            additional_error_code = err->http_status_code;
+        }
+        cxx_err =
+            AppError(ErrorCodes::Error(err->error), err->message, err->link_to_server_logs, additional_error_code);
+    }
+    (*cxx_cb)(cxx_err);
+    delete cxx_cb;
+}
+
+struct CAPIAppUser : SyncUser {
+    void* m_userdata = nullptr;
+    realm_free_userdata_func_t m_free = nullptr;
+    const std::string m_app_id;
+    const std::string m_user_id;
+    realm_user_get_access_token_cb_t m_access_token_cb = nullptr;
+    realm_user_get_refresh_token_cb_t m_refresh_token_cb = nullptr;
+    realm_user_state_cb_t m_state_cb = nullptr;
+    realm_user_access_token_refresh_required_cb_t m_atrr_cb = nullptr;
+    realm_user_get_sync_manager_cb_t m_sync_manager_cb = nullptr;
+    realm_user_request_log_out_cb_t m_request_log_out_cb = nullptr;
+    realm_user_request_refresh_location_cb_t m_request_refresh_location_cb = nullptr;
+    realm_user_request_access_token_cb_t m_request_access_token_cb = nullptr;
+    realm_user_track_realm_cb_t m_track_realm_cb = nullptr;
+    realm_user_create_file_action_cb_t m_create_fa_cb = nullptr;
+
+    CAPIAppUser(const char* app_id, const char* user_id)
+        : m_app_id(app_id)
+        , m_user_id(user_id)
+    {
+    }
+    CAPIAppUser(CAPIAppUser&& other)
+        : m_userdata(std::exchange(other.m_userdata, nullptr))
+        , m_free(std::exchange(other.m_free, nullptr))
+        , m_app_id(std::move(other.m_app_id))
+        , m_user_id(std::move(other.m_user_id))
+        , m_access_token_cb(std::move(other.m_access_token_cb))
+        , m_refresh_token_cb(std::move(other.m_refresh_token_cb))
+        , m_state_cb(std::move(other.m_state_cb))
+        , m_atrr_cb(std::move(other.m_atrr_cb))
+        , m_sync_manager_cb(std::move(other.m_sync_manager_cb))
+        , m_request_log_out_cb(std::move(other.m_request_log_out_cb))
+        , m_request_refresh_location_cb(std::move(other.m_request_refresh_location_cb))
+        , m_request_access_token_cb(std::move(other.m_request_access_token_cb))
+        , m_track_realm_cb(std::move(other.m_track_realm_cb))
+        , m_create_fa_cb(std::move(other.m_create_fa_cb))
+    {
+    }
+
+    ~CAPIAppUser()
+    {
+        if (m_free)
+            m_free(m_userdata);
+    }
+    std::string user_id() const noexcept override
+    {
+        return m_user_id;
+    }
+    std::string app_id() const noexcept override
+    {
+        return m_app_id;
+    }
+    std::string access_token() const override
+    {
+        return m_access_token_cb(m_userdata);
+    }
+    std::string refresh_token() const override
+    {
+        return m_refresh_token_cb(m_userdata);
+    }
+    State state() const override
+    {
+        return State(m_state_cb(m_userdata));
+    }
+    bool access_token_refresh_required() const override
+    {
+        return m_atrr_cb(m_userdata);
+    }
+    SyncManager* sync_manager() override
+    {
+        auto value = m_sync_manager_cb(m_userdata);
+        if (value && value->get()) {
+            return (value->get());
+        }
+        return nullptr;
+    }
+    void request_log_out() override
+    {
+        m_request_log_out_cb(m_userdata);
+    }
+    void request_refresh_location(CompletionHandler&& callback) override
+    {
+        auto unscoped_cb = new CompletionHandler(std::move(callback));
+        m_request_refresh_location_cb(m_userdata, cb_proxy_for_completion, unscoped_cb);
+    }
+    void request_access_token(CompletionHandler&& callback) override
+    {
+        auto unscoped_cb = new CompletionHandler(std::move(callback));
+        m_request_access_token_cb(m_userdata, cb_proxy_for_completion, unscoped_cb);
+    }
+    void track_realm(std::string_view path) override
+    {
+        if (m_track_realm_cb) {
+            m_track_realm_cb(m_userdata, path.data());
+        }
+    }
+    std::string create_file_action(SyncFileAction a, std::string_view path,
+                                   std::optional<std::string> recovery_dir) override
+    {
+
+        if (m_create_fa_cb) {
+            return m_create_fa_cb(m_userdata, realm_sync_file_action_e(a), path.data(),
+                                  recovery_dir ? recovery_dir->data() : nullptr);
+        }
+        return "";
+    }
+};
+
+RLM_API realm_user_t* realm_user_new(realm_sync_user_create_config_t c) noexcept
+{
+    // optional to provide:
+    // m_userdata
+    // m_free
+    // m_track_realm_cb
+    // m_create_fa_cb
+
+    REALM_ASSERT(c.app_id);
+    REALM_ASSERT(c.user_id);
+    REALM_ASSERT(c.access_token_cb);
+    REALM_ASSERT(c.refresh_token_cb);
+    REALM_ASSERT(c.state_cb);
+    REALM_ASSERT(c.atrr_cb);
+    REALM_ASSERT(c.sync_manager_cb);
+    REALM_ASSERT(c.request_log_out_cb);
+    REALM_ASSERT(c.request_refresh_location_cb);
+    REALM_ASSERT(c.request_access_token_cb);
+
+    return wrap_err([&]() {
+        auto capi_user = std::make_shared<CAPIAppUser>(c.app_id, c.user_id);
+        capi_user->m_userdata = c.userdata;
+        capi_user->m_free = c.free_func;
+        capi_user->m_access_token_cb = c.access_token_cb;
+        capi_user->m_refresh_token_cb = c.refresh_token_cb;
+        capi_user->m_state_cb = c.state_cb;
+        capi_user->m_atrr_cb = c.atrr_cb;
+        capi_user->m_sync_manager_cb = c.sync_manager_cb;
+        capi_user->m_request_log_out_cb = c.request_log_out_cb;
+        capi_user->m_request_refresh_location_cb = c.request_refresh_location_cb;
+        capi_user->m_request_access_token_cb = c.request_access_token_cb;
+        capi_user->m_track_realm_cb = c.track_realm_cb;
+        capi_user->m_create_fa_cb = c.create_fa_cb;
+
+        return new realm_user_t(std::move(capi_user));
+    });
+}
+
+RLM_API realm_sync_manager_t* realm_sync_manager_create(const realm_sync_client_config_t* config)
+{
+    return wrap_err([&]() {
+        auto manager = SyncManager::create(*config);
+        return new realm_sync_manager_t(std::move(manager));
+    });
+}
+
+RLM_API void realm_sync_manager_set_route(const realm_sync_manager_t* manager, const char* route, bool is_verified)
+{
+    REALM_ASSERT(manager);
+    (*manager)->set_sync_route(route, is_verified);
+}
+#endif // #!REALM_APP_SERVICES
 
 #if REALM_APP_SERVICES
 
@@ -1097,3 +1278,11 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
 #endif // REALM_APP_SERVICES
 
 } // namespace realm::c_api
+
+#if REALM_APP_SERVICES
+// definitions outside the c_api namespace
+realm_app_user_subscription_token::~realm_app_user_subscription_token()
+{
+    user->unsubscribe(token);
+}
+#endif

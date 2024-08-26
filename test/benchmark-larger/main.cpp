@@ -22,6 +22,7 @@
 #include <iostream>
 
 #include <realm.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
@@ -162,7 +163,7 @@ int main()
                               << std::endl;
                     start = end;
                     for (size_t i = 0; i < probe_size; ++i) {
-                        sum += objects[i].get<Int>(col2);
+                        sum = sum + objects[i].get<Int>(col2);
                     }
                     end = std::chrono::steady_clock::now();
                     diff = end - start;

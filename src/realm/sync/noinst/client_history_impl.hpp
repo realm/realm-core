@@ -22,6 +22,8 @@
 #include <realm/array_integer.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/instruction_replication.hpp>
+#include <realm/sync/transform.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
 
@@ -136,8 +138,8 @@ public:
     /// The returned SyncProgress is the one that was last stored by
     /// set_sync_progress(), or `SyncProgress{}` if set_sync_progress() has
     /// never been called.
-    void get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident, SyncProgress& progress,
-                    bool* has_pending_client_reset = nullptr) const;
+    void get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
+                    SyncProgress& progress) const;
 
     /// Stores the server assigned client file identifier in the associated
     /// Realm file, such that it is available via get_status() during future
@@ -173,7 +175,7 @@ public:
     /// \param downloadable_bytes If specified, and if the implementation cares
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
-    void set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes, VersionInfo&);
+    void set_sync_progress(const SyncProgress& progress, DownloadableProgress downloadable_bytes, VersionInfo&);
 
     /// \brief Scan through the history for changesets to be uploaded.
     ///
@@ -247,13 +249,24 @@ public:
     /// Note: In FLX, the transaction is left in reading state when bootstrap ends.
     /// In all other cases, the transaction is left in reading state when the function returns.
     void integrate_server_changesets(
-        const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+        const SyncProgress& progress, DownloadableProgress downloadable_bytes,
         util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
         util::Logger&, const TransactionRef& transact,
-        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr);
+        util::UniqueFunction<void(const Transaction&, util::Span<Changeset>)> run_in_write_tr = nullptr);
 
-    static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
-                                          std::uint_fast64_t&, std::uint_fast64_t&);
+    static void get_upload_download_state(Transaction&, Allocator& alloc, std::uint_fast64_t&, DownloadableProgress&,
+                                          std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
+                                          version_type&);
+    static void get_upload_download_state(DB*, std::uint_fast64_t&, std::uint_fast64_t&);
+
+    /// Record the current download progress.
+    ///
+    /// This is used when storing FLX bootstraps to make the progress available
+    /// to other processes which are observing the file. It must be called
+    /// inside of a write transaction. The data stored here is only meaningful
+    /// until the next call of integrate_server_changesets(), which will
+    /// overwrite it.
+    static void set_download_progress(Transaction& tr, DownloadableProgress);
 
     // Overriding member functions in realm::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override;
@@ -408,7 +421,7 @@ private:
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(const HistoryEntry&);
-    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes, TransactionRef);
+    void update_sync_progress(const SyncProgress&, DownloadableProgress downloadable_bytes);
     void trim_ct_history();
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);

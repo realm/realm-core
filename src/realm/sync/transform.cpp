@@ -1,5 +1,6 @@
 #include <realm/sync/transform.hpp>
 
+#include <realm/sync/changeset_encoder.hpp>
 #include <realm/sync/noinst/changeset_index.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 
@@ -2589,8 +2590,9 @@ size_t Transformer::transform_remote_changesets(TransformHistory& history, file_
 Changeset& Transformer::get_reciprocal_transform(TransformHistory& history, file_ident_type local_file_ident,
                                                  version_type version, const HistoryEntry& history_entry)
 {
-    auto& changeset = m_reciprocal_transform_cache[version]; // Throws
-    if (changeset.empty()) {
+    auto [it, success] = m_reciprocal_transform_cache.insert({version, Changeset{}}); // Throws
+    if (success) {
+        Changeset& changeset = it->second;
         bool is_compressed = false;
         ChunkedBinaryData data = history.get_reciprocal_transform(version, is_compressed);
         ChunkedBinaryInputStream in{data};
@@ -2612,7 +2614,7 @@ Changeset& Transformer::get_reciprocal_transform(TransformHistory& history, file
             origin_file_ident = local_file_ident;
         changeset.origin_file_ident = origin_file_ident;
     }
-    return changeset;
+    return it->second;
 }
 
 

@@ -33,26 +33,26 @@ constexpr static std::string_view c_meta_schema_schema_group_field("schema_group
 
 } // namespace
 
-void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables)
+void create_sync_metadata_schema(Group& g, std::vector<SyncMetadataTable>* tables)
 {
     util::FlatMap<std::string_view, TableRef> found_tables;
     for (auto& table : *tables) {
-        if (tr->has_table(table.name)) {
+        if (g.has_table(table.name)) {
             throw RuntimeError(
                 ErrorCodes::RuntimeError,
                 util::format("table %1 already existed when creating internal tables for sync", table.name));
         }
         TableRef table_ref;
         if (table.is_embedded) {
-            table_ref = tr->add_table(table.name, Table::Type::Embedded);
+            table_ref = g.add_table(table.name, Table::Type::Embedded);
         }
         else if (table.pk_info) {
-            table_ref = tr->add_table_with_primary_key(table.name, table.pk_info->data_type, table.pk_info->name,
-                                                       table.pk_info->is_optional);
+            table_ref = g.add_table_with_primary_key(table.name, table.pk_info->data_type, table.pk_info->name,
+                                                     table.pk_info->is_optional);
             *table.pk_info->key_out = table_ref->get_primary_key_column();
         }
         else {
-            table_ref = tr->add_table(table.name);
+            table_ref = g.add_table(table.name);
         }
 
         found_tables.insert({table.name, table_ref});
@@ -83,34 +83,41 @@ void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetad
     }
 }
 
-void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables)
+void load_sync_metadata_schema(const Group& g, std::vector<SyncMetadataTable>* tables)
+{
+    if (auto status = try_load_sync_metadata_schema(g, tables); !status.is_ok()) {
+        throw Exception(std::move(status));
+    }
+}
+
+Status try_load_sync_metadata_schema(const Group& g, std::vector<SyncMetadataTable>* tables)
 {
     for (auto& table : *tables) {
-        auto table_ref = tr->get_table(table.name);
+        auto table_ref = g.get_table(table.name);
         if (!table_ref) {
-            throw RuntimeError(ErrorCodes::RuntimeError,
-                               util::format("could not find internal sync table %1", table.name));
+            return Status(ErrorCodes::RuntimeError,
+                          util::format("could not find internal sync table %1", table.name));
         }
 
         *table.key_out = table_ref->get_key();
         if (table.pk_info) {
             auto pk_col = table_ref->get_primary_key_column();
             if (auto pk_name = table_ref->get_column_name(pk_col); pk_name != table.pk_info->name) {
-                throw RuntimeError(
+                return Status(
                     ErrorCodes::RuntimeError,
                     util::format(
                         "primary key name of sync internal table %1 does not match (stored: %2, defined: %3)",
                         table.name, pk_name, table.pk_info->name));
             }
             if (auto pk_type = table_ref->get_column_type(pk_col); pk_type != table.pk_info->data_type) {
-                throw RuntimeError(
+                return Status(
                     ErrorCodes::RuntimeError,
                     util::format(
                         "primary key type of sync internal table %1 does not match (stored: %2, defined: %3)",
                         table.name, pk_type, table.pk_info->data_type));
             }
             if (auto is_nullable = table_ref->is_nullable(pk_col); is_nullable != table.pk_info->is_optional) {
-                throw RuntimeError(
+                return Status(
                     ErrorCodes::RuntimeError,
                     util::format(
                         "primary key nullabilty of sync internal table %1 does not match (stored: %2, defined: %3)",
@@ -119,12 +126,12 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
             *table.pk_info->key_out = pk_col;
         }
         else if (table.is_embedded && !table_ref->is_embedded()) {
-            throw RuntimeError(ErrorCodes::RuntimeError,
-                               util::format("internal sync table %1 should be embedded, but is not", table.name));
+            return Status(ErrorCodes::RuntimeError,
+                          util::format("internal sync table %1 should be embedded, but is not", table.name));
         }
 
         if (table.columns.size() + size_t(table.pk_info ? 1 : 0) != table_ref->get_column_count()) {
-            throw RuntimeError(
+            return Status(
                 ErrorCodes::RuntimeError,
                 util::format("sync internal table %1 has a different number of columns than its schema", table.name));
         }
@@ -132,20 +139,19 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
         for (auto& col : table.columns) {
             auto col_key = table_ref->get_column_key(col.name);
             if (!col_key) {
-                throw RuntimeError(
-                    ErrorCodes::RuntimeError,
-                    util::format("column %1 is missing in sync internal table %2", col.name, table.name));
+                return Status(ErrorCodes::RuntimeError,
+                              util::format("column %1 is missing in sync internal table %2", col.name, table.name));
             }
 
             auto found_col_type = table_ref->get_column_type(col_key);
             if (found_col_type != col.data_type) {
-                throw RuntimeError(
+                return Status(
                     ErrorCodes::RuntimeError,
                     util::format("column %1 in sync internal table %2 is the wrong type", col.name, table.name));
             }
 
             if (col.is_optional != table_ref->is_nullable(col_key)) {
-                throw RuntimeError(
+                return Status(
                     ErrorCodes::RuntimeError,
                     util::format("column %1 in sync internal table %2 has different nullabilty than in its schema",
                                  col.name, table.name));
@@ -153,29 +159,28 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
 
             if (col.data_type == type_Link) {
                 if (table_ref->get_link_target(col_key)->get_name() != col.target_table) {
-                    RuntimeError(ErrorCodes::RuntimeError,
-                                 util::format("column %1 in sync internal table %2 links to the wrong table %3",
-                                              col.name, table.name, table_ref->get_link_target(col_key)->get_name()));
+                    return Status(ErrorCodes::RuntimeError,
+                                  util::format("column %1 in sync internal table %2 links to the wrong table %3",
+                                               col.name, table.name,
+                                               table_ref->get_link_target(col_key)->get_name()));
                 }
             }
             *col.key_out = col_key;
         }
     }
+    return Status::OK();
 }
 
 SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const TransactionRef& tr)
 {
-    TableKey legacy_table_key;
-    ColKey legacy_version_key;
-    std::vector<SyncMetadataTable> legacy_table_def{
-        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
     std::vector<SyncMetadataTable> unified_schema_version_table_def{
         {&m_table,
          c_sync_internal_schemas_table,
          {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
-    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
+    // Any type of transaction is allowed, including frozen and write, as long as it supports reading
+    REALM_ASSERT_EX(tr->get_transact_stage() != DB::transact_Ready, tr->get_transact_stage());
     // If the legacy_meta_table exists, then this table hasn't been converted and
     // the metadata schema versions information has not been upgraded/not accurate
     if (tr->has_table(c_flx_metadata_table)) {
@@ -184,14 +189,43 @@ SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const Transac
 
     if (tr->has_table(c_sync_internal_schemas_table)) {
         // Load m_table with the table/schema information
-        load_sync_metadata_schema(tr, &unified_schema_version_table_def);
+        load_sync_metadata_schema(*tr, &unified_schema_version_table_def);
     }
+}
+
+std::optional<int64_t> SyncMetadataSchemaVersionsReader::get_legacy_version(const TransactionRef& tr)
+{
+    if (!tr->has_table(c_flx_metadata_table)) {
+        return std::nullopt;
+    }
+
+    TableKey legacy_table_key;
+    ColKey legacy_version_key;
+    std::vector<SyncMetadataTable> legacy_table_def{
+        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
+
+    // Convert the legacy table to the regular schema versions table if it exists
+    load_sync_metadata_schema(*tr, &legacy_table_def);
+
+    if (auto legacy_meta_table = tr->get_table(legacy_table_key);
+        legacy_meta_table && legacy_meta_table->size() > 0) {
+        auto legacy_obj = legacy_meta_table->get_object(0);
+        return legacy_obj.get<int64_t>(legacy_version_key);
+    }
+
+    return std::nullopt;
 }
 
 std::optional<int64_t> SyncMetadataSchemaVersionsReader::get_version_for(const TransactionRef& tr,
                                                                          std::string_view schema_group_name)
 {
     if (!m_table) {
+        // The legacy version only applies to the subscription store, don't query otherwise
+        if (schema_group_name == internal_schema_groups::c_flx_subscription_store) {
+            if (auto legacy_version = get_legacy_version(tr)) {
+                return legacy_version;
+            }
+        }
         return util::none;
     }
 
@@ -211,48 +245,54 @@ std::optional<int64_t> SyncMetadataSchemaVersionsReader::get_version_for(const T
 SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
     : SyncMetadataSchemaVersionsReader(tr)
 {
-    TableKey legacy_table_key;
-    ColKey legacy_version_key;
-    std::vector<SyncMetadataTable> legacy_table_def{
-        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
     std::vector<SyncMetadataTable> unified_schema_version_table_def{
         {&m_table,
          c_sync_internal_schemas_table,
          {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
-    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
+    DB::TransactStage orig = tr->get_transact_stage();
+    bool modified = false;
+
+    // Read and write transactions are allowed, but not frozen
+    REALM_ASSERT_EX((orig == DB::transact_Reading || orig == DB::transact_Writing), orig);
     // If the versions table exists, then m_table would have been initialized by the reader constructor
     // If the versions table doesn't exist, then initialize it now
     if (!m_table) {
         // table should have already been initialized or needs to be created,
         // but re-initialize in case it isn't (e.g. both unified and legacy tables exist in DB)
         if (REALM_UNLIKELY(tr->has_table(c_sync_internal_schemas_table))) {
-            load_sync_metadata_schema(tr, &unified_schema_version_table_def);
+            load_sync_metadata_schema(*tr, &unified_schema_version_table_def);
         }
         else {
-            tr->promote_to_write();
-            create_sync_metadata_schema(tr, &unified_schema_version_table_def);
-            tr->commit_and_continue_as_read();
+            // Only write the versions table if it doesn't exist
+            if (tr->get_transact_stage() != DB::transact_Writing) {
+                tr->promote_to_write();
+            }
+            create_sync_metadata_schema(*tr, &unified_schema_version_table_def);
+            modified = true;
         }
     }
 
-    if (!tr->has_table(c_flx_metadata_table)) {
-        return;
+    if (auto legacy_version = get_legacy_version(tr)) {
+        // Migrate from just having a subscription store metadata table to having multiple table groups with multiple
+        // versions.
+        if (tr->get_transact_stage() != DB::transact_Writing) {
+            tr->promote_to_write();
+        }
+        // Only the flx subscription store can potentially have the legacy metadata table
+        set_version_for(tr, internal_schema_groups::c_flx_subscription_store, *legacy_version);
+        tr->remove_table(c_flx_metadata_table);
+        modified = true;
     }
+    if (!modified)
+        return; // nothing to commit
 
-    // Convert the legacy table to the regular schema versions table if it exists
-    load_sync_metadata_schema(tr, &legacy_table_def);
-    // Migrate from just having a subscription store metadata table to having multiple table groups with multiple
-    // versions.
-    tr->promote_to_write();
-    auto legacy_meta_table = tr->get_table(legacy_table_key);
-    auto legacy_obj = legacy_meta_table->get_object(0);
-    // Only the flx subscription store can potentially have the legacy metadata table
-    set_version_for(tr, internal_schema_groups::c_flx_subscription_store,
-                    legacy_obj.get<int64_t>(legacy_version_key));
-    tr->remove_table(legacy_table_key);
-    tr->commit_and_continue_as_read();
+    // Commit and revert to the original transact stage
+    if (orig == DB::transact_Reading)
+        tr->commit_and_continue_as_read();
+    else
+        tr->commit_and_continue_writing();
 }
 
 void SyncMetadataSchemaVersions::set_version_for(const TransactionRef& tr, std::string_view schema_group_name,

@@ -27,6 +27,8 @@
 #include <vector>
 
 namespace realm {
+class Group;
+class Status;
 class Transaction;
 using TransactionRef = std::shared_ptr<Transaction>;
 } // namespace realm
@@ -36,6 +38,7 @@ namespace internal_schema_groups {
 constexpr static std::string_view c_flx_subscription_store("flx_subscription_store");
 constexpr static std::string_view c_pending_bootstraps("pending_bootstraps");
 constexpr static std::string_view c_flx_migration_store("flx_migration_store");
+constexpr static std::string_view c_pending_reset_store("pending_reset_store");
 } // namespace internal_schema_groups
 
 /*
@@ -120,14 +123,17 @@ struct SyncMetadataTable {
 };
 
 
-void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
-void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
+void create_sync_metadata_schema(Group& g, std::vector<SyncMetadataTable>* tables);
+void load_sync_metadata_schema(const Group& g, std::vector<SyncMetadataTable>* tables);
+Status try_load_sync_metadata_schema(const Group& g, std::vector<SyncMetadataTable>* tables);
 
 class SyncMetadataSchemaVersionsReader {
 public:
     explicit SyncMetadataSchemaVersionsReader(const TransactionRef& ref);
 
     std::optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
+
+    std::optional<int64_t> get_legacy_version(const TransactionRef& tr);
 
 protected:
     TableKey m_table;

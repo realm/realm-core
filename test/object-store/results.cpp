@@ -1040,9 +1040,9 @@ TEST_CASE("notifications: skip", "[notifications]") {
     SECTION("skipping must be done from the Realm's thread") {
         advance_and_notify(*r);
         r->begin_transaction();
-        std::thread([&] {
+        JoiningThread([&] {
             REQUIRE_EXCEPTION(token1.suppress_next(), WrongThread, "Realm accessed from incorrect thread.");
-        }).join();
+        });
         r->cancel_transaction();
     }
 
@@ -4984,7 +4984,7 @@ TEST_CASE("results: public name declared", "[results]") {
     realm->commit_transaction();
     Results r(realm, table);
 
-    SECTION("sorted") {
+    SECTION("sorted by public_name") {
         auto sorted = r.sort({{"public_value", true}});
         REQUIRE(sorted.limit(0).size() == 0);
         REQUIRE_ORDER(sorted.limit(1), 2);
@@ -4993,7 +4993,16 @@ TEST_CASE("results: public name declared", "[results]") {
         REQUIRE_ORDER(sorted.limit(100), 2, 6, 3, 7, 0, 4, 1, 5);
     }
 
-    SECTION("distinct") {
+    SECTION("sorted by name") {
+        auto sorted = r.sort({{"value", true}});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 6);
+        REQUIRE_ORDER(sorted.limit(8), 2, 6, 3, 7, 0, 4, 1, 5);
+        REQUIRE_ORDER(sorted.limit(100), 2, 6, 3, 7, 0, 4, 1, 5);
+    }
+
+    SECTION("distinct by public_name") {
         auto sorted = r.distinct({"public_value"});
         REQUIRE(sorted.limit(0).size() == 0);
         REQUIRE_ORDER(sorted.limit(1), 0);
@@ -5001,6 +5010,20 @@ TEST_CASE("results: public name declared", "[results]") {
         REQUIRE_ORDER(sorted.limit(8), 0, 1, 2, 3);
 
         sorted = r.sort({{"public_value", true}}).distinct({"public_value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 3);
+        REQUIRE_ORDER(sorted.limit(8), 2, 3, 0, 1);
+    }
+
+    SECTION("distinct by name") {
+        auto sorted = r.distinct({"value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 0);
+        REQUIRE_ORDER(sorted.limit(2), 0, 1);
+        REQUIRE_ORDER(sorted.limit(8), 0, 1, 2, 3);
+
+        sorted = r.sort({{"value", true}}).distinct({"value"});
         REQUIRE(sorted.limit(0).size() == 0);
         REQUIRE_ORDER(sorted.limit(1), 2);
         REQUIRE_ORDER(sorted.limit(2), 2, 3);

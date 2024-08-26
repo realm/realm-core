@@ -20,78 +20,31 @@
 #define REALM_OS_BINDING_CALLBACK_THREAD_OBSERVER_HPP
 
 #include <exception>
-#include <functional>
-#include <optional>
-
 
 namespace realm {
-// Interface for bindings interested in registering callbacks before/after the ObjectStore thread runs.
-// This is for example helpful to attach/detach the pthread to the JavaVM in order to be able to perform JNI calls.
+// Interface for observing the lifecycle of the worker thread used by
+// DefaultSocketProvider. This is required to be able to attach/detach the thread
+// to the JVM to be able to perform JNI calls.
 struct BindingCallbackThreadObserver {
-    using NotificationCallback = std::function<void()>;
-    using ErrorCallback = std::function<bool(const std::exception&)>;
-
-    // Create a BindingCallbackThreadObserver that can be used in SyncClientConfig
-    BindingCallbackThreadObserver(std::optional<NotificationCallback>&& did_create_thread,
-                                  std::optional<NotificationCallback>&& will_destroy_thread,
-                                  std::optional<ErrorCallback>&& error_handler)
-        : m_create_thread_callback{std::move(did_create_thread)}
-        , m_destroy_thread_callback{std::move(will_destroy_thread)}
-        , m_handle_error_callback{std::move(error_handler)}
-    {
-    }
-
     virtual ~BindingCallbackThreadObserver() = default;
 
-    ///
-    /// Execution Functions - check for a valid instance and if the function was set
-    ///
-
-    // Call the stored create thread callback function with the id of this thread
-    // Can be overridden to provide a custom implementation
-    virtual void did_create_thread()
+    // Called on the thread shortly after it is created. This is guaranteed to
+    // be called before any other callbacks to the SDK are made.
+    virtual void did_create_thread() {}
+    // Called on the thread shortly before it is destroyed. No further callbacks
+    // to the SDK on the thread will be made after this is called.
+    virtual void will_destroy_thread() {}
+    // If has_handle_error() returns true, any uncaught exceptions from the
+    // event loop are passed to this. If this returns true, the thread exits
+    // cleanly, while if it returns false the exception is rethrown.
+    virtual bool handle_error(const std::exception&)
     {
-        if (m_create_thread_callback) {
-            (*m_create_thread_callback)();
-        }
+        return false;
     }
-
-    // Call the stored destroy thread callback function with the id of this thread
-    // Can be overridden to provide a custom implementation
-    virtual void will_destroy_thread()
-    {
-        if (m_destroy_thread_callback) {
-            (*m_destroy_thread_callback)();
-        }
-    }
-
-    // Call the stored handle error callback function with the id of this thread
-    // IMPORTANT: If a function is supplied that handles the exception, it must
-    // call abort() or cause the application to crash since the SyncClient will
-    // be in a bad state if this occurs and will not be able to shut down properly.
-    // Can be overridden to provide a custom implementation
-    // Return true if the exception was handled by this function, otherwise false
-    virtual bool handle_error(const std::exception& e)
-    {
-        if (!m_handle_error_callback)
-            return false;
-
-        return (*m_handle_error_callback)(e);
-    }
-
-    // Return true if this event loop observer has a handle error callback defined
     virtual bool has_handle_error()
     {
-        return bool(m_handle_error_callback);
+        return false;
     }
-
-protected:
-    // Default constructor
-    BindingCallbackThreadObserver() = default;
-
-    std::optional<NotificationCallback> m_create_thread_callback;
-    std::optional<NotificationCallback> m_destroy_thread_callback;
-    std::optional<ErrorCallback> m_handle_error_callback;
 };
 
 } // namespace realm

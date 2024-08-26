@@ -151,6 +151,7 @@ public:
     Query& greater_equal(ColKey column_key, Timestamp value);
     Query& less_equal(ColKey column_key, Timestamp value);
     Query& less(ColKey column_key, Timestamp value);
+    Query& between(ColKey column_key, Timestamp from, Timestamp to);
 
     // Conditions: ObjectId
     Query& equal(ColKey column_key, ObjectId value);

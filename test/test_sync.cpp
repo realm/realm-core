@@ -1,17 +1,17 @@
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <tuple>
-#include <set>
-#include <string>
-#include <sstream>
 #include <mutex>
-#include <condition_variable>
+#include <set>
+#include <sstream>
+#include <string>
 #include <thread>
-#include <chrono>
+#include <tuple>
 
 #include <realm.hpp>
 #include <realm/chunked_binary.hpp>
@@ -126,6 +126,23 @@ ClientHistory& get_history(DBRef db)
     return get_replication(db).get_history();
 }
 
+Changeset get_reciprocal_changeset(ClientHistory& hist, version_type version)
+{
+    bool is_compressed = false;
+    auto data = hist.get_reciprocal_transform(version, is_compressed);
+    Changeset reciprocal_changeset;
+    ChunkedBinaryInputStream in{data};
+    if (is_compressed) {
+        size_t total_size;
+        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
+        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
+    }
+    else {
+        sync::parse_changeset(in, reciprocal_changeset); // Throws
+    }
+    return reciprocal_changeset;
+}
+
 #if !REALM_MOBILE // the server is not implemented on devices
 TEST(Sync_BadVirtualPath)
 {
@@ -142,28 +159,24 @@ TEST(Sync_BadVirtualPath)
 
     int nerrors = 0;
 
-    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
-        if (state != ConnectionState::disconnected)
-            return;
-        REALM_ASSERT(error_info);
-        CHECK_EQUAL(error_info->status, ErrorCodes::BadSyncPartitionValue);
-        CHECK(error_info->is_fatal);
-        ++nerrors;
-        if (nerrors == 3)
-            fixture.stop();
+    auto config = [&] {
+        Session::Config config;
+        config.connection_state_change_listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
+            if (state != ConnectionState::disconnected)
+                return;
+            REALM_ASSERT(error_info);
+            CHECK_EQUAL(error_info->status, ErrorCodes::BadSyncPartitionValue);
+            CHECK(error_info->is_fatal);
+            ++nerrors;
+            if (nerrors == 3)
+                fixture.stop();
+        };
+        return config;
     };
 
-    Session session_1 = fixture.make_session(db_1, "/test.realm");
-    session_1.set_connection_state_change_listener(listener);
-    session_1.bind();
-
-    Session session_2 = fixture.make_session(db_2, "/../test");
-    session_2.set_connection_state_change_listener(listener);
-    session_2.bind();
-
-    Session session_3 = fixture.make_session(db_3, "test%abc ");
-    session_3.set_connection_state_change_listener(listener);
-    session_3.bind();
+    Session session_1 = fixture.make_session(db_1, "/test.realm", config());
+    Session session_2 = fixture.make_session(db_2, "/../test", config());
+    Session session_3 = fixture.make_session(db_3, "test%abc ", config());
 
     session_1.wait_for_download_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -577,9 +590,8 @@ TEST(Sync_TokenWithoutExpirationAllowed)
 
         Session::Config sess_config;
         sess_config.signed_user_token = g_signed_test_user_token_expiration_unspecified;
+        sess_config.connection_state_change_listener = listener;
         Session session = fixture.make_session(db, "/test", std::move(sess_config));
-        session.set_connection_state_change_listener(listener);
-        session.bind();
         write_transaction(db, [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         });
@@ -607,7 +619,6 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         Session::Config config;
         config.signed_user_token = g_signed_test_user_token_expiration_null;
         Session session = fixture.make_session(db, "/test", std::move(config));
-        session.bind();
         {
             write_transaction(db, [](WriteTransaction& wt) {
                 wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
@@ -659,9 +670,7 @@ TEST(Sync_Replication)
         fixture.start();
 
         Session session_1 = fixture.make_bound_session(db_1);
-
         Session session_2 = fixture.make_session(db_2, "/test");
-        session_2.bind();
 
         // Create schema
         write_transaction(db_1, [](WriteTransaction& wt) {
@@ -706,10 +715,7 @@ TEST(Sync_Merge)
         fixture.start();
 
         Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-        session_1.bind();
-
         Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-        session_2.bind();
 
         // Create schema on both clients.
         auto create_schema = [](DBRef db) {
@@ -793,17 +799,16 @@ void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRe
     fixture.allow_server_errors(0, 1);
     fixture.start();
 
-    Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-    Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-
     if (!expected_error_2)
         expected_error_2 = expected_error_1;
 
-    session_1.set_connection_state_change_listener(ExpectChangesetError{test_context, fixture, expected_error_1});
-    session_2.set_connection_state_change_listener(ExpectChangesetError{test_context, fixture, expected_error_2});
+    Session::Config config_1;
+    config_1.connection_state_change_listener = ExpectChangesetError{test_context, fixture, expected_error_1};
+    Session::Config config_2;
+    config_2.connection_state_change_listener = ExpectChangesetError{test_context, fixture, expected_error_2};
 
-    session_1.bind();
-    session_2.bind();
+    Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(config_1));
+    Session session_2 = fixture.make_session(1, 0, db_2, "/test", std::move(config_2));
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -1041,47 +1046,6 @@ TEST(Sync_UnbindBeforeActivation)
     for (int i = 0; i < 1000; ++i) {
         Session session_2 = fixture.make_bound_session(db_2);
         session_2.wait_for_upload_complete_or_client_stopped();
-    }
-}
-
-
-TEST(Sync_AbandonUnboundSessions)
-{
-    TEST_DIR(dir);
-    TEST_CLIENT_DB(db_1);
-    TEST_CLIENT_DB(db_2);
-    TEST_CLIENT_DB(db_3);
-    ClientServerFixture fixture(dir, test_context);
-    fixture.start();
-
-    int n = 32;
-    for (int i = 0; i < n; ++i) {
-        fixture.make_session(db_1, "/test");
-        fixture.make_session(db_2, "/test");
-        fixture.make_session(db_3, "/test");
-    }
-
-    for (int i = 0; i < n; ++i) {
-        fixture.make_session(db_1, "/test");
-        Session session = fixture.make_session(db_2, "/test");
-        fixture.make_session(db_3, "/test");
-        session.bind();
-    }
-
-    for (int i = 0; i < n; ++i) {
-        fixture.make_session(db_1, "/test");
-        Session session = fixture.make_session(db_2, "/test");
-        fixture.make_session(db_3, "/test");
-        session.bind();
-        session.wait_for_upload_complete_or_client_stopped();
-    }
-
-    for (int i = 0; i < n; ++i) {
-        fixture.make_session(db_1, "/test");
-        Session session = fixture.make_session(db_2, "/test");
-        fixture.make_session(db_3, "/test");
-        session.bind();
-        session.wait_for_download_complete_or_client_stopped();
     }
 }
 
@@ -1391,11 +1355,10 @@ TEST(Sync_Randomized)
         client_shared_groups[i] = DB::create(make_client_replication(), test_path);
     }
 
-    std::vector<std::unique_ptr<Session>> sessions(num_clients);
+    std::vector<Session> sessions(num_clients);
     for (size_t i = 0; i < num_clients; ++i) {
         auto db = client_shared_groups[i];
-        sessions[i] = std::make_unique<Session>(fixture.make_session(int(i), 0, db, "/test"));
-        sessions[i]->bind();
+        sessions[i] = fixture.make_session(int(i), 0, db, "/test");
     }
 
     auto run_client_test_program = [&](size_t i) {
@@ -1422,14 +1385,14 @@ TEST(Sync_Randomized)
     // Wait until all local changes are uploaded, and acknowledged by the
     // server.
     for (size_t i = 0; i < num_clients; ++i)
-        sessions[i]->wait_for_upload_complete_or_client_stopped();
+        sessions[i].wait_for_upload_complete_or_client_stopped();
 
     log("Everything uploaded");
 
     // Now wait for all previously uploaded changes to be downloaded by all
     // others.
     for (size_t i = 0; i < num_clients; ++i)
-        sessions[i]->wait_for_download_complete_or_client_stopped();
+        sessions[i].wait_for_download_complete_or_client_stopped();
 
     log("Everything downloaded");
 
@@ -2114,7 +2077,6 @@ TEST(Sync_MultipleServers)
             for (int i = 0; i < num_sessions_per_file; ++i) {
                 int client_index = 0;
                 Session session = fixture.make_session(client_index, server_index, db, server_path);
-                session.bind();
                 for (int j = 0; j < num_transacts_per_session; ++j) {
                     WriteTransaction wt(db);
                     TableRef table = wt.get_table("class_table");
@@ -2142,7 +2104,6 @@ TEST(Sync_MultipleServers)
             DBRef db = DB::create(make_client_replication(), path);
             std::string server_path = "/" + std::to_string(realm_index);
             Session session = fixture.make_session(client_index, server_index, db, server_path);
-            session.bind();
             session.wait_for_download_complete_or_client_stopped();
         }
         catch (...) {
@@ -2673,7 +2634,6 @@ TEST(Sync_SSL_Certificate_1)
     session_config.signed_user_token = g_signed_test_user_token;
 
     Session session = fixture.make_session(db, "/test", std::move(session_config));
-    session.bind();
 
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
@@ -2769,7 +2729,6 @@ TEST(Sync_SSL_Certificate_DER)
     session_config.signed_user_token = g_signed_test_user_token;
 
     Session session = fixture.make_session(db, "/test", std::move(session_config));
-    session.bind();
 
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
@@ -2839,7 +2798,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
         std::string pem(pem_data, pem_size);
 
         std::string expected = "-----BEGIN CERTIFICATE-----\n"
-                               "MIIF0zCCA7ugAwIBAgIBCDANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
+                               "MIIF0zCCA7ugAwIBAgIBCjANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
 
         CHECK_EQUAL(expected, pem.substr(0, expected.size()));
 
@@ -2897,7 +2856,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
         else {
             CHECK_EQUAL(pem_size, 1700);
             CHECK_EQUAL(preverify_ok, 1);
-            CHECK_EQUAL(pem_data[1667], '2');
+            CHECK_EQUAL(pem_data[1667], 'J');
             CHECK_EQUAL(pem_data[1698], '-');
             CHECK_EQUAL(pem_data[1699], '\n');
         }
@@ -2963,7 +2922,6 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_verify_callback = ssl_verify_callback;
 
     Session session(client, db, nullptr, nullptr, std::move(session_config));
-    session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
     client.shutdown_and_wait();
@@ -2986,75 +2944,80 @@ TEST(Sync_UploadDownloadProgress_1)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    std::atomic<uint_fast64_t> downloaded_bytes;
-    std::atomic<uint_fast64_t> downloadable_bytes;
-    std::atomic<uint_fast64_t> uploaded_bytes;
-    std::atomic<uint_fast64_t> uploadable_bytes;
-    std::atomic<uint_fast64_t> snapshot_version;
+    struct ProgressInfo {
+        uint64_t downloaded_bytes = 0;
+        uint64_t downloadable_bytes = 0;
+        uint64_t uploaded_bytes = 0;
+        uint64_t uploadable_bytes = 0;
+        uint64_t snapshot_version = 0;
+    };
+
+    ProgressInfo first_run_progress;
+
     {
-        int handler_entry = 0;
-
-        bool cond_var_signaled = false;
-        std::mutex mutex;
-        std::condition_variable cond_var;
-
         ClientServerFixture fixture(server_dir, test_context);
         fixture.start();
 
-        Session session = fixture.make_session(db, "/test");
-
-        auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
-            downloaded_bytes = downloaded;
-            downloadable_bytes = downloadable;
-            uploaded_bytes = uploaded;
-            uploadable_bytes = uploadable;
-            snapshot_version = snapshot;
-            ++handler_entry;
+        Session::Config config;
+        std::mutex progress_mutex;
+        std::condition_variable progress_cv;
+        std::optional<ProgressInfo> observed_progress;
+        auto wait_for_progress_info = [&] {
+            std::unique_lock lk(progress_mutex);
+            progress_cv.wait(lk, [&] {
+                return observed_progress;
+            });
+            auto ret = std::exchange(observed_progress, std::optional<ProgressInfo>{});
+            return *ret;
+        };
+        config.progress_handler = [&](uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
+                                      uint64_t uploadable, uint64_t snapshot, double, double, int64_t) {
+            std::lock_guard lk(progress_mutex);
+            observed_progress = ProgressInfo{downloaded, downloadable, uploaded, uploadable, snapshot};
+            progress_cv.notify_one();
         };
 
-        std::unique_lock<std::mutex> lock(mutex);
-        session.set_progress_handler(progress_handler);
-        session.set_connection_state_change_listener([&](ConnectionState state, util::Optional<ErrorInfo>) {
-            if (state == ConnectionState::connected) {
-                std::unique_lock<std::mutex> lock(mutex);
-                cond_var_signaled = true;
-                lock.unlock();
-                cond_var.notify_one();
-            }
-        });
-        session.bind();
-        cond_var.wait(lock, [&] {
-            return cond_var_signaled;
-        });
-        CHECK_EQUAL(handler_entry, 0);
+
+        Session session = fixture.make_session(db, "/test", std::move(config));
+        auto progress_info = wait_for_progress_info();
+
+        CHECK_EQUAL(progress_info.downloaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.downloadable_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.uploaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.uploadable_bytes, uint_fast64_t(0));
+        CHECK_GREATER_EQUAL(progress_info.snapshot_version, 1);
 
         auto commit_version = write_transaction(db, [](WriteTransaction& wt) {
-            wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
+            auto tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
+            tr->add_column(type_Int, "integer column");
         });
 
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
 
-        CHECK_EQUAL(downloaded_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(downloadable_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploaded_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
-        CHECK_GREATER_EQUAL(snapshot_version, commit_version);
-
+        auto old_progress_info = progress_info;
+        progress_info = wait_for_progress_info();
+        CHECK_EQUAL(progress_info.downloaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.downloadable_bytes, uint_fast64_t(0));
+        CHECK_GREATER(progress_info.uploaded_bytes, old_progress_info.uploaded_bytes);
+        CHECK_GREATER(progress_info.uploadable_bytes, old_progress_info.uploadable_bytes);
+        CHECK_GREATER_EQUAL(progress_info.snapshot_version, commit_version);
 
         commit_version = write_transaction(db, [](WriteTransaction& wt) {
-            wt.get_table("class_table")->create_object_with_primary_key(1);
+            wt.get_table("class_table")->create_object_with_primary_key(1).set("integer column", 42);
         });
 
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
 
-        CHECK_EQUAL(downloaded_bytes, uint_fast64_t(0));
-        CHECK_EQUAL(downloadable_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploaded_bytes, uint_fast64_t(0));
-        CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
-        CHECK_GREATER_EQUAL(snapshot_version, commit_version);
+        old_progress_info = progress_info;
+        progress_info = wait_for_progress_info();
+        CHECK_EQUAL(progress_info.downloaded_bytes, uint_fast64_t(0));
+        CHECK_EQUAL(progress_info.downloadable_bytes, uint_fast64_t(0));
+        CHECK_GREATER(progress_info.uploaded_bytes, old_progress_info.uploaded_bytes);
+        CHECK_GREATER(progress_info.uploadable_bytes, old_progress_info.uploadable_bytes);
+        CHECK_GREATER_EQUAL(progress_info.snapshot_version, commit_version);
+        first_run_progress = progress_info;
     }
 
     {
@@ -3063,42 +3026,25 @@ TEST(Sync_UploadDownloadProgress_1)
         // are the ones stored in the Realm in the previous
         // session.
 
-        bool cond_var_signaled = false;
-        std::mutex mutex;
-        std::condition_variable cond_var;
-
         ClientServerFixture fixture(server_dir, test_context);
         fixture.start();
-        Session session = fixture.make_session(db, "/test");
 
         int number_of_handler_calls = 0;
-
-        auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
-            CHECK_EQUAL(downloaded, downloaded_bytes);
-            CHECK_EQUAL(downloadable, downloaded_bytes);
-            CHECK_EQUAL(uploaded, uploaded_bytes);
-            CHECK_GREATER(uploadable, uploaded_bytes);
-            CHECK_GREATER(snapshot, snapshot_version);
+        auto pf = util::make_promise_future<int>();
+        Session::Config config;
+        config.progress_handler = [&](uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
+                                      uint64_t uploadable, uint64_t snapshot, double, double, int64_t) {
+            CHECK_EQUAL(downloaded, first_run_progress.downloaded_bytes);
+            CHECK_EQUAL(downloadable, first_run_progress.downloadable_bytes);
+            CHECK_EQUAL(uploaded, first_run_progress.uploaded_bytes);
+            CHECK_EQUAL(uploadable, first_run_progress.uploadable_bytes);
+            CHECK_GREATER(snapshot, first_run_progress.snapshot_version);
             number_of_handler_calls++;
-
-            std::unique_lock<std::mutex> lock(mutex);
-            cond_var_signaled = true;
-            lock.unlock();
-            cond_var.notify_one();
+            pf.promise.emplace_value(number_of_handler_calls);
         };
 
-        std::unique_lock<std::mutex> lock(mutex);
-        session.set_progress_handler(progress_handler);
-        session.bind();
-        write_transaction(db, [](WriteTransaction& wt) {
-            wt.get_table("class_table")->create_object_with_primary_key(2);
-        });
-        cond_var.wait(lock, [&] {
-            return cond_var_signaled;
-        });
-
-        CHECK_EQUAL(number_of_handler_calls, 1);
+        Session session = fixture.make_session(db, "/test", std::move(config));
+        CHECK_EQUAL(pf.future.get(), 1);
     }
 }
 
@@ -3118,18 +3064,15 @@ TEST(Sync_UploadDownloadProgress_2)
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    Session session_1 = fixture.make_session(db_1, "/test");
-    Session session_2 = fixture.make_session(db_2, "/test");
-
     uint_fast64_t downloaded_bytes_1 = 123; // Not zero
     uint_fast64_t downloadable_bytes_1 = 123;
     uint_fast64_t uploaded_bytes_1 = 123;
     uint_fast64_t uploadable_bytes_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
-    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+    Session::Config config_1;
+    config_1.progress_handler = [&](uint64_t downloaded_bytes, uint64_t downloadable_bytes, uint64_t uploaded_bytes,
+                                    uint64_t uploadable_bytes, uint64_t snapshot_version, double, double, int64_t) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -3137,17 +3080,15 @@ TEST(Sync_UploadDownloadProgress_2)
         snapshot_version_1 = snapshot_version;
     };
 
-    session_1.set_progress_handler(progress_handler_1);
-
     uint_fast64_t downloaded_bytes_2 = 123;
     uint_fast64_t downloadable_bytes_2 = 123;
     uint_fast64_t uploaded_bytes_2 = 123;
     uint_fast64_t uploadable_bytes_2 = 123;
     uint_fast64_t snapshot_version_2 = 0;
 
-    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+    Session::Config config_2;
+    config_2.progress_handler = [&](uint64_t downloaded_bytes, uint64_t downloadable_bytes, uint64_t uploaded_bytes,
+                                    uint64_t uploadable_bytes, uint64_t snapshot_version, double, double, int64_t) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -3155,10 +3096,8 @@ TEST(Sync_UploadDownloadProgress_2)
         snapshot_version_2 = snapshot_version;
     };
 
-    session_2.set_progress_handler(progress_handler_2);
-
-    session_1.bind();
-    session_2.bind();
+    Session session_1 = fixture.make_session(db_1, "/test", std::move(config_1));
+    Session session_2 = fixture.make_session(db_2, "/test", std::move(config_2));
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -3327,16 +3266,6 @@ TEST(Sync_UploadDownloadProgress_3)
     client_config.reconnect_mode = ReconnectMode::testing;
     Client client(client_config);
 
-    // when connecting to the C++ server, use URL prefix:
-    Session::Config config;
-    config.service_identifier = "/realm-sync";
-    config.server_address = server_address;
-    config.signed_user_token = g_signed_test_user_token;
-    config.server_port = server_port;
-    config.realm_identifier = "/test";
-
-    Session session(client, db, nullptr, nullptr, std::move(config));
-
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
     // not running, and it is started by progress_handler().
@@ -3350,10 +3279,15 @@ TEST(Sync_UploadDownloadProgress_3)
     uint_fast64_t uploadable_bytes_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
-    auto progress_handler = [&, entry = int(0), promise = util::CopyablePromiseHolder(std::move(signal_pf.promise))](
-                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) mutable {
+    Session::Config config;
+    config.service_identifier = "/realm-sync";
+    config.server_address = server_address;
+    config.signed_user_token = g_signed_test_user_token;
+    config.server_port = server_port;
+    config.realm_identifier = "/test";
+    config.progress_handler = [&, entry = 0](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                             uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                             uint_fast64_t snapshot_version, double, double, int64_t) mutable {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -3369,19 +3303,17 @@ TEST(Sync_UploadDownloadProgress_3)
         }
 
         if (should_signal_cond_var) {
-            promise.get_promise().emplace_value();
+            signal_pf.promise.emplace_value();
         }
 
         entry++;
     };
 
-    session.set_progress_handler(progress_handler);
-
     server_thread.start([&] {
         server.run();
     });
 
-    session.bind();
+    Session session(client, db, nullptr, nullptr, std::move(config));
 
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
@@ -3459,13 +3391,11 @@ TEST(Sync_UploadDownloadProgress_4)
     ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
-    Session session_1 = fixture.make_session(db_1, "/test");
-
     int entry_1 = 0;
-
-    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+    Session::Config config_1;
+    config_1.progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                    uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                    uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_NOT_EQUAL(uploadable_bytes, 0);
@@ -3496,22 +3426,18 @@ TEST(Sync_UploadDownloadProgress_4)
         ++entry_1;
     };
 
-    session_1.set_progress_handler(progress_handler_1);
-
-    session_1.bind();
-
+    Session session_1 = fixture.make_session(db_1, "/test", std::move(config_1));
     session_1.wait_for_upload_complete_or_client_stopped();
     session_1.wait_for_download_complete_or_client_stopped();
 
     CHECK_EQUAL(entry_1, 3);
 
-    Session session_2 = fixture.make_session(db_2, "/test");
-
     int entry_2 = 0;
 
-    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t snapshot_version, double, double) {
+    Session::Config config_2;
+    config_2.progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                    uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                    uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
 
@@ -3536,9 +3462,7 @@ TEST(Sync_UploadDownloadProgress_4)
         ++entry_2;
     };
 
-    session_2.set_progress_handler(progress_handler_2);
-
-    session_2.bind();
+    Session session_2 = fixture.make_session(db_2, "/test", std::move(config_2));
 
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -3554,39 +3478,24 @@ TEST(Sync_UploadDownloadProgress_5)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    std::mutex mutex;
-    std::condition_variable session_cv;
-    bool signaled = false;
-
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(db, "/test");
-
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) mutable {
+    auto pf = util::make_promise_future();
+    Session::Config config;
+    config.progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                  uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
         CHECK_EQUAL(snapshot_version, 3);
-        std::lock_guard lock{mutex};
-        signaled = true;
-        session_cv.notify_one();
+        pf.promise.emplace_value();
     };
 
-    session.set_progress_handler(progress_handler);
-
-    {
-        std::unique_lock lock{mutex};
-        session.bind();
-        // Wait until the progress handler is called on the session before tearing down the client
-        session_cv.wait_for(lock, std::chrono::seconds(5), [&]() {
-            return signaled;
-        });
-    }
-    CHECK(signaled);
+    Session session = fixture.make_session(db, "/test", std::move(config));
+    pf.future.get();
 
     // The check is that we reach this point.
 }
@@ -3630,44 +3539,29 @@ TEST(Sync_UploadDownloadProgress_6)
         server_thread.join();
     });
 
+    auto session_pf = util::make_promise_future<std::unique_ptr<Session>*>();
+    auto complete_pf = util::make_promise_future();
     Session::Config session_config;
     session_config.server_address = "localhost";
     session_config.server_port = server_port;
     session_config.realm_identifier = "/test";
     session_config.service_identifier = "/realm-sync";
     session_config.signed_user_token = g_signed_test_user_token;
-
-    std::mutex mutex;
-    std::condition_variable session_cv;
-    bool signaled = false;
-    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
-
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) {
+    session_config.progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                          uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                          uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
         CHECK_EQUAL(snapshot_version, 3);
-        std::lock_guard lock{mutex};
-        session.reset();
-        signaled = true;
-        session_cv.notify_one();
+        session_pf.future.get()->reset();
+        complete_pf.promise.emplace_value();
     };
-
-    session->set_progress_handler(progress_handler);
-
-    {
-        std::unique_lock lock{mutex};
-        session->bind();
-        // Wait until the progress handler is called on the session before tearing down the client
-        session_cv.wait_for(lock, std::chrono::seconds(5), [&]() {
-            return signaled;
-        });
-    }
-    CHECK(signaled);
-    CHECK(!(session));
+    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
+    session_pf.promise.emplace_value(&session);
+    complete_pf.future.get();
+    CHECK(!session);
 
     // The check is that we reach this point without deadlocking or throwing an assert while tearing
     // down the active session
@@ -3714,8 +3608,7 @@ TEST(Sync_UploadDownloadProgress_7)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
-    session->bind();
+    Session session(client, db, nullptr, nullptr, std::move(session_config));
 
     client.shutdown_and_wait();
     server.stop();
@@ -3732,7 +3625,6 @@ TEST(Sync_UploadProgress_EmptyCommits)
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
-    Session session = fixture.make_session(db, "/test");
 
     {
         WriteTransaction wt{db};
@@ -3741,11 +3633,13 @@ TEST(Sync_UploadProgress_EmptyCommits)
     }
 
     std::atomic<int> entry = 0;
-    session.set_progress_handler(
-        [&](uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, double, double) {
-            ++entry;
-        });
-    session.bind();
+    Session::Config config;
+    config.progress_handler = [&](uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, double,
+                                  double, int64_t) {
+        ++entry;
+    };
+
+    Session session = fixture.make_session(db, "/test", std::move(config));
 
     // Each step calls wait_for_upload_complete twice because upload completion
     // is fired before progress handlers, so we need another hop through the
@@ -3804,30 +3698,50 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // particular session participant over the "temporally overlapping access"
     // relation.
 
+    TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    Client::Config config;
-    config.logger = test_context.logger;
-    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(
-        config.logger, "", nullptr, websocket::DefaultSocketProvider::AutoStart{false});
-    config.socket_provider = socket_provider;
-    config.reconnect_mode = ReconnectMode::testing;
-    Client client{config};
+
+    auto pf = util::make_promise_future();
+    struct Observer : BindingCallbackThreadObserver {
+        unit_test::TestContext& test_context;
+        util::Promise<void>& got_error;
+        Observer(unit_test::TestContext& test_context, util::Promise<void>& got_error)
+            : test_context(test_context)
+            , got_error(got_error)
+        {
+        }
+
+        bool has_handle_error() override
+        {
+            return true;
+        }
+        bool handle_error(const std::exception& e) override
+        {
+            CHECK(dynamic_cast<const MultipleSyncAgents*>(&e));
+            got_error.emplace_value();
+            return true;
+        }
+    };
+
+    auto observer = std::make_shared<Observer>(test_context, pf.promise);
+    ClientServerFixture::Config config;
+    config.socket_provider_observer = observer;
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
+    fixture.start();
+
     {
-        Session::Config config_1;
-        config_1.realm_identifier = "blablabla";
-        Session::Config config_2;
-        config_2.realm_identifier = config_1.realm_identifier;
-        Session session_1{client, db, nullptr, nullptr, std::move(config_1)};
-        Session session_2{client, db, nullptr, nullptr, std::move(config_2)};
-        session_1.bind();
-        session_2.bind();
-        CHECK_THROW(
-            websocket::DefaultSocketProvider::OnlyForTesting::run_event_loop_on_current_thread(socket_provider.get()),
-            MultipleSyncAgents);
-        websocket::DefaultSocketProvider::OnlyForTesting::prep_event_loop_for_restart(socket_provider.get());
+        Session session = fixture.make_session(db, "/test");
+        Session session2 = fixture.make_session(db, "/test");
+        pf.future.get();
+
+        // The exception caused the event loop to stop so we need to restart it
+        fixture.start_client(0);
     }
 
-    socket_provider->start();
+    // Verify that after the error occurs (and is ignored) things are still
+    // in a functional state
+    Session session = fixture.make_session(db, "/test");
+    session.wait_for_upload_complete_or_client_stopped();
 }
 
 TEST(Sync_CancelReconnectDelay)
@@ -3839,19 +3753,26 @@ TEST(Sync_CancelReconnectDelay)
     ClientServerFixture::Config fixture_config;
     fixture_config.one_connection_per_session = false;
 
+    auto expect_status = [&](BowlOfStonesSemaphore& bowl, ErrorCodes::Error code) {
+        Session::Config config;
+        config.connection_state_change_listener = [&, code](ConnectionState state,
+                                                            std::optional<SessionErrorInfo> error) {
+            if (state != ConnectionState::disconnected)
+                return;
+            CHECK(error);
+            if (CHECK_EQUAL(error->status, code))
+                bowl.add_stone();
+        };
+        return config;
+    };
+
     // After connection-level error, and at session-level.
     {
         ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.status, ErrorCodes::ConnectionClosed))
-                bowl.add_stone();
-        };
-        Session session = fixture.make_session(db, "/test");
-        session.set_error_handler(std::move(handler));
-        session.bind();
+        Session session = fixture.make_session(db, "/test", expect_status(bowl, ErrorCodes::ConnectionClosed));
         session.wait_for_download_complete_or_client_stopped();
         fixture.close_server_side_connections();
         bowl.get_stone();
@@ -3867,13 +3788,7 @@ TEST(Sync_CancelReconnectDelay)
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.status, ErrorCodes::ConnectionClosed))
-                bowl.add_stone();
-        };
-        Session session = fixture.make_session(db, "/test");
-        session.set_error_handler(std::move(handler));
-        session.bind();
+        Session session = fixture.make_session(db, "/test", expect_status(bowl, ErrorCodes::ConnectionClosed));
         session.wait_for_download_complete_or_client_stopped();
         fixture.close_server_side_connections();
         bowl.get_stone();
@@ -3890,13 +3805,7 @@ TEST(Sync_CancelReconnectDelay)
 
         {
             BowlOfStonesSemaphore bowl;
-            auto handler = [&](const SessionErrorInfo& info) {
-                if (CHECK_EQUAL(info.status, ErrorCodes::ConnectionClosed))
-                    bowl.add_stone();
-            };
-            Session session = fixture.make_session(db, "/test");
-            session.set_error_handler(std::move(handler));
-            session.bind();
+            Session session = fixture.make_session(db, "/test", expect_status(bowl, ErrorCodes::ConnectionClosed));
             session.wait_for_download_complete_or_client_stopped();
             fixture.close_server_side_connections();
             bowl.get_stone();
@@ -3926,13 +3835,7 @@ TEST(Sync_CancelReconnectDelay)
         session_x.wait_for_download_complete_or_client_stopped();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.status, ErrorCodes::BadSyncPartitionValue))
-                bowl.add_stone();
-        };
-        Session session = fixture.make_session(db, "/..");
-        session.set_error_handler(std::move(handler));
-        session.bind();
+        Session session = fixture.make_session(db, "/..", expect_status(bowl, ErrorCodes::BadSyncPartitionValue));
         bowl.get_stone();
 
         session.cancel_reconnect_delay();
@@ -3949,13 +3852,7 @@ TEST(Sync_CancelReconnectDelay)
         session_x.wait_for_download_complete_or_client_stopped();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.status, ErrorCodes::BadSyncPartitionValue))
-                bowl.add_stone();
-        };
-        Session session = fixture.make_session(db, "/..");
-        session.set_error_handler(std::move(handler));
-        session.bind();
+        Session session = fixture.make_session(db, "/..", expect_status(bowl, ErrorCodes::BadSyncPartitionValue));
         bowl.get_stone();
 
         fixture.cancel_reconnect_delay();
@@ -4040,7 +3937,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
 
     auto progress_handler_1 = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                   std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                  std::uint_fast64_t, double, double) {
+                                  std::uint_fast64_t, double, double, int64_t) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -4054,7 +3951,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes, uint_fast64_t, double,
-                                  double) {
+                                  double, int64_t) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -4067,24 +3964,24 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
         fixture.start();
 
         {
-            Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-            session_1.set_progress_handler(progress_handler_1);
-            session_1.bind();
+            Session::Config config;
+            config.progress_handler = progress_handler_1;
+            Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(config));
             session_1.wait_for_upload_complete_or_client_stopped();
         }
 
         {
-            Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-            session_2.set_progress_handler(progress_handler_2);
-            session_2.bind();
+            Session::Config config;
+            config.progress_handler = progress_handler_2;
+            Session session_2 = fixture.make_session(1, 0, db_2, "/test", std::move(config));
             session_2.wait_for_download_complete_or_client_stopped();
             session_2.wait_for_upload_complete_or_client_stopped();
         }
 
         {
-            Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-            session_1.set_progress_handler(progress_handler_1);
-            session_1.bind();
+            Session::Config config;
+            config.progress_handler = progress_handler_1;
+            Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(config));
             session_1.wait_for_download_complete_or_client_stopped();
         }
     }
@@ -4194,7 +4091,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
     auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* snapshot_version */, double, double) {
+                                  uint_fast64_t /* snapshot_version */, double, double, int64_t) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -4208,7 +4105,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
     auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                   uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* snapshot_version */, double, double) {
+                                  uint_fast64_t /* snapshot_version */, double, double, int64_t) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -4221,24 +4118,24 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
         fixture.start();
 
         {
-            Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-            session_1.set_progress_handler(progress_handler_1);
-            session_1.bind();
+            Session::Config config;
+            config.progress_handler = progress_handler_1;
+            Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(config));
             session_1.wait_for_upload_complete_or_client_stopped();
         }
 
         {
-            Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-            session_2.set_progress_handler(progress_handler_2);
-            session_2.bind();
+            Session::Config config;
+            config.progress_handler = progress_handler_2;
+            Session session_2 = fixture.make_session(1, 0, db_2, "/test", std::move(config));
             session_2.wait_for_download_complete_or_client_stopped();
             session_2.wait_for_upload_complete_or_client_stopped();
         }
 
         {
-            Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-            session_1.set_progress_handler(progress_handler_1);
-            session_1.bind();
+            Session::Config config;
+            config.progress_handler = progress_handler_1;
+            Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(config));
             session_1.wait_for_download_complete_or_client_stopped();
         }
     }
@@ -4334,9 +4231,7 @@ TEST(Sync_MergeLargeChangesets)
         MultiClientServerFixture fixture(2, 1, dir, test_context);
 
         Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-        session_1.bind();
         Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-        session_2.bind();
 
         fixture.start();
 
@@ -4410,9 +4305,7 @@ TEST(Sync_MergeMultipleChangesets)
 
         // Start server and upload changes of first client.
         Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-        session_1.bind();
         Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-        session_2.bind();
 
         fixture.start_server(0);
         fixture.start_client(0);
@@ -4589,11 +4482,9 @@ TEST(Sync_Quadratic_Merge)
     fixture.start();
 
     Session session_1 = fixture.make_session(0, 0, db_1, "/test");
-    session_1.bind();
     session_1.wait_for_upload_complete_or_client_stopped();
 
     Session session_2 = fixture.make_session(1, 0, db_2, "/test");
-    session_2.bind();
     session_2.wait_for_upload_complete_or_client_stopped();
 
     session_1.wait_for_download_complete_or_client_stopped();
@@ -4608,8 +4499,6 @@ TEST(Sync_BatchedUploadMessages)
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
-
-    Session session = fixture.make_session(db, "/test");
 
     {
         WriteTransaction wt{db};
@@ -4627,9 +4516,11 @@ TEST(Sync_BatchedUploadMessages)
         wt.commit();
     }
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) {
+    Session::Config config;
+    auto pf = util::make_promise_future();
+    config.progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes, uint_fast64_t, double,
+                                  double, int64_t) {
         CHECK_GREATER(uploadable_bytes, 1000);
 
         // This is the important check. If the changesets were not batched,
@@ -4638,12 +4529,14 @@ TEST(Sync_BatchedUploadMessages)
         CHECK(uploaded_bytes == 0 || uploaded_bytes == uploadable_bytes);
         CHECK_EQUAL(0, downloaded_bytes);
         CHECK_EQUAL(0, downloadable_bytes);
-        static_cast<void>(snapshot_version);
+        if (uploaded_bytes == uploadable_bytes) {
+            pf.promise.emplace_value();
+        }
     };
 
-    session.set_progress_handler(progress_handler);
-    session.bind();
+    Session session = fixture.make_session(db, "/test", std::move(config));
     session.wait_for_upload_complete_or_client_stopped();
+    pf.future.get();
 }
 
 
@@ -4657,9 +4550,6 @@ TEST(Sync_UploadLogCompactionEnabled)
     config.disable_upload_compaction = false;
     ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
-
-    Session session_1 = fixture.make_session(db_1, "/test");
-    Session session_2 = fixture.make_session(db_2, "/test");
 
     // Create a changeset with lots of overwrites of the
     // same fields.
@@ -4676,12 +4566,13 @@ TEST(Sync_UploadLogCompactionEnabled)
         wt.commit();
     }
 
-    session_1.bind();
+    Session session_1 = fixture.make_session(db_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t snapshot_version, double, double) {
+    Session::Config session_config;
+    session_config.progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                          uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                          uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
@@ -4689,10 +4580,7 @@ TEST(Sync_UploadLogCompactionEnabled)
         CHECK_NOT_EQUAL(downloadable_bytes, 0);
     };
 
-    session_2.set_progress_handler(progress_handler);
-
-    session_2.bind();
-
+    Session session_2 = fixture.make_session(db_2, "/test", std::move(session_config));
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
@@ -4737,9 +4625,10 @@ TEST(Sync_UploadLogCompactionDisabled)
     Session session_1 = fixture.make_bound_session(db_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
-                                std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                std::uint_fast64_t snapshot_version, double, double) {
+    Session::Config session_config;
+    session_config.progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                          uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                          uint_fast64_t snapshot_version, double, double, int64_t) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
@@ -4747,9 +4636,7 @@ TEST(Sync_UploadLogCompactionDisabled)
         CHECK_NOT_EQUAL(0, downloadable_bytes);
     };
 
-    Session session_2 = fixture.make_session(db_2, "/test");
-    session_2.set_progress_handler(progress_handler);
-    session_2.bind();
+    Session session_2 = fixture.make_session(db_2, "/test", std::move(session_config));
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
@@ -4929,14 +4816,14 @@ TEST(Sync_ConnectionStateChange)
                 bowl_2.add_stone();
         };
 
-        Session session_1 = fixture.make_session(db_1, "/test");
-        session_1.set_connection_state_change_listener(listener_1);
-        session_1.bind();
+        Session::Config config_1;
+        config_1.connection_state_change_listener = listener_1;
+        Session session_1 = fixture.make_session(db_1, "/test", std::move(config_1));
         session_1.wait_for_download_complete_or_client_stopped();
 
-        Session session_2 = fixture.make_session(db_2, "/test");
-        session_2.set_connection_state_change_listener(listener_2);
-        session_2.bind();
+        Session::Config config_2;
+        config_2.connection_state_change_listener = listener_2;
+        Session session_2 = fixture.make_session(db_2, "/test", std::move(config_2));
         session_2.wait_for_download_complete_or_client_stopped();
 
         fixture.close_server_side_connections();
@@ -4947,28 +4834,6 @@ TEST(Sync_ConnectionStateChange)
                                            ConnectionState::disconnected};
     CHECK(states_1 == reference);
     CHECK(states_2 == reference);
-}
-
-
-TEST(Sync_ClientErrorHandler)
-{
-    TEST_DIR(dir);
-    TEST_CLIENT_DB(db);
-    ClientServerFixture fixture(dir, test_context);
-    fixture.start();
-
-    BowlOfStonesSemaphore bowl;
-    auto handler = [&](const SessionErrorInfo&) {
-        bowl.add_stone();
-    };
-
-    Session session = fixture.make_session(db, "/test");
-    session.set_error_handler(std::move(handler));
-    session.bind();
-    session.wait_for_download_complete_or_client_stopped();
-
-    fixture.close_server_side_connections();
-    bowl.get_stone();
 }
 
 
@@ -4996,7 +4861,6 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
         wt->commit();
 
         Session session = fixture.make_session(db, "/test");
-        session.bind();
         session.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -5125,9 +4989,8 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, nullptr, nullptr, std::move(session_config)};
-
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        session_config.connection_state_change_listener = [&](ConnectionState state,
+                                                              const util::Optional<ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
                 client_logger->debug("State change: disconnected, error_code = %1, is_fatal = %2", error_info->status,
@@ -5138,9 +5001,7 @@ TEST_IF(Sync_SSL_Certificates, false)
             }
         };
 
-        session.set_connection_state_change_listener(listener);
-        session.bind();
-
+        Session session{client, db, nullptr, nullptr, std::move(session_config)};
         session.wait_for_download_complete_or_client_stopped();
     }
 }
@@ -5169,7 +5030,6 @@ TEST(Sync_AuthorizationHeaderName)
     custom_http_headers["Header-Name-2"] = "Header-Value-2";
     session_config.custom_http_headers = std::move(custom_http_headers);
     Session session = fixture.make_session(db, "/test", std::move(session_config));
-    session.bind();
 
     session.wait_for_download_complete_or_client_stopped();
 }
@@ -5203,7 +5063,9 @@ TEST(Sync_BadChangeset)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        Session::Config session_config;
+        session_config.connection_state_change_listener = [&](ConnectionState state,
+                                                              const util::Optional<ErrorInfo>& error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -5212,11 +5074,7 @@ TEST(Sync_BadChangeset)
             did_fail = true;
             fixture.stop();
         };
-
-        Session session = fixture.make_session(db, "/test");
-        session.set_connection_state_change_listener(listener);
-        session.bind();
-
+        Session session = fixture.make_session(db, "/test", std::move(session_config));
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -5250,17 +5108,15 @@ TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>) {
+        Session::Config session_config;
+        session_config.connection_state_change_listener = [&](ConnectionState state,
+                                                              const util::Optional<ErrorInfo>) {
             if (state != ConnectionState::disconnected)
                 return;
             did_fail = true;
             fixture.stop();
         };
-
-        Session session = fixture.make_session(db, "/test");
-        session.set_connection_state_change_listener(listener);
-        session.bind();
-
+        Session session = fixture.make_session(db, "/test", std::move(session_config));
         session.wait_for_upload_complete_or_client_stopped();
     }
     CHECK_NOT(did_fail);
@@ -5524,7 +5380,10 @@ TEST(Sync_ServerSideEncryption)
     std::string server_path;
     {
         ClientServerFixture::Config config;
-        config.server_encryption_key = crypt_key_2(always_encrypt);
+        if (auto key = crypt_key(always_encrypt)) {
+            config.server_encryption_key.emplace();
+            memcpy(config.server_encryption_key->data(), key, config.server_encryption_key->size());
+        }
         ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
 
@@ -5548,7 +5407,6 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
 
     // Log comapction is true by default, but we emphasize it.
     config.disable_upload_compaction = false;
-    config.disable_download_compaction = false;
 
     ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();
@@ -5745,8 +5603,6 @@ NONCONCURRENT_TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     TEST_TYPE obj_1_id;
     TEST_TYPE obj_2_id;
@@ -5823,8 +5679,6 @@ TEST(Sync_Mixed)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     {
         WriteTransaction tr{db_1};
@@ -5903,8 +5757,6 @@ TEST(Sync_TypedLinks)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     write_transaction(db_1, [](WriteTransaction& tr) {
         auto& g = tr.get_group();
@@ -5965,8 +5817,6 @@ TEST(Sync_Dictionary)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     Timestamp now{std::chrono::system_clock::now()};
 
@@ -6067,8 +5917,6 @@ TEST(Sync_CollectionInMixed)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     Timestamp now{std::chrono::system_clock::now()};
 
@@ -6225,8 +6073,6 @@ TEST(Sync_CollectionInCollection)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     Timestamp now{std::chrono::system_clock::now()};
 
@@ -6324,8 +6170,6 @@ TEST(Sync_DeleteCollectionInCollection)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     Timestamp now{std::chrono::system_clock::now()};
 
@@ -6379,6 +6223,118 @@ TEST(Sync_DeleteCollectionInCollection)
     }
 }
 
+TEST(Sync_NestedCollectionClear)
+{
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+
+    auto tr_1 = db_1->start_write();
+    auto tr_2 = db_2->start_read();
+    auto table_1 = tr_1->add_table_with_primary_key("class_Table", type_Int, "id");
+    auto col = table_1->add_column(type_Mixed, "any");
+    table_1->add_column_list(type_Mixed, "ints");
+    auto col_list = table_1->add_column_list(type_Mixed, "any_list");
+
+    auto foo = table_1->create_object_with_primary_key(123);
+    foo.set_collection(col, CollectionType::List);
+    auto parent_list = foo.get_list<Mixed>(col_list);
+    parent_list.insert_collection(0, CollectionType::List);
+    parent_list.insert_collection(1, CollectionType::Dictionary);
+    auto foo1 = table_1->create_object_with_primary_key(456);
+    foo1.set_collection(col, CollectionType::Dictionary);
+    tr_1->commit_and_continue_as_read();
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        tr_1->promote_to_write();
+        auto list = foo.get_list<Mixed>("any");
+        list.clear();
+        list.add("Hello");
+
+        list = foo.get_list<Mixed>("any_list");
+        auto sub_list = list.get_list(0);
+        sub_list->clear();
+        sub_list->add(1);
+        sub_list->add(2);
+        auto sub_dict = list.get_dictionary(1);
+        sub_dict->clear();
+        sub_dict->insert("one", 1);
+        sub_dict->insert("two", 2);
+
+        auto dict = foo1.get_dictionary("any");
+        dict.clear();
+        dict.insert("age", 42);
+
+        auto list_int = foo.get_list<Mixed>("ints");
+        list_int.clear();
+        list_int.add(1);
+        list_int.add(2);
+        tr_1->commit_and_continue_as_read();
+    }
+
+    {
+        tr_2->promote_to_write();
+        auto table_2 = tr_2->get_table("class_Table");
+
+        auto bar = table_2->get_object_with_primary_key(123);
+        auto list = bar.get_list<Mixed>("any");
+        list.clear();
+        list.add("Godbye");
+
+        list = bar.get_list<Mixed>("any_list");
+        auto sub_list = list.get_list(0);
+        sub_list->clear();
+        sub_list->add(3);
+        sub_list->add(4);
+        auto sub_dict = list.get_dictionary(1);
+        sub_dict->clear();
+        sub_dict->insert("three", 3);
+        sub_dict->insert("four", 4);
+
+        auto bar1 = table_2->get_object_with_primary_key(456);
+        auto dict = bar1.get_dictionary("any");
+        dict.clear();
+        dict.insert("weight", 70);
+
+        auto list_int = bar.get_list<Mixed>("ints");
+        list_int.clear();
+        list_int.add(3);
+        list_int.add(4);
+        tr_2->commit_and_continue_as_read();
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    tr_1->advance_read();
+    tr_2->advance_read();
+    auto list = foo.get_list<Mixed>("any");
+    CHECK_EQUAL(list.size(), 1);
+
+    list = foo.get_list<Mixed>("any_list");
+    CHECK_EQUAL(list.get_list(0)->size(), 2);
+    CHECK_EQUAL(list.get_dictionary(1)->size(), 2);
+
+    auto dict = foo1.get_dictionary("any");
+    CHECK_EQUAL(dict.size(), 1);
+
+    auto list_int = foo.get_list<Mixed>("ints");
+    CHECK_EQUAL(list_int.size(), 4); // We should still have odd behavior for normal lists
+
+    CHECK(compare_groups(*tr_1, *tr_2));
+}
+
 TEST(Sync_Dictionary_Links)
 {
     TEST_CLIENT_DB(db_1);
@@ -6390,8 +6346,6 @@ TEST(Sync_Dictionary_Links)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     // Test that we can transmit links.
 
@@ -6494,8 +6448,6 @@ TEST(Sync_Set)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     ColKey col_ints, col_strings, col_mixeds;
     {
@@ -6608,8 +6560,6 @@ TEST(Sync_BundledRealmFile)
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    Session session = fixture.make_bound_session(db);
-
     write_transaction(db, [](WriteTransaction& tr) {
         auto foos = tr.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
         foos->create_object_with_primary_key(123);
@@ -6618,6 +6568,7 @@ TEST(Sync_BundledRealmFile)
     // We cannot write out file if changes are not synced to server
     CHECK_THROW_ANY(db->write_copy(path.c_str(), nullptr));
 
+    Session session = fixture.make_bound_session(db);
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -6714,8 +6665,6 @@ TEST(Sync_UpgradeToClientHistory)
 
     Session session_1 = fixture.make_session(db_1, "/test");
     Session session_2 = fixture.make_session(db_2, "/test");
-    session_1.bind();
-    session_2.bind();
 
     write_transaction(db_1, [](WriteTransaction& tr) {
         auto foos = tr.get_group().get_table("class_Foo");
@@ -6958,8 +6907,8 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     }();
 
     // Create changeset which moves element from index 7 to index 0 in array.
-    // This changeset will discard the previous move (reciprocal changeset), leaving the local reciprocal changesets
-    // with no instructions (empty).
+    // This changeset will discard the previous move (reciprocal changeset),
+    // leaving the local reciprocal changeset with no instructions (empty).
     Changeset changeset;
     ArrayMove instr;
     instr.table = changeset.intern_string("table");
@@ -6983,30 +6932,368 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
 
     SyncProgress progress = {};
     progress.download.server_version = changeset.version;
-    progress.download.last_integrated_client_version = latest_local_version - 1;
+    progress.download.last_integrated_client_version = changeset.last_integrated_remote_version;
     progress.latest_server_version.version = changeset.version;
     progress.latest_server_version.salt = 0x7876543217654321;
 
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
-    bool is_compressed = false;
-    auto data = history.get_reciprocal_transform(latest_local_version, is_compressed);
-    Changeset reciprocal_changeset;
-    ChunkedBinaryInputStream in{data};
-    if (is_compressed) {
-        size_t total_size;
-        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
-        CHECK(decompressed);
-        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
-    }
-    else {
-        sync::parse_changeset(in, reciprocal_changeset); // Throws
-    }
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
     // The only instruction in the reciprocal changeset was discarded during OT.
+    CHECK(reciprocal_changeset.empty());
+}
+
+TEST(Sync_SetEmptyReciprocalChangesetAfterNonEmptyReciprocalChangeset)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        // Create schema: single table with array of ints as property.
+        tr->add_table_with_primary_key("class_table", type_Int, "_id")->add_column_list(type_Int, "ints");
+        tr->commit_and_continue_writing();
+
+        // Create object and initialize array.
+        TableRef table = tr->get_table("class_table");
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        ints.insert(0, 1);
+        ints.insert(1, 2);
+        ints.insert(2, 3);
+        tr->commit_and_continue_writing();
+
+        // Update two elements in the list.
+
+        ints.set_any(2, Mixed{4});
+        tr->commit_and_continue_writing();
+
+        ints.set_any(0, Mixed{5});
+        return tr->commit();
+    }();
+
+    // Create remote changeset (erase at the same index) that:
+    //  1. Updates the prior_size of the first local update
+    //  2. Discards the second local update
+    // After OT, we end up with two reciprocal changesets: a non-empty
+    // and an empty one.
+    Changeset changeset;
+    ArrayErase instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.prior_size = 3;
+    instr.path.push_back(0);
+    changeset.push_back(instr);
+    changeset.version = 1;
+    // Make it so the merging window contains the last two local updates.
+    changeset.last_integrated_remote_version = latest_local_version - 2;
+    changeset.origin_timestamp = timestamp;
+    changeset.origin_file_ident = 2;
+
+    ChangesetEncoder::Buffer encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
+    encode_changeset(changeset, encoded);
+    server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                           BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
+                                           changeset.origin_file_ident);
+
+    SyncProgress progress = {};
+    progress.download.server_version = changeset.version;
+    progress.download.last_integrated_client_version = changeset.last_integrated_remote_version;
+    progress.latest_server_version.version = changeset.version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, *test_context.logger, transact);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
+    // The second reciprocal changeset is empty.
+    CHECK(reciprocal_changeset.empty());
+}
+
+TEST(Sync_GetEmptyReciprocalChangesetFromCache)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        // Create schema
+        TableRef table = tr->add_table_with_primary_key("class_table", type_Int, "_id");
+        table->add_column_list(type_Int, "ints");
+        table->add_column_dictionary(type_Int, "dict");
+        tr->commit_and_continue_writing();
+
+        // Create object
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        ints.insert(0, 1);
+        ints.insert(1, 2);
+        ints.insert(2, 3);
+        tr->commit_and_continue_writing();
+
+        // Update list
+        ints.set_any(2, Mixed{4});
+        tr->commit_and_continue_writing();
+
+        // Update dictionary
+        auto dict = obj.get_dictionary("dict");
+        dict.insert("key", 42);
+        return tr->commit();
+    }();
+
+    std::vector<Changeset> server_changesets;
+    // Create remote changeset that updates the list and discards
+    // the (local) dictionary update.
+    Changeset changeset;
+    ArrayErase instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.prior_size = 3;
+    instr.path.push_back(0);
+    changeset.push_back(instr);
+    Update instr2;
+    instr2.table = changeset.intern_string("table");
+    instr2.object = instr::PrimaryKey{42};
+    instr2.field = changeset.intern_string("dict");
+    auto key = changeset.intern_string("key2");
+    instr2.path.push_back(key);
+    instr2.value = Payload{int64_t(0)};
+    changeset.push_back(instr2);
+    Clear instr3;
+    instr3.table = changeset.intern_string("table");
+    instr3.object = instr::PrimaryKey{42};
+    instr3.field = changeset.intern_string("dict");
+    instr3.collection_type = instr::CollectionType::Dictionary;
+    changeset.push_back(instr3);
+    changeset.version = 1;
+    // Make it so the merging window contains the last two local updates.
+    changeset.last_integrated_remote_version = latest_local_version - 2;
+    changeset.origin_timestamp = timestamp - 2;
+    changeset.origin_file_ident = 2;
+    server_changesets.push_back(changeset);
+
+    // Create changeset that inserts the same key as the local (discarded) update.
+    Changeset changeset2;
+    Update instr4;
+    instr4.table = changeset2.intern_string("table");
+    instr4.object = instr::PrimaryKey{42};
+    instr4.field = changeset2.intern_string("dict");
+    key = changeset2.intern_string("key");
+    instr4.path.push_back(key);
+    instr4.value = Payload{int64_t(-6)};
+    changeset2.push_back(instr4);
+    changeset2.version = 2;
+    // Make it so the merging window contains the local dictionary update.
+    changeset2.last_integrated_remote_version = latest_local_version - 1;
+    changeset2.origin_timestamp = timestamp - 1;
+    changeset2.origin_file_ident = 2;
+    server_changesets.push_back(changeset2);
+
+    std::vector<ChangesetEncoder::Buffer> encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
+    for (const auto& changeset : server_changesets) {
+        encoded.emplace_back();
+        encode_changeset(changeset, encoded.back());
+        server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                               BinaryData(encoded.back().data(), encoded.back().size()),
+                                               changeset.origin_timestamp, changeset.origin_file_ident);
+    }
+
+    SyncProgress progress = {};
+    progress.download.server_version = server_changesets.back().version;
+    // Prevent history being trimmed when server changes are integrated so we can verify the reciprocal changesets.
+    progress.download.last_integrated_client_version = server_changesets.front().last_integrated_remote_version;
+    progress.latest_server_version.version = server_changesets.back().version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, *test_context.logger, transact);
+
+    // The remote dictionary update persists.
+    auto tr = db->start_read();
+    auto dict = tr->get_table("class_table")->get_object_with_primary_key(42).get_dictionary("dict");
+    CHECK(!dict.is_empty());
+    CHECK(dict.get("key") == -6);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+    // The second reciprocal changeset is empty.
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
+    CHECK(reciprocal_changeset.empty());
+}
+
+TEST(Sync_GetEmptyReciprocalChangesetFromArray)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        // Create schema
+        TableRef table = tr->add_table_with_primary_key("class_table", type_Int, "_id");
+        table->add_column_list(type_Int, "ints");
+        table->add_column_dictionary(type_Int, "dict");
+        tr->commit_and_continue_writing();
+
+        // Create object
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        ints.insert(0, 1);
+        ints.insert(1, 2);
+        ints.insert(2, 3);
+        tr->commit_and_continue_writing();
+
+        // Update list
+        ints.set_any(2, Mixed{4});
+        tr->commit_and_continue_writing();
+
+        // Update dictionary
+        auto dict = obj.get_dictionary("dict");
+        dict.insert("key", 42);
+        return tr->commit();
+    }();
+
+    std::vector<Changeset> server_changesets;
+    // Create remote changeset that updates the list and discards
+    // the (local) dictionary update.
+    Changeset changeset;
+    ArrayErase instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.prior_size = 3;
+    instr.path.push_back(0);
+    changeset.push_back(instr);
+    Update instr2;
+    instr2.table = changeset.intern_string("table");
+    instr2.object = instr::PrimaryKey{42};
+    instr2.field = changeset.intern_string("dict");
+    auto key = changeset.intern_string("key2");
+    instr2.path.push_back(key);
+    instr2.value = Payload{int64_t(0)};
+    changeset.push_back(instr2);
+    Clear instr3;
+    instr3.table = changeset.intern_string("table");
+    instr3.object = instr::PrimaryKey{42};
+    instr3.field = changeset.intern_string("dict");
+    instr3.collection_type = instr::CollectionType::Dictionary;
+    changeset.push_back(instr3);
+    changeset.version = 1;
+    // Make it so the merging window contains the last two local updates.
+    changeset.last_integrated_remote_version = latest_local_version - 2;
+    changeset.origin_timestamp = timestamp - 2;
+    changeset.origin_file_ident = 2;
+    server_changesets.push_back(changeset);
+
+    // Create changeset that inserts the same key as the local (discarded) update.
+    Changeset changeset2;
+    Update instr4;
+    instr4.table = changeset2.intern_string("table");
+    instr4.object = instr::PrimaryKey{42};
+    instr4.field = changeset2.intern_string("dict");
+    key = changeset2.intern_string("key");
+    instr4.path.push_back(key);
+    instr4.value = Payload{int64_t(-6)};
+    changeset2.push_back(instr4);
+    changeset2.version = 2;
+    // Make it so the merging window contains the local dictionary update.
+    changeset2.last_integrated_remote_version = latest_local_version - 1;
+    changeset2.origin_timestamp = timestamp - 1;
+    changeset2.origin_file_ident = 2;
+    server_changesets.push_back(changeset2);
+
+    std::vector<RemoteChangeset> server_changesets_encoded;
+    for (const auto& changeset : server_changesets) {
+        ChangesetEncoder::Buffer encoded;
+        encode_changeset(changeset, encoded);
+        server_changesets_encoded.clear();
+        server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                               BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
+                                               changeset.origin_file_ident);
+
+        SyncProgress progress = {};
+        progress.download.server_version = changeset.version;
+        // Prevent history being trimmed when server changes are integrated so we can verify the reciprocal
+        // changesets.
+        progress.download.last_integrated_client_version = server_changesets.front().last_integrated_remote_version;
+        progress.latest_server_version.version = changeset.version;
+        progress.latest_server_version.salt = 0x7876543217654321;
+
+        uint_fast64_t downloadable_bytes = 0;
+        VersionInfo version_info;
+        auto transact = db->start_read();
+        history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
+                                            DownloadBatchState::SteadyState, *test_context.logger, transact);
+    }
+
+    // The remote dictionary update persists.
+    auto tr = db->start_read();
+    auto dict = tr->get_table("class_table")->get_object_with_primary_key(42).get_dictionary("dict");
+    CHECK(!dict.is_empty());
+    CHECK(dict.get("key") == -6);
+
+    // The first reciprocal changeset has the prior_size changed.
+    auto reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version - 1);
+    CHECK_EQUAL(reciprocal_changeset.size(), 1);
+    auto instruction = reciprocal_changeset.begin()->get_if<Instruction::Update>();
+    CHECK_EQUAL(instruction->prior_size, 2);
+    CHECK_EQUAL(instruction->value.data.integer, 4);
+    // The second reciprocal changeset is empty.
+    reciprocal_changeset = get_reciprocal_changeset(history, latest_local_version);
     CHECK(reciprocal_changeset.empty());
 }
 
@@ -7033,7 +7320,7 @@ TEST(Sync_InvalidChangesetFromServer)
 
     VersionInfo version_info;
     auto transact = db->start_read();
-    CHECK_THROW_EX(history.integrate_server_changesets({}, nullptr, util::Span(&server_changeset, 1), version_info,
+    CHECK_THROW_EX(history.integrate_server_changesets({}, 0, util::Span(&server_changeset, 1), version_info,
                                                        DownloadBatchState::SteadyState, *test_context.logger,
                                                        transact),
                    sync::IntegrationException,
@@ -7081,7 +7368,7 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 
     version_type current_version;
@@ -7168,7 +7455,7 @@ TEST(Sync_NonIncreasingServerVersions)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     auto transact = db->start_read();
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+    history.integrate_server_changesets(progress, downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::SteadyState, *test_context.logger, transact);
 }
 

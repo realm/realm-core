@@ -403,12 +403,9 @@ public:
 
     struct DownloadMessage {
         SyncProgress progress;
-        std::optional<int64_t> query_version;
-        std::optional<bool> last_in_batch;
-        union {
-            uint64_t downloadable_bytes = 0;
-            double progress_estimate;
-        };
+        std::optional<int64_t> query_version; // FLX sync only
+        sync::DownloadBatchState batch_state = sync::DownloadBatchState::SteadyState;
+        sync::DownloadableProgress downloadable;
         ReceivedChangesets changesets;
     };
 
@@ -439,18 +436,24 @@ private:
         if (is_flx) {
             message.query_version = msg.read_next<int64_t>();
             if (message.query_version < 0)
-                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version",
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version: %1",
                                     message.query_version);
+            int batch_state = msg.read_next<int>();
+            if (batch_state != static_cast<int>(sync::DownloadBatchState::MoreToCome) &&
+                batch_state != static_cast<int>(sync::DownloadBatchState::LastInBatch) &&
+                batch_state != static_cast<int>(sync::DownloadBatchState::SteadyState)) {
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad batch state: %1", batch_state);
+            }
+            message.batch_state = static_cast<sync::DownloadBatchState>(batch_state);
 
-            message.last_in_batch = msg.read_next<bool>();
-
-            message.progress_estimate = msg.read_next<double>();
-            if (message.progress_estimate < 0 || message.progress_estimate > 1)
+            double progress_estimate = msg.read_next<double>();
+            if (progress_estimate < 0 || progress_estimate > 1)
                 return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad progress value: %1",
-                                    message.progress_estimate);
+                                    progress_estimate);
+            message.downloadable = progress_estimate;
         }
         else
-            message.downloadable_bytes = msg.read_next<int64_t>();
+            message.downloadable = uint64_t(msg.read_next<int64_t>());
 
         auto is_body_compressed = msg.read_next<bool>();
         auto uncompressed_body_size = msg.read_next<size_t>();

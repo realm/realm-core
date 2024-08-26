@@ -157,6 +157,24 @@ HttpHeaders get_request_headers(const std::shared_ptr<User>& user, RequestTokenT
     return headers;
 }
 
+std::string trim_base_url(std::string base_url)
+{
+    while (!base_url.empty() && base_url.back() == '/') {
+        base_url.pop_back();
+    }
+
+    return base_url;
+}
+
+std::string base_url_from_app_config(const AppConfig& app_config)
+{
+    if (!app_config.base_url) {
+        return std::string{App::default_base_url()};
+    }
+
+    return trim_base_url(*app_config.base_url);
+}
+
 UniqueFunction<void(const Response&)> handle_default_response(UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     return [completion = std::move(completion)](const Response& response) {
@@ -190,14 +208,29 @@ SharedApp App::get_app(CacheMode mode, const AppConfig& config) NO_THREAD_SAFETY
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard lock(s_apps_mutex);
-        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(App::default_base_url()))];
+        auto& app = s_apps_cache[config.app_id][base_url_from_app_config(config)];
         if (!app) {
-            app = std::make_shared<App>(Private(), config);
+            app = App::make_app(config);
         }
         return app;
     }
     REALM_ASSERT(mode == CacheMode::Disabled);
+    return App::make_app(config);
+}
+
+SharedApp App::make_app(const AppConfig& config)
+{
+#ifdef __EMSCRIPTEN__
+    if (!config.transport) {
+        // Make a copy and provide a default transport if not provided
+        AppConfig config_copy = config;
+        config_copy.transport = std::make_shared<_impl::EmscriptenNetworkTransport>();
+        return std::make_shared<App>(Private(), config_copy);
+    }
     return std::make_shared<App>(Private(), config);
+#else
+    return std::make_shared<App>(Private(), config);
+#endif
 }
 
 SharedApp App::get_cached_app(const std::string& app_id, const std::optional<std::string>& base_url)
@@ -206,7 +239,7 @@ SharedApp App::get_cached_app(const std::string& app_id, const std::optional<std
     if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
         const auto& apps_by_url = it->second;
 
-        auto app_it = base_url ? apps_by_url.find(*base_url) : apps_by_url.begin();
+        auto app_it = base_url ? apps_by_url.find(trim_base_url(*base_url)) : apps_by_url.begin();
         if (app_it != apps_by_url.end()) {
             return app_it->second;
         }
@@ -233,17 +266,12 @@ void App::close_all_sync_sessions()
 
 App::App(Private, const AppConfig& config)
     : m_config(config)
-    , m_base_url(m_config.base_url.value_or(std::string(App::default_base_url())))
+    , m_base_url(base_url_from_app_config(m_config))
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(s_default_timeout_ms))
     , m_file_manager(std::make_unique<SyncFileManager>(config))
     , m_metadata_store(create_metadata_store(config, *m_file_manager))
     , m_sync_manager(SyncManager::create(config.sync_client_config))
 {
-#ifdef __EMSCRIPTEN__
-    if (!m_config.transport) {
-        m_config.transport = std::make_shared<_impl::EmscriptenNetworkTransport>();
-    }
-#endif
     REALM_ASSERT(m_config.transport);
 
     // if a base url is provided, then verify the value
@@ -393,7 +421,7 @@ void App::update_hostname(const std::string& host_url, const std::string& ws_hos
                           const std::string& new_base_url)
 {
     log_debug("App: update_hostname: %1 | %2 | %3", host_url, ws_host_url, new_base_url);
-    m_base_url = new_base_url;
+    m_base_url = trim_base_url(new_base_url);
     // If a new host url was returned from the server, use it to configure the routes
     // Otherwise, use the m_base_url value
     std::string base_url = host_url.length() > 0 ? host_url : m_base_url;
@@ -697,12 +725,11 @@ void App::get_profile(const std::shared_ptr<User>& user,
                     identities.push_back({get<std::string>(doc, "id"), get<std::string>(doc, "provider_type")});
                 }
 
-                if (auto data = m_metadata_store->get_user(user->user_id())) {
-                    data->identities = std::move(identities);
-                    data->profile = UserProfile(get<BsonDocument>(profile_json, "data"));
-                    m_metadata_store->update_user(user->user_id(), *data);
-                    user->update_backing_data(std::move(data));
-                }
+                m_metadata_store->update_user(user->user_id(), [&](auto& data) {
+                    data.identities = std::move(identities);
+                    data.profile = UserProfile(get<BsonDocument>(profile_json, "data"));
+                    user->update_backing_data(data); // FIXME
+                });
             }
             catch (const AppError& err) {
                 return completion(nullptr, err);
@@ -760,7 +787,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
     }
 
     if (anon_user) {
-        emit_change_to_subscribers(*this);
+        emit_change_to_subscribers();
         completion(anon_user, util::none);
         return;
     }
@@ -794,12 +821,11 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
             try {
                 auto json = parse<BsonDocument>(response.body);
                 if (linking_user) {
-                    if (auto user_data = m_metadata_store->get_user(linking_user->user_id())) {
-                        user_data->access_token = RealmJWT(get<std::string>(json, "access_token"));
-                        // maybe a callback for this?
-                        m_metadata_store->update_user(linking_user->user_id(), *user_data);
-                        linking_user->update_backing_data(std::move(user_data));
-                    }
+                    m_metadata_store->update_user(linking_user->user_id(), [&](auto& data) {
+                        data.access_token = RealmJWT(get<std::string>(json, "access_token"));
+                        // FIXME: should be powered by callback
+                        linking_user->update_backing_data(data);
+                    });
                 }
                 else {
                     auto user_id = get<std::string>(json, "user_id");
@@ -819,8 +845,14 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 return completion(nullptr,
                                   AppError(ErrorCodes::BadToken, "Could not log in user: received malformed JWT"));
             }
-            switch_user(user);
-            get_profile(user, std::move(completion));
+
+            get_profile(user, [this, completion = std::move(completion)](const std::shared_ptr<User>& user,
+                                                                         Optional<AppError> error) {
+                if (!error) {
+                    switch_user(user);
+                }
+                completion(user, error);
+            });
         },
         false);
 }
@@ -853,7 +885,7 @@ void App::log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
                [self = shared_from_this(), completion = std::move(completion)](auto&&, const Response& response) {
                    auto error = AppUtils::check_for_errors(response);
                    if (!error) {
-                       self->emit_change_to_subscribers(*self);
+                       self->emit_change_to_subscribers();
                    }
                    if (completion) {
                        completion(error);
@@ -886,14 +918,16 @@ void App::switch_user(const std::shared_ptr<User>& user)
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         throw AppError(ErrorCodes::ClientUserNotLoggedIn, "User is no longer valid or is logged out");
     }
-    util::CheckedLockGuard lock(m_user_mutex);
-    if (!verify_user_present(user)) {
-        throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
-    }
+    {
+        util::CheckedLockGuard lock(m_user_mutex);
+        if (!verify_user_present(user)) {
+            throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
+        }
 
-    m_current_user = user.get();
-    m_metadata_store->set_current_user(user->user_id());
-    emit_change_to_subscribers(*this);
+        m_current_user = user.get();
+        m_metadata_store->set_current_user(user->user_id());
+    }
+    emit_change_to_subscribers();
 }
 
 void App::remove_user(const std::shared_ptr<User>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
@@ -952,7 +986,7 @@ void App::delete_user(const std::shared_ptr<User>& user, UniqueFunction<void(Opt
                 auto user_id = user->user_id();
                 user->detach_and_tear_down();
                 m_metadata_store->delete_user(*m_file_manager, user_id);
-                emit_change_to_subscribers(*self);
+                emit_change_to_subscribers();
             }
             completion(std::move(error));
         });
@@ -1318,11 +1352,10 @@ void App::refresh_access_token(const std::shared_ptr<User>& user, bool update_lo
             try {
                 auto json = parse<BsonDocument>(response.body);
                 RealmJWT access_token{get<std::string>(json, "access_token")};
-                if (auto data = self->m_metadata_store->get_user(user->user_id())) {
-                    data->access_token = access_token;
-                    self->m_metadata_store->update_user(user->user_id(), *data);
-                    user->update_backing_data(std::move(data));
-                }
+                self->m_metadata_store->update_user(user->user_id(), [&](auto& data) {
+                    data.access_token = access_token;
+                    user->update_backing_data(data);
+                });
             }
             catch (AppError& err) {
                 return completion(std::move(err));
@@ -1469,6 +1502,14 @@ std::unique_ptr<Request> App::make_request(HttpMethod method, std::string&& url,
 PushClient App::push_notification_client(const std::string& service_name)
 {
     return PushClient(service_name, m_config.app_id, std::shared_ptr<AuthRequestClient>(shared_from_this(), this));
+}
+
+void App::emit_change_to_subscribers()
+{
+    // This wrapper is needed only to be able to add the `REQUIRES(!m_user_mutex)`
+    // annotation. Calling this function with the lock held leads to a deadlock
+    // if any of the listeners try to access us.
+    Subscribable<App>::emit_change_to_subscribers(*this);
 }
 
 // MARK: - UserProvider

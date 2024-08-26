@@ -22,8 +22,6 @@
 #include "realm/list.hpp"
 #include "realm/obj.hpp"
 #include "realm/object-store/c_api/util.hpp"
-#include "realm/sync/protocol.hpp"
-#include "realm/sync/noinst/protocol_codec.hpp"
 #include "realm/sync/transform.hpp"
 #include "realm/util/buffer.hpp"
 #include "realm/util/logger.hpp"
@@ -32,6 +30,8 @@
 #include <stdexcept>
 
 namespace realm::sync {
+
+class SubscriptionStore;
 
 class PendingBootstrapException : public std::runtime_error {
 public:
@@ -42,17 +42,16 @@ public:
 // that are sent across multiple download messages.
 class PendingBootstrapStore {
 public:
-    // Constructs from a DBRef. Constructing is destructive - since pending bootstraps are only valid for the
-    // session they occurred in, this will drop/clear all data when the bootstrap store is constructed.
+    // Constructs from a DBRef.
     //
     // Underneath this creates a table which stores each download message's changesets.
-    explicit PendingBootstrapStore(DBRef db, util::Logger& logger);
+    PendingBootstrapStore(DBRef db, util::Logger& logger, std::shared_ptr<SubscriptionStore> subscription_store);
 
     PendingBootstrapStore(const PendingBootstrapStore&) = delete;
     PendingBootstrapStore& operator=(const PendingBootstrapStore&) = delete;
 
     // True if there are pending changesets to process.
-    bool has_pending();
+    bool has_pending() const noexcept;
 
     struct PendingBatch {
         int64_t query_version = 0;
@@ -64,7 +63,7 @@ public:
 
     // Returns the next batch (download message) of changesets if it exists. The transaction must be in the reading
     // state.
-    PendingBatch peek_pending(size_t limit_in_bytes);
+    PendingBatch peek_pending(Transaction& tr, size_t limit_in_bytes);
 
     struct PendingBatchStats {
         int64_t query_version = 0;
@@ -75,21 +74,19 @@ public:
 
     // Removes the first set of changesets from the current pending bootstrap batch. The transaction must be in the
     // writing state.
-    void pop_front_pending(const TransactionRef& tr, size_t count);
+    void pop_front_pending(const Transaction& tr, size_t count);
 
     // Adds a set of changesets to the store.
     void add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
-                   const std::vector<RemoteChangeset>& changesets, bool* created_new_batch);
+                   DownloadableProgress download_progress, const std::vector<RemoteChangeset>& changesets);
 
-    void clear();
-    void clear(Transaction& wt);
-
+    void clear(Transaction& wt, int64_t query_version);
 
 private:
     DBRef m_db;
     // The pending_bootstrap_store is tied to the lifetime of a session, so a shared_ptr is not needed
     util::Logger& m_logger;
-    _impl::ClientProtocol m_client_protocol;
+    std::shared_ptr<SubscriptionStore> m_subscription_store;
 
     TableKey m_cursor_table;
 

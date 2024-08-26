@@ -737,7 +737,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") 
 // MARK: - UsernamePasswordProviderClient Tests
 
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][baas]") {
-    const std::string base_url = get_base_url();
+    const std::string base_url = get_real_base_url();
     AutoVerifiedEmailCredentials creds;
     auto email = creds.email;
     auto password = creds.password;
@@ -2158,7 +2158,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]")
         Mixed{target_id},
     };
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session(app_session, {}, DeleteApp{false});
         SyncTestFile config(test_session.app()->current_user(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -2222,7 +2222,7 @@ TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
     Decimal128 large_significand = Decimal128(70) / Decimal128(1.09);
     auto obj_id = ObjectId::gen();
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session(app_session, {}, DeleteApp{false});
         SyncTestFile config(test_session.app()->current_user(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -2646,7 +2646,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport<>>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session(session.app_session(), {transport}, DeleteApp{false});
         auto app = hooked_session.app();
         std::shared_ptr<User> user = app->current_user();
         REQUIRE(user);
@@ -2704,7 +2704,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport<>>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session(session.app_session(), {transport}, DeleteApp{false});
         auto app = hooked_session.app();
         std::shared_ptr<User> user = app->current_user();
         REQUIRE(user);
@@ -3167,6 +3167,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 
     SECTION("pausing a session does not hold the DB open") {
+        auto logger = util::Logger::get_default_logger();
         SyncTestFile config(app->current_user(), partition, schema);
         DBRef dbref;
         std::shared_ptr<SyncSession> sync_sess_ext_ref;
@@ -3179,29 +3180,38 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
             sync_sess_ext_ref = realm->sync_session()->external_reference();
             dbref = TestHelper::get_db(*realm);
-            // One ref each for the
+            // An active PBS realm should have one ref each for:
             // - RealmCoordinator
             // - SyncSession
+            // - MigrationStore
             // - SessionWrapper
             // - local dbref
-            REQUIRE(dbref.use_count() >= 4);
+            logger->trace("DBRef ACTIVE use count: %1", dbref.use_count());
+            REQUIRE(dbref.use_count() >= 5);
 
             realm->sync_session()->pause();
             state = realm->sync_session()->state();
             REQUIRE(state == SyncSession::State::Paused);
+            logger->trace("DBRef PAUSING called use count: %1", dbref.use_count());
         }
 
-        // Closing the realm should leave one ref for the SyncSession and one for the local dbref.
+        // Closing the realm should leave one ref each for:
+        // - SyncSession
+        // - MigrationStore
+        // - local dbref
         REQUIRE_THAT(
             [&] {
+                logger->trace("DBRef PAUSED use count: %1", dbref.use_count());
                 return dbref.use_count() < 4;
             },
             ReturnsTrueWithinTimeLimit{});
 
-        // Releasing the external reference should leave one ref (the local dbref) only.
+        // Releasing the external reference should leave one ref for:
+        // - local dbref
         sync_sess_ext_ref.reset();
         REQUIRE_THAT(
             [&] {
+                logger->trace("DBRef TEARDOWN use count: %1", dbref.use_count());
                 return dbref.use_count() == 1;
             },
             ReturnsTrueWithinTimeLimit{});
@@ -3270,6 +3280,95 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         REQUIRE(first_ident.ident != r->sync_session()->get_file_ident().ident);
         REQUIRE(first_ident.salt != r->sync_session()->get_file_ident().salt);
     }
+}
+
+TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
+    class InMemoryLogger : public util::Logger {
+    public:
+        void do_log(const util::LogCategory& cat, Level level, const std::string& msg) final
+        {
+            auto formatted_line = util::format("%1 %2 %3", cat.get_name(), level, msg);
+            std::lock_guard lk(mtx);
+            log_messages.emplace_back(std::move(formatted_line));
+        }
+
+        std::vector<std::string> get_log_messages()
+        {
+            std::lock_guard lk(mtx);
+            std::vector<std::string> ret;
+            std::swap(ret, log_messages);
+            return ret;
+        }
+
+        std::mutex mtx;
+        std::vector<std::string> log_messages;
+    };
+
+    auto in_mem_logger = std::make_shared<InMemoryLogger>();
+    in_mem_logger->set_level_threshold(InMemoryLogger::Level::all);
+    TestAppSession::Config session_config;
+    session_config.logger = in_mem_logger;
+    TestAppSession app_session(get_runtime_app_session(), session_config, DeleteApp{false});
+
+    const auto partition = random_string(100);
+    SyncTestFile config(app_session.app()->current_user(), partition, util::none);
+    auto realm = successfully_async_open_realm(config);
+    auto sync_session = realm->sync_session();
+    auto coid = SyncSession::OnlyForTesting::get_appservices_connection_id(*sync_session);
+
+    auto transition_log_msg =
+        util::format("Connection[1] Connected to app services with request id: \"%1\". Further log entries for this "
+                     "connection will be prefixed with \"Connection[1:%1]\" instead of \"Connection[1]\"",
+                     coid);
+    auto bind_send_msg = util::format("Connection[1:%1] Session[1]: Sending: BIND", coid);
+    auto ping_send_msg = util::format("Connection[1:%1] Will emit a ping in", coid);
+
+    auto log_messages = in_mem_logger->get_log_messages();
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(transition_log_msg)));
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(bind_send_msg)));
+    REQUIRE_THAT(log_messages, AnyMatch(ContainsSubstring(ping_send_msg)));
+}
+
+
+TEST_CASE("app: trailing slash in base url", "[sync][app]") {
+    auto logger = util::Logger::get_default_logger();
+
+    const auto schema = get_default_schema();
+
+    SyncServer server({});
+    auto transport = std::make_shared<HookedTransport<UnitTestTransport>>();
+    auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "");
+    OfflineAppSession::Config oas_config(transport);
+    oas_config.base_url = util::format("http://localhost:%1/", server.port());
+    oas_config.socket_provider = socket_provider;
+    OfflineAppSession oas(oas_config);
+    AutoVerifiedEmailCredentials creds;
+    auto app = oas.app();
+    const auto partition = random_string(100);
+
+    transport->request_hook = [&](const Request& req) -> std::optional<Response> {
+        if (req.url.find("/location") == std::string::npos) {
+            return std::nullopt;
+        }
+
+        REQUIRE(req.url == util::format("http://localhost:%1/api/client/v2.0/app/app_id/location", server.port()));
+        return Response{
+            200,
+            0,
+            {},
+            nlohmann::json(nlohmann::json::object({
+                               {"hostname", util::format("http://localhost:%1", server.port())},
+                               {"ws_hostname", util::format("ws://localhost:%1", server.port())},
+                               {"sync_route", util::format("ws://localhost:%1/realm-sync", server.port())},
+                           }))
+                .dump(),
+        };
+    };
+
+    SyncTestFile realm_config(oas, "test");
+
+    auto r = Realm::get_shared_realm(realm_config);
+    REQUIRE(!wait_for_download(*r));
 }
 
 TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
@@ -4120,6 +4219,17 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
 
     SECTION("jwt happy path") {
         bool processed = false;
+        bool logged_in_once = false;
+
+        auto token = app->subscribe([&logged_in_once, &app](auto&) {
+            REQUIRE(!logged_in_once);
+            auto user = app->current_user();
+            auto metadata = user->user_profile();
+
+            // Ensure that the JWT metadata fields are available when the callback is fired on login.
+            CHECK(metadata["name"] == "Foo Bar");
+            logged_in_once = true;
+        });
 
         std::shared_ptr<User> user = log_in(app, AppCredentials::custom(jwt));
 
@@ -4140,6 +4250,10 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
         auto custom_data = *user->custom_data();
         CHECK(custom_data["name"] == "Not Foo Bar");
         CHECK(metadata["name"] == "Foo Bar");
+
+        REQUIRE(logged_in_once);
+
+        app->unsubscribe(token);
     }
 }
 
@@ -4408,7 +4522,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     auto server_app_config = minimal_app_config("full_text", schema);
     auto app_session = create_app(server_app_config);
     const auto partition = random_string(100);
-    TestAppSession test_session(app_session, nullptr);
+    TestAppSession test_session(app_session);
     SyncTestFile config(test_session.app()->current_user(), partition, schema);
     SharedRealm realm;
     SECTION("sync open") {
@@ -4419,22 +4533,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
         INFO("realm opened with async open");
         auto async_open_task = Realm::get_synchronized_realm(config);
 
-        auto [realm_promise, realm_future] = util::make_promise_future<ThreadSafeReference>();
-        async_open_task->start(
-            [promise = std::move(realm_promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
-                if (ouch) {
-                    try {
-                        std::rethrow_exception(ouch);
-                    }
-                    catch (...) {
-                        promise.set_error(exception_to_status());
-                    }
-                }
-                else {
-                    promise.emplace_value(std::move(ref));
-                }
-            });
-
+        auto realm_future = async_open_task->start();
         realm = Realm::get_shared_realm(std::move(realm_future.get()));
     }
 
@@ -4699,8 +4798,10 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
     CHECK(!app->current_user());
 
     int event_processed = 0;
-    auto token = app->subscribe([&event_processed](auto&) {
+    auto token = app->subscribe([&](auto&) {
         event_processed++;
+        // Read the current user to verify that doing so does not deadlock
+        app->current_user();
     });
 
     SECTION("current user is populated") {

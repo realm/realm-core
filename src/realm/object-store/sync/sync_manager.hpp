@@ -138,7 +138,7 @@ public:
     }
 
     // Return the cached logger
-    const std::shared_ptr<util::Logger>& get_logger() const REQUIRES(!m_mutex);
+    std::shared_ptr<util::Logger> get_logger() const REQUIRES(!m_mutex);
 
     struct OnlyForTesting {
         friend class TestHelper;
@@ -148,10 +148,6 @@ public:
 
     static std::shared_ptr<SyncManager> create(const SyncClientConfig& config);
     SyncManager(Private, const SyncClientConfig& config);
-
-    // Attempt to perform all pending file actions for the given path. Returns
-    // true if any were performed.
-    bool immediately_run_file_actions(std::string_view realm_path);
 
 private:
     friend class SyncSession;

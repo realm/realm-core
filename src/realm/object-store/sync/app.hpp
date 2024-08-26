@@ -190,7 +190,7 @@ public:
     /// @param access_token The access token of the user
     /// @param refresh_token The refresh token of the user
     std::shared_ptr<User> create_fake_user_for_testing(const std::string& user_id, const std::string& access_token,
-                                                       const std::string& refresh_token);
+                                                       const std::string& refresh_token) REQUIRES(!m_user_mutex);
 
     // MARK: - Provider Clients
 
@@ -449,6 +449,8 @@ public:
 private:
     const AppConfig m_config;
 
+    static SharedApp make_app(const AppConfig& config);
+
     util::CheckedMutex m_route_mutex;
     // The following variables hold the different paths to Atlas, depending on the
     // request being performed
@@ -608,6 +610,8 @@ private:
     std::string base_url() REQUIRES(!m_route_mutex);
 
     bool verify_user_present(const std::shared_ptr<User>& user) const REQUIRES(m_user_mutex);
+
+    void emit_change_to_subscribers() REQUIRES(!m_user_mutex);
 
     // UserProvider implementation
     friend class User;

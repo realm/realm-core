@@ -73,6 +73,7 @@ if(REALM_ENABLE_SYNC)
             sync/app.cpp
             sync/client_reset.cpp
             sync/flx_migration.cpp
+            sync/flx_role_change.cpp
             sync/flx_schema_migration.cpp
             sync/flx_sync.cpp
             sync/metadata.cpp
@@ -227,6 +228,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
         set(libuv_target uv_a)
     endif()
 
+    set_target_properties(${libuv_target} PROPERTIES COMPILE_WARNING_AS_ERROR Off)
     target_link_libraries(ObjectStoreTestLib ${libuv_target})
     target_compile_definitions(ObjectStoreTestLib PRIVATE TEST_SCHEDULER_UV=1)
 
@@ -236,8 +238,6 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
         set_target_properties(${libuv_target} PROPERTIES COMPILE_OPTIONS "${comp_opts}")
     endif()
 endif()
-
-add_subdirectory(notifications-fuzzer)
 
 if(NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
     add_subdirectory(benchmarks)
