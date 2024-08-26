@@ -30,11 +30,10 @@ void Spec::detach() noexcept
     m_top.detach();
 }
 
-bool Spec::init(ref_type ref) noexcept
+void Spec::init(ref_type ref) noexcept
 {
     MemRef mem(ref, get_alloc());
     init(mem);
-    return true;
 }
 
 void Spec::init(MemRef mem) noexcept
@@ -44,9 +43,9 @@ void Spec::init(MemRef mem) noexcept
     // Since Core6 we will always have the column keys array
     REALM_ASSERT(top_size == s_spec_max_size);
 
-    m_types.init_from_ref(m_top.get_as_ref(s_types_ndx));
-    m_names.init_from_ref(m_top.get_as_ref(s_names_ndx));
-    m_attr.init_from_ref(m_top.get_as_ref(s_attributes_ndx));
+    m_types.init_from_parent();
+    m_names.init_from_parent();
+    m_attr.init_from_parent();
 
     // Enumkeys array is only there when there are StringEnum columns
     if (auto ref = m_top.get_as_ref(s_enum_keys_ndx)) {
@@ -58,11 +57,6 @@ void Spec::init(MemRef mem) noexcept
 
     m_keys.init_from_parent();
 
-    update_internals();
-}
-
-void Spec::update_internals() noexcept
-{
     size_t n = m_types.size();
     m_num_public_columns = n;
     // We normally have fewer backlink columns than public columns, so quicker to go backwards
@@ -74,26 +68,6 @@ void Spec::update_internals() noexcept
         m_num_public_columns--;
     }
 }
-
-void Spec::update_from_parent() noexcept
-{
-    m_top.update_from_parent();
-    m_types.update_from_parent();
-    m_names.update_from_parent();
-    m_attr.update_from_parent();
-
-    if (m_top.get_as_ref(s_enum_keys_ndx) != 0) {
-        m_enumkeys.update_from_parent();
-    }
-    else {
-        m_enumkeys.detach();
-    }
-
-    m_keys.update_from_parent();
-
-    update_internals();
-}
-
 
 MemRef Spec::create_empty_spec(Allocator& alloc)
 {

@@ -220,15 +220,6 @@ void Array::init_from_mem(MemRef mem) noexcept
     update_width_cache_from_header();
 }
 
-void Array::update_from_parent() noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    ArrayParent* parent = get_parent();
-    REALM_ASSERT_DEBUG(parent);
-    ref_type new_ref = get_ref_from_parent();
-    init_from_ref(new_ref);
-}
-
 void Array::set_type(Type type)
 {
     REALM_ASSERT(is_attached());

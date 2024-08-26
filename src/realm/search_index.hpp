@@ -175,7 +175,7 @@ inline size_t SearchIndex::get_ndx_in_parent() const noexcept
 
 inline void SearchIndex::update_from_parent() noexcept
 {
-    m_root_array->update_from_parent();
+    m_root_array->init_from_parent();
 }
 
 } // namespace realm

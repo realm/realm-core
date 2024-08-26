@@ -126,12 +126,6 @@ public:
         init_from_ref(ref);
     }
 
-    /// Called in the context of Group::commit() to ensure that attached
-    /// accessors stay valid across a commit. Please note that this works only
-    /// for non-transactional commits. Accessors obtained during a transaction
-    /// are always detached when the transaction ends.
-    void update_from_parent() noexcept;
-
     /// Change the type of an already attached array node.
     ///
     /// The effect of calling this function on an unattached accessor is

@@ -1163,8 +1163,8 @@ void Group::update_refs(ref_type top_ref) noexcept
     m_top.init_from_ref(top_ref);
 
     // Now we can update it's child arrays
-    m_table_names.update_from_parent();
-    m_tables.update_from_parent();
+    m_table_names.init_from_parent();
+    m_tables.init_from_parent();
 
     // Update all attached table accessors.
     for (auto& table_accessor : m_table_accessors) {
