@@ -304,8 +304,6 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
     set(REALM_HAVE_OPENSSL ON)
     option(REALM_USE_SYSTEM_OPENSSL_PATHS "Use the system OpenSSL certificate store (specified by the OPENSSLDIR environment variable) at runtime for TLS handshake." ${_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS})
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR "${OPENSSL_VERSION}")
-elseif(APPLE)
-    set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 
 # Use Zlib for Sync, but allow integrators to override it

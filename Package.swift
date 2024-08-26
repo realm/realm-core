@@ -16,14 +16,12 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_ENABLE_ASSERTIONS", to: "1"),
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
     .define("REALM_ENABLE_GEOSPATIAL", to: "1"),
-    .define("REALM_APP_SERVICES", to: "1"),
 
     .define("REALM_VERSION_MAJOR", to: String(versionCompontents[0])),
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
     .define("REALM_VERSION_PATCH", to: String(versionCompontents[2])),
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
-    .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS]))
 ]
 
 let syncServerSources: [String] =  [
