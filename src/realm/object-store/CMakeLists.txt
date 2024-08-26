@@ -37,7 +37,6 @@ set(SOURCES
 
 set(HEADERS
     audit.hpp
-    audit_serializer.hpp
     binding_context.hpp
     collection.hpp
     collection_notifications.hpp
