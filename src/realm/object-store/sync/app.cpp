@@ -1176,6 +1176,11 @@ void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& c
 
 void App::do_request(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion, bool update_location)
 {
+    // NOTE: Since the calls to `send_request_to_server()` or `upldate_location_and_resend()` do not
+    // capture a shared_ptr to App as part of their callback, any function that calls `do_request()`
+    // needs to capture the App as `self = shared_from_this()` to ensure the lifetime of the App
+    // object is extended until the callback is called after the operation is complete.
+
     // Verify the request URL to make sure it is valid
     if (auto valid_url = util::Uri::try_parse(request->url); !valid_url.is_ok()) {
         completion(std::move(request), AppUtils::make_apperror_response(
@@ -1258,10 +1263,10 @@ void App::handle_auth_failure(const AppError& error, std::unique_ptr<Request>&& 
 
                              // Reissue the request with the new access token
                              request->headers = get_request_headers(user, RequestTokenType::AccessToken);
-                             self->do_request(std::move(request),
-                                              [completion = std::move(completion)](auto&&, auto& response) {
-                                                  completion(response);
-                                              });
+                             self->do_request(std::move(request), [self = self, completion = std::move(completion)](
+                                                                      auto&&, auto& response) {
+                                 completion(response);
+                             });
                          });
 }
 
