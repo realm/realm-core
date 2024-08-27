@@ -29,15 +29,11 @@ void ArraySmallBlobs::init_from_mem(MemRef mem) noexcept
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0);
     ref_type blob_ref = get_as_ref(1);
+    ref_type nulls_ref = get_as_ref(2);
 
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
-
-    // In theory you could have an array that survived from ancient days where this array was not present
-    if (Array::size() > 2) {
-        ref_type nulls_ref = get_as_ref(2);
-        m_nulls.init_from_ref(nulls_ref);
-    }
+    m_nulls.init_from_ref(nulls_ref);
 }
 
 void ArraySmallBlobs::add(BinaryData value, bool add_zero_term)

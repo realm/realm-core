@@ -227,7 +227,7 @@ void ClusterNodeInner::init(MemRef mem)
 
 void ClusterNodeInner::update_from_parent() noexcept
 {
-    Array::update_from_parent();
+    Array::init_from_parent();
     ref_type ref = Array::get_as_ref(s_key_ref_index);
     if (ref) {
         m_keys.update_from_parent();
