@@ -1152,6 +1152,11 @@ bool File::rw_lock(bool exclusive, bool non_blocking)
     // or the OS will deadlock when un-suspending the app.
     int mode = exclusive ? O_WRONLY | O_NONBLOCK : O_RDWR | O_NONBLOCK;
 
+    auto report_err = [path = m_fifo_path](int err, const char* msg) {
+        auto message = util::format("%1: %2, path = '%3'", msg, std::system_category().message(err), path);
+        throw RuntimeError(ErrorCodes::FileOperationFailed, message); // LCOV_EXCL_LINE
+    };
+
     // Optimistically try to open the fifo. This may fail due to the fifo not
     // existing, but since it usually exists this is faster than trying to create
     // it first.
@@ -1168,7 +1173,7 @@ bool File::rw_lock(bool exclusive, bool non_blocking)
             }
 
             // Otherwise we got an unexpected error
-            throw std::system_error(err, std::system_category(), "opening lock fifo for writing failed");
+            report_err(err, "opening lock fifo for writing failed");
         }
 
         if (err == ENOENT) {
@@ -1178,7 +1183,7 @@ bool File::rw_lock(bool exclusive, bool non_blocking)
                 try_make_dir(m_fifo_dir_path);
             status = mkfifo(m_fifo_path.c_str(), 0666);
             if (status != 0)
-                throw std::system_error(errno, std::system_category(), "creating lock fifo for reading failed");
+                report_err(errno, "creating lock fifo for reading failed");
 
             // Try again to open the fifo now that it exists
             fd = ::open(m_fifo_path.c_str(), mode);
@@ -1186,7 +1191,7 @@ bool File::rw_lock(bool exclusive, bool non_blocking)
         }
 
         if (fd == -1)
-            throw std::system_error(err, std::system_category(), "opening lock fifo for reading failed");
+            report_err(err, "opening lock fifo for reading failed");
     }
 
     // We successfully opened the pipe. If we're trying to acquire an exclusive
