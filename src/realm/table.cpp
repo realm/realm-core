@@ -1952,18 +1952,18 @@ void Table::update_from_parent() noexcept
 {
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
-        m_top.update_from_parent();
-        m_spec.update_from_parent();
+        m_top.init_from_parent();
+        m_spec.init_from_parent();
         m_clusters.update_from_parent();
-        m_index_refs.update_from_parent();
+        m_index_refs.init_from_parent();
         for (auto&& index : m_index_accessors) {
             if (index != nullptr) {
                 index->update_from_parent();
             }
         }
 
-        m_opposite_table.update_from_parent();
-        m_opposite_column.update_from_parent();
+        m_opposite_table.init_from_parent();
+        m_opposite_column.init_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_table_type = Type(flags & table_type_mask);

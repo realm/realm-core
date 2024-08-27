@@ -81,7 +81,6 @@ public:
     void destroy() noexcept;
 
     size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(size_t) noexcept;
 
     void verify() const;
 
@@ -107,21 +106,12 @@ private:
 
     Spec(Allocator&) noexcept; // Unattached
 
-    bool init(ref_type) noexcept;
+    void init(ref_type) noexcept;
     void init(MemRef) noexcept;
-    void update_internals() noexcept;
 
-    // Returns true in case the ref has changed.
-    bool init_from_parent() noexcept;
+    void init_from_parent() noexcept;
 
     ref_type get_ref() const noexcept;
-
-    /// Called in the context of Group::commit() to ensure that
-    /// attached table accessors stay valid across a commit. Please
-    /// note that this works only for non-transactional commits. Table
-    /// accessors obtained during a transaction are always detached
-    /// when the transaction ends.
-    void update_from_parent() noexcept;
 
     void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept;
 
@@ -161,10 +151,9 @@ inline Spec::Spec(Allocator& alloc) noexcept
     m_keys.set_parent(&m_top, s_col_keys_ndx);
 }
 
-inline bool Spec::init_from_parent() noexcept
+inline void Spec::init_from_parent() noexcept
 {
-    ref_type ref = m_top.get_ref_from_parent();
-    return init(ref);
+    init(m_top.get_ref_from_parent());
 }
 
 inline void Spec::destroy() noexcept
@@ -175,11 +164,6 @@ inline void Spec::destroy() noexcept
 inline size_t Spec::get_ndx_in_parent() const noexcept
 {
     return m_top.get_ndx_in_parent();
-}
-
-inline void Spec::set_ndx_in_parent(size_t ndx) noexcept
-{
-    m_top.set_ndx_in_parent(ndx);
 }
 
 inline ref_type Spec::get_ref() const noexcept
@@ -241,8 +225,6 @@ inline void Spec::set_column_attr(size_t column_ndx, ColumnAttrMask attr)
     // so setting it will overwrite existing. In the future
     // we will allow combinations.
     m_attr.set(column_ndx, attr.m_value);
-
-    update_internals();
 }
 
 inline StringData Spec::get_column_name(size_t ndx) const noexcept
