@@ -269,7 +269,6 @@ option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
-option(REALM_APP_SERVICES "Enable the default app services implementation." ON)
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)

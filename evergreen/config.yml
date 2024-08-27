@@ -700,7 +700,7 @@ tasks:
       target_to_build: ObjectStoreTests
   - func: "run tests"
     vars:
-      test_label: objstore-local
+      test_filter: ObjectStoreTests
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
       disable_tests_against_baas: true
@@ -1282,52 +1282,6 @@ buildvariants:
     emsdk_version: "3.1.37"
   tasks:
   - name: compile_emscripten
-
-# disable these builders since there are constantly failing and not yet ready for nightly builds
-# - name: ubuntu2004-network-nonideal
-#   display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - nonideal transfer)"
-#   run_on: ubuntu2004-large
-#   expansions:
-#     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-#     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
-#     cmake_bindir: "./cmake_binaries/bin"
-#     fetch_missing_dependencies: On
-#     c_compiler: "./clang_binaries/bin/clang"
-#     cxx_compiler: "./clang_binaries/bin/clang++"
-#     cmake_build_type: RelWithDebInfo
-#     run_with_encryption: On
-#     baas_admin_port: 9098
-#     test_logging_level: debug
-#     test_timeout_extra: 60
-#     proxy_toxics_file: evergreen/proxy-nonideal-transfer.toxics
-#     # RANDOM1: bandwidth-upstream limited to between 10-50 KB/s from the client to the server
-#     # RANDOM2: bandwidth-downstream limited to between 10-50 KB/s from the server to the client
-#     proxy_toxics_randoms: "10:50|10:50"
-#   tasks:
-#   - name: network_tests
-#
-# - name: ubuntu2004-network-faulty
-#   display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - network faults)"
-#   run_on: ubuntu2004-large
-#   expansions:
-#     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-#     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
-#     cmake_bindir: "./cmake_binaries/bin"
-#     fetch_missing_dependencies: On
-#     c_compiler: "./clang_binaries/bin/clang"
-#     cxx_compiler: "./clang_binaries/bin/clang++"
-#     cmake_build_type: RelWithDebInfo
-#     run_with_encryption: On
-#     baas_admin_port: 9098
-#     test_logging_level: debug
-#     proxy_toxics_file: evergreen/proxy-network-faults.toxics
-#     # RANDOM1: limit-data-upstream to close connection after between 1000-3000 bytes have been sent
-#     # RANDOM2: limit-data-downstream to close connection after between 1000-3000 bytes have been received
-#     # RANDOM3: slow-close-upstream to keep connection to server open after 1000-1500 milliseconds after being closed
-#     # RANDOM4: reset-peer-upstream after 50-200 seconds to force close the connection to the server
-#     proxy_toxics_randoms: "1000:3000|1000:3000|1000:1500|50:200"
-#   tasks:
-#   - name: network_tests
 
 - name: ubuntu-valgrind
   display_name: "Ubuntu 22.04 x86_64 (Valgrind)"

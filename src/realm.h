@@ -770,11 +770,6 @@ RLM_API void realm_config_set_automatic_change_notifications(realm_config_t*, bo
 RLM_API void realm_config_set_scheduler(realm_config_t*, const realm_scheduler_t*);
 
 /**
- * Set the audit interface for the realm (unimplemented).
- */
-RLM_API bool realm_config_set_audit_factory(realm_config_t*, void*);
-
-/**
  * Get maximum number of active versions in the realm file allowed before an
  * exception is thrown.
  *

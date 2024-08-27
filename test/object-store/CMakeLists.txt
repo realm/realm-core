@@ -41,7 +41,7 @@ if (REALM_ENABLE_GEOSPATIAL)
     list(APPEND SOURCES geospatial.cpp)
 endif()
 
-file(GLOB RESOURCES "*.realm" "../*.pem")
+file(GLOB RESOURCES "*.realm")
 
 set_property(DIRECTORY PROPERTY TEST_RESOURCES "${RESOURCES}")
 
@@ -68,8 +68,7 @@ set_target_resources(ObjectStoreTests "${RESOURCES}")
 enable_stdfilesystem(ObjectStoreTests)
 create_coverage_target(generate-coverage ObjectStoreTests)
 
-# add_bundled_test(ObjectStoreTests)
-add_labeled_test(ObjectStoreTests-local objstore-local ObjectStoreTests "~[baas]")
+add_bundled_test(ObjectStoreTests)
 
 if(REALM_TEST_LOGGING)
     target_compile_definitions(ObjectStoreTestLib PRIVATE
