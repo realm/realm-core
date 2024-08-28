@@ -1152,8 +1152,8 @@ bool File::rw_lock(bool exclusive, bool non_blocking)
     // or the OS will deadlock when un-suspending the app.
     int mode = exclusive ? O_WRONLY | O_NONBLOCK : O_RDWR | O_NONBLOCK;
 
-    auto report_err = [path = m_fifo_path](int err, const char* msg) {
-        auto message = util::format("%1: %2, path = '%3'", msg, std::system_category().message(err), path);
+    auto report_err = [this](int err, const char* msg) {
+        auto message = util::format("%1: %2, path = '%3'", msg, std::system_category().message(err), m_fifo_path);
         throw RuntimeError(ErrorCodes::FileOperationFailed, message); // LCOV_EXCL_LINE
     };
 
