@@ -62,11 +62,6 @@ RLM_API uint64_t realm_get_persisted_schema_version(const realm_config_t* config
     conf.path = config->path;
     conf.encryption_key = config->encryption_key;
 
-    if (config->sync_config) {
-        conf.sync_config = nullptr;
-        conf.force_sync_history = true;
-    }
-
     auto realm = Realm::get_shared_realm(conf);
     uint64_t version = ObjectStore::get_schema_version(realm->read_group());
     return version;

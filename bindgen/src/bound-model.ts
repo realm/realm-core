@@ -168,57 +168,6 @@ export class Func extends TypeBase {
   argsSkippingIgnored() {
     return this.args.filter((arg) => !arg.type.isTemplate("IgnoreArgument"));
   }
-
-  // For functions that take a final AsyncCallback argument, transforms into a
-  // function signature that omits that argument and returns an AsyncResult.
-  // Other functions return undefined.
-  asyncTransform(): Func | undefined {
-    if (!this.ret.isVoid()) return undefined;
-    const voidType = this.ret;
-    if (this.args.length === 0) return undefined;
-    const lastArgType = this.args[this.args.length - 1].type.removeConstRef();
-    if (!lastArgType.isTemplate("AsyncCallback")) return undefined;
-
-    // Now we know we are an async function. Validate requirements and do the transform.
-    const cb = lastArgType.args[0];
-    assert.equal(cb.kind, "Func" as const);
-    assert.equal(cb.ret, voidType);
-
-    // Callback arguments are either (error?) or (result?, error?).
-    // In the latter case, result is the "real" return value from the async op.
-    assert([1, 2].includes(cb.args.length));
-    const lastCbArgType = cb.args[cb.args.length - 1].type;
-    assert(
-      lastCbArgType.isOptional("AppError") ||
-        lastCbArgType.isOptional("Status") ||
-        lastCbArgType.isPrimitive("Status") ||
-        lastCbArgType.isNullable("std::error_code") ||
-        lastCbArgType.isNullable("std::exception_ptr"),
-      "Last arg to AsyncCallback must be one of " +
-        "util::Optional<AppError>, util::Optional<Status>, Status, Nullable<std::exception_ptr>, r Nullable<std::error_code>, " +
-        `but got ${lastCbArgType}`,
-    );
-    let res: Type = voidType;
-    if (cb.args.length === 2) {
-      res = cb.args[0].type.removeConstRef();
-      if (res.isOptional() || res.isNullable()) {
-        res = res.args[0];
-      }
-    }
-    return new Func(
-      new Template("AsyncResult", [res]),
-      this.args.slice(0, -1),
-      this.isConst,
-      this.noexcept,
-      this.isOffThread,
-    );
-  }
-
-  // Like asyncTransform(), but returns self for non-async functions. This is useful if you only care
-  // about the exposed signature, and not whether it is an async function.
-  asyncTransformOrSelf(): Func {
-    return this.asyncTransform() ?? this;
-  }
 }
 
 export class Template extends TypeBase {
@@ -235,15 +184,10 @@ export class Template extends TypeBase {
   }
 
   toCpp(): string {
-    assert.notEqual(this.name, "AsyncResult", "Should never see AsyncResult here");
-
     // These are just markers, not actually a part of the C++ interface.
     if (["Nullable", "IgnoreArgument"].includes(this.name)) return this.args[0].toCpp();
 
-    const templateMap: Record<string, string> = {
-      AsyncCallback: "util::UniqueFunction",
-    };
-    const cppTemplate = templateMap[this.name] ?? this.name;
+    const cppTemplate = this.name;
     let args;
     if (["util::UniqueFunction", "std::function"].includes(cppTemplate)) {
       // Functions can't normally be toCpp'd because lambda types are unutterable.
@@ -564,7 +508,7 @@ export class BoundSpec {
 
     for (const [structName, structRaw] of Object.entries(this.optInSpec?.records ?? {})) {
       const boundStruct = this.types[structName];
-      assert(boundStruct instanceof Struct);
+      assert(boundStruct instanceof Struct, `Expected '${structName}' to be in types`);
       for (const fieldName of structRaw.fields) {
         boundStruct.getField(fieldName).isOptedInTo = true;
       }

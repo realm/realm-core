@@ -1,5 +1,4 @@
 #include <realm.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
 #include <iostream>
 
 const char* legend =
@@ -118,7 +117,7 @@ int main(int argc, char const* argv[])
             return 0;
         }
         catch (const realm::IncompatibleHistories&) {
-            hist = realm::sync::make_client_replication();
+            // TODO hist = realm::sync::make_client_replication();
             options.allow_file_format_upgrade = false;
             options.is_immutable = true;
         }

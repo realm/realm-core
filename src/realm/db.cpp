@@ -1560,30 +1560,6 @@ void DB::open(Replication& repl, const DBOptions& options)
     m_alloc.set_read_only(true);
 }
 
-void DB::create_new_history(Replication& repl)
-{
-    Replication* old_repl = get_replication();
-    try {
-        repl.initialize(*this);
-        set_replication(&repl);
-
-        auto tr = start_write();
-        tr->clear_history();
-        tr->replicate(tr.get(), repl);
-        tr->commit();
-    }
-    catch (...) {
-        set_replication(old_repl);
-        throw;
-    }
-}
-
-void DB::create_new_history(std::unique_ptr<Replication> repl)
-{
-    create_new_history(*repl);
-    m_history = std::move(repl);
-}
-
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails.
 // Tracked by https://github.com/realm/realm-core/issues/4111

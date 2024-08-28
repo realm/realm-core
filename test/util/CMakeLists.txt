@@ -1,5 +1,6 @@
 set(TEST_UTIL_SOURCES
     benchmark_results.cpp
+    compare_groups.cpp
     crypt_key.cpp
     demangle.cpp
     misc.cpp
@@ -42,13 +43,6 @@ set(TEST_UTIL_HEADERS
     verified_string.hpp
     wildcard.hpp
 ) # TEST_UTIL_HEADERS
-
-if(REALM_ENABLE_SYNC)
-    list(APPEND TEST_UTIL_SOURCES
-        compare_groups.cpp
-        dump_changesets.cpp
-    )
-endif()
 
 add_library(TestUtil STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
 

@@ -15,29 +15,13 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_INSTALL_LIBEXECDIR", to: ""),
     .define("REALM_ENABLE_ASSERTIONS", to: "1"),
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
-    .define("REALM_ENABLE_SYNC", to: "1"),
     .define("REALM_ENABLE_GEOSPATIAL", to: "1"),
-    .define("REALM_APP_SERVICES", to: "1"),
 
     .define("REALM_VERSION_MAJOR", to: String(versionCompontents[0])),
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
     .define("REALM_VERSION_PATCH", to: String(versionCompontents[2])),
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
-    .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS]))
-]
-
-let syncServerSources: [String] =  [
-    "realm/sync/noinst/server",
-]
-
-let syncExcludes: [String] = [
-    // Server files
-    "realm/sync/noinst/server/crypto_server_openssl.cpp",
-    "realm/sync/noinst/server/crypto_server_stub.cpp",
-
-    // CLI Tools
-    "realm/sync/tools",
 ]
 
 let notSyncServerSources: [String] = [
@@ -98,36 +82,6 @@ let notSyncServerSources: [String] = [
     "realm/spec.cpp",
     "realm/status.cpp",
     "realm/string_data.cpp",
-    "realm/sync/changeset.cpp",
-    "realm/sync/changeset_encoder.cpp",
-    "realm/sync/changeset_parser.cpp",
-    "realm/sync/client.cpp",
-    "realm/sync/config.cpp",
-    "realm/sync/history.cpp",
-    "realm/sync/instruction_applier.cpp",
-    "realm/sync/instruction_replication.cpp",
-    "realm/sync/instructions.cpp",
-    "realm/sync/network/default_socket.cpp",
-    "realm/sync/network/http.cpp",
-    "realm/sync/network/network.cpp",
-    "realm/sync/network/network_ssl.cpp",
-    "realm/sync/network/websocket.cpp",
-    "realm/sync/noinst/changeset_index.cpp",
-    "realm/sync/noinst/client_history_impl.cpp",
-    "realm/sync/noinst/client_impl_base.cpp",
-    "realm/sync/noinst/client_reset.cpp",
-    "realm/sync/noinst/client_reset_operation.cpp",
-    "realm/sync/noinst/client_reset_recovery.cpp",
-    "realm/sync/noinst/migration_store.cpp",
-    "realm/sync/noinst/pending_bootstrap_store.cpp",
-    "realm/sync/noinst/pending_reset_store.cpp",
-    "realm/sync/noinst/protocol_codec.cpp",
-    "realm/sync/noinst/sync_metadata_schema.cpp",
-    "realm/sync/noinst/sync_schema_migration.cpp",
-    "realm/sync/object_id.cpp",
-    "realm/sync/protocol.cpp",
-    "realm/sync/subscriptions.cpp",
-    "realm/sync/transform.cpp",
     "realm/table.cpp",
     "realm/table_ref.cpp",
     "realm/table_view.cpp",
@@ -139,7 +93,7 @@ let notSyncServerSources: [String] = [
     "realm/utilities.cpp",
     "realm/uuid.cpp",
     "realm/version.cpp",
-] + syncExcludes
+]
 
 let bidExcludes: [String] = [
     "bid128_acos.c",
@@ -412,16 +366,14 @@ let package = Package(
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
                 "realm/object-store/impl/emscripten",
-                "realm/object-store/sync/impl/emscripten",
                 "realm/parser",
-                "realm/sync/CMakeLists.txt",
                 "realm/tools",
                 "realm/util/config.h.in",
                 "realm/version_numbers.hpp.in",
                 "spm",
                 "swift",
                 "win32",
-            ] + syncExcludes + syncServerSources) as [String],
+            ]) as [String],
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath("external"),
@@ -459,28 +411,6 @@ let package = Package(
             cxxSettings: [
                 .headerSearchPath("realm/parser/generated")
             ] + cxxSettings),
-        .target(
-            name: "SyncServer",
-            dependencies: ["RealmCore"],
-            path: "src",
-            exclude: ([
-                "CMakeLists.txt",
-                "external",
-                "realm/CMakeLists.txt",
-                "realm/exec",
-                "realm/object-store",
-                "realm/parser",
-                "realm/sync/CMakeLists.txt",
-                "realm/sync/noinst/server/CMakeLists.txt",
-                "realm/tools",
-                "realm/util/config.h.in",
-                "realm/version_numbers.hpp.in",
-                "swift",
-                "win32",
-            ] + notSyncServerSources) as [String],
-            sources: ["realm/sync"],
-            publicHeadersPath: "realm/sync/impl", // hack
-            cxxSettings: cxxSettings),
         .target(
             name: "Capi",
             dependencies: ["RealmCore", "RealmQueryParser"],
@@ -528,7 +458,7 @@ let package = Package(
             cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTestUtils",
-            dependencies: ["RealmCore", "SyncServer", "Catch2", "CoreTestUtils"],
+            dependencies: ["RealmCore", "Catch2", "CoreTestUtils"],
             path: "test/object-store/util",
             publicHeadersPath: ".",
             cxxSettings: ([
@@ -546,8 +476,6 @@ let package = Package(
                 "c_api",
                 "geospatial.cpp",
                 "query.json",
-                "sync-metadata-v4.realm",
-                "sync-metadata-v5.realm",
                 "test_backup-olden-and-golden.realm",
                 "util",
             ],

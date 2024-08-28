@@ -102,15 +102,7 @@ int main(int argc, const char* argv[])
                         config.encryption_key.resize(64);
                         memcpy(&config.encryption_key[0], &key_ptr[0], 64);
                     }
-                    realm::SharedRealm realm;
-                    try {
-                        realm = realm::Realm::get_shared_realm(config);
-                    }
-                    catch (const realm::FileAccessError& e) {
-                        std::cout << "trying to open as a sync Realm\n" << e.what() << "\n" << std::endl;
-                        config.force_sync_history = true;
-                        realm = realm::Realm::get_shared_realm(config);
-                    }
+                    realm::SharedRealm realm = realm::Realm::get_shared_realm(config);
                     enumerate_strings(realm, threshold);
                     realm->compact();
                     std::chrono::duration<double> diff = std::chrono::steady_clock::now() - start;

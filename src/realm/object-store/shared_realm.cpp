@@ -39,17 +39,6 @@
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/impl/sync_file.hpp>
-#include <realm/object-store/sync/sync_manager.hpp>
-#include <realm/object-store/sync/sync_user.hpp>
-#include <realm/object-store/sync/sync_session.hpp>
-
-#include <realm/sync/config.hpp>
-#include <realm/sync/history.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/history.hpp>
-#endif
 #ifdef REALM_DEBUG
 #include <iostream>
 #endif
@@ -190,40 +179,6 @@ SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<uti
     return realm;
 }
 
-#if REALM_ENABLE_SYNC
-std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
-{
-    auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    return coordinator->get_synchronized_realm(std::move(config));
-}
-
-std::shared_ptr<SyncSession> Realm::sync_session() const
-{
-    return m_coordinator ? m_coordinator->sync_session() : nullptr;
-}
-
-sync::SubscriptionSet Realm::get_latest_subscription_set()
-{
-    if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
-        throw IllegalOperation("Flexible sync is not enabled");
-    }
-    // If there is a subscription store, then return the active set
-    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
-    REALM_ASSERT(flx_sub_store);
-    return flx_sub_store->get_latest();
-}
-
-sync::SubscriptionSet Realm::get_active_subscription_set()
-{
-    if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
-        throw IllegalOperation("Flexible sync is not enabled");
-    }
-    // If there is a subscription store, then return the active set
-    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
-    REALM_ASSERT(flx_sub_store);
-    return flx_sub_store->get_active();
-}
-#endif
 
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
@@ -341,10 +296,6 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
 // Schema version is not allowed to decrease for local and pbs realms.
 void Realm::verify_schema_version_not_decreasing(uint64_t version)
 {
-#if REALM_ENABLE_SYNC
-    if (m_config.sync_config && m_config.sync_config->flx_sync_requested)
-        return;
-#endif
     if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
         throw InvalidSchemaVersionException(m_schema_version, version, false);
 }
@@ -432,12 +383,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
     uint64_t validation_mode = SchemaValidationMode::Basic;
-#if REALM_ENABLE_SYNC
-    if (auto sync_config = m_config.sync_config) {
-        validation_mode |=
-            sync_config->flx_sync_requested ? SchemaValidationMode::SyncFLX : SchemaValidationMode::SyncPBS;
-    }
-#endif
     if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
         validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
     }
@@ -1161,22 +1106,6 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     verify_thread();
     verify_open();
 
-#if REALM_ENABLE_SYNC
-    auto src_is_flx_sync = m_config.sync_config && m_config.sync_config->flx_sync_requested;
-    auto dst_is_flx_sync = config.sync_config && config.sync_config->flx_sync_requested;
-    auto dst_is_pbs_sync = config.sync_config && !config.sync_config->flx_sync_requested;
-
-    if (dst_is_flx_sync && !src_is_flx_sync) {
-        throw IllegalOperation(
-            "Realm cannot be converted to a flexible sync realm unless flexible sync is already enabled");
-    }
-    if (dst_is_pbs_sync && src_is_flx_sync) {
-        throw IllegalOperation(
-            "Realm cannot be converted from a flexible sync realm to a partition based sync realm");
-    }
-
-#endif
-
     if (merge_into_existing && util::File::exists(config.path)) {
         auto destination_realm = Realm::get_shared_realm(config);
         destination_realm->begin_transaction();
@@ -1190,27 +1119,7 @@ void Realm::convert(const Config& config, bool merge_into_existing)
         throw InvalidEncryptionKey();
     }
 
-    auto& tr = transaction();
-    auto repl = tr.get_replication();
-    bool src_is_sync = repl && repl->get_history_type() == Replication::hist_SyncClient;
-    bool dst_is_sync = config.sync_config || config.force_sync_history;
-
-    if (dst_is_sync) {
-        m_coordinator->write_copy(config.path, config.encryption_key.data());
-        if (!src_is_sync) {
-#if REALM_ENABLE_SYNC
-            DBOptions options;
-            if (config.encryption_key.size()) {
-                options.encryption_key = config.encryption_key.data();
-            }
-            auto db = DB::create(make_in_realm_history(), config.path, options);
-            db->create_new_history(sync::make_client_replication());
-#endif
-        }
-    }
-    else {
-        tr.write(config.path, config.encryption_key.data());
-    }
+    transaction().write(config.path, config.encryption_key.data());
 }
 
 OwnedBinaryData Realm::write_copy()

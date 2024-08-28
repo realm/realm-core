@@ -21,15 +21,6 @@ set(REALM_FFI_SOURCES
     # realm/object-store/c_api/realm.c
 )
 
-if(REALM_ENABLE_SYNC)
-    list(APPEND REALM_FFI_SOURCES
-        app.cpp
-        http.cpp
-        sync.cpp
-        socket_provider.cpp
-    )
-endif()
-
 if(NOT EMSCRIPTEN)
     add_library(RealmFFI SHARED ${REALM_FFI_SOURCES})
 else()
@@ -42,11 +33,6 @@ target_compile_definitions(RealmFFIStatic PUBLIC -DRLM_NO_DLLIMPORT)
 
 target_link_libraries(RealmFFI PRIVATE Storage ObjectStore QueryParser)
 target_link_libraries(RealmFFIStatic PRIVATE Storage ObjectStore QueryParser)
-
-if (${REALM_ENABLE_SYNC})
-    target_link_libraries(RealmFFI PRIVATE Sync)
-    target_link_libraries(RealmFFIStatic PRIVATE Sync)
-endif()
 
 if (ANDROID)
     target_link_libraries(RealmFFI PUBLIC android log)

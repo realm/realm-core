@@ -93,9 +93,6 @@ for bt in "${BUILD_TYPES[@]}"; do
         # core binary
         tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${platform}${suffix}.a"
-        # sync binary
-        tar -C core -zxvf "${filename}" "lib/librealm-sync${suffix}.a"
-        mv "core/lib/librealm-sync${suffix}.a" "core/librealm-sync-${platform}${suffix}.a"
         # object store binary
         tar -C core -zxvf "${filename}" "lib/librealm-object-store${suffix}.a"
         mv "core/lib/librealm-object-store${suffix}.a" "core/librealm-object-store-${platform}${suffix}.a"
@@ -104,12 +101,10 @@ for bt in "${BUILD_TYPES[@]}"; do
         # Merge the core, sync & object store libraries together
         libtool -static -o core/librealm-monorepo-${platform}${suffix}.a \
           core/librealm-${platform}${suffix}.a \
-          core/librealm-sync-${platform}${suffix}.a \
           core/librealm-object-store-${platform}${suffix}.a
 
         # remove the now merged libraries
         rm -f core/librealm-${platform}${suffix}.a \
-              core/librealm-sync-${platform}${suffix}.a \
               core/librealm-object-store-${platform}${suffix}.a
     done
 done

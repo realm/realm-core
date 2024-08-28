@@ -37,7 +37,6 @@ set(SOURCES
 
 set(HEADERS
     audit.hpp
-    audit_serializer.hpp
     binding_context.hpp
     collection.hpp
     collection_notifications.hpp
@@ -89,75 +88,6 @@ set(HEADERS
     c_api/conversion.hpp
 )
 
-if(REALM_ENABLE_SYNC)
-    list(APPEND HEADERS
-        sync/async_open_task.hpp
-        sync/generic_network_transport.hpp
-        sync/jwt.hpp
-        sync/sync_manager.hpp
-        sync/sync_session.hpp
-        sync/sync_user.hpp
-
-        sync/impl/network_reachability.hpp
-        sync/impl/sync_client.hpp
-        sync/impl/sync_file.hpp)
-
-    list(APPEND SOURCES
-        sync/async_open_task.cpp
-        sync/generic_network_transport.cpp
-        sync/impl/sync_file.cpp
-        sync/jwt.cpp
-        sync/sync_manager.cpp
-        sync/sync_session.cpp)
-
-    if (REALM_APP_SERVICES)
-        list(APPEND HEADERS
-            sync/app.hpp
-            sync/app_config.hpp
-            sync/app_credentials.hpp
-            sync/app_service_client.hpp
-            sync/app_user.hpp
-            sync/app_utils.hpp
-            sync/auth_request_client.hpp
-            sync/impl/app_metadata.hpp
-            sync/mongo_client.hpp
-            sync/mongo_collection.hpp
-            sync/mongo_database.hpp
-            sync/push_client.hpp
-            sync/subscribable.hpp
-        )
-        list(APPEND SOURCES
-            sync/app.cpp
-            sync/app_credentials.cpp
-            sync/app_user.cpp
-            sync/app_utils.cpp
-            sync/impl/app_metadata.cpp
-            sync/mongo_client.cpp
-            sync/mongo_collection.cpp
-            sync/mongo_database.cpp
-            sync/push_client.cpp
-        )
-    endif()
-
-    if(APPLE)
-        list(APPEND HEADERS
-            sync/impl/apple/network_reachability_observer.hpp
-            sync/impl/apple/system_configuration.hpp)
-
-        list(APPEND SOURCES
-            audit.mm
-            sync/impl/apple/network_reachability_observer.cpp
-            sync/impl/apple/system_configuration.cpp)
-    elseif(EMSCRIPTEN)
-        list(APPEND HEADERS
-            sync/impl/emscripten/network_transport.hpp
-            sync/impl/emscripten/socket_provider.hpp)
-        list(APPEND SOURCES
-            sync/impl/emscripten/network_transport.cpp
-            sync/impl/emscripten/socket_provider.cpp)
-    endif()
-endif()
-
 add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
 add_library(Realm::ObjectStore ALIAS ObjectStore)
 
@@ -181,33 +111,7 @@ else()
     target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
 endif()
 
-if(REALM_ENABLE_SYNC AND NOT REALM_SYNC_MULTIPLEXING)
-    target_compile_definitions(ObjectStore PUBLIC REALM_DISABLE_SYNC_MULTIPLEXING=1)
-endif()
-
-if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
-    # needed to disable assertions in external/json
-    target_compile_definitions(ObjectStore PUBLIC
-        $<$<CONFIG:Release>:NDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:NDEBUG>
-    )
-    target_include_directories(ObjectStore PRIVATE ${JSON_INCLUDE_DIR})
-endif()
-
 target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
-
-if(REALM_ENABLE_SYNC)
-    target_link_libraries(ObjectStore PUBLIC Sync)
-    target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
-    if(EMSCRIPTEN)
-        target_link_options(ObjectStore PUBLIC -sFETCH=1 -sFETCH_SUPPORT_INDEXEDDB=0 -lwebsocket.js)
-    endif()
-endif()
-
-if (REALM_APP_SERVICES)
-    target_compile_definitions(ObjectStore PUBLIC REALM_APP_SERVICES=1)
-endif()
-
 set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")
 
 foreach(FILE ${HEADERS})

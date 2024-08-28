@@ -302,6 +302,10 @@ if (REALM_ENABLE_GEOSPATIAL)
     )
 
     list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:s2geometry>)
+
+    install(FILES ../external/mpark/variant.hpp
+        DESTINATION include/external/mpark
+        COMPONENT devel)
 endif()
 
 add_library(Storage STATIC
@@ -426,9 +430,6 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
 
 add_subdirectory(parser)
 add_subdirectory(object-store)
-if (REALM_ENABLE_SYNC)
-    add_subdirectory(sync)
-endif()
 if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
     add_subdirectory(exec)
     set_macos_only(exec)
