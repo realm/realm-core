@@ -930,39 +930,38 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData index_da
     m_array->insert(ins_pos + 1, ref);
 }
 
+void StringIndex::new_node(const NodeChange& nc)
+{
+    StringIndex new_node(inner_node_tag(), m_array->get_alloc());
+    switch (nc.type) {
+        case NodeChange::change_None:
+            break;
+        case NodeChange::change_InsertBefore: {
+            new_node.node_add_key(nc.ref1);
+            new_node.node_add_key(get_ref());
+            break;
+        }
+        case NodeChange::change_InsertAfter: {
+            new_node.node_add_key(get_ref());
+            new_node.node_add_key(nc.ref1);
+            break;
+        }
+        case NodeChange::change_Split: {
+            new_node.node_add_key(nc.ref1);
+            new_node.node_add_key(nc.ref2);
+            break;
+        }
+    }
+    m_array->init_from_ref(new_node.get_ref());
+    m_array->update_parent();
+}
 
 void StringIndex::TreeInsert(ObjKey obj_key, key_type key, size_t offset, StringData index_data, const Mixed& value)
 {
-    NodeChange nc = do_insert(obj_key, key, offset, index_data, value);
-    switch (nc.type) {
-        case NodeChange::change_None:
-            return;
-        case NodeChange::change_InsertBefore: {
-            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.node_add_key(nc.ref1);
-            new_node.node_add_key(get_ref());
-            m_array->init_from_ref(new_node.get_ref());
-            m_array->update_parent();
-            return;
-        }
-        case NodeChange::change_InsertAfter: {
-            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.node_add_key(get_ref());
-            new_node.node_add_key(nc.ref1);
-            m_array->init_from_ref(new_node.get_ref());
-            m_array->update_parent();
-            return;
-        }
-        case NodeChange::change_Split: {
-            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.node_add_key(nc.ref1);
-            new_node.node_add_key(nc.ref2);
-            m_array->init_from_ref(new_node.get_ref());
-            m_array->update_parent();
-            return;
-        }
+    auto nc = do_insert(obj_key, key, offset, index_data, value);
+    if (nc.type != NodeChange::change_None) {
+        new_node(nc);
     }
-    REALM_ASSERT(false); // LCOV_EXCL_LINE; internal Realm error
 }
 
 
@@ -1155,58 +1154,61 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
         throw LogicError(ErrorCodes::LimitExceeded,
                          util::format("String of length %1 exceeds maximum string length of %2.", len, max));
     }
-
-    // Get subnode table
     Allocator& alloc = m_array->get_alloc();
-    Array keys(alloc);
-    get_child(*m_array, 0, keys);
-    REALM_ASSERT(m_array->size() == keys.size() + 1);
+    size_t ins_pos_refs; // first entry in refs points to offsets
 
-    // If we are keeping the complete string in the index
-    // we want to know if this is the last part
-    bool is_at_string_end = offset + 4 >= index_data.size();
+    {
+        // Get subnode table
+        Array keys(alloc);
+        get_child(*m_array, 0, keys);
+        REALM_ASSERT(m_array->size() == keys.size() + 1);
 
-    size_t ins_pos = keys.lower_bound_int(key);
-    size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
+        // If we are keeping the complete string in the index
+        // we want to know if this is the last part
+        bool is_at_string_end = offset + 4 >= index_data.size();
 
-    if (ins_pos == keys.size()) {
-        if (noextend)
-            return false;
+        size_t ins_pos = keys.lower_bound_int(key);
+        ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
 
-        // When key is outside current range, we can just add it
-        keys.add(key);
-        if (!m_target_column.full_word() || is_at_string_end) {
-            int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
-            m_array->add(shifted);
+        if (ins_pos == keys.size()) {
+            if (noextend)
+                return false;
+
+            // When key is outside current range, we can just add it
+            keys.add(key);
+            if (!m_target_column.full_word() || is_at_string_end) {
+                int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
+                m_array->add(shifted);
+            }
+            else {
+                // create subindex for rest of string
+                StringIndex subindex(m_target_column, m_array->get_alloc());
+                subindex.insert_with_offset(obj_key, index_data, value, offset + 4);
+                m_array->add(subindex.get_ref());
+            }
+            return true;
         }
-        else {
-            // create subindex for rest of string
-            StringIndex subindex(m_target_column, m_array->get_alloc());
-            subindex.insert_with_offset(obj_key, index_data, value, offset + 4);
-            m_array->add(subindex.get_ref());
-        }
-        return true;
-    }
 
-    key_type k = key_type(keys.get(ins_pos));
+        key_type k = key_type(keys.get(ins_pos));
 
-    // If key is not present we add it at the correct location
-    if (k != key) {
-        if (noextend)
-            return false;
+        // If key is not present we add it at the correct location
+        if (k != key) {
+            if (noextend)
+                return false;
 
-        keys.insert(ins_pos, key);
-        if (!m_target_column.full_word() || is_at_string_end) {
-            int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
-            m_array->insert(ins_pos_refs, shifted);
+            keys.insert(ins_pos, key);
+            if (!m_target_column.full_word() || is_at_string_end) {
+                int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
+                m_array->insert(ins_pos_refs, shifted);
+            }
+            else {
+                // create subindex for rest of string
+                StringIndex subindex(m_target_column, m_array->get_alloc());
+                subindex.insert_with_offset(obj_key, index_data, value, offset + 4);
+                m_array->insert(ins_pos_refs, subindex.get_ref());
+            }
+            return true;
         }
-        else {
-            // create subindex for rest of string
-            StringIndex subindex(m_target_column, m_array->get_alloc());
-            subindex.insert_with_offset(obj_key, index_data, value, offset + 4);
-            m_array->insert(ins_pos_refs, subindex.get_ref());
-        }
-        return true;
     }
 
     // This leaf already has a slot for for the key
@@ -1266,28 +1268,28 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
         IntegerColumn sub(alloc, ref); // Throws
         sub.set_parent(m_array.get(), ins_pos_refs);
 
-        IntegerColumn::const_iterator it_end = sub.cend();
-        IntegerColumn::const_iterator lower = it_end;
+        IntegerColumn::const_iterator lower = sub.cend();
 
-        auto value_exists_in_list = [&]() {
-            if (m_target_column.full_word()) {
-                lower = sub.cbegin();
-                return reconstruct_string(offset, key, index_data) == value.get_string();
-            }
+        bool value_exists_in_list = false;
+        if (m_target_column.full_word()) {
+            lower = sub.cbegin();
+            value_exists_in_list = reconstruct_string(offset, key, index_data) == value.get_string();
+        }
+        else {
             SortedListComparator slc(m_target_column);
+            IntegerColumn::const_iterator it_end = lower;
             lower = slc.find_start_of_unsorted(value, sub);
 
             if (lower != it_end) {
                 Mixed lower_value = get(ObjKey(*lower));
                 if (lower_value == value) {
-                    return true;
+                    value_exists_in_list = true;
                 }
             }
-            return false;
-        };
+        }
 
         // If we found the value in this list, add the duplicate to the list.
-        if (value_exists_in_list()) {
+        if (value_exists_in_list) {
             insert_to_existing_list_at_lower(obj_key, value, sub, lower);
         }
         else {

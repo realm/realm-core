@@ -838,8 +838,6 @@ private:
 
     util::Logger* get_logger() const noexcept;
 
-    void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
-
     /// Refresh the part of the accessor tree that is rooted at this
     /// table.
     void refresh_accessor_tree();
@@ -1338,12 +1336,6 @@ inline bool Table::operator!=(const Table& t) const
 inline bool Table::is_link_type(ColumnType col_type) noexcept
 {
     return col_type == col_type_Link;
-}
-
-inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
-{
-    REALM_ASSERT(m_top.is_attached());
-    m_top.set_ndx_in_parent(ndx_in_parent);
 }
 
 inline size_t Table::colkey2spec_ndx(ColKey key) const

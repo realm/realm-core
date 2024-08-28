@@ -30,26 +30,22 @@ void Spec::detach() noexcept
     m_top.detach();
 }
 
-bool Spec::init(ref_type ref) noexcept
+void Spec::init(ref_type ref) noexcept
 {
     MemRef mem(ref, get_alloc());
     init(mem);
-    return true;
 }
 
 void Spec::init(MemRef mem) noexcept
 {
     m_top.init_from_mem(mem);
     size_t top_size = m_top.size();
-    REALM_ASSERT(top_size > s_attributes_ndx && top_size <= s_spec_max_size);
+    // Since Core6 we will always have the column keys array
+    REALM_ASSERT(top_size == s_spec_max_size);
 
-    m_types.init_from_ref(m_top.get_as_ref(s_types_ndx));
-    m_names.init_from_ref(m_top.get_as_ref(s_names_ndx));
-    m_attr.init_from_ref(m_top.get_as_ref(s_attributes_ndx));
-
-    while (m_top.size() < s_spec_max_size) {
-        m_top.add(0);
-    }
+    m_types.init_from_parent();
+    m_names.init_from_parent();
+    m_attr.init_from_parent();
 
     // Enumkeys array is only there when there are StringEnum columns
     if (auto ref = m_top.get_as_ref(s_enum_keys_ndx)) {
@@ -59,56 +55,19 @@ void Spec::init(MemRef mem) noexcept
         m_enumkeys.detach();
     }
 
-    if (m_top.get_as_ref(s_col_keys_ndx) == 0) {
-        // This is an upgrade - create column key array
-        MemRef mem_ref = Array::create_empty_array(Array::type_Normal, false, m_top.get_alloc()); // Throws
-        m_keys.init_from_mem(mem_ref);
-        m_keys.update_parent();
-        size_t num_cols = m_types.size();
-        for (size_t i = 0; i < num_cols; i++) {
-            m_keys.add(i);
-        }
-    }
-    else {
-        m_keys.init_from_parent();
-    }
+    m_keys.init_from_parent();
 
-
-    update_internals();
-}
-
-void Spec::update_internals() noexcept
-{
-    m_num_public_columns = 0;
     size_t n = m_types.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (ColumnType(int(m_types.get(i))) == col_type_BackLink) {
-            // Now we have no more public columns
+    m_num_public_columns = n;
+    // We normally have fewer backlink columns than public columns, so quicker to go backwards
+    for (size_t i = n; i; --i) {
+        if (ColumnType(int(m_types.get(i - 1))) != col_type_BackLink) {
+            // Now we have no more backlink columns. The rest must be public
             return;
         }
-        m_num_public_columns++;
+        m_num_public_columns--;
     }
 }
-
-void Spec::update_from_parent() noexcept
-{
-    m_top.update_from_parent();
-    m_types.update_from_parent();
-    m_names.update_from_parent();
-    m_attr.update_from_parent();
-
-    if (m_top.get_as_ref(s_enum_keys_ndx) != 0) {
-        m_enumkeys.update_from_parent();
-    }
-    else {
-        m_enumkeys.detach();
-    }
-
-    m_keys.update_from_parent();
-
-    update_internals();
-}
-
 
 MemRef Spec::create_empty_spec(Allocator& alloc)
 {
@@ -207,8 +166,6 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     if (m_enumkeys.is_attached() && type != col_type_BackLink) {
         m_enumkeys.insert(column_ndx, 0);
     }
-
-    update_internals();
 }
 
 void Spec::erase_column(size_t column_ndx)
@@ -246,8 +203,6 @@ void Spec::erase_column(size_t column_ndx)
     m_types.erase(column_ndx); // Throws
     m_attr.erase(column_ndx);  // Throws
     m_keys.erase(column_ndx);
-
-    update_internals();
 }
 
 void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref)

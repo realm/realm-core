@@ -26,6 +26,7 @@ namespace realm::util {
 
 namespace {
 auto& s_logger_mutex = *new std::mutex;
+auto& s_stderr_logger_mutex = *new std::mutex;
 std::shared_ptr<util::Logger> s_default_logger;
 } // anonymous namespace
 
@@ -177,8 +178,7 @@ const std::string_view Logger::level_to_string(Level level) noexcept
 
 void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string& message)
 {
-    static Mutex mutex;
-    LockGuard l(mutex);
+    std::lock_guard l(s_stderr_logger_mutex);
     // std::cerr is unbuffered, so no need to flush
     std::cerr << cat.get_name() << " - " << get_level_prefix(level) << message << '\n'; // Throws
 }

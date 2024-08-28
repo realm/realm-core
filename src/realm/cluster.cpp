@@ -218,7 +218,7 @@ void Cluster::init(MemRef mem)
 
 void Cluster::update_from_parent() noexcept
 {
-    Array::update_from_parent();
+    Array::init_from_parent();
     auto rot = Array::get_as_ref_or_tagged(0);
     if (!rot.is_tagged()) {
         m_keys.update_from_parent();

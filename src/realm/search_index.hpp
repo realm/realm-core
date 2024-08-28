@@ -116,7 +116,6 @@ public:
     bool is_attached() const noexcept;
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
     size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
     void update_from_parent() noexcept;
     void refresh_accessor_tree(const ClusterColumn& target_column);
     ref_type get_ref() const noexcept;
@@ -174,14 +173,9 @@ inline size_t SearchIndex::get_ndx_in_parent() const noexcept
     return m_root_array->get_ndx_in_parent();
 }
 
-inline void SearchIndex::set_ndx_in_parent(size_t ndx_in_parent) noexcept
-{
-    m_root_array->set_ndx_in_parent(ndx_in_parent);
-}
-
 inline void SearchIndex::update_from_parent() noexcept
 {
-    m_root_array->update_from_parent();
+    m_root_array->init_from_parent();
 }
 
 } // namespace realm
