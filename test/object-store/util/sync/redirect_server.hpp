@@ -24,10 +24,9 @@
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/util/future.hpp>
+#include <realm/util/random.hpp>
 #include <realm/util/uri.hpp>
 #include <external/json/json.hpp>
-
-#include <catch2/catch_all.hpp>
 
 #include <thread>
 
@@ -35,7 +34,15 @@ namespace realm::sync {
 
 class RedirectingHttpServer {
 public:
+    // Allow the redirecting server to choose the listen port
     RedirectingHttpServer(std::string redirect_to_base_url, std::shared_ptr<util::Logger> logger)
+        : RedirectingHttpServer(std::move(redirect_to_base_url), 0, std::move(logger))
+    {
+    }
+
+    // Specify the listen port to use
+    RedirectingHttpServer(std::string redirect_to_base_url, uint16_t listen_port,
+                          std::shared_ptr<util::Logger> logger)
         : m_redirect_to_base_url(std::move(redirect_to_base_url))
         , m_logger(std::make_shared<util::PrefixLogger>("HTTP Redirector ", std::move(logger)))
         , m_acceptor(m_service)
@@ -43,9 +50,15 @@ public:
             m_service.run_until_stopped();
         })
     {
-        m_acceptor.open(m_endpoint.protocol());
-        m_acceptor.bind(m_endpoint);
-        m_endpoint = m_acceptor.local_endpoint();
+        network::Endpoint ep;
+        if (listen_port != 0) {
+            // If a port is provided, then configure the endpoint with this port num
+            ep = network::Endpoint(network::make_address("0.0.0.0"), listen_port);
+        }
+        m_acceptor.open(ep.protocol());
+        m_acceptor.bind(ep);
+        ep = m_acceptor.local_endpoint();
+        m_listen_port = ep.port();
         m_acceptor.listen();
         m_service.post([this](Status status) {
             REALM_ASSERT(status.is_ok());
@@ -62,7 +75,7 @@ public:
 
     std::string base_url() const
     {
-        return util::format("http://localhost:%1", m_endpoint.port());
+        return util::format("http://localhost:%1", m_listen_port);
     }
 
 private:
@@ -97,11 +110,11 @@ private:
 
     struct Conn : public util::RefCountBase, websocket::Config {
         Conn(network::Service& service, const std::shared_ptr<util::Logger>& logger)
-            : random(Catch::getSeed())
-            , logger(logger)
+            : logger(logger)
             , socket(service)
             , http_server(socket, logger)
         {
+            util::seed_prng_nondeterministically(random); // Throws
         }
 
         // Implement the websocket::Config interface
@@ -175,14 +188,21 @@ private:
 
     void send_simple_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, std::string body)
     {
+        send_http_response(conn, status, std::move(reason), {}, std::move(body));
+    }
+
+    void send_http_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, HTTPHeaders headers,
+                            std::string body)
+    {
         m_logger->debug("sending http response %1: %2 \"%3\"", status, reason, body);
         HTTPResponse resp;
         resp.status = status;
         resp.reason = std::move(reason);
+        resp.headers = std::move(headers);
         resp.body = std::move(body);
         conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
             if (ec && ec != util::error::operation_aborted) {
-                m_logger->warn("Error sending response: %1", ec);
+                m_logger->warn("Error sending response: [%1]: %2", ec, ec.message());
             }
         });
     }
@@ -208,7 +228,7 @@ private:
         conn->http_server.async_send_response(*maybe_resp, [this, conn](std::error_code ec) {
             if (ec) {
                 if (ec != util::error::operation_aborted) {
-                    m_logger->warn("Error sending websocket HTTP upgrade response: %1", ec);
+                    m_logger->warn("Error sending websocket HTTP upgrade response: [%1]: %2", ec, ec.message());
                 }
                 return;
             }
@@ -233,17 +253,20 @@ private:
             }
             do_accept();
             if (ec) {
-                m_logger->error("Error accepting new connection in: %1", ec);
+                m_logger->error("Error accepting new connection to %1 [%2]: %3", base_url(), ec, ec.message());
                 return;
             }
 
             conn->http_server.async_receive_request([this, conn](HTTPRequest req, std::error_code ec) {
+                static bool use_301 = false; // send 301 on first redirect response
                 if (ec) {
                     if (ec != util::error::operation_aborted) {
-                        m_logger->error("Error receiving HTTP request to redirect: %1", ec);
+                        m_logger->error("Error receiving HTTP request to redirect [%1]: %2", ec, ec.message());
                     }
                     return;
                 }
+
+                m_logger->debug("Received request: %1", req.path);
 
                 if (req.path.find("/location") != std::string::npos) {
                     std::string_view base_url(m_redirect_to_base_url);
@@ -255,7 +278,8 @@ private:
                                         {"ws_hostname", ws_url}};
                     auto body_str = body.dump();
 
-                    send_simple_response(conn, HTTPStatus::Ok, "Okay", std::move(body_str));
+                    send_http_response(conn, HTTPStatus::Ok, "Okay", {{"Content-Type", "application/json"}},
+                                       std::move(body_str));
                     return;
                 }
 
@@ -264,16 +288,30 @@ private:
                     return;
                 }
 
-                send_simple_response(conn, HTTPStatus::NotFound, "Not found", {});
+                // Send redirect response for appservices calls
+                // Starts with 'http' and contains api path
+                if (req.path.find("/api/client/v2.0/") == 0) {
+                    use_301 = !use_301;
+                    auto status = use_301 ? HTTPStatus::MovedPermanently : HTTPStatus::PermanentRedirect;
+                    auto reason = use_301 ? "Moved Permanently" : "Permanent Redirect";
+                    auto location = m_redirect_to_base_url + req.path;
+                    auto redirect = util::format("<html><body><p>%1 to <a href=\"%2\">%2</a></p></body></html>",
+                                                 status, location);
+                    send_http_response(conn, status, reason, {{"location", location}}, redirect);
+                    return;
+                }
+
+                send_simple_response(conn, HTTPStatus::NotFound, "Not found",
+                                     util::format("Not found: %1", req.path));
             });
         });
     }
 
     const std::string m_redirect_to_base_url;
+    uint16_t m_listen_port;
     const std::shared_ptr<util::Logger> m_logger;
     network::Service m_service;
     network::Acceptor m_acceptor;
-    network::Endpoint m_endpoint;
     std::thread m_server_thread;
 };
 

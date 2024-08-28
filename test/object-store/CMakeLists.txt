@@ -116,6 +116,10 @@ create_coverage_target(generate-coverage ObjectStoreTests)
 # add_bundled_test(ObjectStoreTests)
 add_labeled_test(ObjectStoreTests-local objstore-local ObjectStoreTests "~[baas]")
 
+if(REALM_ENABLE_SYNC)
+    add_subdirectory(tools)
+endif()
+
 # Baas server and custom tests are only allowed when REALM_ENABLE_AUTH_TESTS is set
 if(REALM_ENABLE_SYNC)
     if(REALM_ENABLE_AUTH_TESTS)
