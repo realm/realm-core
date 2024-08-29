@@ -382,6 +382,7 @@ private:
     bool m_delete_app;
     bool m_delete_storage;
     std::shared_ptr<realm::app::App> m_app;
+    std::shared_ptr<realm::util::Logger> m_logger;
 };
 #endif // REALM_ENABLE_AUTH_TESTS
 
