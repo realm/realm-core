@@ -6,9 +6,11 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Using an empty KeyPath in C API would result in no filtering being done ([#7805](https://github.com/realm/realm-core/issues/7805), since 13.24.0)
-* Filtering notifications with backlink columns as last element could sometimes give wrong results ([#7530](https://github.com/realm/realm-core/issues/7530), since 11.1.0)
+* Using an empty KeyPath in C API would result in no filtering being done ([#7805](https://github.com/realm/realm-core/issues/7805), since v13.24.0)
+* Filtering notifications with backlink columns as last element could sometimes give wrong results ([#7530](https://github.com/realm/realm-core/issues/7530), since v11.1.0)
 * Fix crash during client app shutdown when Logger log level is set higher than Info. ([#7969](https://github.com/realm/realm-core/issues/7969), since v13.23.3)
+* If File::rw_lock() fails to open a file the exception message does not contain the filename ([#7999](https://github.com/realm/realm-core/issues/7999), since v6.0.21)
+* Fallback to hashed filename will fail if length of basename is between 240 and 250 ([#8007](https://github.com/realm/realm-core/issues/8007), since v10.0.0)
 
 ### Breaking changes
 * None.
