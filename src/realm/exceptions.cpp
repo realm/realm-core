@@ -77,7 +77,7 @@ Status exception_to_status() noexcept
                       util::format("Caught std::exception of type %1: %2", util::get_type_name(e), e.what()));
     }
     catch (...) {
-        REALM_UNREACHABLE();
+        return Status(ErrorCodes::UnknownError, "Caught unknown exception");
     }
 }
 
