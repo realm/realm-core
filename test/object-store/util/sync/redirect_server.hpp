@@ -256,11 +256,7 @@ private:
                             std::string body)
     {
         m_logger->debug("sending http response %1: %2 \"%3\"", status, reason, body);
-        HTTPResponse resp;
-        resp.status = status;
-        resp.reason = std::move(reason);
-        resp.headers = std::move(headers);
-        resp.body = std::move(body);
+        HTTPResponse resp{status, std::move(reason), std::move(headers), std::move(body)};
         conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
             if (ec && ec != util::error::operation_aborted) {
                 m_logger->warn("Error sending response: [%1]: %2", ec, ec.message());

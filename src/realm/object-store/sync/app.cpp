@@ -1033,20 +1033,6 @@ void App::reset_location_for_testing()
     configure_route(m_base_url, "");
 }
 
-bool App::set_location_for_testing(const std::string& base_url, const std::string& hostname,
-                                   const std::string& ws_hostname, std::optional<std::string> sync_route)
-{
-    // Simulate a location response from the server to update the location info
-    nlohmann::json body{
-        {"deployment_model", "GLOBAL"}, {"location", "US-VA"}, {"hostname", hostname}, {"ws_hostname", ws_hostname}};
-    if (sync_route) {
-        body["sync_route"] = *sync_route;
-    }
-    Response response{static_cast<int>(sync::HTTPStatus::Ok), 0, {{"Content-Type", "application/json"}}, body.dump()};
-    auto result = update_location(response, base_url);
-    return !result.has_value();
-}
-
 void App::refresh_custom_data(const std::shared_ptr<User>& user,
                               UniqueFunction<void(Optional<AppError>)>&& completion)
 {

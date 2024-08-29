@@ -9,6 +9,7 @@
 * Using an empty KeyPath in C API would result in no filtering being done ([#7805](https://github.com/realm/realm-core/issues/7805), since 13.24.0)
 * Filtering notifications with backlink columns as last element could sometimes give wrong results ([#7530](https://github.com/realm/realm-core/issues/7530), since 11.1.0)
 * Fix crash during client app shutdown when Logger log level is set higher than Info. ([#7969](https://github.com/realm/realm-core/issues/7969), since v13.23.3)
+* If a user authenticated request is redirected, the user will be logged out since the authorization header is removed before request is sent to the new server. The log_in_with_credentials() function will always request the location info from the server prior to logging in to ensure the remote server URL is up to date. ([#8012](https://github.com/realm/realm-core/issues/8012), since v12.9.0)
 
 ### Breaking changes
 * Removed http 301/308 redirection support from app services operations provided by App. It is assumed that the SDK's http implementation will handle http redirects instead. ([PR #7996](https://github.com/realm/realm-core/pull/7996))
@@ -20,6 +21,7 @@
 
 ### Internals
 * Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
+* Updated test http transport to enable redirect support in the curl library and added test to verify real redirect operation using the redirect server. ([PR #8011](https://github.com/realm/realm-core/pull/8011))
 
 ----------------------------------------------
 

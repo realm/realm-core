@@ -375,11 +375,10 @@ TestAppSession::TestAppSession(AppSession session, Config config, DeleteApp dele
     }
 
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
-    if (auto logger = m_app->sync_manager()->get_logger())
-        m_logger = logger;
 
-    // initialize sync client
+    // initialize sync client and save a local copy of the logger
     m_app->sync_manager()->get_sync_client();
+    m_logger = m_app->sync_manager()->get_logger();
     // If no user creds are supplied, then create the user and log in
     if (!m_config.user_creds) {
         auto result = create_user_and_log_in();

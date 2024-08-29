@@ -196,14 +196,6 @@ public:
     // Reset the location_updated flag so the next App request will request the location again
     void reset_location_for_testing() REQUIRES(!m_route_mutex);
 
-    // For testing only
-    // Manually set the base_url and the location and ws_hostname as if it was returned from a
-    // successful request of the server's location endpoint. This also sets the location_updated
-    // flag to true so the location will not be requested again.
-    bool set_location_for_testing(const std::string& base_url, const std::string& hostname,
-                                  const std::string& ws_hostname,
-                                  std::optional<std::string> sync_route = std::nullopt) REQUIRES(!m_route_mutex);
-
     // MARK: - Provider Clients
 
     /// A struct representing a user API key as returned by the App server.
