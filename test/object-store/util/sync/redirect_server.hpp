@@ -28,12 +28,20 @@
 #include <realm/util/uri.hpp>
 #include <external/json/json.hpp>
 
+#include <iostream>
 #include <thread>
 
 namespace realm::sync {
 
 class RedirectingHttpServer {
 public:
+    enum Event {
+        error,
+        location,
+        redirect,
+        ws_redirect,
+    };
+
     // Allow the redirecting server to choose the listen port
     RedirectingHttpServer(std::string redirect_to_base_url, std::shared_ptr<util::Logger> logger)
         : RedirectingHttpServer(std::move(redirect_to_base_url), 0, std::move(logger))
@@ -43,13 +51,15 @@ public:
     // Specify the listen port to use
     RedirectingHttpServer(std::string redirect_to_base_url, uint16_t listen_port,
                           std::shared_ptr<util::Logger> logger)
-        : m_redirect_to_base_url(std::move(redirect_to_base_url))
+        : m_redirect_to_base_url(trim_url(redirect_to_base_url))
+        , m_redirect_to_base_wsurl(make_wsurl(m_redirect_to_base_url))
         , m_logger(std::make_shared<util::PrefixLogger>("HTTP Redirector ", std::move(logger)))
         , m_acceptor(m_service)
         , m_server_thread([this] {
             m_service.run_until_stopped();
         })
     {
+        reset_state();
         network::Endpoint ep;
         if (listen_port != 0) {
             // If a port is provided, then configure the endpoint with this port num
@@ -58,7 +68,8 @@ public:
         m_acceptor.open(ep.protocol());
         m_acceptor.bind(ep);
         ep = m_acceptor.local_endpoint();
-        m_listen_port = ep.port();
+        m_base_url = util::format("http://localhost:%1", ep.port());
+        m_base_wsurl = make_wsurl(m_base_url);
         m_acceptor.listen();
         m_service.post([this](Status status) {
             REALM_ASSERT(status.is_ok());
@@ -73,9 +84,59 @@ public:
         m_server_thread.join();
     }
 
+    void set_event_hook(std::function<void(Event, std::optional<std::string>)> hook)
+    {
+        m_hook = hook;
+    }
+
+    // If true, http (app services) requests will first hit the redirect server and
+    // receive a redirect response which will contain the location to the actual
+    // server.
+    // NOTE: some http transport redirect implementations may strip the authorization
+    // header from the request after it is redirected and the user will be logged out
+    // from the client app as a result.
+    void force_http_redirect(bool remote = true)
+    {
+        m_http_redirect = remote;
+    }
+
+    // If true, websockets will be first directed to the redirect server which will
+    // return a redirect close code. The client will then update the location by
+    // querying the actual server location endpoint (from the 'hostname' location
+    // value) and open a websocket conneciton to the actual server.
+    // NOTE: the websocket will never connect if both http and websockets are
+    // redirecting and will just keep getting the redirect close code.
+    void force_websocket_redirect(bool force = true)
+    {
+        m_websocket_redirect = force;
+    }
+
+    // Reset the state to default (initial) state after test makes updates
+    void reset_state()
+    {
+        m_http_redirect = false;
+        m_websocket_redirect = false;
+        m_hook = nullptr;
+    }
+
     std::string base_url() const
     {
-        return util::format("http://localhost:%1", m_listen_port);
+        return m_base_url;
+    }
+
+    std::string server_url() const
+    {
+        return m_redirect_to_base_url;
+    }
+
+    std::string location_hostname() const
+    {
+        return m_http_redirect ? m_base_url : m_redirect_to_base_url;
+    }
+
+    std::string location_wshostname() const
+    {
+        return m_websocket_redirect ? m_base_wsurl : m_redirect_to_base_wsurl;
     }
 
 private:
@@ -203,6 +264,8 @@ private:
         conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
             if (ec && ec != util::error::operation_aborted) {
                 m_logger->warn("Error sending response: [%1]: %2", ec, ec.message());
+                if (m_hook)
+                    m_hook(Event::error, ec.message());
             }
         });
     }
@@ -229,6 +292,8 @@ private:
             if (ec) {
                 if (ec != util::error::operation_aborted) {
                     m_logger->warn("Error sending websocket HTTP upgrade response: [%1]: %2", ec, ec.message());
+                    if (m_hook)
+                        m_hook(Event::error, ec.message());
                 }
                 return;
             }
@@ -237,9 +302,11 @@ private:
             conn->websocket->initiate_server_websocket_after_handshake();
 
             static const std::string_view msg("\x0f\xa3Permanently moved");
-            conn->websocket->async_write_close(msg.data(), msg.size(), [conn](std::error_code, size_t) {
+            conn->websocket->async_write_close(msg.data(), msg.size(), [this, conn](std::error_code, size_t) {
                 conn->logger->debug("Sent close frame with move code");
                 conn->websocket.reset();
+                if (m_hook)
+                    m_hook(Event::ws_redirect, std::nullopt);
             });
         });
     }
@@ -251,6 +318,7 @@ private:
             if (ec == util::error::operation_aborted) {
                 return;
             }
+            // Allow additonal connections to be accepted
             do_accept();
             if (ec) {
                 m_logger->error("Error accepting new connection to %1 [%2]: %3", base_url(), ec, ec.message());
@@ -269,17 +337,16 @@ private:
                 m_logger->debug("Received request: %1", req.path);
 
                 if (req.path.find("/location") != std::string::npos) {
-                    std::string_view base_url(m_redirect_to_base_url);
-                    auto scheme = base_url.find("://");
-                    auto ws_url = util::format("ws%1", base_url.substr(scheme));
                     nlohmann::json body{{"deployment_model", "GLOBAL"},
                                         {"location", "US-VA"},
-                                        {"hostname", m_redirect_to_base_url},
-                                        {"ws_hostname", ws_url}};
+                                        {"hostname", location_hostname()},
+                                        {"ws_hostname", location_wshostname()}};
                     auto body_str = body.dump();
 
                     send_http_response(conn, HTTPStatus::Ok, "Okay", {{"Content-Type", "application/json"}},
                                        std::move(body_str));
+                    if (m_hook)
+                        m_hook(Event::location, std::nullopt);
                     return;
                 }
 
@@ -298,6 +365,8 @@ private:
                     auto redirect = util::format("<html><body><p>%1 to <a href=\"%2\">%2</a></p></body></html>",
                                                  status, location);
                     send_http_response(conn, status, reason, {{"location", location}}, redirect);
+                    if (m_hook)
+                        m_hook(Event::redirect, std::nullopt);
                     return;
                 }
 
@@ -307,9 +376,41 @@ private:
         });
     }
 
+    std::string trim_url(std::string_view str)
+    {
+        auto p0 = str.data();
+        auto p1 = str.data() + str.size();
+        // Trim spaces and forward slashes from the end of the string
+        while (p1 > p0 && (std::isspace(*(p1 - 1)) || *(p1 - 1) == '/'))
+            --p1;
+        // Trim spaces from the beginning of the string
+        while (p0 < p1 && std::isspace(*p0))
+            ++p0;
+        return std::string(p0, p1 - p0);
+    }
+
+    std::string make_wsurl(std::string base_url)
+    {
+        if (base_url.find("http") == 0) {
+            // Replace the first 4 ('http') characters with 'ws', so we get 'ws://' or 'wss://'
+            return base_url.replace(0, 4, "ws");
+        }
+        else {
+            // If no scheme, return the original base_url
+            return base_url;
+        }
+    }
+
     const std::string m_redirect_to_base_url;
-    uint16_t m_listen_port;
+    const std::string m_redirect_to_base_wsurl;
     const std::shared_ptr<util::Logger> m_logger;
+
+    bool m_http_redirect;
+    bool m_websocket_redirect;
+    std::string m_base_url;
+    std::string m_base_wsurl;
+    std::function<void(Event, std::optional<std::string>)> m_hook;
+
     network::Service m_service;
     network::Acceptor m_acceptor;
     std::thread m_server_thread;

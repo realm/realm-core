@@ -358,6 +358,7 @@ std::string App::get_ws_host_url()
 
 std::string App::make_sync_route(Optional<std::string> ws_host_url)
 {
+    // If not providing a new ws_host_url, then use the App's current ws_host_url
     return util::format("%1%2%3/%4%5", ws_host_url.value_or(m_ws_host_url), s_base_path, s_app_path, m_config.app_id,
                         s_sync_path);
 }
@@ -853,7 +854,8 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 completion(user, error);
             });
         },
-        false);
+        // Update location to make sure we're talking to the latest server before logging in
+        true);
 }
 
 void App::log_in_with_credentials(
@@ -1024,6 +1026,26 @@ std::shared_ptr<User> App::create_fake_user_for_testing(const std::string& user_
     return user;
 }
 
+void App::reset_location_for_testing()
+{
+    util::CheckedLockGuard guard(m_route_mutex);
+    m_location_updated = false;
+    configure_route(m_base_url, "");
+}
+
+bool App::set_location_for_testing(const std::string& base_url, const std::string& hostname,
+                                   const std::string& ws_hostname, std::optional<std::string> sync_route)
+{
+    // Simulate a location response from the server to update the location info
+    nlohmann::json body{
+        {"deployment_model", "GLOBAL"}, {"location", "US-VA"}, {"hostname", hostname}, {"ws_hostname", ws_hostname}};
+    if (sync_route) {
+        body["sync_route"] = *sync_route;
+    }
+    Response response{static_cast<int>(sync::HTTPStatus::Ok), 0, {{"Content-Type", "application/json"}}, body.dump()};
+    auto result = update_location(response, base_url);
+    return !result.has_value();
+}
 
 void App::refresh_custom_data(const std::shared_ptr<User>& user,
                               UniqueFunction<void(Optional<AppError>)>&& completion)

@@ -332,6 +332,13 @@ app::Response do_http_request(const app::Request& request)
         list = curl_slist_append(list, header_str.c_str());
     }
 
+    // Enable redirection, and don't revert POST to GET for 301/302/303 redirects
+    // Max redirects is 30 by default
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+    curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+    curl_easy_setopt(curl, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
+
+    // Set callbacks to write the response headers and data
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
@@ -602,11 +609,17 @@ static std::optional<sync::RedirectingHttpServer>& get_redirector(const std::str
         });
     };
 
-    if (redirector_enabled() && !redirector && !base_url.empty()) {
+    if (!base_url.empty() && !redirector && redirector_enabled()) {
         redirector.emplace(base_url, util::Logger::get_default_logger());
     }
 
     return redirector;
+}
+
+std::optional<sync::RedirectingHttpServer>& get_redirector()
+{
+    // Will not create a redirector if the base_url is empty
+    return get_redirector({});
 }
 
 class BaasaasLauncher : public Catch::EventListenerBase {
@@ -678,7 +691,7 @@ public:
 
     void testRunEnded(Catch::TestRunStats const&) override
     {
-        if (auto& redirector = get_redirector({})) {
+        if (auto& redirector = get_redirector()) {
             redirector = std::nullopt;
         }
 

@@ -22,6 +22,7 @@
 #ifdef REALM_ENABLE_AUTH_TESTS
 
 #include <util/sync/sync_test_utils.hpp>
+#include <util/sync/redirect_server.hpp>
 
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -281,6 +282,9 @@ std::string get_real_base_url();
 // Returns the base url of the admin API. Use this to create/administer apps that
 // your test is talking to.
 std::string get_admin_url();
+
+// Returns a reference to the redirector if it is enabled.
+std::optional<sync::RedirectingHttpServer>& get_redirector();
 
 template <typename Factory>
 inline app::AppConfig get_config(Factory factory, const AppSession& app_session)
