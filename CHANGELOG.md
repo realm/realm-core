@@ -11,6 +11,7 @@
 * Fix crash during client app shutdown when Logger log level is set higher than Info. ([#7969](https://github.com/realm/realm-core/issues/7969), since v13.23.3)
 * If File::rw_lock() fails to open a file the exception message does not contain the filename ([#7999](https://github.com/realm/realm-core/issues/7999), since v6.0.21)
 * Fallback to hashed filename will fail if length of basename is between 240 and 250 ([#8007](https://github.com/realm/realm-core/issues/8007), since v10.0.0)
+* Swift API misuse within a callback from core would result in an internal unreachable error rather than the exception being propagated properly ([#7836](https://github.com/realm/realm-core/issues/7836)).
 
 ### Breaking changes
 * None.

@@ -64,6 +64,8 @@ Exception::Exception(Status status)
 {
 }
 
+// Apple implementation in exceptions.mm
+#if !REALM_PLATFORM_APPLE
 Status exception_to_status() noexcept
 {
     try {
@@ -80,6 +82,7 @@ Status exception_to_status() noexcept
         REALM_UNREACHABLE();
     }
 }
+#endif // !REALM_PLATFORM_APPLE
 
 UnsupportedFileFormatVersion::UnsupportedFileFormatVersion(int version)
     : Exception(ErrorCodes::UnsupportedFileFormatVersion,
