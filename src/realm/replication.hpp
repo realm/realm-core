@@ -75,7 +75,7 @@ public:
     virtual void dictionary_erase(const CollectionBase& dict, size_t dict_ndx, Mixed key);
     virtual void dictionary_clear(const CollectionBase& dict);
 
-    virtual void create_object(const Table*, GlobalKey);
+    virtual void create_object(const Table*, ObjKey);
     virtual void create_object_with_primary_key(const Table*, ObjKey, Mixed);
     void create_linked_object(const Table*, ObjKey);
     virtual void remove_object(const Table*, ObjKey);

@@ -47,7 +47,6 @@ set(REALM_SOURCES
     mixed.cpp
     obj.cpp
     object_converter.cpp
-    global_key.cpp
     query_engine.cpp
     query_expression.cpp
     query_value.cpp
@@ -157,7 +156,6 @@ set(REALM_INSTALL_HEADERS
     error_codes.h
     error_codes.hpp
     exceptions.hpp
-    global_key.hpp
     group.hpp
     group_writer.hpp
     handover_defs.hpp
