@@ -291,6 +291,10 @@ if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
 endif()
 
+if(APPLE)
+    list(APPEND REALM_SOURCES exceptions.mm)
+endif()
+
 if (REALM_ENABLE_GEOSPATIAL)
     list(APPEND REALM_SOURCES geospatial.cpp)
     list(APPEND REALM_INSTALL_HEADERS geospatial.hpp)

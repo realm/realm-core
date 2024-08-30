@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "14.12.0"
+let versionStr = "14.12.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -73,6 +73,7 @@ let notSyncServerSources: [String] = [
     "realm/disable_sync_to_disk.cpp",
     "realm/error_codes.cpp",
     "realm/exceptions.cpp",
+    "realm/exceptions.mm",
     "realm/geospatial.cpp",
     "realm/global_key.cpp",
     "realm/group.cpp",
