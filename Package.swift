@@ -73,6 +73,7 @@ let notSyncServerSources: [String] = [
     "realm/disable_sync_to_disk.cpp",
     "realm/error_codes.cpp",
     "realm/exceptions.cpp",
+    "realm/exceptions.mm",
     "realm/geospatial.cpp",
     "realm/global_key.cpp",
     "realm/group.cpp",
