@@ -551,6 +551,7 @@ let package = Package(
                 "sync-metadata-v5.realm",
                 "test_backup-olden-and-golden.realm",
                 "util",
+                "tools",
             ],
             cxxSettings: ([
                 .headerSearchPath("."),
