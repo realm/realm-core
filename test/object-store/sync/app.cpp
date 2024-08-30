@@ -665,39 +665,6 @@ TEST_CASE("app: verify app utils helpers", "[sync][app][local]") {
         CHECK(!AppUtils::is_success_status_code(300));
         CHECK(!AppUtils::is_success_status_code(99999));
     }
-
-    SECTION("is_redirect_status_code") {
-        // Only MovedPermanently(301) and PermanentRedirect(308) return true
-        CHECK(AppUtils::is_redirect_status_code(301));
-        CHECK(AppUtils::is_redirect_status_code(308));
-        CHECK(!AppUtils::is_redirect_status_code(0));
-        CHECK(!AppUtils::is_redirect_status_code(200));
-        CHECK(!AppUtils::is_redirect_status_code(300));
-        CHECK(!AppUtils::is_redirect_status_code(403));
-        CHECK(!AppUtils::is_redirect_status_code(99999));
-    }
-
-    SECTION("extract_redir_location") {
-        auto comp = AppUtils::extract_redir_location(
-            {{"Content-Type", "application/json"}, {"Location", "http://redirect.host"}});
-        CHECK(comp == "http://redirect.host");
-        comp = AppUtils::extract_redir_location({{"location", "http://redirect.host"}});
-        CHECK(comp == "http://redirect.host");
-        comp = AppUtils::extract_redir_location({{"LoCaTiOn", "http://redirect.host/"}});
-        CHECK(comp == "http://redirect.host/");
-        comp = AppUtils::extract_redir_location({{"LOCATION", "http://redirect.host/includes/path"}});
-        CHECK(comp == "http://redirect.host/includes/path");
-        comp = AppUtils::extract_redir_location({{"Content-Type", "application/json"}});
-        CHECK(!comp);
-        comp = AppUtils::extract_redir_location({{"some-location", "http://redirect.host"}});
-        CHECK(!comp);
-        comp = AppUtils::extract_redir_location({{"location", ""}});
-        CHECK(!comp);
-        comp = AppUtils::extract_redir_location({});
-        CHECK(!comp);
-        comp = AppUtils::extract_redir_location({{"location", "bad-server-url"}});
-        CHECK(!comp);
-    }
 }
 
 // MARK: - Login with Credentials Tests
@@ -2751,7 +2718,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 }
                 else {
                     INFO(request.url);
-                    // any later requests (eg. redirect) won't have a current user
                     REQUIRE(!user);
                 }
                 // simulate the server denying the refresh
@@ -3386,104 +3352,6 @@ TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
     auto app = oas.app();
     const auto partition = random_string(100);
 
-    SECTION("invalid redirect response reports and error") {
-        int request_count = 0;
-
-        // This will fail due to no Location header
-        transport->request_hook = [&](const Request& request) -> std::optional<Response> {
-            logger->trace("request.url (%1): %2", request_count, request.url);
-            REQUIRE(request_count++ == 0);
-            return Response{301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
-        };
-        app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-                REQUIRE(error);
-                REQUIRE(error->is_client_error());
-                REQUIRE(error->code() == ErrorCodes::ClientRedirectError);
-                REQUIRE(error->reason() == "Redirect response missing location header");
-            });
-
-        // This will fail due to empty Location header
-        transport->request_hook = [&](const Request& request) -> std::optional<Response> {
-            logger->trace("request.url (%1): %2", request_count, request.url);
-            REQUIRE(request_count++ == 1);
-            return Response{301, 0, {{"Location", ""}, {"Content-Type", "application/json"}}, "Some body data"};
-        };
-
-        app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-                REQUIRE(error);
-                REQUIRE(error->is_client_error());
-                REQUIRE(error->code() == ErrorCodes::ClientRedirectError);
-                REQUIRE(error->reason() == "Redirect response missing location header");
-            });
-    }
-
-    SECTION("valid redirect response") {
-        int request_count = 0;
-        const std::string second_host = "http://second.invalid:9091";
-        const std::string third_host = "http://third.invalid:9092";
-
-        transport->request_hook = [&](const Request& request) -> std::optional<Response> {
-            logger->trace("Received request[%1]: %2", request_count, request.url);
-            switch (request_count++) {
-                case 0:
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    REQUIRE_THAT(request.url, ContainsSubstring(*oas_config.base_url));
-                    return Response{301, 0, {{"Location", second_host}, {"Content-Type", "application/json"}}, ""};
-
-                case 1:
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    REQUIRE_THAT(request.url, ContainsSubstring(second_host));
-                    return Response{301, 0, {{"Location", third_host}, {"Content-Type", "application/json"}}, ""};
-
-                case 2:
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    REQUIRE_THAT(request.url, ContainsSubstring(third_host));
-                    return Response{301, 0, {{"Location", second_host}, {"Content-Type", "application/json"}}, ""};
-
-                case 3:
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    REQUIRE_THAT(request.url, ContainsSubstring(second_host));
-                    return std::nullopt;
-
-                default:
-                    // some.fake.url is the location reported by UnitTestTransport
-                    REQUIRE_THAT(request.url, ContainsSubstring("https://some.fake.url"));
-                    return std::nullopt;
-            }
-        };
-
-        // This will be successful after a couple of retries due to the redirect response
-        app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-                REQUIRE(!error);
-            });
-    }
-
-    SECTION("too many redirects eventually reports an error") {
-        int request_count = 0;
-        transport->request_hook = [&](const Request& request) -> std::optional<Response> {
-            logger->trace("request.url (%1): %2", request_count, request.url);
-            REQUIRE(request_count < 21);
-            ++request_count;
-            return Response{request_count % 2 == 1 ? 308 : 301,
-                            0,
-                            {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
-                            "Some body data"};
-        };
-
-        app->log_in_with_credentials(app::AppCredentials::username_password(creds.email, creds.password),
-                                     [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
-                                         REQUIRE(!user);
-                                         REQUIRE(error);
-                                         REQUIRE(error->is_client_error());
-                                         REQUIRE(error->code() == ErrorCodes::ClientTooManyRedirects);
-                                         REQUIRE(error->reason() == "number of redirections exceeded 20");
-                                     });
-        REQUIRE(request_count == 21);
-    }
-
     SECTION("server in maintenance reports error") {
         transport->request_hook = [&](const Request&) -> std::optional<Response> {
             nlohmann::json maintenance_error = {{"error_code", "MaintenanceInProgress"},
@@ -3588,22 +3456,8 @@ TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
             int request_count = 0;
             transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 logger->trace("request.url (%1): %2", request_count, request.url);
-                ++request_count;
-
-                // First request should be a location request against the original URL
-                if (request_count == 1) {
+                if (request.url.find("/location") != std::string::npos) {
                     REQUIRE_THAT(request.url, ContainsSubstring("some.fake.url"));
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    return Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
-                                    0,
-                                    {{"Location", "http://asdf.invalid"}},
-                                    ""};
-                }
-
-                // Second request should be a location request against the new URL
-                if (request_count == 2) {
-                    REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                    REQUIRE_THAT(request.url, ContainsSubstring("asdf.invalid"));
                     return Response{200,
                                     0,
                                     {},
@@ -3621,7 +3475,6 @@ TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
 
             sync_session->resume();
             REQUIRE(!wait_for_download(*r));
-            REQUIRE(request_count > 1);
             REQUIRE(realm_config.sync_config->user->is_logged_in());
 
             // Verify session is using the updated server url from the redirect
@@ -3674,57 +3527,25 @@ TEST_CASE("app: redirect handling", "[sync][pbs][app]") {
             REQUIRE(result);
             REQUIRE_FALSE(realm_config.sync_config->user->is_logged_in());
         }
-
-        SECTION("too many websocket redirects logs out user") {
-            int request_count = 0;
-            const int max_http_redirects = 20; // from app.cpp in object-store
-            transport->request_hook = [&](const Request& request) -> std::optional<Response> {
-                logger->trace("request.url (%1): %2", request_count, request.url);
-
-                // The test should never request anything other than /location
-                // even though the user is set to the logged-out state as trying
-                // to log out on the server needs to go through /location first too
-                REQUIRE_THAT(request.url, ContainsSubstring("/location"));
-                REQUIRE(request_count <= max_http_redirects);
-
-                // First request should be a location request against the original URL
-                // and rest should use the redirect url
-                if (request_count++ == 0) {
-                    REQUIRE_THAT(request.url, ContainsSubstring("some.fake.url"));
-                }
-                else {
-                    REQUIRE_THAT(request.url, ContainsSubstring("asdf.invalid"));
-                }
-                // Keep returning the redirected response
-                return Response{static_cast<int>(sync::HTTPStatus::MovedPermanently),
-                                0,
-                                {{"Location", "http://asdf.invalid"}},
-                                ""};
-            };
-
-            sync_session->resume();
-            REQUIRE(wait_for_download(*r));
-            std::unique_lock lk(logout_mutex);
-            auto result = logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
-                return logged_out;
-            });
-            REQUIRE(result);
-            REQUIRE_FALSE(realm_config.sync_config->user->is_logged_in());
-        }
     }
 }
 
 TEST_CASE("app: base_url", "[sync][app][base_url]") {
     struct BaseUrlTransport : UnitTestTransport {
         std::string expected_url;
-        std::optional<std::string_view> redirect_url;
+        std::string location_url;
+        std::string location_wsurl;
         bool location_requested = false;
         bool location_returns_error = false;
 
-        void reset(std::string_view expect_url, std::optional<std::string_view> redir_url = std::nullopt)
+        void reset(std::string expect_url, std::optional<std::string> url = std::nullopt,
+                   std::optional<std::string> wsurl = std::nullopt)
         {
-            expected_url = std::string(expect_url);
-            redirect_url = redir_url;
+            expected_url = expect_url;
+            REALM_ASSERT(!expected_url.empty());
+            location_url = url.value_or(expect_url);
+            REALM_ASSERT(!location_url.empty());
+            location_wsurl = wsurl.value_or(App::create_ws_host_url(location_url));
             location_requested = false;
             location_returns_error = false;
         }
@@ -3740,37 +3561,37 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                     completion(app::Response{static_cast<int>(sync::HTTPStatus::NotFound), 0, {}, "404 not found"});
                     return;
                 }
-                if (redirect_url) {
-                    // Update the expected url to be the redirect url
-                    expected_url = std::string(*redirect_url);
-                    redirect_url.reset();
-
-                    completion(app::Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
-                                             0,
-                                             {{"location", expected_url}},
-                                             "308 permanent redirect"});
-                    return;
-                }
-                auto ws_url = App::create_ws_host_url(expected_url);
                 completion(
                     app::Response{static_cast<int>(sync::HTTPStatus::Ok),
                                   0,
                                   {},
                                   util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
                                                "\"%1\",\"ws_hostname\":\"%2\"}",
-                                               expected_url, ws_url)});
+                                               location_url, location_wsurl)});
                 return;
             }
-
+            if (location_requested) {
+                CHECK_THAT(request.url, ContainsSubstring(location_url));
+            }
+            else {
+                CHECK_THAT(request.url, ContainsSubstring(expected_url));
+            }
             UnitTestTransport::send_request_to_server(request, std::move(completion));
         }
     };
 
     auto logger = util::Logger::get_default_logger();
+    std::string default_base_url = std::string(App::default_base_url());
+    std::string default_base_wsurl = App::create_ws_host_url(App::default_base_url());
+    std::string test_base_url = "https://base.someurl.fake";
+    std::string test_base_wsurl = "wss://base.someurl.fake";
+    std::string test_location_url = "https://loc.someurl.fake";
+    std::string test_location_wsurl = "wss://loc.someurl.fake";
+    std::string test_location_wsurl2 = "wss://ws.loc.someurl.fake";
 
-    auto redir_transport = std::make_shared<BaseUrlTransport>();
+    auto location_transport = std::make_shared<BaseUrlTransport>();
     auto get_config_with_base_url = [&](std::optional<std::string> base_url = std::nullopt) {
-        OfflineAppSession::Config config(redir_transport);
+        OfflineAppSession::Config config(location_transport);
         config.base_url = base_url;
         return config;
     };
@@ -3819,189 +3640,157 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     SECTION("Test app config baseurl") {
         {
             // First time through, base_url is empty; https://services.cloud.mongodb.com is expected
-            redir_transport->reset(App::default_base_url());
+            location_transport->reset(std::string(App::default_base_url()));
             auto config = get_config_with_base_url();
             OfflineAppSession oas(config);
             auto app = oas.app();
 
             // Location is not requested until first app services request
-            CHECK(!redir_transport->location_requested);
+            CHECK(!location_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
             CHECK(app->get_host_url() == App::default_base_url());
             CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url()));
 
             oas.make_user();
-            CHECK(redir_transport->location_requested);
+            CHECK(location_transport->location_requested);
             CHECK(app->get_base_url() == App::default_base_url());
             CHECK(app->get_host_url() == App::default_base_url());
             CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url()));
         }
         {
-            // Second time through, base_url is set to https://alternate.someurl.fake is expected
-            redir_transport->reset("https://alternate.someurl.fake");
-            auto config = get_config_with_base_url("https://alternate.someurl.fake");
+            // Base_url is set to test_base_url and test_location_url is expected after
+            // location request
+            location_transport->reset(test_base_url, test_location_url);
+            auto config = get_config_with_base_url(test_base_url);
             OfflineAppSession oas(config);
             auto app = oas.app();
 
             // Location is not requested until first app services request
-            CHECK(!redir_transport->location_requested);
+            CHECK(!location_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
-            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
+            CHECK(app->get_host_url() == test_base_url);
+            CHECK(app->get_ws_host_url() == test_base_wsurl);
 
             oas.make_user();
-            CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "https://alternate.someurl.fake");
-            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
-            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
+            CHECK(location_transport->location_requested);
+            CHECK(app->get_base_url() == test_base_url);
+            CHECK(app->get_host_url() == test_location_url);
+            CHECK(app->get_ws_host_url() == test_location_wsurl);
         }
         {
             // Third time through, base_url is not set, expect https://services.cloud.mongodb.com,
             // since metadata is no longer used
-            std::string expected_url = std::string(App::default_base_url());
-            std::string expected_wsurl = App::create_ws_host_url(App::default_base_url());
-            redir_transport->reset(expected_url);
+            location_transport->reset(default_base_url);
             auto config = get_config_with_base_url();
             OfflineAppSession oas(config);
             auto app = oas.app();
 
             // Location is not requested until first app services request
-            CHECK(!redir_transport->location_requested);
+            CHECK(!location_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_host_url() == expected_url);
-            CHECK(app->get_ws_host_url() == expected_wsurl);
+            CHECK(app->get_host_url() == default_base_url);
+            CHECK(app->get_ws_host_url() == default_base_wsurl);
 
             oas.make_user();
-            CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == expected_url);
-            CHECK(app->get_host_url() == expected_url);
-            CHECK(app->get_ws_host_url() == expected_wsurl);
-        }
-        {
-            // Fourth time through, base_url is set to https://some-other.someurl.fake, with a redirect
-            redir_transport->reset("https://some-other.someurl.fake", "http://redirect.someurl.fake");
-            auto config = get_config_with_base_url("https://some-other.someurl.fake");
-            OfflineAppSession oas(config);
-            auto app = oas.app();
-
-            // Location is not requested until first app services request
-            CHECK(!redir_transport->location_requested);
-            // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_host_url() == "https://some-other.someurl.fake");
-            CHECK(app->get_ws_host_url() == "wss://some-other.someurl.fake");
-
-            oas.make_user();
-            CHECK(redir_transport->location_requested);
-            // Base URL is still set to the original value
-            CHECK(app->get_base_url() == "https://some-other.someurl.fake");
-            // Hostname and ws hostname use the redirect URL values
-            CHECK(app->get_host_url() == "http://redirect.someurl.fake");
-            CHECK(app->get_ws_host_url() == "ws://redirect.someurl.fake");
+            CHECK(location_transport->location_requested);
+            CHECK(app->get_base_url() == default_base_url);
+            CHECK(app->get_host_url() == default_base_url);
+            CHECK(app->get_ws_host_url() == default_base_wsurl);
         }
     }
 
-    SECTION("Test update_baseurl") {
-        redir_transport->reset("https://alternate.someurl.fake");
-        auto config = get_config_with_base_url("https://alternate.someurl.fake");
+    SECTION("Test update_baseurl after first request") {
+        bool error_occurred = GENERATE(true, false);
+
+        location_transport->reset(test_base_url, test_location_url);
+        auto config = get_config_with_base_url(test_base_url);
         OfflineAppSession oas(config);
         auto app = oas.app();
 
         // Location is not requested until first app services request
-        CHECK(!redir_transport->location_requested);
+        CHECK(!location_transport->location_requested);
 
+        // Perform an operation prior to updating the base URL
         oas.make_user();
-        CHECK(redir_transport->location_requested);
-        CHECK(app->get_base_url() == "https://alternate.someurl.fake");
-        CHECK(app->get_host_url() == "https://alternate.someurl.fake");
-        CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
+        CHECK(location_transport->location_requested);
+        CHECK(app->get_base_url() == test_base_url);
+        CHECK(app->get_host_url() == test_location_url);
+        CHECK(app->get_ws_host_url() == test_location_wsurl);
 
-        redir_transport->reset(App::default_base_url());
+        location_transport->reset(default_base_url);
+        location_transport->location_returns_error = error_occurred;
 
         // Revert the base URL to the default URL value using the empty string
-        app->update_base_url("", [](util::Optional<app::AppError> error) {
-            CHECK(!error);
+        app->update_base_url("", [error_occurred](util::Optional<app::AppError> error) {
+            CHECK(error.has_value() == error_occurred);
         });
-        CHECK(redir_transport->location_requested);
-        CHECK(app->get_base_url() == App::default_base_url());
-        CHECK(app->get_host_url() == App::default_base_url());
-        CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url()));
-        oas.make_user();
+        CHECK(location_transport->location_requested);
+        if (error_occurred) {
+            // Not updated due to the error
+            CHECK(app->get_base_url() == test_base_url);
+            CHECK(app->get_host_url() == test_location_url);
+            CHECK(app->get_ws_host_url() == test_location_wsurl);
+        }
+        else {
+            // updated successfully
+            CHECK(app->get_base_url() == default_base_url);
+            CHECK(app->get_host_url() == default_base_url);
+            CHECK(app->get_ws_host_url() == default_base_wsurl);
+            oas.make_user(); // try another operation
+        }
     }
 
-    SECTION("Test update_baseurl with redirect") {
-        redir_transport->reset("https://alternate.someurl.fake");
-        auto config = get_config_with_base_url("https://alternate.someurl.fake");
+    SECTION("Test update_baseurl before first request") {
+        bool error_occurred = GENERATE(true, false);
+
+        location_transport->reset(default_base_url, test_location_url, test_location_wsurl2);
+        location_transport->location_returns_error = error_occurred;
+        auto config = get_config_with_base_url(test_base_url);
         OfflineAppSession oas(config);
         auto app = oas.app();
 
-        // Location is not requested until first app services request
-        CHECK(!redir_transport->location_requested);
+        // Check updating the base URL before an initial app_services request.
+        CHECK(!location_transport->location_requested);
 
-        oas.make_user();
-        CHECK(redir_transport->location_requested);
-        CHECK(app->get_base_url() == "https://alternate.someurl.fake");
-        CHECK(app->get_host_url() == "https://alternate.someurl.fake");
-        CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
-
-        redir_transport->reset("http://some-other.someurl.fake", "https://redirect.otherurl.fake");
-
-        app->update_base_url("http://some-other.someurl.fake", [](util::Optional<app::AppError> error) {
-            CHECK(!error);
+        // Revert the base URL to the default URL value using the empty string
+        app->update_base_url("", [error_occurred](util::Optional<app::AppError> error) {
+            CHECK(error.has_value() == error_occurred);
         });
-        CHECK(redir_transport->location_requested);
-        CHECK(app->get_base_url() == "http://some-other.someurl.fake");
-        CHECK(app->get_host_url() == "https://redirect.otherurl.fake");
-        CHECK(app->get_ws_host_url() == "wss://redirect.otherurl.fake");
-        // Expected URL is still "https://redirect.otherurl.fake" after redirect
-        oas.make_user();
-    }
-
-    SECTION("Test update_baseurl returns error") {
-        redir_transport->reset("http://alternate.someurl.fake");
-        auto config = get_config_with_base_url("http://alternate.someurl.fake");
-        OfflineAppSession oas(config);
-        auto app = oas.app();
-
-        // Location is not requested until first app services request
-        CHECK(!redir_transport->location_requested);
-
-        oas.make_user();
-        CHECK(redir_transport->location_requested);
-        CHECK(app->get_base_url() == "http://alternate.someurl.fake");
-        CHECK(app->get_host_url() == "http://alternate.someurl.fake");
-        CHECK(app->get_ws_host_url() == "ws://alternate.someurl.fake");
-
-        redir_transport->reset("https://some-other.someurl.fake");
-        redir_transport->location_returns_error = true;
-
-        app->update_base_url("https://some-other.someurl.fake", [](util::Optional<app::AppError> error) {
-            CHECK(error);
-        });
-        CHECK(redir_transport->location_requested);
-        // Verify original url values are still being used
-        CHECK(app->get_base_url() == "http://alternate.someurl.fake");
-        CHECK(app->get_host_url() == "http://alternate.someurl.fake");
-        CHECK(app->get_ws_host_url() == "ws://alternate.someurl.fake");
+        CHECK(location_transport->location_requested);
+        if (error_occurred) {
+            // Not updated due to the error
+            CHECK(app->get_base_url() == test_base_url);
+            CHECK(app->get_host_url() == test_base_url);
+            CHECK(app->get_ws_host_url() == test_base_wsurl);
+        }
+        else {
+            // updated successfully
+            CHECK(app->get_base_url() == default_base_url);
+            CHECK(app->get_host_url() == test_location_url);
+            CHECK(app->get_ws_host_url() == test_location_wsurl2);
+            oas.make_user(); // try another operation
+        }
     }
 
     // Verify new sync session updates location when created with cached user
     SECTION("Verify new sync session updates location") {
         bool use_ssl = GENERATE(true, false);
-        std::string initial_host = "alternate.someurl.fake";
-        unsigned initial_port = use_ssl ? 443 : 80;
-        std::string expected_host = "redirect.someurl.fake";
-        unsigned expected_port = 8081;
-        std::string init_url = util::format("http%1://%2", use_ssl ? "s" : "", initial_host);
-        std::string init_wsurl = util::format("ws%1://%2", use_ssl ? "s" : "", initial_host);
-        std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
-        std::string redir_wsurl = util::format("ws%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
+        std::string base_host = "base.url.fake";
+        std::string location_host = "alternate.url.fake";
+        std::string new_location_host = "new.url.fake";
+        unsigned location_port = use_ssl ? 443 : 80;
+        std::string sync_base_url = util::format("http://%1", base_host);
+        std::string sync_location_url = util::format("http%1://%2", use_ssl ? "s" : "", location_host);
+        std::string sync_location_wsurl = util::format("ws%1://%2", use_ssl ? "s" : "", location_host);
+        std::string new_location_url = util::format("http%1://%2", use_ssl ? "s" : "", new_location_host);
+        std::string new_location_wsurl = util::format("ws%1://%2", use_ssl ? "s" : "", new_location_host);
 
         auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
         socket_provider->websocket_connect_func = []() -> std::optional<SocketProviderError> {
             return SocketProviderError(sync::websocket::WebSocketError::websocket_connection_failed, "404 not found");
         };
 
-        auto config = get_config_with_base_url(init_url);
+        auto config = get_config_with_base_url(sync_base_url);
         config.metadata_mode = AppConfig::MetadataMode::NoEncryption;
         config.socket_provider = socket_provider;
         config.storage_path = util::make_temp_dir();
@@ -4009,24 +3798,24 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
         // Log in to get a cached user
         {
-            redir_transport->reset(init_url);
+            location_transport->reset(sync_base_url, sync_location_url, sync_location_wsurl);
             OfflineAppSession oas(config);
             auto app = oas.app();
 
             {
+                CHECK_FALSE(location_transport->location_requested);
                 auto [sync_route, verified] = app->sync_manager()->sync_route();
-                CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(init_url)));
+                CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(sync_base_url)));
                 CHECK_FALSE(verified);
             }
 
             oas.make_user();
-            CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == init_url);
-            CHECK(app->get_host_url() == init_url);
-            CHECK(app->get_ws_host_url() == init_wsurl);
+            CHECK(location_transport->location_requested);
+            CHECK(app->get_base_url() == sync_base_url);
+            CHECK(app->get_host_url() == sync_location_url);
+            CHECK(app->get_ws_host_url() == sync_location_wsurl);
             auto [sync_route, verified] = app->sync_manager()->sync_route();
-            CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(init_url)));
-            CHECK_THAT(sync_route, ContainsSubstring(init_wsurl));
+            CHECK_THAT(sync_route, ContainsSubstring(sync_location_wsurl));
             CHECK(verified);
         }
 
@@ -4034,37 +3823,42 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         config.delete_storage = true;
         // Recreate the app using the cached user and start a sync session, which will is set to fail on connect
         SECTION("Sync Session fails on connect after updating location") {
-            enum class TestState { start, session_started };
+            enum class TestState { start, first_attempt, second_attempt, complete };
             TestingStateMachine<TestState> state(TestState::start);
-            redir_transport->reset(init_url, redir_url);
+            location_transport->reset(sync_base_url, new_location_url, new_location_wsurl);
 
+            // Reuse the config so the app uses the cached user
             OfflineAppSession oas(config);
             auto app = oas.app();
-
-            // Verify the default sync route, which has not been verified
-            {
-                auto [sync_route, verified] = app->sync_manager()->sync_route();
-                CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(init_url)));
-                CHECK_FALSE(verified);
-            }
             REQUIRE(app->current_user());
 
-            std::atomic<int> connect_attempts = 0;
+            // Verify the initial sync route, since the location hasn't been queried
+            // and the location is not "verified", the sync route host is based off
+            // the value provided in the AppConfig::base_url value
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(sync_base_url)));
+                CHECK_FALSE(verified);
+            }
+
             socket_provider->endpoint_verify_func = [&](const sync::WebSocketEndpoint& ep) {
-                // First connection attempt is to the originally specified endpoint. Since
-                // it hasn't been verified, we swallow the error and do a location update,
-                // which will then try to connect to the redir target
-                auto attempt = connect_attempts++;
-                if (attempt == 0) {
-                    CHECK(ep.address == initial_host);
-                    CHECK(ep.port == initial_port);
-                    CHECK(ep.is_ssl == use_ssl);
-                }
-                else {
-                    CHECK(ep.address == expected_host);
-                    CHECK(ep.port == expected_port);
-                    CHECK(ep.is_ssl == use_ssl);
-                }
+                state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+                    if (cur_state == TestState::start) {
+                        // First time through is using the original base URL
+                        CHECK(ep.address == base_host);
+                        CHECK(ep.port == 80);
+                        CHECK(ep.is_ssl == false);
+                        return TestState::first_attempt;
+                    }
+                    else if (cur_state == TestState::first_attempt) {
+                        // Second time through is using the values from location endpoint
+                        CHECK(ep.address == new_location_host);
+                        CHECK(ep.port == location_port);
+                        CHECK(ep.is_ssl == use_ssl);
+                        return TestState::second_attempt;
+                    }
+                    return std::nullopt;
+                });
             };
 
             RealmConfig r_config;
@@ -4076,42 +3870,47 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                 CHECK(!error.status.is_ok());
                 CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
                 CHECK(!error.is_fatal);
-                state.transition_to(TestState::session_started);
+                state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+                    CHECK(cur_state == TestState::second_attempt);
+                    return TestState::complete;
+                });
             };
             auto realm = Realm::get_shared_realm(r_config);
-            state.wait_for(TestState::session_started);
+            state.wait_for(TestState::complete);
 
-            CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == init_url);
-            CHECK(app->get_host_url() == redir_url);
-            CHECK(app->get_ws_host_url() == redir_wsurl);
+            CHECK(location_transport->location_requested);
+            CHECK(app->get_base_url() == sync_base_url);
+            CHECK(app->get_host_url() == new_location_url);
+            CHECK(app->get_ws_host_url() == new_location_wsurl);
             auto [sync_route, verified] = app->sync_manager()->sync_route();
-            CHECK_THAT(sync_route, ContainsSubstring(redir_wsurl));
+            CHECK_THAT(sync_route, ContainsSubstring(new_location_wsurl));
             CHECK(verified);
         }
-
         SECTION("Sync Session retries after initial location failure") {
             enum class TestState { start, location_failed, session_started };
             TestingStateMachine<TestState> state(TestState::start);
             const int retry_count = GENERATE(1, 3);
 
-            redir_transport->reset(init_url);
-            redir_transport->location_returns_error = true;
+            location_transport->reset(sync_base_url, new_location_url, new_location_wsurl);
+            location_transport->location_returns_error = true;
 
+            // Reuse the config so the app uses the cached user
             OfflineAppSession oas(config);
             auto app = oas.app();
             REQUIRE(app->current_user());
-            // Verify the default sync route, which has not been verified
+            // Verify the initial sync route, since the location hasn't been queried
+            // and the location is not "verified", the sync route host is based off
+            // the value provided in the AppConfig::base_url value
             {
                 auto [sync_route, verified] = app->sync_manager()->sync_route();
-                CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(init_url)));
+                CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(sync_base_url)));
                 CHECK_FALSE(verified);
             }
 
             socket_provider->endpoint_verify_func = [&](const sync::WebSocketEndpoint& ep) {
-                CHECK(ep.address == initial_host);
-                CHECK(ep.port == initial_port);
-                CHECK(ep.is_ssl == use_ssl);
+                CHECK(ep.address == base_host);
+                CHECK(ep.port == 80);
+                CHECK(ep.is_ssl == false);
             };
 
             socket_provider->websocket_connect_func = [&, request_count =
@@ -4120,33 +3919,33 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                     // First connection attempt is to the unverified initial URL
                     // since we have a valid access token but have never successfully
                     // connected. This failing will trigger a location update.
-                    CHECK_FALSE(redir_transport->location_requested);
+                    CHECK_FALSE(location_transport->location_requested);
                 }
                 else {
                     // All attempts after the first should have requested location
-                    CHECK(redir_transport->location_requested);
-                    redir_transport->location_requested = false;
+                    CHECK(location_transport->location_requested);
+                    location_transport->location_requested = false;
                 }
 
                 // Until we allow a location request to succeed we should keep
                 // getting the original unverified route
-                if (redir_transport->location_returns_error) {
-                    CHECK(app->get_base_url() == init_url);
-                    CHECK(app->get_host_url() == init_url);
-                    CHECK(app->get_ws_host_url() == init_wsurl);
+                if (location_transport->location_returns_error) {
+                    CHECK(app->get_base_url() == sync_base_url);
+                    CHECK(app->get_host_url() == sync_base_url);
+                    CHECK(app->get_ws_host_url() == app::App::create_ws_host_url(sync_base_url));
                     {
                         auto [sync_route, verified] = app->sync_manager()->sync_route();
-                        CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(init_url)));
+                        CHECK_THAT(sync_route, ContainsSubstring(app::App::create_ws_host_url(sync_base_url)));
                         CHECK_FALSE(verified);
                     }
                 }
 
                 // After the chosen number of attempts let the location request succeed
                 if (request_count++ >= retry_count) {
-                    redir_transport->reset(init_url, redir_url);
+                    location_transport->reset(sync_base_url, new_location_url, new_location_wsurl);
                     socket_provider->endpoint_verify_func = [&](const sync::WebSocketEndpoint& ep) {
-                        CHECK(ep.address == expected_host);
-                        CHECK(ep.port == expected_port);
+                        CHECK(ep.address == new_location_host);
+                        CHECK(ep.port == location_port);
                         CHECK(ep.is_ssl == use_ssl);
                         state.transition_to(TestState::location_failed);
                     };
@@ -4177,11 +3976,11 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             auto realm = Realm::get_shared_realm(r_config);
             state.wait_for(TestState::session_started);
 
-            CHECK(app->get_base_url() == init_url);
-            CHECK(app->get_host_url() == redir_url);
-            CHECK(app->get_ws_host_url() == redir_wsurl);
+            CHECK(app->get_base_url() == sync_base_url);
+            CHECK(app->get_host_url() == new_location_url);
+            CHECK(app->get_ws_host_url() == new_location_wsurl);
             auto [sync_route, verified] = app->sync_manager()->sync_route();
-            CHECK_THAT(sync_route, ContainsSubstring(redir_wsurl));
+            CHECK_THAT(sync_route, ContainsSubstring(new_location_wsurl));
             CHECK(verified);
         }
     }
