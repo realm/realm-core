@@ -3257,7 +3257,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         return;
 
     util::ScopeExit cleanup([&]() noexcept {
-        if (auto& director = get_redirector(); director) {
+        if (auto& director = get_redirector()) {
             // Reset the redirector state when the test exits
             director->reset_state();
         }
@@ -3345,7 +3345,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
     // all others 0 since location request prior to login hits actual server
     check_counters({1}, {0}, {0}, {0});
     REQUIRE(app->get_base_url() == get_redirector()->base_url());
-    REQUIRE(app->get_host_url() == get_redirector()->location_hostname());
+    REQUIRE(app->get_host_url() == get_redirector()->server_url());
 
     SECTION("Appservices requests are redirected") {
         // Switch the location to use the redirector's address for http requests which will
@@ -3477,7 +3477,6 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
                 }
             });
         }
-
         {
             reset_counters();
             // Reset the location flag and the cached location info so the app will request
