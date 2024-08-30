@@ -113,6 +113,10 @@ if (REALM_ENABLE_GEOSPATIAL)
     list(APPEND CORE_TEST_SOURCES test_query_geo.cpp)
 endif()
 
+if (APPLE)
+    list(APPEND CORE_TEST_SOURCES test_nsexception.mm)
+endif()
+
 set(LARGE_TEST_SOURCES
     large_tests/test_column_large.cpp
     large_tests/test_strings.cpp)

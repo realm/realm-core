@@ -6,9 +6,6 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Using an empty KeyPath in C API would result in no filtering being done ([#7805](https://github.com/realm/realm-core/issues/7805), since 13.24.0)
-* Filtering notifications with backlink columns as last element could sometimes give wrong results ([#7530](https://github.com/realm/realm-core/issues/7530), since 11.1.0)
-* Fix crash during client app shutdown when Logger log level is set higher than Info. ([#7969](https://github.com/realm/realm-core/issues/7969), since v13.23.3)
 * If a user authenticated request is redirected, the user will be logged out since the authorization header is removed before request is sent to the new server. The log_in_with_credentials() function will always request the location info from the server prior to logging in to ensure the remote server URL is up to date. ([#8012](https://github.com/realm/realm-core/issues/8012), since v12.9.0)
 
 ### Breaking changes
@@ -20,8 +17,33 @@
 -----------
 
 ### Internals
+* Enabled curl redirect support for the test http network transport and added a test that uses the redirect server, if enabled, to validate redirections being handled by the network transport implementation. ([PR #8011](https://github.com/realm/realm-core/pull/8011))
+
+----------------------------------------------
+
+# 14.12.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Using an empty KeyPath in C API would result in no filtering being done ([#7805](https://github.com/realm/realm-core/issues/7805), since v13.24.0)
+* Filtering notifications with backlink columns as last element could sometimes give wrong results ([#7530](https://github.com/realm/realm-core/issues/7530), since v11.1.0)
+* Fix crash during client app shutdown when Logger log level is set higher than Info. ([#7969](https://github.com/realm/realm-core/issues/7969), since v13.23.3)
+* If File::rw_lock() fails to open a file the exception message does not contain the filename ([#7999](https://github.com/realm/realm-core/issues/7999), since v6.0.21)
+* Fallback to hashed filename will fail if length of basename is between 240 and 250 ([#8007](https://github.com/realm/realm-core/issues/8007), since v10.0.0)
+* Swift API misuse within a callback from core would result in an internal unreachable error rather than the exception being propagated properly ([#7836](https://github.com/realm/realm-core/issues/7836)).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
 * Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
-* Updated test http transport to enable redirect support in the curl library and added test to verify real redirect operation using the redirect server. ([PR #8011](https://github.com/realm/realm-core/pull/8011))
 
 ----------------------------------------------
 

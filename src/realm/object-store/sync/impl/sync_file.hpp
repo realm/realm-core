@@ -133,7 +133,7 @@ private:
     static constexpr const char c_metadata_realm[] = "sync_metadata.realm";
     static constexpr const char c_realm_file_suffix[] = ".realm";
     static constexpr const char c_realm_file_test_suffix[] =
-        ".rtest"; // Must have same length as c_realm_file_suffix.
+        ".rtest.management"; // Must have same length as the biggest path name we might use.
     static constexpr const char c_legacy_sync_directory[] = "realm-object-server";
 
     std::string get_special_directory(std::string directory_name) const;
