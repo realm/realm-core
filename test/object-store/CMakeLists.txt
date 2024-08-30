@@ -170,6 +170,9 @@ if(REALM_ENABLE_SYNC)
         find_package(CURL REQUIRED)
         target_link_libraries(ObjectStoreTestLib "${CURL_LIBRARY}")
         target_include_directories(ObjectStoreTestLib PRIVATE "${CURL_INCLUDE_DIRS}")
+        
+        # Also build the redir_server
+        add_subdirectory(tools)
     endif()
 endif()
 
