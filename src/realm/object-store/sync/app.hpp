@@ -525,12 +525,8 @@ private:
     /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
     /// @param completion The callback that will be called with the error on failure or empty on success
     /// @param new_hostname The (Original) new hostname to request the location from
-    /// @param redir_location The location provided by the last redirect response when querying location
-    /// @param redirect_count The current number of redirects that have occurred in a row
-    void request_location(util::UniqueFunction<void(std::optional<AppError>)>&& completion,
-                          std::optional<std::string>&& new_hostname = std::nullopt,
-                          std::optional<std::string>&& redir_location = std::nullopt, int redirect_count = 0)
-        REQUIRES(!m_route_mutex);
+    void request_location(util::UniqueFunction<void(std::optional<app::AppError>)>&& completion,
+                          std::optional<std::string>&& new_hostname) REQUIRES(!m_route_mutex);
 
     /// Update the location metadata from the location response
     /// @param response The response returned from the location request
@@ -542,9 +538,8 @@ private:
     /// Update the app metadata and resend the request with the updated metadata
     /// @param request The original request object that needs to be sent after the update
     /// @param completion The original completion object that will be called with the response to the request
-    /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void update_location_and_resend(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion,
-                                    std::optional<std::string>&& new_hostname = util::none) REQUIRES(!m_route_mutex);
+    void update_location_and_resend(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion)
+        REQUIRES(!m_route_mutex);
 
     void post(std::string&& route, util::UniqueFunction<void(std::optional<AppError>)>&& completion,
               const bson::BsonDocument& body) REQUIRES(!m_route_mutex);
@@ -558,13 +553,6 @@ private:
 
     std::unique_ptr<Request> make_request(HttpMethod method, std::string&& url, const std::shared_ptr<User>& user,
                                           RequestTokenType, std::string&& body) const;
-
-    /// Process the redirect response received from the last request that was sent to the server
-    /// @param request The request to be performed (in case it needs to be sent again)
-    /// @param response The response from the send_request_to_server operation
-    /// @param completion Returns the response from the server if not a redirect
-    void check_for_redirect_response(std::unique_ptr<Request>&& request, const Response& response,
-                                     IntermediateCompletion&& completion) REQUIRES(!m_route_mutex);
 
     void do_authenticated_request(HttpMethod, std::string&& route, std::string&& body,
                                   const std::shared_ptr<User>& user, RequestTokenType,

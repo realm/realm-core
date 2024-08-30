@@ -189,7 +189,6 @@ constexpr static std::string_view s_sync_path = "/realm-sync";
 constexpr static uint64_t s_default_timeout_ms = 60000;
 constexpr static std::string_view s_username_password_provider_key = "local-userpass";
 constexpr static std::string_view s_user_api_key_provider_key_path = "api_keys";
-constexpr static int s_max_http_redirects = 20;
 static util::FlatMap<std::string, util::FlatMap<std::string, SharedApp>> s_apps_cache; // app_id -> base_url -> app
 std::mutex s_apps_mutex;
 } // anonymous namespace
@@ -978,18 +977,17 @@ void App::delete_user(const std::shared_ptr<User>& user, UniqueFunction<void(Opt
         }
     }
 
-    do_authenticated_request(
-        HttpMethod::del, url_for_path("/auth/delete"), "", user, RequestTokenType::AccessToken,
-        [self = shared_from_this(), completion = std::move(completion), user, this](const Response& response) {
-            auto error = AppUtils::check_for_errors(response);
-            if (!error) {
-                auto user_id = user->user_id();
-                user->detach_and_tear_down();
-                m_metadata_store->delete_user(*m_file_manager, user_id);
-                emit_change_to_subscribers();
-            }
-            completion(std::move(error));
-        });
+    do_authenticated_request(HttpMethod::del, url_for_path("/auth/delete"), "", user, RequestTokenType::AccessToken,
+                             [completion = std::move(completion), user, this](const Response& response) {
+                                 auto error = AppUtils::check_for_errors(response);
+                                 if (!error) {
+                                     auto user_id = user->user_id();
+                                     user->detach_and_tear_down();
+                                     m_metadata_store->delete_user(*m_file_manager, user_id);
+                                     emit_change_to_subscribers();
+                                 }
+                                 completion(std::move(error));
+                             });
 }
 
 void App::link_user(const std::shared_ptr<User>& user, const AppCredentials& credentials,
@@ -1054,34 +1052,32 @@ std::string App::get_app_route(const Optional<std::string>& hostname) const
 }
 
 void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& completion,
-                           std::optional<std::string>&& new_hostname, std::optional<std::string>&& redir_location,
-                           int redirect_count)
+                           std::optional<std::string>&& new_hostname)
 {
-    // Request the new location information at the new base url hostname; or redir response location if a redirect
-    // occurred during the initial location request. redirect_count is used to track the number of sequential
-    // redirect responses received during the location update and return an error if this count exceeds
-    // max_http_redirects. If neither new_hostname nor redir_location is provided, the current value of m_base_url
-    // will be used.
-    std::string app_route;
-    std::string base_url;
+    // Request the new location information the original configured base_url or the new_hostname
+    // if the base_url is being updated. If a new_hostname has not been provided and the location
+    // has already been requested, this function does nothing.
+    std::string app_route; // The app_route for the server to query the location
+    std::string base_url;  // The configured base_url hostname used for querying the location
     {
         util::CheckedUniqueLock lock(m_route_mutex);
         // Skip if the location info has already been initialized and a new hostname is not provided
-        if (!new_hostname && !redir_location && m_location_updated) {
+        if (!new_hostname && m_location_updated) {
             // Release the lock before calling the completion function
             lock.unlock();
             completion(util::none);
             return;
         }
-        base_url = new_hostname.value_or(m_base_url);
-        // If this is for a redirect after querying new_hostname, then use the redirect location
-        if (redir_location)
-            app_route = get_app_route(redir_location);
-        // If this is querying the new_hostname, then use that location
-        else if (new_hostname)
+        // If this is querying the new_hostname, then use that to query the location
+        if (new_hostname) {
+            base_url = *new_hostname;
             app_route = get_app_route(new_hostname);
-        else
+        }
+        // Otherwise, use the current hostname
+        else {
             app_route = get_app_route();
+            base_url = m_base_url;
+        }
         REALM_ASSERT(!app_route.empty());
     }
 
@@ -1093,46 +1089,15 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
     log_debug("App: request location: %1", req.url);
 
     m_config.transport->send_request_to_server(req, [self = shared_from_this(), completion = std::move(completion),
-                                                     base_url = std::move(base_url),
-                                                     redirect_count](const Response& response) mutable {
-        // Check to see if a redirect occurred
-        if (AppUtils::is_redirect_status_code(response.http_status_code)) {
-            // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
-            if (redirect_count >= s_max_http_redirects) {
-                completion(AppError{ErrorCodes::ClientTooManyRedirects,
-                                    util::format("number of redirections exceeded %1", s_max_http_redirects),
-                                    {},
-                                    response.http_status_code});
-                return;
-            }
-            // Handle the redirect response when requesting the location - extract the
-            // new location header field and resend the request.
-            auto redir_location = AppUtils::extract_redir_location(response.headers);
-            if (!redir_location) {
-                // Location not found in the response, pass error response up the chain
-                completion(AppError{ErrorCodes::ClientRedirectError,
-                                    "Redirect response missing location header",
-                                    {},
-                                    response.http_status_code});
-                return;
-            }
-            // try to request the location info at the new location in the redirect response
-            // retry_count is passed in to track the number of subsequent redirection attempts
-            self->request_location(std::move(completion), std::move(base_url), std::move(redir_location),
-                                   redirect_count + 1);
-            return;
-        }
-
+                                                     base_url = std::move(base_url)](const Response& response) {
         // Location request was successful - update the location info
-        auto update_response = self->update_location(response, base_url);
-        if (update_response) {
-            self->log_error("App: request location failed (%1%2): %3", update_response->code_string(),
-                            update_response->additional_status_code
-                                ? util::format(" %1", *update_response->additional_status_code)
-                                : "",
-                            update_response->reason());
+        auto error = self->update_location(response, base_url);
+        if (error) {
+            self->log_error("App: request location failed (%1%2): %3", error->code_string(),
+                            error->additional_status_code ? util::format(" %1", *error->additional_status_code) : "",
+                            error->reason());
         }
-        completion(update_response);
+        completion(error);
     });
 }
 
@@ -1169,8 +1134,7 @@ std::optional<AppError> App::update_location(const Response& response, const std
     return util::none;
 }
 
-void App::update_location_and_resend(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion,
-                                     Optional<std::string>&& redir_location)
+void App::update_location_and_resend(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion)
 {
     // Update the location information if a redirect response was received or m_location_updated == false
     // and then send the request to the server with request.url updated to the new AppServices hostname.
@@ -1192,13 +1156,13 @@ void App::update_location_and_resend(std::unique_ptr<Request>&& request, Interme
             // Retry the original request with the updated url
             auto& request_ref = *request;
             self->m_config.transport->send_request_to_server(
-                request_ref, [self = std::move(self), completion = std::move(completion),
-                              request = std::move(request)](const Response& response) mutable {
-                    self->check_for_redirect_response(std::move(request), response, std::move(completion));
+                request_ref,
+                [completion = std::move(completion), request = std::move(request)](const Response& response) mutable {
+                    completion(std::move(request), response);
                 });
         },
         // The base_url is not changing for this request
-        util::none, std::move(redir_location));
+        util::none);
 }
 
 void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& completion, const BsonDocument& body)
@@ -1212,8 +1176,18 @@ void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& c
 
 void App::do_request(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion, bool update_location)
 {
+    // NOTE: Since the calls to `send_request_to_server()` or `update_location_and_resend()` do not
+    // capture a shared_ptr to App as part of their callback, any function that calls `do_request()`
+    // or `do_authenticated_request()` needs to capture the App as `self = shared_from_this()` for
+    // the completion callback to ensure the lifetime of the App object is extended until the
+    // callback is called after the operation is complete.
+
     // Verify the request URL to make sure it is valid
-    util::Uri::parse(request->url);
+    if (auto valid_url = util::Uri::try_parse(request->url); !valid_url.is_ok()) {
+        completion(std::move(request), AppUtils::make_apperror_response(
+                                           AppError{valid_url.get_status().code(), valid_url.get_status().reason()}));
+        return;
+    }
 
     // Refresh the location info when app is created or when requested (e.g. after a websocket redirect)
     // to ensure the http and websocket URL information is up to date.
@@ -1235,34 +1209,10 @@ void App::do_request(std::unique_ptr<Request>&& request, IntermediateCompletion&
     // If location info has already been updated, then send the request directly
     auto& request_ref = *request;
     m_config.transport->send_request_to_server(
-        request_ref, [self = shared_from_this(), completion = std::move(completion),
-                      request = std::move(request)](const Response& response) mutable {
-            self->check_for_redirect_response(std::move(request), response, std::move(completion));
+        request_ref,
+        [completion = std::move(completion), request = std::move(request)](const Response& response) mutable {
+            completion(std::move(request), response);
         });
-}
-
-void App::check_for_redirect_response(std::unique_ptr<Request>&& request, const Response& response,
-                                      IntermediateCompletion&& completion)
-{
-    // If this isn't a redirect response, then we're done
-    if (!AppUtils::is_redirect_status_code(response.http_status_code)) {
-        return completion(std::move(request), response);
-    }
-
-    // Handle a redirect response when sending the original request - extract the location
-    // header field and resend the request.
-    auto redir_location = AppUtils::extract_redir_location(response.headers);
-    if (!redir_location) {
-        // Location not found in the response, pass error response up the chain
-        return completion(std::move(request),
-                          AppUtils::make_clienterror_response(ErrorCodes::ClientRedirectError,
-                                                              "Redirect response missing location header",
-                                                              response.http_status_code));
-    }
-
-    // Request the location info at the new location - once this is complete, the original
-    // request will be sent to the new server
-    update_location_and_resend(std::move(request), std::move(completion), std::move(redir_location));
 }
 
 void App::do_authenticated_request(HttpMethod method, std::string&& route, std::string&& body,
@@ -1314,10 +1264,10 @@ void App::handle_auth_failure(const AppError& error, std::unique_ptr<Request>&& 
 
                              // Reissue the request with the new access token
                              request->headers = get_request_headers(user, RequestTokenType::AccessToken);
-                             self->do_request(std::move(request),
-                                              [completion = std::move(completion)](auto&&, auto& response) {
-                                                  completion(response);
-                                              });
+                             self->do_request(std::move(request), [self = self, completion = std::move(completion)](
+                                                                      auto&&, auto& response) {
+                                 completion(response);
+                             });
                          });
 }
 

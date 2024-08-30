@@ -50,28 +50,6 @@ bool AppUtils::is_success_status_code(int status_code)
     return status_code == 0 || (status_code < 300 && status_code >= 200);
 }
 
-bool AppUtils::is_redirect_status_code(int status_code)
-{
-    using namespace realm::sync;
-    // If the response contains a redirection, then return true
-    if (auto code = HTTPStatus(status_code);
-        code == HTTPStatus::MovedPermanently || code == HTTPStatus::PermanentRedirect) {
-        return true;
-    }
-    return false;
-}
-
-std::optional<std::string> AppUtils::extract_redir_location(const std::map<std::string, std::string>& headers)
-{
-    // Look for case insensitive redirect "location" in headers
-    auto location = AppUtils::find_header("location", headers);
-    if (location && !location->second.empty() && util::Uri::try_parse(location->second).is_ok()) {
-        // If the location is valid, return it wholesale (e.g., it could include a path for API proxies)
-        return location->second;
-    }
-    return std::nullopt;
-}
-
 // Create a Response object with the given client error, message and optional http status code
 Response AppUtils::make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
                                              std::optional<int> http_status)
