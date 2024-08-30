@@ -380,7 +380,7 @@ app::Response do_http_request(const app::Request& request)
 
 class Baasaas {
 public:
-    enum class StartMode { Default, GitHash, Branch, PatchId };
+    enum class StartMode { Default, GitHash, Branch, PatchId, CurrentStable };
     explicit Baasaas(std::string api_key, StartMode mode, std::string ref_spec)
         : m_api_key(std::move(api_key))
         , m_base_url(get_baasaas_base_url())
@@ -399,6 +399,11 @@ public:
         else if (mode == StartMode::PatchId) {
             url_path = util::format("startContainer?patchId=%1", ref_spec);
             logger->info("Starting baasaas container for patch id %1", ref_spec);
+        }
+        else if (mode == StartMode::CurrentStable) {
+            auto stable_branch = get_current_stable_image();
+            url_path = util::format("startContainer?branch=%1", stable_branch);
+            logger->info("Starting baasaas container on stable branch %1", stable_branch);
         }
         else {
             logger->info("Starting baasaas container");
@@ -561,6 +566,18 @@ private:
         }
     }
 
+    std::string get_current_stable_image()
+    {
+        auto [images, coid] = do_request("images", app::HttpMethod::get);
+        auto all_branches = images["allBranches"].template get<std::vector<std::string>>();
+        if (all_branches.size() < 2) {
+            throw RuntimeError(
+                ErrorCodes::MalformedJson,
+                util::format("No stable branch found in baasaas response %1 (coid: %2)", images.dump(), coid));
+        }
+        return all_branches[1];
+    }
+
     std::string baas_coid_from_response(const app::Response& resp)
     {
         if (auto it = resp.headers.find(g_baas_coid_header_name); it != resp.headers.end()) {
@@ -661,6 +678,9 @@ public:
                 throw std::runtime_error("Expected patch id in BAASAAS_REF_SPEC env variable, but it was empty");
             }
             mode = Baasaas::StartMode::PatchId;
+        }
+        else if (mode_spec == "currentstable") {
+            mode = Baasaas::StartMode::CurrentStable;
         }
         else {
             if (!mode_spec.empty()) {
