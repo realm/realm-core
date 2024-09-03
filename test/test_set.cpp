@@ -241,7 +241,7 @@ TEST(Set_Links)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    auto bars = g.add_table("class_Bar");
+    auto bars = g.add_table_with_primary_key("class_Bar", type_Int, "id");
     auto cabs = g.add_table("class_Cab");
 
     ColKey col_links = foos->add_column_set(*bars, "links");
@@ -249,10 +249,10 @@ TEST(Set_Links)
 
     auto foo = foos->create_object();
 
-    auto bar1 = bars->create_object();
-    auto bar2 = bars->create_object();
-    auto bar3 = bars->create_object();
-    auto bar4 = bars->create_object();
+    auto bar1 = bars->create_object_with_primary_key(1);
+    auto bar2 = bars->create_object_with_primary_key(2);
+    auto bar3 = bars->create_object_with_primary_key(3);
+    auto bar4 = bars->create_object_with_primary_key(4);
 
     auto cab1 = cabs->create_object();
     auto cab2 = cabs->create_object();
@@ -500,13 +500,13 @@ TEST(Set_LnkSetUnresolved)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    auto bars = g.add_table("class_Bar");
+    auto bars = g.add_table_with_primary_key("class_Bar", type_Int, "id");
 
     ColKey col_links = foos->add_column_set(*bars, "links");
     auto foo = foos->create_object();
-    auto bar1 = bars->create_object();
-    auto bar2 = bars->create_object();
-    auto bar3 = bars->create_object();
+    auto bar1 = bars->create_object_with_primary_key(1);
+    auto bar2 = bars->create_object_with_primary_key(2);
+    auto bar3 = bars->create_object_with_primary_key(3);
 
     auto key_set = foo.get_set<ObjKey>(col_links);
     auto link_set = foo.get_linkset(col_links);

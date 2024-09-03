@@ -156,14 +156,14 @@ void Replication::track_new_object(const Table* table, ObjKey key)
     m_most_recently_created_object[table_index] = key;
 }
 
-void Replication::create_object(const Table* t, GlobalKey id)
+void Replication::create_object(const Table* t, ObjKey key)
 {
     if (auto logger = would_log(LogLevel::debug)) {
         logger->log(LogCategory::object, LogLevel::debug, "Create object '%1'", t->get_class_name());
     }
     select_table(t);                              // Throws
-    m_encoder.create_object(id.get_local_key(0)); // Throws
-    track_new_object(t, id.get_local_key(0));     // Throws
+    m_encoder.create_object(key);                 // Throws
+    track_new_object(t, key);                     // Throws
 }
 
 void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mixed pk)

@@ -582,6 +582,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             // avoid upgrading them because it affects a small niche case. Instead, there is a
             // workaround in the String Index search code for not relying on items being ordered.
             t->migrate_col_keys();
+            t->free_collision_table();
         }
     }
     // NOTE: Additional future upgrade steps go here.

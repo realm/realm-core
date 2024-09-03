@@ -57,7 +57,6 @@ set(CORE_TEST_SOURCES
     test_dictionary.cpp
     test_file.cpp
     test_file_locks.cpp
-    test_global_key.cpp
     test_group.cpp
     test_impl_simulated_failure.cpp
     test_index_string.cpp

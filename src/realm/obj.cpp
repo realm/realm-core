@@ -114,11 +114,6 @@ Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
     m_storage_version = get_alloc().get_storage_version();
 }
 
-GlobalKey Obj::get_object_id() const
-{
-    return m_table->get_object_id(m_key);
-}
-
 ObjLink Obj::get_link() const
 {
     return ObjLink(m_table->get_key(), m_key);

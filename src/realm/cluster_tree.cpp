@@ -991,7 +991,6 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
             }
         }
     }
-    m_owner->free_local_id_after_hash_collision(k);
     m_owner->erase_from_search_indexes(k);
 
     size_t root_size = m_root->erase(ClusterNode::RowKey(k), state);
