@@ -575,6 +575,16 @@ TEST_CASE("object") {
                     });
                 }
 
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'origin' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, kpa_target_backlink);
+
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+
                 SECTION("modifying related table 'table', property 'value 1' "
                         "while observing related table 'table', property 'value 1' "
                         "-> DOES send a notification") {
