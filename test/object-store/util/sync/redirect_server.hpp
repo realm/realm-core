@@ -44,14 +44,7 @@ public:
 
     // Allow the redirecting server to choose the listen port
     RedirectingHttpServer(std::string redirect_to_base_url, std::shared_ptr<util::Logger> logger)
-        : RedirectingHttpServer(std::move(redirect_to_base_url), 0, std::move(logger))
-    {
-    }
-
-    // Specify the listen port to use
-    RedirectingHttpServer(std::string redirect_to_base_url, uint16_t listen_port,
-                          std::shared_ptr<util::Logger> logger)
-        : m_redirect_to_base_url(trim_url(redirect_to_base_url))
+        : m_redirect_to_base_url{redirect_to_base_url}
         , m_redirect_to_base_wsurl(make_wsurl(m_redirect_to_base_url))
         , m_logger(std::make_shared<util::PrefixLogger>("HTTP Redirector ", std::move(logger)))
         , m_acceptor(m_service)
@@ -59,12 +52,7 @@ public:
             m_service.run_until_stopped();
         })
     {
-        reset_state();
         network::Endpoint ep;
-        if (listen_port != 0) {
-            // If a port is provided, then configure the endpoint with this port num
-            ep = network::Endpoint(network::make_address("0.0.0.0"), listen_port);
-        }
         m_acceptor.open(ep.protocol());
         m_acceptor.bind(ep);
         ep = m_acceptor.local_endpoint();
@@ -95,7 +83,7 @@ public:
     // NOTE: some http transport redirect implementations may strip the authorization
     // header from the request after it is redirected and the user will be logged out
     // from the client app as a result.
-    void force_http_redirect(bool remote = true)
+    void force_http_redirect(bool remote)
     {
         m_http_redirect = remote;
     }
@@ -106,17 +94,9 @@ public:
     // value) and open a websocket conneciton to the actual server.
     // NOTE: the websocket will never connect if both http and websockets are
     // redirecting and will just keep getting the redirect close code.
-    void force_websocket_redirect(bool force = true)
+    void force_websocket_redirect(bool force)
     {
         m_websocket_redirect = force;
-    }
-
-    // Reset the state to default (initial) state after test makes updates
-    void reset_state()
-    {
-        m_http_redirect = false;
-        m_websocket_redirect = false;
-        m_hook = nullptr;
     }
 
     std::string base_url() const
@@ -127,16 +107,6 @@ public:
     std::string server_url() const
     {
         return m_redirect_to_base_url;
-    }
-
-    std::string location_hostname() const
-    {
-        return m_http_redirect ? m_base_url : m_redirect_to_base_url;
-    }
-
-    std::string location_wshostname() const
-    {
-        return m_websocket_redirect ? m_base_wsurl : m_redirect_to_base_wsurl;
     }
 
 private:
@@ -171,7 +141,8 @@ private:
 
     struct Conn : public util::RefCountBase, websocket::Config {
         Conn(network::Service& service, const std::shared_ptr<util::Logger>& logger)
-            : logger(logger)
+            : random(Catch::getSeed())
+            , logger(logger)
             , socket(service)
             , http_server(socket, logger)
         {
@@ -247,15 +218,16 @@ private:
         std::optional<websocket::Socket> websocket;
     };
 
-    void send_simple_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, std::string body)
+    void send_simple_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason,
+                              std::optional<std::string> body)
     {
         send_http_response(conn, status, std::move(reason), {}, std::move(body));
     }
 
     void send_http_response(util::bind_ptr<Conn> conn, HTTPStatus status, std::string reason, HTTPHeaders headers,
-                            std::string body)
+                            std::optional<std::string> body)
     {
-        m_logger->debug("sending http response %1: %2 \"%3\"", status, reason, body);
+        m_logger->debug("sending http response %1: %2 '%3'", status, reason, body.value_or(""));
         HTTPResponse resp{status, std::move(reason), std::move(headers), std::move(body)};
         conn->http_server.async_send_response(resp, [this, conn](std::error_code ec) {
             if (ec && ec != util::error::operation_aborted) {
@@ -322,7 +294,6 @@ private:
             }
 
             conn->http_server.async_receive_request([this, conn](HTTPRequest req, std::error_code ec) {
-                static bool use_301 = false; // send 301 on first redirect response
                 if (ec) {
                     if (ec != util::error::operation_aborted) {
                         m_logger->error("Error receiving HTTP request to redirect [%1]: %2", ec, ec.message());
@@ -333,10 +304,11 @@ private:
                 m_logger->debug("Received request: %1", req.path);
 
                 if (req.path.find("/location") != std::string::npos) {
-                    nlohmann::json body{{"deployment_model", "GLOBAL"},
-                                        {"location", "US-VA"},
-                                        {"hostname", location_hostname()},
-                                        {"ws_hostname", location_wshostname()}};
+                    nlohmann::json body{
+                        {"deployment_model", "GLOBAL"},
+                        {"location", "US-VA"},
+                        {"hostname", m_http_redirect ? m_base_url : m_redirect_to_base_url},
+                        {"ws_hostname", m_websocket_redirect ? m_base_wsurl : m_redirect_to_base_wsurl}};
                     auto body_str = body.dump();
 
                     send_http_response(conn, HTTPStatus::Ok, "Okay", {{"Content-Type", "application/json"}},
@@ -354,13 +326,12 @@ private:
                 // Send redirect response for appservices calls
                 // Starts with 'http' and contains api path
                 if (req.path.find("/api/client/v2.0/") == 0) {
-                    use_301 = !use_301;
-                    auto status = use_301 ? HTTPStatus::MovedPermanently : HTTPStatus::PermanentRedirect;
-                    auto reason = use_301 ? "Moved Permanently" : "Permanent Redirect";
+                    // Alternate sending 301 and 308 redirect status codes
+                    auto status = m_use_301 ? HTTPStatus::MovedPermanently : HTTPStatus::PermanentRedirect;
+                    auto reason = m_use_301 ? "Moved Permanently" : "Permanent Redirect";
+                    m_use_301 = !m_use_301;
                     auto location = m_redirect_to_base_url + req.path;
-                    auto redirect = util::format("<html><body><p>%1 to <a href=\"%2\">%2</a></p></body></html>",
-                                                 status, location);
-                    send_http_response(conn, status, reason, {{"location", location}}, redirect);
+                    send_http_response(conn, status, reason, {{"location", location}}, std::nullopt);
                     if (m_hook)
                         m_hook(Event::redirect, std::nullopt);
                     return;
@@ -370,19 +341,6 @@ private:
                                      util::format("Not found: %1", req.path));
             });
         });
-    }
-
-    std::string trim_url(std::string_view str)
-    {
-        auto p0 = str.data();
-        auto p1 = str.data() + str.size();
-        // Trim spaces and forward slashes from the end of the string
-        while (p1 > p0 && (std::isspace(*(p1 - 1)) || *(p1 - 1) == '/'))
-            --p1;
-        // Trim spaces from the beginning of the string
-        while (p0 < p1 && std::isspace(*p0))
-            ++p0;
-        return std::string(p0, p1 - p0);
     }
 
     std::string make_wsurl(std::string base_url)
@@ -401,11 +359,12 @@ private:
     const std::string m_redirect_to_base_wsurl;
     const std::shared_ptr<util::Logger> m_logger;
 
-    bool m_http_redirect;
-    bool m_websocket_redirect;
+    bool m_http_redirect = false;
+    bool m_websocket_redirect = false;
     std::string m_base_url;
     std::string m_base_wsurl;
     std::function<void(Event, std::optional<std::string>)> m_hook;
+    bool m_use_301 = true;
 
     network::Service m_service;
     network::Acceptor m_acceptor;

@@ -18,6 +18,7 @@
 
 #include "collection_fixtures.hpp"
 #include "util/sync/baas_admin_api.hpp"
+#include "util/sync/redirect_server.hpp"
 #include "util/sync/sync_test_utils.hpp"
 #include "util/test_path.hpp"
 #include "util/unit_test_transport.hpp"
@@ -3253,23 +3254,14 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
     auto app_session = get_runtime_app_session();
 
     // Skip this test if not using the redirect server
-    if (!get_redirector())
-        return;
-
-    util::ScopeExit cleanup([&]() noexcept {
-        if (auto& director = get_redirector()) {
-            // Reset the redirector state when the test exits
-            director->reset_state();
-        }
-    });
-
+    auto redirector = sync::RedirectingHttpServer(get_real_base_url(), logger);
     std::mutex counter_mutex;
     int error_count = 0;
     int location_count = 0;
     int redirect_count = 0;
     int wsredirect_count = 0;
     using RedirectEvent = sync::RedirectingHttpServer::Event;
-    get_redirector()->set_event_hook([&](RedirectEvent event, std::optional<std::string> message) {
+    redirector.set_event_hook([&](RedirectEvent event, std::optional<std::string> message) {
         std::lock_guard lk(counter_mutex);
         switch (event) {
             case RedirectEvent::location:
@@ -3331,10 +3323,13 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
     };
 
     // Make sure the location response points to the actual server
-    get_redirector()->force_http_redirect(false);
-    get_redirector()->force_websocket_redirect(false);
+    redirector.force_http_redirect(false);
+    redirector.force_websocket_redirect(false);
 
-    TestAppSession session{app_session, {}, DeleteApp{false}};
+    auto tas_config = TestAppSession::Config{};
+    tas_config.base_url = redirector.base_url();
+
+    TestAppSession session{app_session, tas_config, DeleteApp{false}};
     auto app = session.app();
 
     // We should have already requested the location when the user was logged in
@@ -3344,14 +3339,14 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
     // Expected location requested 1 time for the original location request,
     // all others 0 since location request prior to login hits actual server
     check_counters({1}, {0}, {0}, {0});
-    REQUIRE(app->get_base_url() == get_redirector()->base_url());
-    REQUIRE(app->get_host_url() == get_redirector()->server_url());
+    REQUIRE(app->get_base_url() == redirector.base_url());
+    REQUIRE(app->get_host_url() == redirector.server_url());
 
     SECTION("Appservices requests are redirected") {
         // Switch the location to use the redirector's address for http requests which will
         // return redirect responses to redirect the request to the actual server
-        get_redirector()->force_http_redirect(true);
-        get_redirector()->force_websocket_redirect(false);
+        redirector.force_http_redirect(true);
+        redirector.force_websocket_redirect(false);
         reset_counters();
         // Reset the location flag and the cached location info so the app will request
         // the location from the original base URL again upon the next appservices request.
@@ -3382,13 +3377,13 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         REQUIRE(user1 == user2);
         // Expected location requested 2 times, and at least 1 redirects, all others 0
         check_counters({2}, {true, 1}, {0}, {0});
-        REQUIRE(app->get_base_url() == get_redirector()->base_url());
-        REQUIRE(app->get_host_url() == get_redirector()->base_url());
+        REQUIRE(app->get_base_url() == redirector.base_url());
+        REQUIRE(app->get_host_url() == redirector.base_url());
 
         // Revert the location to point to the actual server's address so the login
         // will complete successfully.
-        get_redirector()->force_http_redirect(false);
-        get_redirector()->force_websocket_redirect(false);
+        redirector.force_http_redirect(false);
+        redirector.force_websocket_redirect(false);
         reset_counters();
         // Log in will refresh the location prior to performing the login
         auto result = session.log_in_user(creds);
@@ -3402,8 +3397,8 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         REQUIRE(user3 != user2);
         // Expected location requested 1 time for location prior to login, all others 0
         check_counters({1}, {0}, {0}, {0});
-        REQUIRE(app->get_base_url() == get_redirector()->base_url());
-        REQUIRE(app->get_host_url() == get_redirector()->server_url());
+        REQUIRE(app->get_base_url() == redirector.base_url());
+        REQUIRE(app->get_host_url() == redirector.server_url());
     }
 
     SECTION("Websocket connection returns redirection") {
@@ -3441,7 +3436,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         // Switch the location to use the redirector's address for websocket requests which will
         // return the 4003 redirect close code, forcing app to update the location and refresh
         // the access token.
-        get_redirector()->force_websocket_redirect(true);
+        redirector.force_websocket_redirect(true);
         // Since app uses the hostname value returned from the last location response to create
         // the server URL for requesting the location, the first location request (due to the
         // location_updated flag being reset) needs to return the redirect server for both
@@ -3450,9 +3445,8 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         // hostname (so the login is successful) and the redirect server for the ws_hostname
         // so the websocket initially connects to the redirect server.
         {
-            auto& redirector = get_redirector();
-            redirector->force_http_redirect(true);
-            redirector->set_event_hook([&](RedirectEvent event, std::optional<std::string> message) {
+            redirector.force_http_redirect(true);
+            redirector.set_event_hook([&](RedirectEvent event, std::optional<std::string> message) {
                 std::lock_guard lk(counter_mutex);
                 switch (event) {
                     case RedirectEvent::location:
@@ -3460,7 +3454,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
                         logger->debug("Redirector event: location - count: %1", location_count);
                         if (location_count == 1)
                             // No longer sending redirect server as location hostname value
-                            redirector->force_http_redirect(false);
+                            redirector.force_http_redirect(false);
                         return;
                     case RedirectEvent::redirect:
                         redirect_count++;

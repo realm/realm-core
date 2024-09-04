@@ -608,17 +608,11 @@ static std::optional<sync::RedirectingHttpServer>& get_redirector(const std::str
         });
     };
 
-    if (!base_url.empty() && !redirector && redirector_enabled()) {
+    if (redirector_enabled() && !redirector && !base_url.empty()) {
         redirector.emplace(base_url, util::Logger::get_default_logger());
     }
 
     return redirector;
-}
-
-std::optional<sync::RedirectingHttpServer>& get_redirector()
-{
-    // Will not create a redirector if the base_url is empty
-    return get_redirector({});
 }
 
 class BaasaasLauncher : public Catch::EventListenerBase {
@@ -690,7 +684,7 @@ public:
 
     void testRunEnded(Catch::TestRunStats const&) override
     {
-        if (auto& redirector = get_redirector()) {
+        if (auto& redirector = get_redirector({})) {
             redirector = std::nullopt;
         }
 
