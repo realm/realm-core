@@ -3251,10 +3251,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
 TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
     auto logger = util::Logger::get_default_logger();
-    auto app_session = get_runtime_app_session();
-
-    // Skip this test if not using the redirect server
     auto redirector = sync::RedirectingHttpServer(get_real_base_url(), logger);
+
     std::mutex counter_mutex;
     int error_count = 0;
     int location_count = 0;
@@ -3283,28 +3281,6 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         }
     });
 
-    struct CounterValue {
-        bool greater_than;
-        int value = 0;
-        CounterValue(bool greater_than, int value)
-            : greater_than(greater_than)
-            , value(value)
-        {
-        }
-        CounterValue(int value)
-            : CounterValue(false, value)
-        {
-        }
-    };
-
-    auto check_value = [](int value, const CounterValue& check, std::string_view name) {
-        INFO(util::format("Checking '%1' counter value", name));
-        if (check.greater_than)
-            REQUIRE(value > check.value);
-        else
-            REQUIRE(value == check.value);
-    };
-
     auto reset_counters = [&] {
         std::lock_guard lk(counter_mutex);
         error_count = 0;
@@ -3313,13 +3289,12 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         wsredirect_count = 0;
     };
 
-    auto check_counters = [&](CounterValue locations, CounterValue redirects, CounterValue wsredirects,
-                              CounterValue errors) {
+    auto check_counters = [&](int locations, int redirects, int wsredirects, int errors) {
         std::lock_guard lk(counter_mutex);
-        check_value(location_count, locations, "locations");
-        check_value(redirect_count, redirects, "redirects");
-        check_value(wsredirect_count, wsredirects, "ws redirects");
-        check_value(error_count, errors, "errors");
+        REQUIRE(location_count == locations);
+        REQUIRE(redirect_count == redirects);
+        REQUIRE(wsredirect_count == wsredirects);
+        REQUIRE(error_count == errors);
     };
 
     // Make sure the location response points to the actual server
@@ -3329,7 +3304,10 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
     auto tas_config = TestAppSession::Config{};
     tas_config.base_url = redirector.base_url();
 
-    TestAppSession session{app_session, tas_config, DeleteApp{false}};
+    // Since this test defines its own RedirectingHttpServer, the app session doesn't
+    // need to be retrieved at the beginning of the test to ensure the redirect server
+    // is initialized.
+    TestAppSession session{get_runtime_app_session(), tas_config, DeleteApp{false}};
     auto app = session.app();
 
     // We should have already requested the location when the user was logged in
@@ -3338,7 +3316,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
     REQUIRE(user1);
     // Expected location requested 1 time for the original location request,
     // all others 0 since location request prior to login hits actual server
-    check_counters({1}, {0}, {0}, {0});
+    check_counters(1, 0, 0, 0);
     REQUIRE(app->get_base_url() == redirector.base_url());
     REQUIRE(app->get_host_url() == redirector.server_url());
 
@@ -3376,7 +3354,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         REQUIRE(user2->is_logged_in());
         REQUIRE(user1 == user2);
         // Expected location requested 2 times, and at least 1 redirects, all others 0
-        check_counters({2}, {true, 1}, {0}, {0});
+        check_counters(2, 4, 0, 0);
         REQUIRE(app->get_base_url() == redirector.base_url());
         REQUIRE(app->get_host_url() == redirector.base_url());
 
@@ -3396,7 +3374,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         REQUIRE(user3 == app->current_user());
         REQUIRE(user3 != user2);
         // Expected location requested 1 time for location prior to login, all others 0
-        check_counters({1}, {0}, {0}, {0});
+        check_counters(1, 0, 0, 0);
         REQUIRE(app->get_base_url() == redirector.base_url());
         REQUIRE(app->get_host_url() == redirector.server_url());
     }
@@ -3431,7 +3409,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
             create_one_dog(r);
             REQUIRE(get_dogs(r).size() == 1);
             // The redirect server is not expected to be used...
-            check_counters({0}, {0}, {0}, {0});
+            check_counters(0, 0, 0, 0);
         }
         // Switch the location to use the redirector's address for websocket requests which will
         // return the 4003 redirect close code, forcing app to update the location and refresh
@@ -3483,7 +3461,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
             // The location should have been requested twice; once since the location_updated
             // flag was reset and a second time for the login request. One redirect occurred
             // for the register_email request, since that was sent to the redirect server.
-            check_counters({2}, {1}, {0}, {0});
+            check_counters(2, 1, 0, 0);
             reset_counters();
             SyncTestFile config(app->current_user(), partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -3493,7 +3471,7 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
             // The location should have been requested again and the websocket should have
             // been hit, which sent the redirect close code.
-            check_counters({0}, {0}, {1}, {0});
+            check_counters(0, 0, 1, 0);
         }
     }
 }

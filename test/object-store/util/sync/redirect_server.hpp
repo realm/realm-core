@@ -67,8 +67,12 @@ public:
 
     ~RedirectingHttpServer()
     {
-        m_acceptor.cancel();
-        m_service.stop();
+        m_service.post([this](Status status) {
+            if (status == ErrorCodes::OperationAborted)
+                return;
+            m_acceptor.cancel();
+            m_service.stop();
+        });
         m_server_thread.join();
     }
 
