@@ -3264,19 +3264,19 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         switch (event) {
             case RedirectEvent::location:
                 location_count++;
-                logger->debug("Redirector event: location - count: %1", location_count);
+                logger->trace("Redirector event: location - count: %1", location_count);
                 return;
             case RedirectEvent::redirect:
                 redirect_count++;
-                logger->debug("Redirector event: redirect - count: %1", redirect_count);
+                logger->trace("Redirector event: redirect - count: %1", redirect_count);
                 return;
             case RedirectEvent::ws_redirect:
                 wsredirect_count++;
-                logger->debug("Redirector event: ws_redirect - count: %1", wsredirect_count);
+                logger->trace("Redirector event: ws_redirect - count: %1", wsredirect_count);
                 return;
             case RedirectEvent::error:
                 error_count++;
-                logger->error("Redirect server received error: %1", message.value_or("unknown error"));
+                logger->trace("Redirect server received error: %1", message.value_or("unknown error"));
                 return;
         }
     });
@@ -3431,22 +3431,22 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
                 switch (event) {
                     case RedirectEvent::location:
                         location_count++;
-                        logger->debug("Redirector event: location - count: %1", location_count);
+                        logger->trace("Redirector event: location - count: %1", location_count);
                         if (location_count == 1)
                             // No longer sending redirect server as location hostname value
                             redirector.force_http_redirect(false);
                         return;
                     case RedirectEvent::redirect:
                         redirect_count++;
-                        logger->debug("Redirector event: redirect - count: %1", redirect_count);
+                        logger->trace("Redirector event: redirect - count: %1", redirect_count);
                         return;
                     case RedirectEvent::ws_redirect:
                         wsredirect_count++;
-                        logger->debug("Redirector event: ws_redirect - count: %1", wsredirect_count);
+                        logger->trace("Redirector event: ws_redirect - count: %1", wsredirect_count);
                         return;
                     case RedirectEvent::error:
                         error_count++;
-                        logger->error("Redirect server received error: %1", message.value_or("unknown error"));
+                        logger->trace("Redirect server received error: %1", message.value_or("unknown error"));
                         return;
                 }
             });

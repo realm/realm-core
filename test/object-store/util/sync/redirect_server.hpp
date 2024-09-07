@@ -28,7 +28,8 @@
 #include <realm/util/uri.hpp>
 #include <external/json/json.hpp>
 
-#include <iostream>
+#include <catch2/catch_all.hpp>
+
 #include <thread>
 
 namespace realm::sync {
