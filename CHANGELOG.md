@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* If a user authenticated request is redirected, the user will be logged out since the authorization header is removed before request is sent to the new server. The log_in_with_credentials() function will always request the location info from the server prior to logging in to ensure the remote server URL is up to date. ([#8012](https://github.com/realm/realm-core/issues/8012), since v12.9.0)
+* If a user authenticated app services (http) request is redirected, the user will be logged out since the authorization header is removed before request is sent to the new server. If an authenticated request fails, the location will now be updated prior to refreshing the access token to ensure the remote server URL is up to date. ([#8012](https://github.com/realm/realm-core/issues/8012), since v12.9.0)
 
 ### Breaking changes
 * Removed http 301/308 redirection support from app services operations provided by App. It is assumed that the SDK's http implementation will handle http redirects instead. ([PR #7996](https://github.com/realm/realm-core/pull/7996))
