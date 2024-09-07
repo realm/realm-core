@@ -3787,13 +3787,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                // Location is now requested again when the user logs in - only check the exepected
-                // url on the first location request - after that, it will be using the location_url
-                // value when requesting the location.
-                if (!location_requested)
-                    CHECK_THAT(request.url, ContainsSubstring(expected_url));
-                else
-                    CHECK_THAT(request.url, ContainsSubstring(location_url));
+                CHECK_THAT(request.url, ContainsSubstring(expected_url));
                 location_requested = true;
                 if (location_returns_error) {
                     completion(app::Response{static_cast<int>(sync::HTTPStatus::NotFound), 0, {}, "404 not found"});
