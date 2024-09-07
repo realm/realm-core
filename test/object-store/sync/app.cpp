@@ -3312,8 +3312,8 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
 
     // We should have already requested the location when the user was logged in
     // during the session constructor.
-    auto user1 = app->current_user();
-    REQUIRE(user1);
+    auto user1_a = app->current_user();
+    REQUIRE(user1_a);
     // Expected location requested 1 time for the original location request,
     // all others 0 since location request prior to login hits actual server
     check_counters(1, 0, 0, 0);
@@ -3345,15 +3345,16 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
                 });
             REQUIRE(pf.future.get_no_throw().is_ok());
         }
-        // Login should fail since the profile() command does not complete successfully due
+        // Login should fail since the profile request does not complete successfully due
         // to the authorization headers being stripped from the redirected request
         REQUIRE_FALSE(session.log_in_user(creds).is_ok());
-        // User was originally logged in, but logged out when profile request failed and
-        // app's current user was not updated
-        auto user2 = app->current_user();
-        REQUIRE(user2->is_logged_in());
-        REQUIRE(user1 == user2);
-        // Expected location requested 2 times, and at least 1 redirects, all others 0
+        // Since the login failed, the original user1 is still the App's current user
+        auto user1_b = app->current_user();
+        REQUIRE(user1_b->is_logged_in());
+        REQUIRE(user1_a == user1_b);
+        // Expected location requested 2 times: once for register and after first profile
+        // attempt fails; there are 4 redirects: register, login, get profile, and refresh
+        // token
         check_counters(2, 4, 0, 0);
         REQUIRE(app->get_base_url() == redirector.base_url());
         REQUIRE(app->get_host_url() == redirector.base_url());
@@ -3372,9 +3373,10 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         REQUIRE(user3);
         REQUIRE(user3->is_logged_in());
         REQUIRE(user3 == app->current_user());
-        REQUIRE(user3 != user2);
-        // Expected location requested 1 time for location prior to login, all others 0
-        check_counters(1, 0, 0, 0);
+        REQUIRE(user3 != user1_b);
+        // Expected location requested 1 time for location after first profile attempt
+        // fails; and two redirects: login and the first profile attempt
+        check_counters(1, 2, 0, 0);
         REQUIRE(app->get_base_url() == redirector.base_url());
         REQUIRE(app->get_host_url() == redirector.server_url());
     }
@@ -3399,11 +3401,11 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
 
         const auto schema = get_default_schema();
         const auto partition = random_string(100);
-        // First websocket connection is not using redirection. Should connect
+        // This websocket connection is not using redirection. Should connect
         // directly to the actual server
         {
             reset_counters();
-            SyncTestFile config(user1, partition, schema);
+            SyncTestFile config(user1_a, partition, schema);
             auto r = Realm::get_shared_realm(config);
             REQUIRE(get_dogs(r).size() == 0);
             create_one_dog(r);
@@ -3422,8 +3424,8 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
         // login request, the location response should include the actual server for the
         // hostname (so the login is successful) and the redirect server for the ws_hostname
         // so the websocket initially connects to the redirect server.
+        redirector.force_http_redirect(true);
         {
-            redirector.force_http_redirect(true);
             redirector.set_event_hook([&](RedirectEvent event, std::optional<std::string> message) {
                 std::lock_guard lk(counter_mutex);
                 switch (event) {
@@ -3458,10 +3460,11 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
             // and start with a new realm
             auto result = session.create_user_and_log_in();
             REQUIRE(result.is_ok());
-            // The location should have been requested twice; once since the location_updated
-            // flag was reset and a second time for the login request. One redirect occurred
-            // for the register_email request, since that was sent to the redirect server.
-            check_counters(2, 1, 0, 0);
+            // The location should have been requested twice; before register email and after
+            // first profile attempt fails; and three redirects: register email, login, and
+            // first profile attempt.
+            // NOTE: The ws_hostname still points to the redirect server
+            check_counters(2, 3, 0, 0);
             reset_counters();
             SyncTestFile config(app->current_user(), partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -3469,8 +3472,9 @@ TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
-            // The location should have been requested again and the websocket should have
-            // been hit, which sent the redirect close code.
+            // The websocket should have redirected one time - the location update hits the
+            // actual server since the hostname points to its URL after the location update
+            // during user log in.
             check_counters(0, 0, 1, 0);
         }
     }
