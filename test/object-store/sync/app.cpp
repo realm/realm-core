@@ -5367,8 +5367,10 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     SECTION("refresh token ensure flow is correct") {
         /*
          Expected flow:
+         Location - first http request since app was just created
          Login - this gets access and refresh tokens
          Get profile - throw back a 401 error
+         Location - return location response
          Refresh token - get a new token for the user
          Get profile - get the profile with the new token
          */
@@ -5400,13 +5402,13 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                     }
                 }
                 else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-                    CHECK(state.get() == TestState::profile_1);
+                    CHECK(state.get() == TestState::location);
                     state.transition_to(TestState::refresh);
                     nlohmann::json json{{"access_token", good_access_token2}};
                     completion({200, 0, {}, json.dump()});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
-                    CHECK(state.get() == TestState::unknown);
+                    CHECK((state.get() == TestState::unknown || state.get() == TestState::profile_1));
                     state.transition_to(TestState::location);
                     CHECK(request.method == HttpMethod::get);
                     completion({200,
