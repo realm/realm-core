@@ -150,7 +150,6 @@ private:
             , socket(service)
             , http_server(socket, logger)
         {
-            util::seed_prng_nondeterministically(random); // Throws
         }
 
         // Implement the websocket::Config interface
