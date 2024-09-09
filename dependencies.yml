@@ -1,5 +1,5 @@
 PACKAGE_NAME: realm-core
-VERSION: 20.0.0
+VERSION: 20.0.1
 OPENSSL_VERSION: 3.3.1
 # https://github.com/10gen/baas/commits
 # 2f308db is 2024 July 10
