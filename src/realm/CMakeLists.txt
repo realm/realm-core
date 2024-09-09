@@ -397,18 +397,6 @@ if(REALM_HAVE_OPENSSL AND (UNIX OR WIN32))
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 
-# Use Zlib if the imported target is defined, otherise use -lz on Apple platforms
-if(TARGET ZLIB::ZLIB)
-    target_link_libraries(Storage PUBLIC ZLIB::ZLIB)
-elseif(APPLE)
-    target_link_options(Storage PUBLIC "-lz")
-elseif(EMSCRIPTEN)
-    target_compile_options(Storage PUBLIC "-sUSE_ZLIB=1")
-    target_link_options(Storage PUBLIC "-sUSE_ZLIB=1")
-else()
-    message(FATAL_ERROR "No zlib dependency defined")
-endif()
-
 if(APPLE)
     target_link_libraries(Storage PUBLIC "-lcompression")
 endif()
