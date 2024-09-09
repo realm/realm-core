@@ -395,10 +395,6 @@ if(REALM_HAVE_OPENSSL AND (UNIX OR WIN32))
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 
-if(APPLE)
-    target_link_libraries(Storage PUBLIC "-lcompression")
-endif()
-
 install(TARGETS Storage EXPORT realm
         ARCHIVE DESTINATION lib
         COMPONENT devel)
