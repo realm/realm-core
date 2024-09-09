@@ -380,8 +380,6 @@ let package = Package(
                 .headerSearchPath("external"),
             ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
-                .linkedLibrary("compression"),
-                .linkedLibrary("z"),
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
                 .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
             ]),
