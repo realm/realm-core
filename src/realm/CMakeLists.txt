@@ -76,7 +76,6 @@ set(UTIL_SOURCES
     util/base64.cpp
     util/basic_system_errors.cpp
     util/cli_args.cpp
-    util/compression.cpp
     util/encrypted_file_mapping.cpp
     util/fifo_helper.cpp
     util/file.cpp
@@ -224,7 +223,6 @@ set(REALM_INSTALL_HEADERS
     util/buffer_stream.hpp
     util/cf_ptr.hpp
     util/checked_mutex.hpp
-    util/compression.hpp
     util/encrypted_file_mapping.hpp
     util/errno.hpp
     util/features.h
