@@ -5,7 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Having a query with a number of predicates ORed together may result in a crash on some platforms (strict weak ordering check failing on iphone) ([#8028](https://github.com/realm/realm-core/issues/8028), since v14.6.0)
 * None.
 
 ### Breaking changes
