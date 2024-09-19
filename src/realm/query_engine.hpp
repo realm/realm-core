@@ -2268,7 +2268,7 @@ private:
         std::type_index m_type;
         bool operator<(const ConditionType& other) const
         {
-            return this->m_col < other.m_col && this->m_type < other.m_type;
+            return (this->m_col == other.m_col) ? this->m_type < other.m_type : this->m_col < other.m_col;
         }
         bool operator!=(const ConditionType& other) const
         {
