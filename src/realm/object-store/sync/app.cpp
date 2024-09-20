@@ -358,6 +358,7 @@ std::string App::get_ws_host_url()
 
 std::string App::make_sync_route(Optional<std::string> ws_host_url)
 {
+    // If not providing a new ws_host_url, then use the App's current ws_host_url
     return util::format("%1%2%3/%4%5", ws_host_url.value_or(m_ws_host_url), s_base_path, s_app_path, m_config.app_id,
                         s_sync_path);
 }
@@ -1024,6 +1025,12 @@ std::shared_ptr<User> App::create_fake_user_for_testing(const std::string& user_
     return user;
 }
 
+void App::reset_location_for_testing()
+{
+    util::CheckedLockGuard guard(m_route_mutex);
+    m_location_updated = false;
+    configure_route(m_base_url, "");
+}
 
 void App::refresh_custom_data(const std::shared_ptr<User>& user,
                               UniqueFunction<void(Optional<AppError>)>&& completion)
@@ -1252,8 +1259,11 @@ void App::handle_auth_failure(const AppError& error, std::unique_ptr<Request>&& 
         return;
     }
 
-    // Otherwise we may be able to request a new access token and have the request succeed with that
-    refresh_access_token(user, false,
+    // Otherwise we may be able to request a new access token and resend the request request to see
+    // if it will succeed with that. Also update the location beforehand to ensure the failure
+    // wasn't because of a redirect handled by the SDK (which strips the Authorization header
+    // before re-sending the request to the new server)
+    refresh_access_token(user, true,
                          [self = shared_from_this(), request = std::move(request), completion = std::move(completion),
                           response = std::move(response), user](Optional<AppError>&& error) mutable {
                              if (error) {
@@ -1261,6 +1271,12 @@ void App::handle_auth_failure(const AppError& error, std::unique_ptr<Request>&& 
                                  completion(response);
                                  return;
                              }
+
+                             // In case the location info was updated, update the original request
+                             // to point to the latest location URL.
+                             auto url = util::Uri::parse(request->url);
+                             request->url = util::format("%1%2%3%4", self->get_host_url(), url.get_path(),
+                                                         url.get_query(), url.get_frag());
 
                              // Reissue the request with the new access token
                              request->headers = get_request_headers(user, RequestTokenType::AccessToken);

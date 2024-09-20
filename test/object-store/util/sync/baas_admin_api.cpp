@@ -332,6 +332,12 @@ app::Response do_http_request(const app::Request& request)
         list = curl_slist_append(list, header_str.c_str());
     }
 
+    // Enable redirection, and don't revert POST to GET for 301/302/303 redirects
+    // Max redirects is 30 by default
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+    curl_easy_setopt(curl, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
+
+    // Set callbacks to write the response headers and data
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
