@@ -223,33 +223,6 @@ functions:
           make "-j$NPROC" 2>&1
           popd > /dev/null  # realm-core
 
-  "run benchmark":
-    - command: shell.exec
-      params:
-        working_dir: realm-core
-        shell: bash
-        script: |-
-          set -o errexit
-
-          if [[ -z "${benchmark_name}" ]]; then
-              echo "No benchmark specified."
-              exit 1
-          fi
-
-          export UNITTEST_THREADS=1
-
-          BENCHMARK=$(./evergreen/abspath.sh ./build/test/benchmark-${benchmark_name}/${cmake_build_type|Debug}/realm-benchmark-${benchmark_name})
-          echo "Going to run benchmark $BENCHMARK"
-
-          [[ -d benchmark_results ]] && rm -rf benchmark_results
-          mkdir benchmark_results
-          cd benchmark_results
-
-          $BENCHMARK "$(pwd)/"
-    - command: perf.send
-      params:
-        file: './realm-core/benchmark_results/results.latest.json'
-
   "run tests":
     - command: expansions.update
       params:
@@ -351,52 +324,6 @@ functions:
     params:
       file_location: realm-core/${task_name}_results.json
 
-  "upload fuzzer results":
-  - command: shell.exec
-    params:
-      working_dir: realm-core/build/test/realm-fuzzer
-      script: |-
-        if ls crash-*> /dev/null 2>&1; then
-          echo "Found crash file"
-          #Rename the crash file and the realm file.
-          #If there is a crash, this will signal that something needs to be uploaded.
-          mv crash-* realm-fuzzer-crash.txt
-          mv fuzz-realm.realm fuzzer_realm.realm
-        fi
-
-  - command: s3.put
-    params:
-      working_dir: realm-core/build/test/realm-fuzzer
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/build/test/realm-fuzzer/realm-fuzzer-crash.txt'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash.txt'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: Crash input file
-      optional: true
-
-  - command: s3.put
-    params:
-      working_dir: realm-core/build/test/realm-fuzzer
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/build/test/realm-fuzzer/fuzzer_realm.realm'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/fuzzer_realm.realm'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/x-binary
-      display_name: Realm File
-      optional: true
-
-  - command: shell.exec
-    params:
-      working_dir: realm-core/build/test/realm-fuzzer
-      script: |-
-        #remove the crash file and the realm produced by the fuzzer run
-        rm realm-fuzzer-crash.txt
-        rm fuzzer_realm.realm
 
   "run hang analyzer":
   - command: shell.exec
@@ -674,22 +601,6 @@ tasks:
       test_filter: CoreTests
       test_executable_name: "realm-tests"
 
-- name: benchmark-common-tasks
-  exec_timeout_secs: 1800
-  tags: [ "benchmark" ]
-  commands:
-  - func: "run benchmark"
-    vars:
-      benchmark_name: common-tasks
-
-- name: benchmark-crud
-  exec_timeout_secs: 1800
-  tags: [ "benchmark" ]
-  commands:
-  - func: "run benchmark"
-    vars:
-      benchmark_name: crud
-
 # These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
   tags: [ "for_pull_requests", "test_suite" ]
@@ -851,16 +762,6 @@ tasks:
         echo "COMMAND: git clang-format -f --commit $format_ref"
         exit 1
 
-- name: fuzzer
-  tags: [ "for_nightly_tests" ]
-  allowed_requesters: [ "ad_hoc", "patch" ]
-  commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core/build/test/realm-fuzzer
-      shell: /bin/bash
-      script: |-
-        ${cmake_build_type|Debug}/realm-libfuzz -rss_limit_mb=0 -max_total_time=3600
 
 - name: combined-tests-ios-simulator
   tags: [ "for_pull_requests" ]
@@ -897,7 +798,6 @@ tasks:
             ./build/test/${cmake_build_type|Debug}-iphonesimulator/realm-combined-tests.app \
             'io.realm.CombinedTests' \
             $TEST_RESULTS_FILE
-
 
 task_groups:
 - name: core_tests_group
@@ -983,18 +883,6 @@ task_groups:
   - .test_suite
   - process_coverage_data
 
-- name: benchmarks
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      target_to_build: "benchmarks"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - .benchmark
 
 - name: long-running-tests
   setup_group_can_fail_task: true
@@ -1012,18 +900,6 @@ task_groups:
   tasks:
   - long-running-core-tests
 
-- name: fuzzer-tests
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      target_to_build: realm-libfuzz
-  teardown_task:
-  - func: "upload fuzzer results"
-  tasks:
-  - fuzzer
 
 - name: ios-simulator-tests
   max_hosts: 1
@@ -1149,38 +1025,6 @@ buildvariants:
   tasks:
   - name: core_tests_group
 
-# TODO RCORE-2085 ubuntu2004-release/ubuntu2004-arm64 build variants are here until we've established
-# a new baseline for the updated ubuntu 2204/clang 18 builders and to generate artifacts for the baas
-# team.
-
-- name: ubuntu2004-arm64
-  display_name: "Ubuntu 20.04 ARM64 (GCC 9 release benchmarks)"
-  run_on: ubuntu2004-arm64-large
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    python3: "/opt/mongodbtoolchain/v3/bin/python3"
-    use_system_openssl: On
-    fetch_missing_dependencies: On
-    cmake_build_type: RelWithDebInfo
-  tasks:
-  - name: benchmarks
-
-- name: ubuntu-x86_64-benchmarks
-  display_name: "Ubuntu x86_64 benchmarks"
-  run_on: ubuntu2204-large
-  expansions:
-    fetch_missing_dependencies: On
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-18.1.2-x86_64-linux-gnu.tar.xz"
-    clang_sha256_sum: "feab4b0f5fba325bfe0f4245710fd19fd74f813f44b5e81eda794f4f75bca343"
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    cmake_build_type: RelWithDebInfo
-  tasks:
-  - name: benchmarks
-
 - name: ubuntu-release
   display_name: "Ubuntu (Release build)"
   run_on: ubuntu2204-arm64-large
@@ -1192,7 +1036,6 @@ buildvariants:
     python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
   - name: compile_test_and_package
-  - name: benchmarks
   - name: long-running-tests
 
 - name: ubuntu-asan
@@ -1247,20 +1090,6 @@ buildvariants:
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
   tasks:
   - name: compile_test
-
-- name: ubuntu-fuzzer
-  display_name: "Ubuntu (Fuzzer)"
-  run_on: ubuntu2204-arm64-large
-  expansions:
-    fetch_missing_dependencies: On
-    enable_ubsan: On
-    c_compiler: "/opt/clang+llvm/bin/clang"
-    cxx_compiler: "/opt/clang+llvm/bin/clang++"
-    cmake_build_type: RelWithDebInfo
-    run_with_encryption: 1
-    enable_fuzzer: On
-  tasks:
-  - name: fuzzer-tests
 
 - name: ubuntu-emscripten
   display_name: "Ubuntu (Emscripten x86_64)"
@@ -1342,34 +1171,18 @@ buildvariants:
   - name: core_tests_group
 
 - name: macos-release
-  display_name: "MacOS 11.0 x86_64 (Release build)"
-  run_on: macos-1100
+  display_name: "MacOS 13.0 arm64 (Release build)"
+  run_on: macos-13-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode.app/Contents/Developer
     extra_flags: -DREALM_ENABLE_ASSERTIONS=ON
   tasks:
-  - name: benchmarks
-  - name: compile_test
   - name: test-on-exfat
-
-- name: macos-1100-arm64-release
-  display_name: "MacOS 11 arm64 (Release benchmarks)"
-  run_on: macos-1100-arm64
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DREALM_ENABLE_ASSERTIONS=ON
-  tasks:
-  - name: benchmarks
 
 - name: macos
   display_name: "MacOS 14 arm64"
@@ -1401,8 +1214,6 @@ buildvariants:
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test_and_package
-  # benchmarks are disabled for now because of perf problems on AWS macos instances.
-  # - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
 
@@ -1601,9 +1412,8 @@ buildvariants:
   expansions:
     cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
     cmake_generator: "Visual Studio 16 2019"
-    extra_flags: "-A x64"
     cmake_build_type: "Debug"
-    extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+    extra_flags: -A x64 -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     python3: "/cygdrive/c/python/python37/python.exe"

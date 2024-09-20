@@ -2,6 +2,6 @@ PACKAGE_NAME: realm-core
 VERSION: 20.0.1
 OPENSSL_VERSION: 3.3.1
 # https://github.com/10gen/baas/commits
-# 2f308db is 2024 July 10
-BAAS_VERSION: 2f308db6f65333728a101d1fecbb792f9659a5ce
+# 04e3f27ad0e is 2024 Sep 8th
+BAAS_VERSION: 04e3f27ad0eb9154bc4e3b631d179d702ac05215
 BAAS_VERSION_TYPE: githash
