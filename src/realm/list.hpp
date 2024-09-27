@@ -66,6 +66,7 @@ public:
     virtual void remove(size_t from, size_t to) = 0;
     virtual void move(size_t from, size_t to) = 0;
     virtual void swap(size_t ndx1, size_t ndx2) = 0;
+    virtual void set(const bson::BsonArray&);
 
 protected:
     static constexpr CollectionType s_collection_type = CollectionType::List;
@@ -686,6 +687,7 @@ public:
     {
         return clone_linklist();
     }
+    void set(const bson::BsonArray&) override;
     // Overriding members of ObjList:
     LinkCollectionPtr clone_obj_list() const override
     {

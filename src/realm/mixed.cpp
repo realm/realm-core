@@ -160,6 +160,69 @@ int compare_long_to_double(int64_t lhs, double rhs)
 }
 } // anonymous namespace
 
+Mixed::Mixed(const bson::Bson& value)
+{
+    m_type = 0;
+    switch (value.type()) {
+        case bson::Bson::Type::Null:
+            break;
+        case bson::Bson::Type::Int32:
+            m_type = int(type_Int) + 1;
+            int_val = int32_t(value);
+            break;
+        case bson::Bson::Type::Int64:
+            m_type = int(type_Int) + 1;
+            int_val = int64_t(value);
+            break;
+        case bson::Bson::Type::Bool:
+            m_type = int(type_Bool) + 1;
+            bool_val = bool(value);
+            break;
+        case bson::Bson::Type::Double:
+            m_type = int(type_Double) + 1;
+            double_val = Double(value);
+            break;
+        case bson::Bson::Type::String: {
+            m_type = int(type_String) + 1;
+            const std::string& str(value);
+            string_val = str;
+            break;
+        }
+        case bson::Bson::Type::Binary: {
+            m_type = int(type_Binary) + 1;
+            const std::vector<char>& bin_data(value);
+            binary_val = BinaryData(bin_data.data(), bin_data.size());
+            break;
+        }
+        case bson::Bson::Type::Datetime:
+            m_type = int(type_Timestamp) + 1;
+            date_val = Timestamp(value);
+            break;
+        case bson::Bson::Type::ObjectId:
+            m_type = int(type_ObjectId) + 1;
+            id_val = ObjectId(value);
+            break;
+        case bson::Bson::Type::Decimal128:
+            m_type = int(type_Decimal) + 1;
+            decimal_val = Decimal128(value);
+            break;
+        case bson::Bson::Type::Uuid:
+            m_type = int(type_UUID) + 1;
+            uuid_val = UUID(value);
+            break;
+        case bson::Bson::Type::Document:
+            m_type = int(CollectionType::Dictionary) + 1;
+            int_val = 0;
+            break;
+        case bson::Bson::Type::Array:
+            m_type = int(CollectionType::List) + 1;
+            int_val = 0;
+            break;
+        default:
+            throw Exception(ErrorCodes::Error::MalformedJson, "Unsupported Bson Type");
+    }
+}
+
 Mixed::Mixed(const Obj& obj) noexcept
     : Mixed(ObjLink(obj.get_table()->get_key(), obj.get_key()))
 {

@@ -5330,17 +5330,16 @@ TEST(Table_LoggingMutations)
     {
         auto wt = db->start_write();
 
+        auto b = wt->add_table_with_primary_key("bar", type_Int, "id");
         auto t = wt->add_table_with_primary_key("foo", type_Int, "id");
         col = t->add_column(type_Mixed, "any");
         col_int = t->add_column(type_Int, "int");
+        t->add_column(*b, "link");
 
-        auto dict =
-            t->create_object_with_primary_key(1).set_collection(col, CollectionType::Dictionary).get_dictionary(col);
-        dict.insert("hello", "world");
-
-        auto list =
-            t->create_object_with_primary_key(2).set_collection(col, CollectionType::List).get_list<Mixed>(col);
-        list.add(47.50);
+        b->create_object_with_primary_key(7);
+        t->create_object(R"({"id": 1, "any": {"hello": "world"}})");
+        t->create_object(R"({"id": 2, "any": [47.5]})");
+        t->create_object(R"({"id": 3, "link": 7, "int": 8})");
 
         std::vector<char> str_data(90);
         std::iota(str_data.begin(), str_data.end(), ' ');
@@ -5369,7 +5368,9 @@ TEST(Table_LoggingMutations)
     CHECK(str.find("2023-09-20 10:53:35") != std::string::npos);
     CHECK(str.find("VIEW { 5 element(s) }") != std::string::npos);
     CHECK(str.find("Set 'any' to dictionary") != std::string::npos);
+    CHECK(str.find("\"world\" in ['any'] at position \"hello\"") != std::string::npos);
     CHECK(str.find("Set 'any' to list") != std::string::npos);
+    CHECK(str.find("primary key 7 from 'link'") != std::string::npos);
 }
 
 #endif // TEST_TABLE

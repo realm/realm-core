@@ -2373,6 +2373,74 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     return *this;
 }
 
+Obj& Obj::set(ColKey col_key, const bson::Bson& value)
+{
+    if (value.type() == bson::Bson::Type::Document) {
+        const bson::BsonDocument& document = static_cast<const bson::BsonDocument&>(value);
+        if (col_key.get_type() == col_type_Link) {
+            auto target_table = m_table->get_opposite_table(col_key);
+            if (target_table->is_embedded()) {
+                Obj obj = create_and_set_linked_object(col_key);
+                obj.set(document);
+            }
+            else {
+                auto obj = target_table->create_object(document);
+                set(col_key, obj.get_key());
+            }
+        }
+        else {
+            if (!col_key.is_dictionary()) {
+                if (col_key.get_type() != col_type_Mixed) {
+                    throw InvalidArgument(
+                        util::format("Property '%1' not a dictionary", m_table->get_column_name(col_key)));
+                }
+                set_collection(col_key, CollectionType::Dictionary);
+            }
+            auto dict = get_dictionary(col_key);
+            dict.set(document);
+        }
+    }
+    else if (value.type() == bson::Bson::Type::Array) {
+        if (!col_key.is_list()) {
+            if (col_key.get_type() != col_type_Mixed) {
+                throw InvalidArgument(util::format("Property '%1' not a list", m_table->get_column_name(col_key)));
+            }
+            set_collection(col_key, CollectionType::List);
+        }
+        get_listbase_ptr(col_key)->set(static_cast<const bson::BsonArray&>(value));
+    }
+    else {
+        if (col_key.get_type() == col_type_Link) {
+            auto target_table = m_table->get_opposite_table(col_key);
+            set(col_key, target_table->get_objkey_from_primary_key(Mixed(value)));
+        }
+        else {
+            set_any(col_key, Mixed(value));
+        }
+    }
+    return *this;
+}
+
+Obj& Obj::set(const bson::BsonDocument& document)
+{
+    auto primary_key_col = m_table->get_primary_key_column();
+    for (const auto& [key, value] : document) {
+        auto col_key = get_column_key(key);
+        if (!col_key) {
+            throw InvalidArgument(util::format("Invalid property '%1'", key));
+        }
+        if (col_key != primary_key_col) {
+            set(col_key, value);
+        }
+    }
+
+    return *this;
+}
+
+Obj& Obj::set_json(ColKey col_key, std::string_view json)
+{
+    return set(col_key, bson::parse(json));
+}
 
 ColKey Obj::spec_ndx2colkey(size_t col_ndx)
 {

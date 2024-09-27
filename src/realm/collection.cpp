@@ -263,4 +263,18 @@ void CollectionBase::out_of_bounds(const char* msg, size_t index, size_t size) c
                       index, size);
 }
 
+ObjLink CollectionBase::get_link(const bson::BsonDocument& document)
+{
+    auto val = document.find("$link");
+    if (val) {
+        auto sub_doc = static_cast<const bson::BsonDocument&>(*val);
+        std::string table_name = static_cast<const std::string&>(sub_doc["table"]);
+        Mixed pk(sub_doc["key"]);
+        Group::TableNameBuffer buffer;
+        auto table = get_table()->get_parent_group()->get_table(Group::class_name_to_table_name(table_name, buffer));
+        return {table->get_key(), table->get_objkey_from_primary_key(pk)};
+    }
+    return {};
+}
+
 } // namespace realm

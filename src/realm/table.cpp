@@ -2286,6 +2286,37 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     }
 }
 
+Obj Table::create_object(const bson::BsonDocument& document)
+{
+    REALM_ASSERT(m_primary_key_col);
+    Mixed pk;
+    FieldValues primitive_values;
+    bson::BsonDocument collection_values;
+    for (auto [key, val] : document) {
+        auto col = get_column_key(StringData(key));
+        if (col == m_primary_key_col) {
+            pk = val;
+        }
+        else if (val.type() == bson::Bson::Type::Array ||
+                 val.type() == bson::Bson::Type::Document || col.get_type() == col_type_Link) {
+            collection_values[key] = val;
+        }
+        else {
+            primitive_values.insert(col, val);
+        }
+    }
+    Obj obj = create_object_with_primary_key(pk, std::move(primitive_values));
+    if (!collection_values.empty()) {
+        obj.set(collection_values);
+    }
+    return obj;
+}
+
+Obj Table::create_object(std::string_view json_string)
+{
+    return create_object(static_cast<const bson::BsonDocument&>(bson::parse(json_string)));
+}
+
 Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, UpdateMode mode,
                                           bool* did_create)
 {

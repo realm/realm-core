@@ -269,6 +269,7 @@ protected:
     }
     void out_of_bounds(const char* msg, size_t index, size_t size) const;
     static UpdateStatus do_init_from_parent(BPlusTreeBase* tree, ref_type ref, bool allow_create);
+    ObjLink get_link(const bson::BsonDocument& document);
 };
 
 inline std::string_view collection_type_name(CollectionType col_type, bool uppercase = false)

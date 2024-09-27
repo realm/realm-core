@@ -46,6 +46,9 @@ enum JSONOutputMode {
     output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
 };
 using ref_type = size_t;
+namespace bson {
+class Bson;
+}
 
 /// This class represents a polymorphic Realm value.
 ///
@@ -159,6 +162,7 @@ public:
     Mixed(Geospatial*) noexcept;
 #endif
 
+    Mixed(const bson::Bson&);
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
     Mixed(char* c_str) noexcept

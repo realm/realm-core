@@ -23,6 +23,7 @@
 #include <realm/collection_parent.hpp>
 #include <realm/mixed.hpp>
 #include "realm/column_type_traits.hpp"
+#include "realm/util/bson/bson.hpp"
 
 #include <map>
 
@@ -204,7 +205,9 @@ public:
     {
         return set_null(get_column_key(col_name), is_default);
     }
-    Obj& set_json(ColKey col_key, StringData json);
+    Obj& set_json(ColKey col_key, std::string_view json);
+    Obj& set(ColKey col_key, const bson::Bson& value);
+    Obj& set(const bson::BsonDocument&);
 
     Obj& add_int(ColKey col_key, int64_t value);
     Obj& add_int(StringData col_name, int64_t value)
