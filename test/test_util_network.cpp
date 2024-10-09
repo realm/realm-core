@@ -1998,10 +1998,10 @@ TEST(Sync_Trigger_Basics)
 
     // Check that triggering works
     bool was_triggered = false;
-    auto func = [&](realm::Status) {
+    auto func = [&] {
         was_triggered = true;
     };
-    Trigger<network::Service> trigger(&service, std::move(func));
+    Trigger<network::Service> trigger(service, std::move(func));
     trigger.trigger();
     service.run();
     CHECK(was_triggered);
@@ -2020,7 +2020,7 @@ TEST(Sync_Trigger_Basics)
 
     // Check that retriggering from triggered function works
     realm::util::UniqueFunction<void()> func_2;
-    Trigger<network::Service> trigger_2(&service, [&](realm::Status) {
+    Trigger<network::Service> trigger_2(service, [&] {
         func_2();
     });
     was_triggered = false;
@@ -2042,10 +2042,10 @@ TEST(Sync_Trigger_Basics)
     // object
     was_triggered = false;
     {
-        auto func_3 = [&](realm::Status) {
+        auto func_3 = [&] {
             was_triggered = true;
         };
-        Trigger<network::Service> trigger_3(&service, std::move(func_3));
+        Trigger<network::Service> trigger_3(service, std::move(func_3));
         trigger_3.trigger();
     }
     service.run();
@@ -2054,14 +2054,14 @@ TEST(Sync_Trigger_Basics)
     // Check that two functions can be triggered in an overlapping fashion
     bool was_triggered_4 = false;
     bool was_triggered_5 = false;
-    auto func_4 = [&](realm::Status) {
+    auto func_4 = [&] {
         was_triggered_4 = true;
     };
-    auto func_5 = [&](realm::Status) {
+    auto func_5 = [&] {
         was_triggered_5 = true;
     };
-    Trigger<network::Service> trigger_4(&service, std::move(func_4));
-    Trigger<network::Service> trigger_5(&service, std::move(func_5));
+    Trigger<network::Service> trigger_4(service, std::move(func_4));
+    Trigger<network::Service> trigger_5(service, std::move(func_5));
     trigger_4.trigger();
     trigger_5.trigger();
     service.run();
@@ -2077,12 +2077,12 @@ TEST(Sync_Trigger_ThreadSafety)
     keep_alive.async_wait(std::chrono::hours(10000), [](Status) {});
     long n_1 = 0, n_2 = 0;
     std::atomic<bool> flag{false};
-    auto func = [&](realm::Status) {
+    auto func = [&] {
         ++n_1;
         if (flag)
             ++n_2;
     };
-    Trigger<network::Service> trigger(&service, std::move(func));
+    Trigger<network::Service> trigger(service, std::move(func));
     ThreadWrapper thread;
     thread.start([&] {
         service.run();
