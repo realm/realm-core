@@ -655,6 +655,7 @@ private:
     void open_new_realm() REQUIRES(!m_mutex);
     void wait_for_upload(std::shared_ptr<SyncSession>) REQUIRES(m_mutex);
     void scan_for_realms_to_upload() REQUIRES(!m_mutex);
+    bool clean_up_backup(const std::string& file_name);
     std::string prefixed_partition(std::string const& partition);
 };
 
@@ -814,6 +815,8 @@ void AuditRealmPool::scan_for_realms_to_upload()
     while (dir.next(file_name)) {
         if (!StringData(file_name).ends_with(".realm"))
             continue;
+        if (clean_up_backup(file_name))
+            continue;
 
         std::string path = m_path_root + file_name;
         if (m_open_paths.count(path)) {
@@ -844,6 +847,37 @@ void AuditRealmPool::scan_for_realms_to_upload()
     // Did not find any files needing to be uploaded, so wake up anyone sitting
     // in wait_for_uploads()
     m_cv.notify_all();
+}
+
+bool AuditRealmPool::clean_up_backup(const std::string& file_name)
+{
+    auto pos = file_name.find(".backup.");
+    if (pos == std::string::npos)
+        return false;
+
+    auto base_name = StringData(file_name.c_str(), file_name.find('.'));
+    auto base_realm_path = util::format("%1%2.realm", m_path_root, base_name);
+
+    // If the file which this was a backup of no longer exists we no longer need
+    // the backup, and the backup won't be cleaned up by the normal code path as
+    // that happens when the base file is opened.
+    if (!util::File::exists(base_realm_path)) {
+        auto path = m_path_root + file_name;
+        m_logger->info("Events: Removing stale backup of uploaded file at '%1'", path);
+        util::File::remove(path);
+        return true;
+    }
+
+    pos = file_name.find(".backup.", pos + 1);
+    if (pos == std::string::npos)
+        return true;
+
+    // .backup appears multiple times, so this was a backup of a backup and
+    // should be removed even though the base Realm still exists
+    auto path = m_path_root + file_name;
+    m_logger->info("Events: Removing backup of a backup at '%1'", path);
+    util::File::remove(path);
+    return true;
 }
 
 void AuditRealmPool::open_new_realm()

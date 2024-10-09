@@ -34,7 +34,7 @@ public:
     void restore_from_backup();
     void cleanup_backups();
     void backup_realm_if_needed(int current_file_format_version, int target_file_format_version);
-    std::string get_prefix();
+    std::string get_prefix() const;
 
     static std::string get_prefix_from_path(const std::string& path);
     // default lists of accepted versions and backups to delete when they get old enough

@@ -1542,7 +1542,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     std::string file_name;
     util::DirScanner dir(root);
     size_t file_count = 0;
-    size_t unlocked_file_count = 0;
+    std::vector<std::string> unlocked_files;
     while (dir.next(file_name)) {
         if (!StringData(file_name).ends_with(".realm"))
             continue;
@@ -1551,7 +1551,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         // than it. 1 MB errs on the side of never getting spurious failures.
         REQUIRE(util::File::get_size_static(root + "/" + file_name) < 1024 * 1024);
         if (DB::call_with_lock(root + "/" + file_name, [](auto&) {})) {
-            ++unlocked_file_count;
+            unlocked_files.push_back(file_name);
         }
     }
     // The exact number of shards is fuzzy due to the combination of the
@@ -1561,7 +1561,16 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     // There should be exactly two files open still: the one we're currently
     // writing to, and the first one which we wrote and are waiting for the
     // upload to complete.
-    REQUIRE(unlocked_file_count == file_count - 2);
+    REQUIRE(unlocked_files.size() == file_count - 2);
+
+    // Create a backup copy of each of the unlocked files which should be cleaned up
+    for (auto& file : unlocked_files) {
+        BackupHandler handler(root + "/" + file, {}, {});
+        handler.backup_realm_if_needed(23, 24);
+        // Set the version field in the backup file to 23 so that opening it
+        // won't accidentally work
+        util::File(handler.get_prefix() + "v23.backup.realm", util::File::mode_Update).write(12, "\x17");
+    }
 
     auto get_sorted_events = [&] {
         auto events = get_audit_events(test_session, false);
