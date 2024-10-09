@@ -117,4 +117,24 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
         REQUIRE(listener1_call_cnt == 1); // Only called once before unregister
         REQUIRE(listener2_called);
     }
+
+    SECTION("Callback not invoked when SyncSession is detached from SyncManager") {
+        auto session = sync_session(
+            user, "/connection-state-changes-1", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
+
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
+        EventLoop::main().run_until([&] {
+            return sessions_are_connected(*session);
+        });
+
+        bool listener_called = false;
+        session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+            listener_called = true;
+        });
+
+        session->detach_from_sync_manager();
+        REQUIRE_FALSE(listener_called);
+    }
 }
