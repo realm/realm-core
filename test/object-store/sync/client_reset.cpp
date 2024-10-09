@@ -204,7 +204,8 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
     REQUIRE(expected_obj_ids == found_object_ids);
 }
 
-TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[sync][pbs][client reset][baas]") {
+TEST_CASE("sync: pending client resets are cleared immediately when there's nothing to recover",
+          "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -718,12 +719,10 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                     Property::IsPrimary{true}};
             const std::string table_name = "new table";
             const std::string prop_name = "new_property";
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
+            std::optional<SyncError> err;
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
+                ->expect_reset_error(err)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -749,14 +748,11 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         0, nullptr, nullptr, true);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
-                    util::EventLoop::main().run_until([&] {
-                        return bool(err);
-                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
             REQUIRE(err);
-            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(err->is_client_reset_requested());
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
@@ -1107,10 +1103,6 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("invalid files at the fresh copy path are cleaned up") {
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
             std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             {
                 util::File f(fresh_path, util::File::Mode::mode_Write);
@@ -1118,31 +1110,20 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             }
 
             make_reset(local_config, remote_config)->run();
-            REQUIRE(!err);
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
         SECTION("failing to download a fresh copy results in an error") {
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
             std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             // create a non-empty directory that we'll fail to delete
             util::make_dir(fresh_path);
             util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
 
-            REQUIRE(!err);
-            make_reset(local_config, remote_config)
-                ->on_post_reset([&](SharedRealm) {
-                    util::EventLoop::main().run_until([&] {
-                        return bool(err);
-                    });
-                })
-                ->run();
+            std::optional<SyncError> err;
+            make_reset(local_config, remote_config)->expect_reset_error(err)->run();
             REQUIRE(err);
-            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(err->is_client_reset_requested());
         }
 
         SECTION("should honor encryption key for downloaded Realm") {
@@ -1290,12 +1271,10 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("extra local table creates a client reset error") {
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
+            std::optional<SyncError> err;
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
+                ->expect_reset_error(err)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1310,25 +1289,20 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     create_object(*local, "object2", ObjectId::gen(), partition);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
-                    util::EventLoop::main().run_until([&] {
-                        return bool(err);
-                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
             REQUIRE(err);
-            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(err->is_client_reset_requested());
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
 
         SECTION("extra local column creates a client reset error") {
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
+            std::optional<SyncError> err;
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
+                ->expect_reset_error(err)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1346,15 +1320,12 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     table->begin()->set(table->get_column_key("value2"), 123);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
-                    util::EventLoop::main().run_until([&] {
-                        return bool(err);
-                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
 
             REQUIRE(err);
-            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(err->is_client_reset_requested());
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
@@ -1407,12 +1378,10 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("incompatible schema changes in remote and local transactions") {
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
+            std::optional<SyncError> err;
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
+                ->expect_reset_error(err)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1438,24 +1407,18 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         0, nullptr, nullptr, true);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
-                    util::EventLoop::main().run_until([&] {
-                        return bool(err);
-                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
             REQUIRE(err);
-            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(err->is_client_reset_requested());
         }
 
         SECTION("primary key type cannot be changed") {
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
-
+            std::optional<SyncError> err;
             make_reset(local_config, remote_config)
                 ->set_development_mode(true)
+                ->expect_reset_error(err)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1479,14 +1442,11 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                         0, nullptr, nullptr, true);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
-                    util::EventLoop::main().run_until([&] {
-                        return bool(err);
-                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
             REQUIRE(err);
-            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(err->is_client_reset_requested());
         }
 
         SECTION("list operations") {
@@ -1681,15 +1641,8 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
     SECTION("cycle detection") {
         auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<sync::PendingReset> {
-            auto db = TestHelper::get_db(realm);
-            auto rd_tr = db->start_frozen();
-            return sync::PendingResetStore::has_pending_reset(*rd_tr);
-        };
-        auto logger = util::Logger::get_default_logger();
-        ThreadSafeSyncError err;
-        local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            logger->error("Detected cycle detection error: %1", error.status);
-            err = error;
+            realm->refresh();
+            return sync::PendingResetStore::has_pending_reset(realm->read_group());
         };
         auto make_fake_previous_reset = [&local_config](ClientResyncMode mode,
                                                         sync::ProtocolErrorInfo::Action action =
@@ -1702,7 +1655,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 wr_tr->commit();
             };
         };
-        SECTION("a normal reset adds and removes a cycle detection flag") {
+        SECTION("a successful reset adds and removes a cycle detection flag") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             local_config.sync_config->notify_before_client_reset = [&](SharedRealm realm) {
                 REQUIRE_FALSE(has_reset_cycle_flag(realm));
@@ -1713,7 +1666,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                                                                       bool did_recover) {
                 SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref), util::Scheduler::make_dummy());
                 auto flag = has_reset_cycle_flag(realm);
-                REQUIRE(bool(flag));
+                REQUIRE(flag);
                 REQUIRE(flag->mode == ClientResyncMode::Recover);
                 REQUIRE(did_recover);
                 std::lock_guard lock(mtx);
@@ -1724,19 +1677,21 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     REQUIRE_FALSE(has_reset_cycle_flag(realm));
                 })
                 ->run();
-            REQUIRE(!err);
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
-        SECTION("a failed reset leaves a cycle detection flag") {
+        SECTION("failed recovery leaves a cycle detection flag") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            std::optional<SyncError> error;
             make_reset(local_config, remote_config)
                 ->make_local_changes([](SharedRealm realm) {
                     auto table = realm->read_group().get_table("class_object");
                     table->remove_column(table->add_column(type_Int, "new col"));
                 })
+                ->expect_reset_error(error)
                 ->run();
+            REQUIRE(error);
             local_config.sync_config.reset();
             local_config.force_sync_history = true;
             auto realm = Realm::get_shared_realm(local_config);
@@ -1745,42 +1700,30 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             CHECK(flag->mode == ClientResyncMode::Recover);
         }
 
-        SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {
-            local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-            make_fake_previous_reset(ClientResyncMode::DiscardLocal);
-            make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
-            REQUIRE(err.value()->is_client_reset_requested());
+        SECTION("failed discard leaves a cycle detection flag") {
+            // DiscardLocal can only fail due to resource exhaustion, an internal
+            // bug, or the process being killed, so there isn't a clear way to test this
         }
+
+        SECTION("a previous failed discard reset is detected and generates an error") {
+            local_config.sync_config->client_resync_mode = GENERATE(
+                ClientResyncMode::DiscardLocal, ClientResyncMode::Recover, ClientResyncMode::RecoverOrDiscard);
+            make_fake_previous_reset(ClientResyncMode::DiscardLocal);
+            std::optional<SyncError> error;
+            make_reset(local_config, remote_config)->expect_reset_error(error)->run();
+            REQUIRE(error);
+            REQUIRE(error->is_client_reset_requested());
+        }
+
         SECTION("In Recover mode: a previous failed recover reset is detected and generates an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
-            REQUIRE(err.value()->is_client_reset_requested());
+            std::optional<SyncError> error;
+            make_reset(local_config, remote_config)->expect_reset_error(error)->run();
+            REQUIRE(error);
+            REQUIRE(error->is_client_reset_requested());
         }
-        SECTION("In Recover mode: a previous failed discard reset is detected and generates an error") {
-            local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
-            make_fake_previous_reset(ClientResyncMode::DiscardLocal);
-            make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
-            REQUIRE(err.value()->is_client_reset_requested());
-        }
-        SECTION("In RecoverOrDiscard mode: a previous failed discard reset is detected and generates an error") {
-            local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
-            make_fake_previous_reset(ClientResyncMode::DiscardLocal);
-            make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
-            REQUIRE(err.value()->is_client_reset_requested());
-        }
+
         const ObjectId added_pk = ObjectId::gen();
         auto has_added_object = [&](SharedRealm realm) -> bool {
             REQUIRE_NOTHROW(realm->refresh());
@@ -1789,9 +1732,11 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             ObjKey key = table->find_primary_key(added_pk);
             return !!key;
         };
-        SECTION(
-            "In RecoverOrDiscard mode: a previous failed recovery is detected and triggers a DiscardLocal reset") {
-            local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+
+        SECTION("In DiscardLocal or RecoverOrDiscard mode: a previous failed recovery is detected and triggers a "
+                "DiscardLocal reset") {
+            local_config.sync_config->client_resync_mode =
+                GENERATE(ClientResyncMode::RecoverOrDiscard, ClientResyncMode::DiscardLocal);
             make_fake_previous_reset(ClientResyncMode::Recover);
             local_config.sync_config->notify_after_client_reset =
                 [&](SharedRealm before, ThreadSafeReference after_ref, bool did_recover) {
@@ -1800,8 +1745,6 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     REQUIRE(!did_recover);
                     REQUIRE(has_added_object(before));
                     REQUIRE(!has_added_object(after)); // discarded insert due to fallback to DiscardLocal mode
-                    std::lock_guard<std::mutex> lock(mtx);
-                    ++after_callback_invocations;
                 };
             make_reset(local_config, remote_config)
                 ->make_local_changes([&](SharedRealm realm) {
@@ -1810,43 +1753,9 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     create_object(*realm, "object", {added_pk}, partition);
                 })
                 ->run();
-            timed_sleeping_wait_for(
-                [&]() -> bool {
-                    std::lock_guard<std::mutex> lock(mtx);
-                    return after_callback_invocations > 0 || err;
-                },
-                std::chrono::seconds(120));
-            REQUIRE(!err);
-        }
-        SECTION("In DiscardLocal mode: a previous failed recovery does not cause an error") {
-            local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-            make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset =
-                [&](SharedRealm before, ThreadSafeReference after_ref, bool did_recover) {
-                    SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_dummy());
-
-                    REQUIRE(!did_recover);
-                    REQUIRE(has_added_object(before));
-                    REQUIRE(!has_added_object(after)); // not recovered
-                    std::lock_guard<std::mutex> lock(mtx);
-                    ++after_callback_invocations;
-                };
-            make_reset(local_config, remote_config)
-                ->make_local_changes([&](SharedRealm realm) {
-                    auto table = get_table(*realm, "object");
-                    REQUIRE(table);
-                    create_object(*realm, "object", {added_pk}, partition);
-                })
-                ->run();
-            timed_sleeping_wait_for(
-                [&]() -> bool {
-                    std::lock_guard<std::mutex> lock(mtx);
-                    return after_callback_invocations > 0 || err;
-                },
-                std::chrono::seconds(120));
-            REQUIRE(!err);
         }
     } // end cycle detection
+
     SECTION("The server can prohibit recovery") {
         const realm::AppSession& app_session = test_app_session.app_session();
         auto sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
@@ -1860,19 +1769,10 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
         SECTION("In Recover mode, a manual client reset is triggered") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
-            ThreadSafeSyncError err;
-            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                err = error;
-            };
-            make_reset(local_config, remote_config)
-                ->on_post_reset([&](SharedRealm) {
-                    util::EventLoop::main().run_until([&] {
-                        return bool(err);
-                    });
-                })
-                ->run();
+            std::optional<SyncError> err;
+            make_reset(local_config, remote_config)->expect_reset_error(err)->run();
             REQUIRE(err);
-            SyncError error = *err.value();
+            SyncError error = *err;
             REQUIRE(error.is_client_reset_requested());
             REQUIRE(error.user_info.size() >= 2);
             REQUIRE(error.user_info.count(SyncError::c_original_file_path_key) == 1);

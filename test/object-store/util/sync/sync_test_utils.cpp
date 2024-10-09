@@ -308,6 +308,9 @@ StatusWith<std::shared_ptr<Realm>> async_open_realm(const Realm::Config& config)
 std::shared_ptr<Realm> successfully_async_open_realm(const Realm::Config& config)
 {
     auto status = async_open_realm(config);
+    if (!status.is_ok()) {
+        FAIL(status.get_status().reason());
+    }
     REQUIRE(status.is_ok());
     return status.get_value();
 }
@@ -386,7 +389,7 @@ struct FakeLocalClientReset : public TestClientReset {
             progress.upload.client_version = current_version;
             progress.upload.last_integrated_server_version = current_version;
             sync::VersionInfo info_out;
-            history_local->set_sync_progress(progress, 0, info_out);
+            history_local->set_sync_progress(progress, 0, info_out, *util::Logger::get_default_logger());
         }
         {
             local_realm->begin_transaction();
@@ -573,8 +576,16 @@ struct BaasClientReset : public TestClientReset {
             },
             std::chrono::seconds(30), std::chrono::seconds(1));
 
+        std::atomic<bool> got_error{false};
+        if (m_error) {
+            m_local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                *m_error = error;
+                got_error = true;
+            };
+        }
+
         auto realm = Realm::get_shared_realm(m_local_config);
-        auto session = sync_manager->get_existing_session(realm->config().path);
+        auto session = realm->sync_session();
         const std::string object_schema_name = "object";
         {
             wait_for_download(*realm);
@@ -652,10 +663,14 @@ struct BaasClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
-        if (!m_wait_for_reset_completion) {
-            return;
+        if (m_error) {
+            timed_wait_for([&] {
+                return got_error.load();
+            });
         }
-        wait_for_upload(*realm);
+        else if (m_wait_for_reset_completion) {
+            wait_for_upload(*realm);
+        }
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }
@@ -687,6 +702,14 @@ struct BaasFLXClientReset : public TestClientReset {
     {
         m_did_run = true;
         const AppSession& app_session = m_test_app_session.app_session();
+
+        std::atomic<bool> got_error{false};
+        if (m_error) {
+            m_local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                *m_error = error;
+                got_error = true;
+            };
+        }
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = realm->sync_session();
@@ -750,7 +773,14 @@ struct BaasFLXClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
-        wait_for_download(*realm);
+        if (m_error) {
+            timed_wait_for([&] {
+                return got_error.load();
+            });
+        }
+        else if (m_wait_for_reset_completion) {
+            wait_for_upload(*realm);
+        }
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }
@@ -873,9 +903,16 @@ ObjectId TestClientReset::get_pk_of_object_driving_reset() const
     return m_pk_driving_reset;
 }
 
-void TestClientReset::disable_wait_for_reset_completion()
+TestClientReset* TestClientReset::disable_wait_for_reset_completion()
 {
     m_wait_for_reset_completion = false;
+    return this;
+}
+
+TestClientReset* TestClientReset::expect_reset_error(std::optional<SyncError>& err)
+{
+    m_error = &err;
+    return this;
 }
 
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
