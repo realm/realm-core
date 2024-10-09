@@ -128,6 +128,9 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::schema_version_changed:
             return "Client opened a session with a new valid schema version - migrating client to use new schema "
                    "version (BIND)";
+        case ProtocolError::schema_version_force_upgrade:
+            return "Server has forcefully bumped client's schema version because it does not support schema "
+                   "versioning";
     }
     return nullptr;
 }
@@ -222,6 +225,8 @@ Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
             case ProtocolError::bad_schema_version:
                 [[fallthrough]];
             case ProtocolError::schema_version_changed:
+                [[fallthrough]];
+            case ProtocolError::schema_version_force_upgrade:
                 return ErrorCodes::SyncSchemaMigrationError;
 
             case ProtocolError::limits_exceeded:
