@@ -66,6 +66,7 @@
 
 ### Internals
 * Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
+* Added test to verify upload progress notification reporting during a client reset. [PR #7958](https://github.com/realm/realm-core/pull/7958)
 
 ----------------------------------------------
 
