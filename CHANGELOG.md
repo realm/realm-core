@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 14.13.1 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * The events library would attempt to upload backup files created as part of file format upgrades, causing backup copies of those backups to be made, looping until the maximum file name size was reached ([#8040](https://github.com/realm/realm-core/issues/8040), since v11.17.0).
 
 ### Breaking changes
