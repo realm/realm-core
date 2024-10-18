@@ -19,6 +19,7 @@
 #ifndef REALM_OS_UTIL_EVENT_LOOP_DISPATCHER_HPP
 #define REALM_OS_UTIL_EVENT_LOOP_DISPATCHER_HPP
 
+#include <memory>
 #include <realm/object-store/util/scheduler.hpp>
 
 #include <tuple>
@@ -35,11 +36,13 @@ class EventLoopDispatcher<void(Args...)> {
 
 private:
     const std::shared_ptr<util::UniqueFunction<void(Args...)>> m_func;
-    const std::shared_ptr<util::Scheduler> m_scheduler = util::Scheduler::make_default();
+    const std::shared_ptr<util::Scheduler> m_scheduler;
 
 public:
-    EventLoopDispatcher(util::UniqueFunction<void(Args...)> func)
+    EventLoopDispatcher(util::UniqueFunction<void(Args...)> func,
+                        std::shared_ptr<util::Scheduler> scheduler = util::Scheduler::make_default())
         : m_func(std::make_shared<util::UniqueFunction<void(Args...)>>(std::move(func)))
+        , m_scheduler(scheduler)
     {
     }
 
@@ -93,11 +96,11 @@ struct ExtractSignatureImpl<void (T::*)(Args...) const noexcept> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...)& noexcept> {
+struct ExtractSignatureImpl<void (T::*)(Args...) & noexcept> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) const& noexcept> {
+struct ExtractSignatureImpl<void (T::*)(Args...) const & noexcept> {
     using signature = void(Args...);
 };
 // Note: no && specializations since util::UniqueFunction doesn't support them, so you can't construct an
@@ -112,11 +115,15 @@ namespace util {
 // Deduction guide for function pointers.
 template <typename... Args>
 EventLoopDispatcher(void (*)(Args...)) -> EventLoopDispatcher<void(Args...)>;
+template <typename... Args>
+EventLoopDispatcher(void (*)(Args...), std::shared_ptr<Scheduler>) -> EventLoopDispatcher<void(Args...)>;
 
 // Deduction guide for callable objects, such as lambdas. Only supports types with a non-overloaded, non-templated
 // call operator, so no polymorphic (auto argument) lambdas.
 template <typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
 EventLoopDispatcher(const T&) -> EventLoopDispatcher<Sig>;
+template <typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
+EventLoopDispatcher(const T&, std::shared_ptr<Scheduler>) -> EventLoopDispatcher<Sig>;
 
 
 } // namespace util

@@ -352,12 +352,12 @@ private:
 };
 
 template <typename F>
-auto schedulerWrapBlockingFunction(F&& f)
+auto schedulerWrapBlockingFunction(F&& f,
+                                   std::shared_ptr<util::Scheduler> scheduler = util::Scheduler::make_default())
 {
-    return [f = FWD(f), sched = util::Scheduler::make_default()](
-               auto&&... args) -> std::decay_t<std::invoke_result_t<F, decltype(args)...>> {
+    return [f = FWD(f), scheduler](auto&&... args) -> std::decay_t<std::invoke_result_t<F, decltype(args)...>> {
         using Ret = std::decay_t<std::invoke_result_t<F, decltype(args)...>>;
-        if (sched->is_on_thread())
+        if (scheduler->is_on_thread())
             return f(FWD(args)...);
 
         // TODO in C++20, can use std::atomic<bool>::wait() and notify() rather than mutex and condvar.
@@ -366,7 +366,7 @@ auto schedulerWrapBlockingFunction(F&& f)
         std::optional<Ret> ret;
         std::exception_ptr ex;
 
-        sched->invoke([&]() noexcept {
+        scheduler->invoke([&]() noexcept {
             auto lk = std::lock_guard(mx);
             try {
                 ret.emplace(f(FWD(args)...));
