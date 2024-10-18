@@ -376,8 +376,9 @@ TestAppSession::TestAppSession(AppSession session, Config config, DeleteApp dele
 
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
 
-    // initialize sync client
+    // initialize sync client and save a local copy of the logger
     m_app->sync_manager()->get_sync_client();
+    m_logger = m_app->sync_manager()->get_logger();
     // If no user creds are supplied, then create the user and log in
     if (!m_config.user_creds) {
         auto result = create_user_and_log_in();
@@ -419,11 +420,15 @@ StatusWith<realm::app::AppCredentials> TestAppSession::create_user_and_log_in()
         [this, &creds, promise = util::CopyablePromiseHolder<void>(std::move(pf.promise))](
             util::Optional<app::AppError> error) mutable {
             if (error) {
+                if (m_logger)
+                    m_logger->error("Failed to create user: %1", error->to_status());
                 promise.get_promise().set_error(error->to_status());
                 return;
             }
             auto result = log_in_user(creds);
             if (!result.is_ok()) {
+                if (m_logger)
+                    m_logger->error("User login failed: %1", result.get_status());
                 promise.get_promise().set_error(result.get_status());
                 return;
             }

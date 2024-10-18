@@ -18,6 +18,7 @@
 
 #include "collection_fixtures.hpp"
 #include "util/sync/baas_admin_api.hpp"
+#include "util/sync/redirect_server.hpp"
 #include "util/sync/sync_test_utils.hpp"
 #include "util/test_path.hpp"
 #include "util/unit_test_transport.hpp"
@@ -3248,6 +3249,237 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
+TEST_CASE("app: network transport handles redirection", "[sync][app][baas]") {
+    auto logger = util::Logger::get_default_logger();
+    auto redirector = sync::RedirectingHttpServer(get_real_base_url(), logger);
+
+    std::mutex counter_mutex;
+    int error_count = 0;
+    int location_count = 0;
+    int redirect_count = 0;
+    int wsredirect_count = 0;
+    using RedirectEvent = sync::RedirectingHttpServer::Event;
+    redirector.set_event_hook([&](RedirectEvent event, std::optional<std::string> message) {
+        std::lock_guard lk(counter_mutex);
+        switch (event) {
+            case RedirectEvent::location:
+                location_count++;
+                logger->trace("Redirector event: location - count: %1", location_count);
+                return;
+            case RedirectEvent::redirect:
+                redirect_count++;
+                logger->trace("Redirector event: redirect - count: %1", redirect_count);
+                return;
+            case RedirectEvent::ws_redirect:
+                wsredirect_count++;
+                logger->trace("Redirector event: ws_redirect - count: %1", wsredirect_count);
+                return;
+            case RedirectEvent::error:
+                error_count++;
+                logger->trace("Redirect server received error: %1", message.value_or("unknown error"));
+                return;
+        }
+    });
+
+    auto reset_counters = [&] {
+        std::lock_guard lk(counter_mutex);
+        error_count = 0;
+        location_count = 0;
+        redirect_count = 0;
+        wsredirect_count = 0;
+    };
+
+    auto check_counters = [&](int locations, int redirects, int wsredirects, int errors) {
+        std::lock_guard lk(counter_mutex);
+        REQUIRE(location_count == locations);
+        REQUIRE(redirect_count == redirects);
+        REQUIRE(wsredirect_count == wsredirects);
+        REQUIRE(error_count == errors);
+    };
+
+    // Make sure the location response points to the actual server
+    redirector.force_http_redirect(false);
+    redirector.force_websocket_redirect(false);
+
+    auto tas_config = TestAppSession::Config{};
+    tas_config.base_url = redirector.base_url();
+
+    // Since this test defines its own RedirectingHttpServer, the app session doesn't
+    // need to be retrieved at the beginning of the test to ensure the redirect server
+    // is initialized.
+    TestAppSession session{get_runtime_app_session(), tas_config, DeleteApp{false}};
+    auto app = session.app();
+
+    // We should have already requested the location when the user was logged in
+    // during the session constructor.
+    auto user1_a = app->current_user();
+    REQUIRE(user1_a);
+    // Expected location requested 1 time for the original location request,
+    // all others 0 since location request prior to login hits actual server
+    check_counters(1, 0, 0, 0);
+    REQUIRE(app->get_base_url() == redirector.base_url());
+    REQUIRE(app->get_host_url() == redirector.server_url());
+
+    SECTION("Appservices requests are redirected") {
+        // Switch the location to use the redirector's address for http requests which will
+        // return redirect responses to redirect the request to the actual server
+        redirector.force_http_redirect(true);
+        redirector.force_websocket_redirect(false);
+        reset_counters();
+        // Reset the location flag and the cached location info so the app will request
+        // the location from the original base URL again upon the next appservices request.
+        app->reset_location_for_testing();
+        // Email registration should complete successfully
+        AutoVerifiedEmailCredentials creds;
+        {
+            auto pf = util::make_promise_future<void>();
+            app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password,
+                [promise = util::CopyablePromiseHolder<void>(std::move(pf.promise))](
+                    util::Optional<app::AppError> error) mutable {
+                    if (error) {
+                        promise.get_promise().set_error(error->to_status());
+                        return;
+                    }
+                    promise.get_promise().emplace_value();
+                });
+            REQUIRE(pf.future.get_no_throw().is_ok());
+        }
+        // Login should fail since the profile request does not complete successfully due
+        // to the authorization headers being stripped from the redirected request
+        REQUIRE_FALSE(session.log_in_user(creds).is_ok());
+        // Since the login failed, the original user1 is still the App's current user
+        auto user1_b = app->current_user();
+        REQUIRE(user1_b->is_logged_in());
+        REQUIRE(user1_a == user1_b);
+        // Expected location requested 2 times: once for register and after first profile
+        // attempt fails; there are 4 redirects: register, login, get profile, and refresh
+        // token
+        check_counters(2, 4, 0, 0);
+        REQUIRE(app->get_base_url() == redirector.base_url());
+        REQUIRE(app->get_host_url() == redirector.base_url());
+
+        // Revert the location to point to the actual server's address so the login
+        // will complete successfully.
+        redirector.force_http_redirect(false);
+        redirector.force_websocket_redirect(false);
+        reset_counters();
+        // Log in will refresh the location prior to performing the login
+        auto result = session.log_in_user(creds);
+        REQUIRE(result.is_ok());
+        // Since the log in completed successfully, app's current user was updated to
+        // the new user.
+        auto user3 = result.get_value();
+        REQUIRE(user3);
+        REQUIRE(user3->is_logged_in());
+        REQUIRE(user3 == app->current_user());
+        REQUIRE(user3 != user1_b);
+        // Expected location requested 1 time for location after first profile attempt
+        // fails; and two redirects: login and the first profile attempt
+        check_counters(1, 2, 0, 0);
+        REQUIRE(app->get_base_url() == redirector.base_url());
+        REQUIRE(app->get_host_url() == redirector.server_url());
+    }
+
+    SECTION("Websocket connection returns redirection") {
+        auto get_dogs = [](SharedRealm r) -> Results {
+            wait_for_upload(*r, std::chrono::seconds(10));
+            wait_for_download(*r, std::chrono::seconds(10));
+            return Results(r, r->read_group().get_table("class_Dog"));
+        };
+
+        auto create_one_dog = [](SharedRealm r) {
+            r->begin_transaction();
+            CppContext c;
+            Object::create(c, r, "Dog",
+                           std::any(AnyDict{{"_id", std::any(ObjectId::gen())},
+                                            {"breed", std::string("bulldog")},
+                                            {"name", std::string("fido")}}),
+                           CreatePolicy::ForceCreate);
+            r->commit_transaction();
+        };
+
+        const auto schema = get_default_schema();
+        const auto partition = random_string(100);
+        // This websocket connection is not using redirection. Should connect
+        // directly to the actual server
+        {
+            reset_counters();
+            SyncTestFile config(user1_a, partition, schema);
+            auto r = Realm::get_shared_realm(config);
+            REQUIRE(get_dogs(r).size() == 0);
+            create_one_dog(r);
+            REQUIRE(get_dogs(r).size() == 1);
+            // The redirect server is not expected to be used...
+            check_counters(0, 0, 0, 0);
+        }
+        // Switch the location to use the redirector's address for websocket requests which will
+        // return the 4003 redirect close code, forcing app to update the location and refresh
+        // the access token.
+        redirector.force_websocket_redirect(true);
+        // Since app uses the hostname value returned from the last location response to create
+        // the server URL for requesting the location, the first location request (due to the
+        // location_updated flag being reset) needs to return the redirect server for both
+        // hostname and ws_hostname. When the location is requested a second time due to the
+        // login request, the location response should include the actual server for the
+        // hostname (so the login is successful) and the redirect server for the ws_hostname
+        // so the websocket initially connects to the redirect server.
+        redirector.force_http_redirect(true);
+        {
+            redirector.set_event_hook([&](RedirectEvent event, std::optional<std::string> message) {
+                std::lock_guard lk(counter_mutex);
+                switch (event) {
+                    case RedirectEvent::location:
+                        location_count++;
+                        logger->trace("Redirector event: location - count: %1", location_count);
+                        if (location_count == 1)
+                            // No longer sending redirect server as location hostname value
+                            redirector.force_http_redirect(false);
+                        return;
+                    case RedirectEvent::redirect:
+                        redirect_count++;
+                        logger->trace("Redirector event: redirect - count: %1", redirect_count);
+                        return;
+                    case RedirectEvent::ws_redirect:
+                        wsredirect_count++;
+                        logger->trace("Redirector event: ws_redirect - count: %1", wsredirect_count);
+                        return;
+                    case RedirectEvent::error:
+                        error_count++;
+                        logger->trace("Redirect server received error: %1", message.value_or("unknown error"));
+                        return;
+                }
+            });
+        }
+        {
+            reset_counters();
+            // Reset the location flag and the cached location info so the app will request
+            // the location from the original base URL again upon the next appservices request.
+            app->reset_location_for_testing();
+            // Create a new user and log in to update the location info
+            // and start with a new realm
+            auto result = session.create_user_and_log_in();
+            REQUIRE(result.is_ok());
+            // The location should have been requested twice; before register email and after
+            // first profile attempt fails; and three redirects: register email, login, and
+            // first profile attempt.
+            // NOTE: The ws_hostname still points to the redirect server
+            check_counters(2, 3, 0, 0);
+            reset_counters();
+            SyncTestFile config(app->current_user(), partition, schema);
+            auto r = Realm::get_shared_realm(config);
+            Results dogs = get_dogs(r);
+            REQUIRE(dogs.size() == 1);
+            REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
+            REQUIRE(dogs.get(0).get<String>("name") == "fido");
+            // The websocket should have redirected one time - the location update hits the
+            // actual server since the hostname points to its URL after the location update
+            // during user log in.
+            check_counters(0, 0, 1, 0);
+        }
+    }
+}
+
 TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
     class InMemoryLogger : public util::Logger {
     public:
@@ -5135,8 +5367,10 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     SECTION("refresh token ensure flow is correct") {
         /*
          Expected flow:
+         Location - first http request since app was just created
          Login - this gets access and refresh tokens
          Get profile - throw back a 401 error
+         Location - return location response
          Refresh token - get a new token for the user
          Get profile - get the profile with the new token
          */
@@ -5168,13 +5402,13 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                     }
                 }
                 else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-                    CHECK(state.get() == TestState::profile_1);
+                    CHECK(state.get() == TestState::location);
                     state.transition_to(TestState::refresh);
                     nlohmann::json json{{"access_token", good_access_token2}};
                     completion({200, 0, {}, json.dump()});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
-                    CHECK(state.get() == TestState::unknown);
+                    CHECK((state.get() == TestState::unknown || state.get() == TestState::profile_1));
                     state.transition_to(TestState::location);
                     CHECK(request.method == HttpMethod::get);
                     completion({200,

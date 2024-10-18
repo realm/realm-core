@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* If a user authenticated app services (http) request is redirected, the user will be logged out since the authorization header is removed before request is sent to the new server. If an authenticated request fails, the location will now be updated prior to refreshing the access token to ensure the remote server URL is up to date. ([#8012](https://github.com/realm/realm-core/issues/8012), since v12.9.0)
 
 ### Breaking changes
 * None.
@@ -60,7 +60,7 @@
 -----------
 
 ### Internals
-* None.
+* Enabled curl redirect support for the test http network transport and added a test that uses the redirect server, if enabled, to validate redirections being handled by the network transport implementation. ([PR #8011](https://github.com/realm/realm-core/pull/8011))
 
 ----------------------------------------------
 

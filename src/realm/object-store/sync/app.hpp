@@ -192,6 +192,10 @@ public:
     std::shared_ptr<User> create_fake_user_for_testing(const std::string& user_id, const std::string& access_token,
                                                        const std::string& refresh_token) REQUIRES(!m_user_mutex);
 
+    // For testing only
+    // Reset the location_updated flag so the next App request will request the location again
+    void reset_location_for_testing() REQUIRES(!m_route_mutex);
+
     // MARK: - Provider Clients
 
     /// A struct representing a user API key as returned by the App server.
