@@ -69,12 +69,13 @@ Group::Group()
 }
 
 
-Group::Group(const std::string& file_path, const char* encryption_key)
+Group::Group(const std::string& file_path, const char* encryption_key, bool allow_additional_properties)
     : m_local_alloc(new SlabAlloc) // Throws
     , m_alloc(*m_local_alloc)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
+    , m_allow_additional_properties(allow_additional_properties)
 {
     init_array_parents();
 
@@ -760,6 +761,10 @@ Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl
 
     Table* table = create_table_accessor(j);
     table->do_set_table_type(table_type);
+
+    if (m_allow_additional_properties && name.begins_with(g_class_name_prefix)) {
+        table->do_add_additional_prop_column();
+    }
 
     return table;
 }

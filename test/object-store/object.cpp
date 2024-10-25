@@ -155,6 +155,100 @@ public:
     mutable CreatePolicy last_create_policy;
 };
 
+TEST_CASE("object with flexible schema") {
+    using namespace std::string_literals;
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
+    config.flexible_schema = true;
+    config.schema = Schema{{
+        "table",
+        {
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
+        },
+    }};
+
+    config.schema_version = 0;
+    auto r = Realm::get_shared_realm(config);
+
+    TestContext d(r);
+    auto create = [&](std::any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("table"), value, policy);
+        r->commit_transaction();
+        return obj;
+    };
+
+    SECTION("create object") {
+        auto object = create(AnyDict{
+            {"_id", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"date", Timestamp(10, 20)},
+            {"object id", ObjectId("000000000000000000000001")},
+            {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-abba-baba-caca-4136c566a962")},
+            {"mixed", "mixed"s},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"date array", AnyVec{Timestamp(10, 20), Timestamp(30, 40)}},
+            {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
+            {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
+            {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
+            {"mixed array",
+             AnyVec{25, "b"s, 1.45, util::none, Timestamp(30, 40), Decimal128("1.23e45"),
+                    ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
+            {"dictionary", AnyDict{{"key", "value"s}}},
+        });
+
+        Obj obj = object.get_obj();
+        REQUIRE(obj.get<Int>("_id") == 1);
+        REQUIRE(obj.get<Bool>("bool") == true);
+        REQUIRE(obj.get<Int>("int") == 5);
+        REQUIRE(obj.get<float>("float") == 2.2f);
+        REQUIRE(obj.get<double>("double") == 3.3);
+        REQUIRE(obj.get<String>("string") == "hello");
+        REQUIRE(obj.get<Timestamp>("date") == Timestamp(10, 20));
+        REQUIRE(obj.get<ObjectId>("object id") == ObjectId("000000000000000000000001"));
+        REQUIRE(obj.get<Decimal128>("decimal") == Decimal128("1.23e45"));
+        REQUIRE(obj.get<UUID>("uuid") == UUID("3b241101-abba-baba-caca-4136c566a962"));
+        REQUIRE(obj.get<Mixed>("mixed") == Mixed("mixed"));
+
+        auto check_array = [&](StringData prop, auto... values) {
+            auto vec = get_vector({values...});
+            using U = typename decltype(vec)::value_type;
+            auto list = obj.get_list_ptr<Mixed>(prop);
+            size_t i = 0;
+            for (auto value : vec) {
+                CAPTURE(i);
+                REQUIRE(i < list->size());
+                REQUIRE(value == list->get(i).get<U>());
+                ++i;
+            }
+        };
+        check_array("bool array", true, false);
+        check_array("int array", INT64_C(5), INT64_C(6));
+        check_array("float array", 1.1f, 2.2f);
+        check_array("double array", 3.3, 4.4);
+        check_array("string array", StringData("a"), StringData("b"), StringData("c"));
+        check_array("date array", Timestamp(10, 20), Timestamp(30, 40));
+        check_array("object id array", ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB"));
+        check_array("decimal array", Decimal128("1.23e45"), Decimal128("6.78e9"));
+        check_array("uuid array", UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
+
+        REQUIRE(obj.get_dictionary_ptr("dictionary")->get("key") == Mixed("value"));
+    }
+}
+
 TEST_CASE("object") {
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();
@@ -281,6 +375,7 @@ TEST_CASE("object") {
         {"person",
          {
              {"_id", PropertyType::String, Property::IsPrimary{true}},
+             {"name", PropertyType::String},
              {"age", PropertyType::Int},
              {"scores", PropertyType::Array | PropertyType::Int},
              {"assistant", PropertyType::Object | PropertyType::Nullable, "person"},
@@ -1180,7 +1275,6 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-0000-0000-0000-4136c566a962")},
@@ -1532,7 +1626,6 @@ TEST_CASE("object") {
                 {"string array", AnyVec{"a"s, "b"s, "c"s}},
                 {"data array", AnyVec{"d"s, "e"s, "f"s}},
                 {"date array", AnyVec{}},
-                {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
                 {"object id array", AnyVec{ObjectId("000000000000000000000001")}},
                 {"decimal array", AnyVec{Decimal128("1.23e45")}},
                 {"uuid array", AnyVec{UUID("3b241101-1111-bbbb-cccc-4136c566a962")}},
@@ -1672,7 +1765,6 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
@@ -1688,7 +1780,6 @@ TEST_CASE("object") {
                               {"data", "olleh"s},
                               {"date", Timestamp(10, 20)},
                               {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-                              {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
                               {"object id", ObjectId("000000000000000000000001")},
                               {"decimal", Decimal128("1.23e45")},
                               {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
@@ -1720,9 +1811,9 @@ TEST_CASE("object") {
         obj = create(AnyDict{{"_id", d.null_value()}}, "nullable string pk");
         REQUIRE(obj.get_obj().is_null(col_pk_str));
 
-        obj = create(AnyDict{{}}, "nullable int pk");
+        obj = create(AnyDict{}, "nullable int pk");
         REQUIRE(obj.get_obj().get<util::Optional<Int>>(col_pk_int) == 10);
-        obj = create(AnyDict{{}}, "nullable string pk");
+        obj = create(AnyDict{}, "nullable string pk");
         REQUIRE(obj.get_obj().get<String>(col_pk_str) == "value");
     }
 
