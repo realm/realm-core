@@ -5,7 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Migrating primary key to a new type without migration function would cause an assertion to fail. ([#8045](https://github.com/realm/realm-core/issues/8045), since v10.0.0)
 * None.
 
 ### Breaking changes
