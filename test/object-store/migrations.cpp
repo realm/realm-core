@@ -1137,6 +1137,31 @@ TEST_CASE("migration: Automatic", "[migration]") {
         });
     }
 
+    SECTION("change primary key from string to UUID without migration function") {
+        using namespace std::string_literals;
+        Schema schema{{"Foo",
+                       {
+                           {"_id", PropertyType::String, Property::IsPrimary{true}},
+                       }}};
+        Schema schema2{{"Foo",
+                        {
+                            {"_id", PropertyType::UUID, Property::IsPrimary{true}},
+                        }}};
+        InMemoryTestFile config;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+        realm->update_schema(schema2, 2);
+
+        CppContext ctx(realm);
+        std::any values = AnyDict{
+            {"_id", UUID("3b241101-0000-0000-0000-4136c566a964"s)},
+        };
+        realm->begin_transaction();
+        Object::create(ctx, realm, *realm->schema().find("Foo"), values);
+        realm->commit_transaction();
+    }
+
     SECTION("object accessors inside migrations") {
         using namespace std::string_literals;
 
