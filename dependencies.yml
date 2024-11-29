@@ -1,5 +1,5 @@
 PACKAGE_NAME: realm-core
-VERSION: 20.1.0
+VERSION: 20.1.1
 OPENSSL_VERSION: 3.3.1
 # Set to track a release branch on 10/9/24.
 BAAS_VERSION: 670fb61d897b7d0007167843
