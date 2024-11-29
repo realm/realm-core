@@ -120,7 +120,8 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     REALM_ASSERT(property.type != PropertyType::LinkingObjects);
 
     if (property.is_primary) {
-        // Primary key columns should have been created when the table was created
+        // Primary key columns should have been created when the table was created.
+        // Unless this is a migration
         if (auto col = table.get_column_key(property.name)) {
             return col;
         }
@@ -135,9 +136,11 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     else {
         auto key =
             table.add_column(to_core_type(property.type), property.name, is_nullable(property.type), collection_type);
-        if (property.requires_index())
+        if (property.is_primary)
+            table.set_primary_key_column(key); // You can end here if this is a migration
+        else if (property.requires_index())
             table.add_search_index(key);
-        if (property.requires_fulltext_index())
+        else if (property.requires_fulltext_index())
             table.add_fulltext_index(key);
         return key;
     }

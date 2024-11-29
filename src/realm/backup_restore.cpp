@@ -80,6 +80,11 @@ BackupHandler::BackupHandler(const std::string& path, const VersionList& accepte
     m_delete_versions = to_be_deleted;
 }
 
+std::string BackupHandler::get_prefix() const
+{
+    return m_prefix;
+}
+
 bool BackupHandler::must_restore_from_backup(int current_file_format_version) const
 {
     if (current_file_format_version == 0)

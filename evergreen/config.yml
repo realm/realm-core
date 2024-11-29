@@ -1147,7 +1147,7 @@ buildvariants:
     cmake_build_tool_options: "-sdk iphonesimulator -arch arm64"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.3.app/Contents/Developer
     build_command_line_tools: Off
     disable_tests_against_baas: On
     disable_sync: On
@@ -1164,7 +1164,7 @@ buildvariants:
     cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.3.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     run_with_encryption: 1
   tasks:
@@ -1193,7 +1193,7 @@ buildvariants:
     cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.3.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test
@@ -1210,7 +1210,7 @@ buildvariants:
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.3.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test_and_package
@@ -1226,7 +1226,7 @@ buildvariants:
     cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.3.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_asan: On
@@ -1242,7 +1242,7 @@ buildvariants:
     cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.3.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
@@ -1258,7 +1258,7 @@ buildvariants:
     cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.3.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     enable_llvm_coverage: On
     coveralls_flag_name: "macos-arm64"
