@@ -5,8 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Changing type of primary key column crashes if more than one object ([#8056](https://github.com/realm/realm-core/issues/8056), since v14.13.2)
 
 ### Breaking changes
 * None.
@@ -28,7 +27,6 @@
 
 ### Fixed
 * Migrating primary key to a new type without migration function would cause an assertion to fail. ([#8045](https://github.com/realm/realm-core/issues/8045), since v10.0.0)
-* None.
 
 ### Breaking changes
 * None.
