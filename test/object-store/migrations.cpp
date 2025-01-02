@@ -1137,6 +1137,55 @@ TEST_CASE("migration: Automatic", "[migration]") {
         });
     }
 
+    SECTION("change primary key from int to string") {
+        using namespace std::string_literals;
+        Schema schema{{"Foo",
+                       {
+                           {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                           {"value", PropertyType::String},
+                       }}};
+        Schema schema2{{"Foo",
+                        {
+                            {"_id", PropertyType::String, Property::IsPrimary{true}},
+                            {"value", PropertyType::String},
+                        }}};
+        TestFile config;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        config.schema_version = 1;
+        {
+            auto realm = Realm::get_shared_realm(config);
+
+            CppContext ctx(realm);
+            std::any value1 = AnyDict{
+                {"_id", INT64_C(1)},
+                {"value", "foo"s},
+            };
+            std::any value2 = AnyDict{
+                {"_id", INT64_C(2)},
+                {"value", "bar"s},
+            };
+            realm->begin_transaction();
+            auto s = realm->schema().find("Foo");
+            Object::create(ctx, realm, *s, value1);
+            Object::create(ctx, realm, *s, value2);
+            realm->commit_transaction();
+        }
+        config.schema = schema2;
+        config.schema_version = 2;
+        config.migration_function = [](SharedRealm old_realm, SharedRealm realm, Schema&) {
+            Results r{Class(old_realm, &*old_realm->schema().find("Foo"))};
+            auto sz = r.size();
+            auto t = ObjectStore::table_for_object_type(realm->read_group(), "Foo");
+            for (size_t i = 0; i < sz; i++) {
+                Obj o = r.get(i);
+                auto new_obj = t->get_object(o.get_key());
+                new_obj.set("_id", util::to_string(o.get<Int>("_id")));
+            }
+        };
+        auto realm = Realm::get_shared_realm(config);
+    }
+
     SECTION("change primary key from string to UUID without migration function") {
         using namespace std::string_literals;
         Schema schema{{"Foo",
@@ -1153,6 +1202,7 @@ TEST_CASE("migration: Automatic", "[migration]") {
         auto realm = Realm::get_shared_realm(config);
         realm->update_schema(schema2, 2);
 
+        // Make sure you can actually create an object with UUID as primary key
         CppContext ctx(realm);
         std::any values = AnyDict{
             {"_id", UUID("3b241101-0000-0000-0000-4136c566a964"s)},
