@@ -5,8 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Changing type of primary key column crashes if more than one object ([#8056](https://github.com/realm/realm-core/issues/8056), since v14.13.2)
 
 ### Breaking changes
 * None.

@@ -136,9 +136,7 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     else {
         auto key =
             table.add_column(to_core_type(property.type), property.name, is_nullable(property.type), collection_type);
-        if (property.is_primary)
-            table.set_primary_key_column(key); // You can end here if this is a migration
-        else if (property.requires_index())
+        if (property.requires_index())
             table.add_search_index(key);
         else if (property.requires_fulltext_index())
             table.add_fulltext_index(key);
@@ -824,7 +822,12 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
                                             handle_backlinks_automatically);
         }
         void operator()(RemoveTable) {}
-        void operator()(ChangePropertyType) {}
+        void operator()(ChangePropertyType op)
+        {
+            if (op.new_property->is_primary) {
+                set_primary_key(table(op.object), op.new_property);
+            }
+        }
         void operator()(MakePropertyNullable) {}
         void operator()(MakePropertyRequired) {}
         void operator()(AddProperty) {}
