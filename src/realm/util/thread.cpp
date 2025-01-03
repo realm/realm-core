@@ -60,15 +60,7 @@ using namespace realm::util;
 
 void Thread::set_name(const std::string& name)
 {
-#if REALM_PLATFORM_APPLE
-    int r = pthread_setname_np(name.data());
-    if (REALM_UNLIKELY(r != 0))
-        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
-#elif REALM_HAVE_PTHREAD_SETNAME || (!defined(REALM_HAVE_PTHREAD_SETNAME) && defined(_GNU_SOURCE))
-// Look for the HAVE_ macro defined by CMake. If building outside CMake and the macro wasn't explicitly defined, fall
-// back to assuming this is available on Unix-y systems.
-#if defined(__linux__)
-    // Thread names on Linux can only be 16 characters long, including the null terminator
+#if defined _GNU_SOURCE && !REALM_ANDROID && !REALM_PLATFORM_APPLE && !defined(__EMSCRIPTEN__)
     const size_t max = 16;
     size_t n = name.size();
     if (n > max - 1)
@@ -76,11 +68,12 @@ void Thread::set_name(const std::string& name)
     char name_2[max];
     std::copy(name.data(), name.data() + n, name_2);
     name_2[n] = '\0';
-#else
-    const char* name_2 = name.c_str();
-#endif
     pthread_t id = pthread_self();
     int r = pthread_setname_np(id, name_2);
+    if (REALM_UNLIKELY(r != 0))
+        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
+#elif REALM_PLATFORM_APPLE
+    int r = pthread_setname_np(name.data());
     if (REALM_UNLIKELY(r != 0))
         throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
 #else
@@ -91,10 +84,7 @@ void Thread::set_name(const std::string& name)
 
 bool Thread::get_name(std::string& name) noexcept
 {
-// Look for the HAVE_ macro defined by CMake. If building outside CMake and the macro wasn't explicitly defined, fall
-// back to assuming this is available on Unix-y systems.
-#if REALM_HAVE_PTHREAD_GETNAME ||                                                                                    \
-    (!defined(REALM_HAVE_PTHREAD_GETNAME) && (defined(_GNU_SOURCE) || REALM_PLATFORM_APPLE))
+#if (defined _GNU_SOURCE && !REALM_ANDROID && !defined(__EMSCRIPTEN__)) || REALM_PLATFORM_APPLE
     const size_t max = 64;
     char name_2[max];
     pthread_t id = pthread_self();

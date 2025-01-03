@@ -316,9 +316,6 @@ TEST(Utils_File_SystemErrorMessage)
     std::string_view message = "my message";
 #ifdef _WIN32
     const char* expected = "my message: too many files open (%1)";
-#elif defined(__linux__) && !defined(__GLIBC__)
-    // Linux and not glibc implies Musl, which has its own message
-    const char* expected = "my message: No file descriptors available (%1)";
 #else
     const char* expected = "my message: Too many open files (%1)";
 #endif

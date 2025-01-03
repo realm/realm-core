@@ -64,12 +64,7 @@ TEST(BasicSystemErrors_Category)
 
 TEST(BasicSystemErrors_Messages)
 {
-#if defined(__linux__) && !defined(__GLIBC__)
-    // Linux and not glibc implies Musl, which has its own message
-    const std::string error_message("No error information");
-#else
     const std::string error_message("Unknown error");
-#endif
 
     {
         std::error_code err = make_error_code(error::address_family_not_supported);

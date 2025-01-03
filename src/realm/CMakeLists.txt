@@ -381,17 +381,7 @@ endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
-if(REALM_HAVE_BACKTRACE AND NOT CMAKE_GENERATOR STREQUAL Xcode)
-    # Apple platforms always have backtrace. We disregard the `Backtrace_*` variables
-    # because their paths are hardcoded to one SDK within Xcode (e.g. macosx),
-    # whereas we build for several different SDKs and thus we can't use the include path from one in the other.
-    # Otherwise if CMake found that the backtrace facility is provided by an external library and not built-in
-    # we need to configure the interface target with the library include and link path.
-    target_include_directories(Storage PRIVATE ${Backtrace_INCLUDE_DIRS})
-    target_link_libraries(Storage PUBLIC ${Backtrace_LIBRARIES})
-endif()
-
-if(REALM_HAVE_OPENSSL AND (UNIX OR WIN32))
+if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 

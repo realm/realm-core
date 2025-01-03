@@ -888,7 +888,7 @@ void File::prealloc(SizeType size)
         }
     };
 
-#if REALM_HAVE_POSIX_FALLOCATE
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
     // Mostly Linux only
     if (!prealloc_if_supported(0, new_size)) {
         manually_consume_space();
@@ -956,7 +956,9 @@ void File::prealloc(SizeType size)
     manually_consume_space();
 #else
 #error Please check if/how your OS supports file preallocation
-#endif // REALM_HAVE_POSIX_FALLOCATE
+#endif
+
+#endif // !(_POSIX_C_SOURCE >= 200112L)
 }
 
 
@@ -964,7 +966,7 @@ bool File::prealloc_if_supported(SizeType offset, SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if REALM_HAVE_POSIX_FALLOCATE
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
@@ -1017,7 +1019,7 @@ bool File::prealloc_if_supported(SizeType offset, SizeType size)
 
 bool File::is_prealloc_supported()
 {
-#if REALM_HAVE_POSIX_FALLOCATE
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
     return true;
 #else
     return false;

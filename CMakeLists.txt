@@ -15,7 +15,6 @@ endif()
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
-include(CMakePushCheckState)
 include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
@@ -243,19 +242,11 @@ if(MSVC)
 endif()
 
 if(UNIX)
-    cmake_push_check_state(RESET)
     # Enable access to large file APIs, but don't make them the default.
     add_compile_definitions("_LARGEFILE_SOURCE" "_LARGEFILE64_SOURCE")
     set(CMAKE_REQUIRED_DEFINITIONS "-D_LARGEFILE_SOURCE" "-D_LARGEFILE64_SOURCE")
     # Use readdir64 if available.
     check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
-    cmake_reset_check_state()
-    set(CMAKE_REQUIRED_DEFINITIONS "-D_POSIX_C_SOURCE=200112L")
-    check_symbol_exists(posix_fallocate "fcntl.h" REALM_HAVE_POSIX_FALLOCATE)
-    if(REALM_HAVE_POSIX_FALLOCATE)
-        add_compile_definitions("_POSIX_C_SOURCE=200112L")
-    endif()
-    cmake_pop_check_state()
 endif()
 
 # Options (passed to CMake)
@@ -274,16 +265,6 @@ option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-# Threads library is pthread-compatible
-# Check for these explicitly because older versions of musl define only one or the other
-if(CMAKE_USE_PTHREADS_INIT)
-    check_symbol_exists(pthread_getname_np "pthread.h" REALM_HAVE_PTHREAD_GETNAME)
-    check_symbol_exists(pthread_setname_np "pthread.h" REALM_HAVE_PTHREAD_SETNAME)
-endif()
-
-find_package(Backtrace)
-set(REALM_HAVE_BACKTRACE ${Backtrace_FOUND})
-
 if(REALM_ENABLE_ENCRYPTION AND CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
     set(REALM_NEEDS_OPENSSL TRUE)
 endif()
@@ -299,6 +280,7 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
         set(_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS OFF)
     endif()
 
+    set(OPENSSL_USE_STATIC_LIBS ON)
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
     option(REALM_USE_SYSTEM_OPENSSL_PATHS "Use the system OpenSSL certificate store (specified by the OPENSSLDIR environment variable) at runtime for TLS handshake." ${_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS})
