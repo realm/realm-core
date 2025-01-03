@@ -6,9 +6,10 @@
 
 ### Fixed
 * Changing type of primary key column crashes if more than one object ([#8056](https://github.com/realm/realm-core/issues/8056), since v14.13.2)
+* Fixed a hardlock on Pixel devices with Android 14+. ([#7950](https://github.com/realm/realm-core/issues/7950), since 13.23.3)
 
 ### Breaking changes
-* None.
+* Removed support for building against the musl library. ([PR #8061](https://github.com/realm/realm-core/pull/8061))
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
@@ -1008,6 +1009,7 @@
 
 ### Internals
 * REALM_[ATMU]SAN cmake flags no longer override compilation options and can be combined with Debug|RelWithDebInfo|etc. build types. Rel[ATMU]SAN build type shortcuts are now all slightly optimized debug-based builds with sanitizers. REALM_ASAN now works with msvc (2019/2022) builds. ([PR #6911](https://github.com/realm/realm-core/pull/6911))
+* Add support for building against the musl library. ([PR #7067](https://github.com/realm/realm-core/pull/7067))
 * Remove ArrayWithFind's ability to use a templated callback parameter. The QueryStateBase consumers now use an index and the array leaf to get the actual value if needed. This allows certain queries such as count() to not do as many lookups to the actual values and results in a small performance gain. Also remove `find_action_pattern()` which was unused for a long time. This reduction in templating throughout the query system produces a small (~100k) binary size reduction. ([#7095](https://github.com/realm/realm-core/pull/7095))
 * Rework the implemenatation of the set algrebra functions on Set<T> to reduce the compiled size.
 * Rework the internal interface for sync Transformers to simplify it and reduce the compiled size ([PR #7098](https://github.com/realm/realm-core/pull/7098)).

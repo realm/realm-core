@@ -265,6 +265,9 @@ option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+find_package(Backtrace)
+set(REALM_HAVE_BACKTRACE ${Backtrace_FOUND})
+
 if(REALM_ENABLE_ENCRYPTION AND CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
     set(REALM_NEEDS_OPENSSL TRUE)
 endif()
@@ -280,7 +283,6 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
         set(_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS OFF)
     endif()
 
-    set(OPENSSL_USE_STATIC_LIBS ON)
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
     option(REALM_USE_SYSTEM_OPENSSL_PATHS "Use the system OpenSSL certificate store (specified by the OPENSSLDIR environment variable) at runtime for TLS handshake." ${_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS})
