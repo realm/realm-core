@@ -6,6 +6,7 @@
 
 ### Fixed
 * Changing type of primary key column crashes if more than one object ([#8056](https://github.com/realm/realm-core/issues/8056), since v14.13.2)
+* Opening a Realm on Pixel devices running Android 14+ could result in a hardlock. ([#7950](https://github.com/realm/realm-core/issues/7950), since v13.23.3)
 
 ### Breaking changes
 * None.
