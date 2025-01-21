@@ -291,7 +291,13 @@ static bool check_for_redirect_response(const app::AppError& error)
 util::UniqueFunction<void(std::optional<app::AppError>)>
 SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool restart_session)
 {
-    return [session, restart_session](std::optional<app::AppError> error) {
+    auto weak_session = session->weak_from_this();
+    return [weak_session, restart_session](std::optional<app::AppError> error) {
+        auto session = weak_session.lock();
+        if (!session) {
+            return;
+        }
+
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);

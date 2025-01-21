@@ -340,6 +340,11 @@ public:
             return session.m_db;
         }
 
+        static std::weak_ptr<SyncSession> weak_from_session(const std::shared_ptr<SyncSession>& sess)
+        {
+            return sess->weak_from_this();
+        }
+
         static std::string get_appservices_connection_id(SyncSession& session)
         {
             return session.get_appservices_connection_id();
