@@ -3300,6 +3300,7 @@ TEST_CASE("app: sync session refreshes end with sync session lifetime", "[sync][
 
     REQUIRE(user);
     sync::AccessToken token = [&] {
+        sync::AccessToken token;
         sync::AccessToken::ParseError error_state = sync::AccessToken::ParseError::none;
         REQUIRE(sync::AccessToken::parse(user->access_token(), token, error_state, nullptr));
         auto now = std::chrono::system_clock::now();
