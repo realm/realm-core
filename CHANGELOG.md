@@ -5,8 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* If you open a synchronized realm and it needs to refresh its access token, and that refresh operation doesn't complete before the realm is closed, the lifetime of the sync session will be extended until the refresh is complete. If you open the realm again before that refresh is complete, then you'll have two sync sessions both try to start synchronizing the realm when the refreshes do complete, and that will crash the process with a MultipleSyncAgents exception. ([PR #8064](https://github.com/realm/realm-core/pull/8064))
 
 ### Breaking changes
 * None.
