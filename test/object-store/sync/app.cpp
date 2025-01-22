@@ -3248,6 +3248,91 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
+class BlockingTransport : public SynchronousTestTransport {
+public:
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    {
+        if (is_blocking) {
+            pending_requests.push_back(std::make_pair(request, std::move(completion)));
+            return;
+        }
+        SynchronousTestTransport::send_request_to_server(request, [&](app::Response response) mutable {
+            completion(response);
+        });
+    }
+
+    void unblock()
+    {
+        is_blocking = false;
+        while (!pending_requests.empty()) {
+            auto& pending = pending_requests.front();
+            SynchronousTestTransport::send_request_to_server(pending.first, [&](app::Response response) mutable {
+                pending.second(response);
+            });
+            pending_requests.pop_front();
+        }
+    }
+
+    bool is_blocking = false;
+    std::deque<std::pair<app::Request, util::UniqueFunction<void(const app::Response&)>>> pending_requests;
+};
+
+TEST_CASE("app: sync session refreshes end with sync session lifetime", "[sync][app][baas]") {
+    const Schema schema{ObjectSchema{
+        "user",
+        {{"_id", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}}},
+    }};
+    auto app_session_config = minimal_app_config("HELP-67254", schema);
+    auto app_session = create_app(app_session_config);
+
+    auto transport = std::make_shared<BlockingTransport>();
+    TestAppSession session(app_session, {transport});
+
+    const auto partition = random_string(100);
+    auto app = session.app();
+    create_user_and_log_in(app);
+    auto user = app->current_user();
+
+    SyncTestFile config(app->current_user(), partition, schema);
+    successfully_async_open_realm(config);
+    app->sync_manager()->wait_for_sessions_to_terminate();
+
+    REQUIRE(user);
+    sync::AccessToken token = [&] {
+        sync::AccessToken token;
+        sync::AccessToken::ParseError error_state = sync::AccessToken::ParseError::none;
+        REQUIRE(sync::AccessToken::parse(user->access_token(), token, error_state, nullptr));
+        auto now = std::chrono::system_clock::now();
+        token.expires = std::chrono::system_clock::to_time_t(now - 30s);
+        REQUIRE(token.expired(now));
+        return token;
+    }();
+
+    REQUIRE(!user->access_token_refresh_required());
+    transport->is_blocking = true;
+    // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
+    user->update_data_for_testing([&token](UserData& data) {
+        data.access_token = RealmJWT(encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
+    });
+    REQUIRE(user->access_token_refresh_required());
+
+    auto weak_session = [&] {
+        auto realm = Realm::get_shared_realm(config);
+        auto weak_session = SyncSession::OnlyForTesting::weak_from_session(realm->sync_session());
+        REQUIRE(!weak_session.expired());
+        return weak_session;
+    }();
+    REQUIRE(transport->pending_requests.size() == 1);
+    REQUIRE(weak_session.expired());
+
+    auto realm = Realm::get_shared_realm(config);
+    REQUIRE(transport->pending_requests.size() > 1);
+
+    transport->unblock();
+    wait_for_download(*realm);
+}
+
 TEST_CASE("app: sync logs contain baas coid", "[sync][app][baas]") {
     class InMemoryLogger : public util::Logger {
     public:
