@@ -420,7 +420,7 @@ private:
     };
 
     Obj get_active(const Transaction& tr);
-    SubscriptionSet get_refreshed(ObjKey, int64_t flx_version, std::optional<TransactionRef> tr = util::none);
+    SubscriptionSet get_refreshed(ObjKey, int64_t flx_version, TransactionRef tr);
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set);
 
     // Ensure the subscriptions table is properly initialized. No-op if already initialized.

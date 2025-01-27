@@ -433,7 +433,7 @@ void SubscriptionSet::refresh()
 {
     auto mgr = get_flx_subscription_store(); // Throws
     if (mgr->would_refresh(m_cur_version)) {
-        *this = mgr->get_refreshed(m_obj_key, version());
+        *this = mgr->get_refreshed(m_obj_key, version(), nullptr);
     }
 }
 
@@ -448,7 +448,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // If there have been writes to the database since this SubscriptionSet was created, we need to fetch
     // the updated version from the DB to know the true current state and maybe return a ready future.
     if (m_cur_version < mgr->m_db->get_version_of_latest_snapshot()) {
-        auto refreshed_self = mgr->get_refreshed(m_obj_key, version());
+        auto refreshed_self = mgr->get_refreshed(m_obj_key, version(), nullptr);
         cur_state = refreshed_self.state();
         err_str = refreshed_self.error_str();
     }
@@ -964,9 +964,11 @@ SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id)
     throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
 }
 
-SubscriptionSet SubscriptionStore::get_refreshed(ObjKey key, int64_t version, std::optional<TransactionRef> maybe_tr)
+SubscriptionSet SubscriptionStore::get_refreshed(ObjKey key, int64_t version, TransactionRef tr)
 {
-    auto tr = maybe_tr.value_or(m_db->start_frozen());
+    if (tr == nullptr) {
+        tr = m_db->start_frozen();
+    }
     auto sub_sets = tr->get_table(m_sub_set_table);
     if (auto obj = sub_sets->try_get_object(key)) {
         return SubscriptionSet(weak_from_this(), *tr, obj);
