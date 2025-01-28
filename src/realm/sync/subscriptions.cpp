@@ -433,7 +433,7 @@ void SubscriptionSet::refresh()
 {
     auto mgr = get_flx_subscription_store(); // Throws
     if (mgr->would_refresh(m_cur_version)) {
-        *this = mgr->get_refreshed(m_obj_key, version());
+        *this = mgr->get_refreshed(m_obj_key, version(), nullptr);
     }
 }
 
@@ -448,7 +448,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // If there have been writes to the database since this SubscriptionSet was created, we need to fetch
     // the updated version from the DB to know the true current state and maybe return a ready future.
     if (m_cur_version < mgr->m_db->get_version_of_latest_snapshot()) {
-        auto refreshed_self = mgr->get_refreshed(m_obj_key, version());
+        auto refreshed_self = mgr->get_refreshed(m_obj_key, version(), nullptr);
         cur_state = refreshed_self.state();
         err_str = refreshed_self.error_str();
     }
@@ -576,13 +576,7 @@ SubscriptionSet MutableSubscriptionSet::commit()
     m_tr->commit_and_continue_as_read();
 
     mgr->report_progress(m_tr);
-
-    DB::VersionID commit_version = m_tr->get_version_of_current_transaction();
-    // release the read lock so that this instance doesn't keep a version pinned
-    // for the remainder of its lifetime
-    m_tr.reset();
-
-    return mgr->get_refreshed(m_obj.get_key(), flx_version, commit_version);
+    return mgr->get_refreshed(m_obj.get_key(), flx_version, std::move(m_tr));
 }
 
 std::string SubscriptionSet::to_ext_json() const
@@ -970,9 +964,11 @@ SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id)
     throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
 }
 
-SubscriptionSet SubscriptionStore::get_refreshed(ObjKey key, int64_t version, std::optional<DB::VersionID> db_version)
+SubscriptionSet SubscriptionStore::get_refreshed(ObjKey key, int64_t version, TransactionRef tr)
 {
-    auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
+    if (tr == nullptr) {
+        tr = m_db->start_frozen();
+    }
     auto sub_sets = tr->get_table(m_sub_set_table);
     if (auto obj = sub_sets->try_get_object(key)) {
         return SubscriptionSet(weak_from_this(), *tr, obj);
