@@ -5,7 +5,7 @@
 * None.
 
 ### Fixed
-* Committing a subscription set prematurely released a read lock, which may have caused a BadVersion exception with an error like `Unable to lock version XX as it does not exist or has been cleaned up` while changing subscriptions. ([PR #8086](https://github.com/realm/realm-core/pull/8068), since v14.12.0)
+* Committing a subscription set prematurely released a read lock, which may have caused a BadVersion exception with an error like `Unable to lock version XX as it does not exist or has been cleaned up` while changing subscriptions. ([PR #8068](https://github.com/realm/realm-core/pull/8068), since v14.12.0)
 
 ### Breaking changes
 * None.
