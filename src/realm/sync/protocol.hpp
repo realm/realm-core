@@ -425,6 +425,7 @@ enum class ProtocolError {
     revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
     bad_schema_version           = RLM_SYNC_ERR_SESSION_BAD_SCHEMA_VERSION,         // Client tried to open a session with an invalid schema version (BIND)
     schema_version_changed       = RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_CHANGED,     // Client opened a session with a new valid schema version - migrate client to use new schema version (BIND)
+    schema_version_force_upgrade = RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_FORCE_UPGRADE, // Server has forcefully bumped client's schema version because it does not support schema versioning
 
     // clang-format on
 };
