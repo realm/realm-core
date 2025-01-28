@@ -1,5 +1,5 @@
 PACKAGE_NAME: realm-core
-VERSION: 14.13.4
+VERSION: 14.13.5
 OPENSSL_VERSION: 3.3.1
 ZLIB_VERSION: 1.2.13
 # Set to track a release branch on 10/9/24.
