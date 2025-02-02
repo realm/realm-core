@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Refactor the implementation of sync triggers and timers to eliminate some duplicated code. ([PR #7912](https://github.com/realm/realm-core/pull/7912))
 
 ----------------------------------------------
 
