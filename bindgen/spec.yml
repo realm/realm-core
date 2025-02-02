@@ -443,6 +443,9 @@ records:
       disable_format_upgrade:
         type: bool
         default: false
+      scheduler:
+        type: SharedScheduler
+        default: {}
       sync_config: Nullable<std::shared_ptr<SyncConfig>>
       # Used internally as a flag for opening a synced realm locally.
       force_sync_history:
