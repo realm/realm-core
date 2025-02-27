@@ -22,9 +22,11 @@
 #include <util/sync/baas_admin_api.hpp>
 #include <util/sync/flx_sync_harness.hpp>
 
-#include <realm/set.hpp>
-#include <realm/list.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/list.hpp>
+#include <realm/set.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/util/logger.hpp>
 
 #include <realm/object-store/audit.hpp>
 #include <realm/object-store/audit_serializer.hpp>
@@ -41,10 +43,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <realm/util/logger.hpp>
-
 #include <catch2/catch_all.hpp>
-
 #include <external/json/json.hpp>
 
 using namespace realm;
@@ -69,6 +68,14 @@ struct AuditEvent {
     Timestamp timestamp;
     std::map<std::string, std::string> metadata;
 };
+
+std::ostream& operator<<(std::ostream& os, const std::vector<AuditEvent>& events)
+{
+    for (auto& event : events) {
+        util::format(os, "%1: %2\n", event.event, event.data);
+    }
+    return os;
+}
 
 util::Optional<std::string> to_optional_string(StringData sd)
 {
@@ -1455,6 +1462,7 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
+        INFO(events);
         REQUIRE(events.size() == 6);
         std::string str = events[0].data.dump();
         // initial
@@ -1925,6 +1933,96 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
             realm->sync_session()->force_close();
             generate_event(realm, 0);
             get_audit_events_from_baas(session, *session.app()->current_user(), 1);
+        }
+    }
+
+    SECTION("creating audit event while offline uploads event when logged back in") {
+        auto sync_user = session.app()->current_user();
+        auto creds = create_user_and_log_in(session.app());
+        auto audit_user = session.app()->current_user();
+        config.audit_config->audit_user = audit_user;
+        config.audit_config->sync_error_handler = [&](SyncError error) {
+            REALM_ASSERT(ErrorCodes::error_categories(error.status.code()).test(ErrorCategory::app_error));
+        };
+        auto realm = Realm::get_shared_realm(config);
+
+        audit_user->log_out();
+        generate_event(realm);
+        log_in_user(session.app(), creds);
+
+        REQUIRE(get_audit_events_from_baas(session, *sync_user, 1).size() == 1);
+    }
+
+    SECTION("files with invalid client file idents are recovered") {
+        auto sync_user = session.app()->current_user();
+        auto creds = create_user_and_log_in(session.app());
+        auto audit_user = session.app()->current_user();
+        config.audit_config->audit_user = audit_user;
+        config.audit_config->sync_error_handler = [&](SyncError error) {
+            REALM_ASSERT(ErrorCodes::error_categories(error.status.code()).test(ErrorCategory::app_error));
+        };
+        auto realm = Realm::get_shared_realm(config);
+        audit_user->log_out();
+
+        auto audit = realm->audit_context();
+        REQUIRE(audit);
+
+        // Set a small shard size so that we don't have to write an absurd
+        // amount of data to test this
+        audit_test_hooks::set_maximum_shard_size(32 * 1024);
+        auto cleanup = util::make_scope_exit([]() noexcept {
+            audit_test_hooks::set_maximum_shard_size(256 * 1024 * 1024);
+        });
+
+        realm->begin_transaction();
+        auto table = realm->read_group().get_table("class_object");
+        std::vector<Obj> objects;
+        for (int i = 0; i < 2000; ++i)
+            objects.push_back(table->create_object_with_primary_key(i));
+        realm->commit_transaction();
+
+        // Write a lot of audit scopes while unable to sync
+        for (int i = 0; i < 50; ++i) {
+            auto scope = audit->begin_scope(util::format("scope %1", i));
+            Results(realm, table->where()).snapshot();
+            audit->end_scope(scope, assert_no_error);
+        }
+        audit->wait_for_completion();
+
+        // Client file idents aren't reread while a session is active, so we need
+        // to close all of the open audit Realms awaiting upload
+        realm->close();
+        realm = nullptr;
+        auto sync_manager = session.sync_manager();
+        for (auto& session : sync_manager->get_all_sessions()) {
+            session->shutdown_and_wait();
+        }
+
+        // Set the client file ident for all pending Realms to an invalid one so
+        // that they'll get client resets
+        auto root = util::format("%1/realm-audit/%2/%3/audit", *session.config().storage_path,
+                                 session.app()->app_id(), audit_user->user_id());
+        std::string file_name;
+        util::DirScanner dir(root);
+        while (dir.next(file_name)) {
+            if (!StringData(file_name).ends_with(".realm") || StringData(file_name).contains(".backup."))
+                continue;
+            sync::ClientReplication repl;
+            auto db = DB::create(repl, root + "/" + file_name);
+            static_cast<sync::ClientHistory*>(repl._get_history_write())->set_client_file_ident({123, 456}, false);
+        }
+
+        // Log the user back in and reopen the parent Realm to start trying to upload the audit data
+        log_in_user(session.app(), creds);
+        realm = Realm::get_shared_realm(config);
+        audit = realm->audit_context();
+        REQUIRE(audit);
+        audit->wait_for_uploads();
+
+        auto events = get_audit_events_from_baas(session, *sync_user, 50);
+        REQUIRE(events.size() == 50);
+        for (int i = 0; i < 50; ++i) {
+            REQUIRE(events[i].activity == util::format("scope %1", i));
         }
     }
 
