@@ -26,6 +26,7 @@
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/util/logger.hpp>
 
 #include <realm/object-store/audit.hpp>
 #include <realm/object-store/audit_serializer.hpp>
@@ -42,10 +43,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <realm/util/logger.hpp>
-
 #include <catch2/catch_all.hpp>
-
 #include <external/json/json.hpp>
 
 using namespace realm;
@@ -70,6 +68,14 @@ struct AuditEvent {
     Timestamp timestamp;
     std::map<std::string, std::string> metadata;
 };
+
+std::ostream& operator<<(std::ostream& os, const std::vector<AuditEvent>& events)
+{
+    for (auto& event : events) {
+        util::format(os, "%1: %2\n", event.event, event.data);
+    }
+    return os;
+}
 
 util::Optional<std::string> to_optional_string(StringData sd)
 {
@@ -1456,6 +1462,7 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
+        INFO(events);
         REQUIRE(events.size() == 6);
         std::string str = events[0].data.dump();
         // initial
