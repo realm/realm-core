@@ -827,15 +827,7 @@ bool SessionImpl::process_flx_bootstrap_message(const DownloadMessage& message)
         return true;
     }
 
-    try {
-        process_pending_flx_bootstrap(); // throws
-    }
-    catch (const IntegrationException& e) {
-        on_integration_failure(e);
-    }
-    catch (...) {
-        on_integration_failure(IntegrationException(exception_to_status()));
-    }
+    try_process_pending_flx_bootstrap();
 
     return true;
 }
@@ -845,6 +837,10 @@ void SessionImpl::process_pending_flx_bootstrap()
 {
     // Ignore the call if not a flx session or session is not active
     if (!m_is_flx_sync_session || m_state != State::Active) {
+        return;
+    }
+    // Ignore the call if the client detects an error.
+    if (m_client_error) {
         return;
     }
     auto bootstrap_store = m_wrapper.get_flx_pending_bootstrap_store();
@@ -915,6 +911,19 @@ void SessionImpl::process_pending_flx_bootstrap()
                                   DownloadBatchState::LastInBatch, changesets_processed);
     // NoAction/EarlyReturn are both valid no-op actions to take here.
     REALM_ASSERT_EX(action == SyncClientHookAction::NoAction || action == SyncClientHookAction::EarlyReturn, action);
+}
+
+void SessionImpl::try_process_pending_flx_bootstrap()
+{
+    try {
+        process_pending_flx_bootstrap(); // throws
+    }
+    catch (const IntegrationException& error) {
+        on_integration_failure(error);
+    }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
 }
 
 void SessionImpl::on_flx_sync_error(int64_t version, std::string_view err_msg)
