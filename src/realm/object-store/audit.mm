@@ -840,6 +840,7 @@ void AuditRealmPool::scan_for_realms_to_upload()
         RealmConfig config;
         config.path = db->get_path();
         config.sync_config = std::make_shared<SyncConfig>(m_user, prefixed_partition(partition));
+        config.sync_config->client_resync_mode = ClientResyncMode::Recover;
         wait_for_upload(m_user->sync_manager()->get_session(db, config));
         return;
     }
@@ -897,7 +898,7 @@ void AuditRealmPool::open_new_realm()
     std::string partition = ObjectId::gen().to_string();
     auto sync_config = std::make_shared<SyncConfig>(m_user, prefixed_partition(partition));
     sync_config->apply_server_changes = false;
-    sync_config->client_resync_mode = ClientResyncMode::Manual;
+    sync_config->client_resync_mode = ClientResyncMode::Recover;
     sync_config->recovery_directory = std::string("io.realm.audit");
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
