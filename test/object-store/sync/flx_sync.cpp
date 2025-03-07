@@ -5174,6 +5174,44 @@ TEST_CASE("flx: no upload during bootstraps", "[sync][flx][bootstrap][baas]") {
     wait_for_download(*realm);
 }
 
+TEST_CASE("flx: bootstrap is properly applied when the connection is reestablished", "[sync][flx][bootstrap][baas]") {
+    FLXSyncTestHarness harness("flx_bootstrap", {g_large_array_schema, {"queryable_int_field"}});
+    auto& app_session = harness.session().app_session();
+    REQUIRE(app_session.admin_api.patch_app_settings(app_session.server_app_id,
+                                                     {{"sync", {{"num_objects_before_bootstrap_flush", 1}}}}));
+    REQUIRE(app_session.admin_api.patch_app_settings(
+        app_session.server_app_id, {{"sync", {{"qbs_download_changeset_soft_max_byte_size", 1000}}}}));
+
+    fill_large_array_schema(harness);
+    auto config = harness.make_test_file();
+    bool once = false;
+    config.sync_config->on_sync_client_event_hook = [&once](std::weak_ptr<SyncSession>,
+                                                            const SyncClientHookData& data) {
+        if (data.query_version != 1) {
+            return SyncClientHookAction::NoAction;
+        }
+        if (data.event == SyncClientHookEvent::BootstrapMessageProcessed && !once) {
+            once = true;
+            return SyncClientHookAction::TriggerReconnect;
+        }
+        // The batch of changesets added to the PendingBoostrapStore before disconnect
+        // were removed when the connection was reestablished.
+        // There are 5 changesets in 5 download messages and one additional download message
+        // with an empty changeset (as per server design).
+        if (data.event == SyncClientHookEvent::BootstrapProcessed) {
+            CHECK(data.num_changesets == 6);
+        }
+        return SyncClientHookAction::NoAction;
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    new_subs.insert_or_assign(Query(table));
+    auto subs = new_subs.commit();
+    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
