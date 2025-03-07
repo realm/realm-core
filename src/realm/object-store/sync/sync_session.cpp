@@ -408,6 +408,17 @@ SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, co
 
 void SyncSession::detach_from_sync_manager()
 {
+    // Unregister all callbacks when the App and SyncManager are destroyed.
+    {
+        util::CheckedLockGuard lk(m_state_mutex);
+        m_completion_callbacks.clear();
+    }
+    {
+        util::CheckedLockGuard lk(m_connection_state_mutex);
+        m_connection_change_notifier.remove_callbacks();
+    }
+    m_progress_notifier.unregister_callbacks();
+
     shutdown_and_wait();
     util::CheckedLockGuard lk(m_state_mutex);
     m_sync_manager = nullptr;
@@ -1561,6 +1572,14 @@ void SyncProgressNotifier::unregister_callback(uint64_t token)
     m_packages.erase(token);
 }
 
+void SyncProgressNotifier::unregister_callbacks()
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_packages.clear();
+    m_current_progress.reset();
+    m_local_transaction_version = 0;
+}
+
 void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
                                   uint64_t snapshot_version, double download_estimate, double upload_estimate,
                                   int64_t query_version)
@@ -1666,6 +1685,14 @@ void SyncSession::ConnectionChangeNotifier::remove_callback(uint64_t token)
         old = std::move(*it);
         m_callbacks.erase(it);
     }
+}
+
+void SyncSession::ConnectionChangeNotifier::remove_callbacks()
+{
+    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    m_callbacks.clear();
+    m_callback_count = -1;
+    m_callback_index = -1;
 }
 
 void SyncSession::ConnectionChangeNotifier::invoke_callbacks(ConnectionState old_state, ConnectionState new_state)
