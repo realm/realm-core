@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 14.14.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Enable automatic client reset recovery for audit Realm files ([PR #8072](https://github.com/realm/realm-core/pull/8072)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
 
 ### Breaking changes
