@@ -45,10 +45,14 @@
 #if _POSIX_THREADS >= 200809L
 #ifdef __GNU_LIBRARY__
 #if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 12 && !REALM_ANDROID
+#ifndef REALM_OHOS
 #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
 #endif
+#endif
 #elif !REALM_ANDROID
+#ifndef REALM_OHOS
 #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
+#endif
 #endif
 #endif
 #endif
