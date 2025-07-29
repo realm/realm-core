@@ -1,6 +1,7 @@
 #include "realm/util/cli_args.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cerrno>
 #include <cstdint>
 #include <string>
