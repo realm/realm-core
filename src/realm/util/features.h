@@ -212,6 +212,10 @@
 #if defined ANDROID || defined __ANDROID_API__
 #define REALM_ANDROID 1
 #define REALM_LINUX 0
+#elif defined __OHOS__
+#define REALM_ANDROID 0
+#define REALM_LINUX 0
+#define REALM_OHOS 1
 #elif defined(__linux__)
 #define REALM_ANDROID 0
 #define REALM_LINUX 1
@@ -275,7 +279,7 @@
 #define REALM_APPLE_DEVICE 0
 #endif
 
-#if REALM_ANDROID || REALM_IOS || REALM_WATCHOS || REALM_TVOS || REALM_UWP
+#if REALM_ANDROID || REALM_IOS || REALM_WATCHOS || REALM_TVOS || REALM_UWP || REALM_OHOS
 #define REALM_MOBILE 1
 #else
 #define REALM_MOBILE 0
