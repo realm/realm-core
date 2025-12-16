@@ -18,6 +18,7 @@
 
 #include "util/event_loop.hpp"
 
+#include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/features.h>
@@ -70,6 +71,10 @@ void static_assert_EventLoopDispatcher_guide(const EventLoopDispatcher<Actual>&)
         void operator()(int) const& noexcept {}
     };
     static_assert_EventLoopDispatcher_guide<void(int)>(EventLoopDispatcher(Funcy()));
+
+    // Passing a scheduler as second argument
+    auto scheduler = Scheduler::make_dummy();
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher([] {}, scheduler));
 }
 } // namespace
 
