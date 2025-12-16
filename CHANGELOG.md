@@ -220,6 +220,7 @@
 
 ### Internals
 * Reverted the bfd linker override in the Linux-armv7 toolchain file because the upstream OpenSSL issue it was working around was resolved.
+* Added CMake toolchain files for cross-compiling to Linux using the musl libc (PR [#7904](https://github.com/realm/realm-core/pull/7904)).
 
 ----------------------------------------------
 
