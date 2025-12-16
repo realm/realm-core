@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Added missing cstdlib header in cli_args.cpp. (PR [#8091](https://github.com/realm/realm-core/pull/8091))
 
 ### Breaking changes
 * None.
