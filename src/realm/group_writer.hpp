@@ -211,6 +211,22 @@ private:
         size_t size;
         uint64_t released_at_version;
     };
+    struct AugmentedFreeSpaceEntry {
+        enum class Source : int { Unknown, InTransaction, FreeInFile, LockedInFile, Evacuating };
+        AugmentedFreeSpaceEntry(size_t r, size_t s, uint64_t v, Source src)
+            : ref(r)
+            , size(s)
+            , released_at_version(v)
+            , source(src)
+        {
+        }
+        size_t ref;
+        size_t size;
+        uint64_t released_at_version;
+        Source source;
+        constexpr static const char* source_to_string[5] = {"Unknown", "InTransaction", "FreeInFile", "LockedInFile",
+                                                            "Evacuating"};
+    };
 
     static void merge_adjacent_entries_in_freelist(std::vector<FreeSpaceEntry>& list);
     static void move_free_in_file_to_size_map(const std::vector<GroupWriter::FreeSpaceEntry>& list,
@@ -234,14 +250,18 @@ private:
     size_t m_logical_size = 0;
 
     //  m_free_in_file;
-    std::vector<FreeSpaceEntry> m_not_free_in_file;
+    std::vector<FreeSpaceEntry> m_locked_in_file;
     std::vector<FreeSpaceEntry> m_under_evacuation;
     std::multimap<size_t, size_t> m_size_map;
     std::vector<size_t> m_evacuation_progress;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
+    bool m_allocation_allowed = true;
 
     void read_in_freelist();
     size_t recreate_freelist(size_t reserve_pos);
+    std::vector<AugmentedFreeSpaceEntry> create_combined_freelist();
+    void verify_no_overlaps(std::vector<AugmentedFreeSpaceEntry>& freelist);
+    void verify_freelists();
 
     /// Allocate a chunk of free space of the specified size. The
     /// specified size must be 8-byte aligned. Extend the file if
