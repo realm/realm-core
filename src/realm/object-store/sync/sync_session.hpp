@@ -57,6 +57,7 @@ public:
     uint64_t register_callback(std::function<ProgressNotifierCallback>, NotifierType direction, bool is_streaming,
                                int64_t pending_query_version);
     void unregister_callback(uint64_t);
+    void unregister_callbacks();
 
     void set_local_version(uint64_t);
     void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
@@ -373,6 +374,7 @@ private:
     public:
         uint64_t add_callback(std::function<ConnectionStateChangeCallback> callback);
         void remove_callback(uint64_t token);
+        void remove_callbacks();
         void invoke_callbacks(ConnectionState old_state, ConnectionState new_state);
 
     private:
@@ -398,8 +400,6 @@ private:
         return std::make_shared<SyncSession>(Private(), client, std::move(db), config, sync_manager);
     }
     // }
-
-    std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
 
     static util::UniqueFunction<void(std::optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&, bool);
