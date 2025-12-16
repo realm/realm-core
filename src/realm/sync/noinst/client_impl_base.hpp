@@ -932,6 +932,7 @@ private:
 
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
+    void try_process_pending_flx_bootstrap();
 
     bool client_reset_if_needed();
     void handle_pending_client_reset_acknowledgement();
@@ -941,7 +942,6 @@ private:
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
 
-private:
     Connection& m_conn;
     const session_ident_type m_ident;
 
@@ -1397,6 +1397,8 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
     // Notify the debug hook of the SessionConnected event before sending
     // the bind messsage
     call_debug_hook(SyncClientHookEvent::SessionConnected);
+
+    try_process_pending_flx_bootstrap();
 
     if (!m_suspended) {
         // Ready to send BIND message

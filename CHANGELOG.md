@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* If the client disconnects while a bootstrap is in progresss, stale data from the previous bootstrap may be included when the client reconnects and the bootstrap is restarted. This can lead to objects stored in the database that do not match the actual state of the server and potentially leading to compensating writes. ([#7707](https://github.com/realm/realm-core/issues/7707), since v12.0.0)
 
 ### Breaking changes
 * None.

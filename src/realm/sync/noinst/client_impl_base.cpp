@@ -1296,7 +1296,7 @@ Session* Connection::find_and_validate_session(session_ident_type session_ident,
         logger.error("Bad session identifier in %1 message, session_ident = %2", message, session_ident);
         close_due_to_protocol_error(
             {ErrorCodes::SyncProtocolInvariantFailed,
-             util::format("Received message %1 for session iden %2 when that session never existed", message,
+             util::format("Received message %1 for session ident %2 when that session never existed", message,
                           session_ident)});
     }
     else {
@@ -1513,15 +1513,7 @@ void Session::cancel_resumption_delay()
     if (unbind_process_complete())
         initiate_rebind(); // Throws
 
-    try {
-        process_pending_flx_bootstrap(); // throws
-    }
-    catch (const IntegrationException& error) {
-        on_integration_failure(error);
-    }
-    catch (...) {
-        on_integration_failure(IntegrationException(exception_to_status()));
-    }
+    try_process_pending_flx_bootstrap();
 
     m_conn.one_more_active_unsuspended_session(); // Throws
     if (m_try_again_activation_timer) {
@@ -1709,15 +1701,7 @@ void Session::activate()
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
 
-    try {
-        process_pending_flx_bootstrap(); // throws
-    }
-    catch (const IntegrationException& error) {
-        on_integration_failure(error);
-    }
-    catch (...) {
-        on_integration_failure(IntegrationException(exception_to_status()));
-    }
+    try_process_pending_flx_bootstrap();
 
     // Checks if there is a pending client reset
     handle_pending_client_reset_acknowledgement();
