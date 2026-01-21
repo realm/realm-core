@@ -2070,30 +2070,61 @@ TEST_CASE("SharedRealm: async writes") {
                 REQUIRE(complete_count == 1);
                 verify_persisted_count(1);
             }
-            SECTION("within did_change()") {
-                struct Context : public BindingContext {
-                    int i;
-                    Context(int i)
-                        : i(i)
-                    {
-                    }
-                    void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
-                    {
-                        std::invoke(close_functions[i], *realm.lock());
-                    }
-                };
-                realm->m_binding_context.reset(new Context(i));
+
+            struct Context : public BindingContext {
+                int i;
+                bool& called;
+                Context(int i, bool& called)
+                    : i(i)
+                    , called(called)
+                {
+                }
+                void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+                {
+                    called = true;
+                    std::invoke(close_functions[i], *realm.lock());
+                }
+            };
+            SECTION("within did_change() after committing") {
+                bool called = false;
+                realm->m_binding_context.reset(new Context(i, called));
                 realm->m_binding_context->realm = realm;
 
                 realm->async_begin_transaction([&] {
                     table->create_object().set(col, 45);
+                    CHECK_FALSE(called);
                     realm->async_commit_transaction([&](std::exception_ptr) {
+                        CHECK(called);
                         done = true;
                     });
                 });
 
                 wait_for_done();
                 verify_persisted_count(1);
+            }
+
+            SECTION("within did_change() when beginning") {
+                realm->m_binding_context.reset(new Context(i, done));
+                realm->m_binding_context->realm = realm;
+
+                // Make a write on a different instance while autorefresh is
+                // off to ensure that beginning the transaction advances the
+                // read version and thus sends notifications
+                realm->set_auto_refresh(false);
+                auto realm2 = Realm::get_shared_realm(config);
+                realm2->begin_transaction();
+                realm2->commit_transaction();
+
+                bool called = false;
+                realm->async_begin_transaction([&] {
+                    called = true;
+                });
+                wait_for_done();
+
+                // close() inside a notification closes the Realm, but invalidate()
+                // is a no-op. This means the write callback should be invoked
+                // if we're testing invalidate() but not if we're testing close().
+                REQUIRE(called == i);
             }
         }
     }

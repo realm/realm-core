@@ -855,6 +855,12 @@ void Realm::run_writes()
 
         do_begin_transaction();
 
+        // Beginning the transaction may have delivered notifications, which
+        // then may have closed the Realm.
+        if (!m_transaction) {
+            return;
+        }
+
         auto write_desc = std::move(m_async_write_q.front());
         m_async_write_q.pop_front();
 
