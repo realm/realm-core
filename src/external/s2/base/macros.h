@@ -137,9 +137,10 @@ char (&ArraySizeHelper(const T (&array)[N]))[N];
 // pretend that non-POD types are POD, which is both invalid and would do very
 // broken things. Fortunately s2 internally does not actually rely on this and
 // we can make them no-ops.
-#define DECLARE_POD(TypeName)
+#define DECLARE_POD(TypeName) typedef int Dummy_Type_For_DECLARE_POD
 #define DECLARE_NESTED_POD(TypeName) DECLARE_POD(TypeName)
-#define PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT(TemplateName)
+#define PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT(TemplateName) \
+typedef int Dummy_Type_For_PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT
 
 template <bool IsPod> struct ERROR_TYPE_MUST_BE_POD;
 template <> struct ERROR_TYPE_MUST_BE_POD<true> { };
