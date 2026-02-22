@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Added missing cstdlib header in cli_args.cpp. (PR [#8091](https://github.com/realm/realm-core/pull/8091))
+* Remove invalid std::is_pod specializations in s2 that broke compilation with Xcode 26.4.
 
 ### Breaking changes
 * None.
