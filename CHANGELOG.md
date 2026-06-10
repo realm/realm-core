@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix compilation with Xcode 27 ([PR #8096](https://github.com/realm/realm-core/pull/8096))
 
 ### Breaking changes
 * None.
