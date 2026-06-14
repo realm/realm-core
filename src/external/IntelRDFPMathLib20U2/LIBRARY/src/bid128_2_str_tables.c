@@ -37,6 +37,9 @@ BID_UINT32 bid_Tento9 = 1000000000;
 BID_UINT32 bid_Tento6 = 1000000;
 BID_UINT32 bid_Tento3 = 1000;
 
+#ifdef __GNUC__
+__attribute__((nonstring))
+#endif
 const char bid_midi_tbl[1000][3] = {
   "000", "001", "002", "003", "004", "005", "006", "007", "008", "009",
   "010", "011", "012", "013", "014", "015", "016", "017", "018", "019",
