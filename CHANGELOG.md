@@ -1409,7 +1409,7 @@
 -----------
 
 ### Internals
-* None.
+* Added additional checks in response to reported freelist corruptions (PR [#6763](https://github.com/realm/realm-core/pull/6763))
 
 ----------------------------------------------
 
