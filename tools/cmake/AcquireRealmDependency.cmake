@@ -1,4 +1,8 @@
 function(realm_acquire_dependency dep_name dep_version out_dep_cmake)
+    if(NOT DEFINED REALM_LINUX_LIBC)
+        set(REALM_LINUX_LIBC gnu)
+    endif()
+
     set(_target_architecture_Android_armeabi-v7a arm)
     set(_target_architecture_Android_arm64-v8a arm64)
     set(_target_architecture_Android_x86 x86)
@@ -18,7 +22,7 @@ function(realm_acquire_dependency dep_name dep_version out_dep_cmake)
     set(_target_platform_name_Android android)
     set(_target_platform_name_Windows windows-static)
     set(_target_platform_name_WindowsStore uwp-static)
-    set(_target_platform_name_Linux linux-gnu)
+    set(_target_platform_name_Linux linux-${REALM_LINUX_LIBC})
 
     if(ANDROID)
         set(_target_architecture ${CMAKE_ANDROID_ARCH_ABI})
