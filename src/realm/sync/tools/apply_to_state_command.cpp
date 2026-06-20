@@ -99,6 +99,15 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     if (is_flx_sync) {
         ret.query_version = msg.read_next<int64_t>();
         ret.batch_state = static_cast<sync::DownloadBatchState>(msg.read_next<int>());
+        switch (ret.batch_state) {
+            case realm::sync::DownloadBatchState::SteadyState:
+            case realm::sync::DownloadBatchState::MoreToCome:
+            case realm::sync::DownloadBatchState::LastInBatch:
+                break;
+            default:
+                throw ProtocolCodecException(
+                    util::format("invalid batch state in download msg: %1", static_cast<int>(ret.batch_state)));
+        }
     }
     else {
         ret.query_version = 0;
@@ -294,11 +303,21 @@ int main(int argc, const char** argv)
         mpark::visit(realm::util::overload{
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
-                             auto transact = bool(flx_sync_arg) ? local_db->start_write() : local_db->start_read();
+                             TransactionRef tr;
+                             switch (download_message.batch_state) {
+                                 case realm::sync::DownloadBatchState::SteadyState:
+                                     tr = local_db->start_read();
+                                     break;
+                                 case realm::sync::DownloadBatchState::LastInBatch:
+                                     [[fallthrough]];
+                                 case realm::sync::DownloadBatchState::MoreToCome:
+                                     tr = local_db->start_write();
+                                     break;
+                             }
                              history.integrate_server_changesets(download_message.progress,
                                                                  download_message.downloadable_bytes,
                                                                  download_message.changesets, version_info,
-                                                                 download_message.batch_state, *logger, transact);
+                                                                 download_message.batch_state, *logger, tr);
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {
