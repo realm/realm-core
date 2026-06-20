@@ -20,7 +20,6 @@
 
 #include <realm/status.hpp>
 #include <realm/util/bind_ptr.hpp>
-#include <realm/sync/socket_provider.hpp>
 
 namespace realm::sync {
 
@@ -40,7 +39,8 @@ namespace realm::sync {
 template <class Service>
 class Trigger final {
 public:
-    Trigger(Service* service, SyncSocketProvider::FunctionHandler&& handler);
+    template <typename Handler, typename... Args>
+    Trigger(Service& service, Handler&& handler, Args&&... args);
     ~Trigger() noexcept;
 
     Trigger() noexcept = delete;
@@ -77,67 +77,79 @@ public:
     void trigger();
 
 private:
-    Service* m_service;
+    Service& m_service;
 
-    struct HandlerInfo : public util::AtomicRefCountBase {
+    struct HandlerBase : public util::AtomicRefCountBase {
         enum class State { Idle, Triggered, Destroyed };
+        std::mutex mutex;
+        State state = State::Idle;
+        virtual void call() = 0;
+    };
 
-        HandlerInfo(SyncSocketProvider::FunctionHandler&& handler)
-            : handler(std::move(handler))
-            , state(State::Idle)
+    template <typename Handler, typename... Args>
+    struct HandlerImpl : HandlerBase {
+        Handler handler;
+        std::tuple<Args...> args;
+        HandlerImpl(Handler&& h, Args&&... a)
+            : handler(std::forward<Handler>(h))
+            , args(std::forward<Args>(a)...)
         {
         }
-
-        SyncSocketProvider::FunctionHandler handler;
-        util::Mutex mutex;
-        State state;
+        void call() override
+        {
+            std::apply(handler, args);
+        }
     };
-    util::bind_ptr<HandlerInfo> m_handler_info;
+    util::bind_ptr<HandlerBase> m_handler;
 };
 
 template <class Service>
-inline Trigger<Service>::Trigger(Service* service, SyncSocketProvider::FunctionHandler&& handler)
+template <typename H, typename... A>
+inline Trigger<Service>::Trigger(Service& service, H&& handler, A&&... args)
     : m_service(service)
-    , m_handler_info(new HandlerInfo(std::move(handler)))
+    , m_handler(new HandlerImpl<H, A...>(std::forward<H>(handler), std::forward<A>(args)...))
 {
 }
 
 template <class Service>
 inline Trigger<Service>::~Trigger() noexcept
 {
-    if (m_handler_info) {
-        util::LockGuard lock{m_handler_info->mutex};
-        REALM_ASSERT(m_handler_info->state != HandlerInfo::State::Destroyed);
-        m_handler_info->state = HandlerInfo::State::Destroyed;
+    if (m_handler) {
+        std::lock_guard lock{m_handler->mutex};
+        REALM_ASSERT(m_handler->state != HandlerBase::State::Destroyed);
+        m_handler->state = HandlerBase::State::Destroyed;
     }
 }
 
 template <class Service>
 inline void Trigger<Service>::trigger()
 {
-    REALM_ASSERT(m_service);
-    REALM_ASSERT(m_handler_info);
+    REALM_ASSERT(m_handler);
 
-    util::LockGuard lock{m_handler_info->mutex};
-    REALM_ASSERT(m_handler_info->state != HandlerInfo::State::Destroyed);
+    std::lock_guard lock{m_handler->mutex};
+    REALM_ASSERT(m_handler->state != HandlerBase::State::Destroyed);
 
-    if (m_handler_info->state == HandlerInfo::State::Triggered) {
+    if (m_handler->state == HandlerBase::State::Triggered) {
         return;
     }
-    m_handler_info->state = HandlerInfo::State::Triggered;
+    m_handler->state = HandlerBase::State::Triggered;
 
-    auto handler = [handler_info = util::bind_ptr(m_handler_info)](Status status) {
+    m_service.post([handler = util::bind_ptr(m_handler)](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        if (!status.is_ok())
+            throw Exception(status);
+
         {
-            util::LockGuard lock{handler_info->mutex};
+            std::lock_guard lock{handler->mutex};
             // Do not execute the handler if the Trigger does not exist anymore.
-            if (handler_info->state == HandlerInfo::State::Destroyed) {
+            if (handler->state == HandlerBase::State::Destroyed) {
                 return;
             }
-            handler_info->state = HandlerInfo::State::Idle;
+            handler->state = HandlerBase::State::Idle;
         }
-        handler_info->handler(status);
-    };
-    m_service->post(std::move(handler));
+        handler->call();
+    });
 }
 
 } // namespace realm::sync

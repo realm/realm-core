@@ -494,10 +494,9 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper)
             return;
         }
 
-        REALM_ASSERT(m_actualize_and_finalize);
         m_unactualized_session_wrappers.push(util::bind_ptr(wrapper));
     }
-    m_actualize_and_finalize->trigger();
+    m_actualize_and_finalize.trigger();
 }
 
 
@@ -506,7 +505,6 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
     // Thread safety required.
     {
         util::CheckedLockGuard lock{m_mutex};
-        REALM_ASSERT(m_actualize_and_finalize);
         // The wrapper may have already been finalized before being abandoned
         // if we were stopped when it was created.
         if (wrapper->mark_abandoned())
@@ -522,7 +520,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
         }
         m_abandoned_session_wrappers.push(std::move(wrapper));
     }
-    m_actualize_and_finalize->trigger();
+    m_actualize_and_finalize.trigger();
 }
 
 
@@ -1731,23 +1729,12 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}               // DEPRECATED
     , m_proxy_config{std::move(proxy_config)}                             // DEPRECATED
     , m_reconnect_info{reconnect_info}
+    , m_on_idle{m_client, &Connection::on_idle, this}
     , m_ident{ident}
     , m_server_endpoint{std::move(endpoint)}
     , m_authorization_header_name{authorization_header_name} // DEPRECATED
     , m_custom_http_headers{custom_http_headers}             // DEPRECATED
 {
-    m_on_idle = m_client.create_trigger([this](Status status) {
-        if (status == ErrorCodes::OperationAborted)
-            return;
-        else if (!status.is_ok())
-            throw Exception(status);
-
-        REALM_ASSERT(m_activated);
-        if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
-            on_idle(); // Throws
-            // Connection object may be destroyed now.
-        }
-    });
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept
@@ -1779,6 +1766,10 @@ void ClientImpl::Connection::resume_active_sessions()
 
 void ClientImpl::Connection::on_idle()
 {
+    REALM_ASSERT(m_activated);
+    if (m_state != ConnectionState::disconnected || m_num_active_sessions != 0)
+        return;
+
     logger.debug(util::LogCategory::session, "Destroying connection object");
     ClientImpl& client = get_client();
     client.remove_connection(*this);

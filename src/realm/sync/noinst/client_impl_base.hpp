@@ -231,10 +231,8 @@ public:
     void post(SyncSocketProvider::FunctionHandler&& handler) REQUIRES(!m_drain_mutex);
     void post(util::UniqueFunction<void()>&& handler) REQUIRES(!m_drain_mutex);
     SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
-                                               SyncSocketProvider::FunctionHandler&& handler)
-        REQUIRES(!m_drain_mutex);
-    using SyncTrigger = std::unique_ptr<Trigger<ClientImpl>>;
-    SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
+                                               util::UniqueFunction<void()>&& handler) REQUIRES(!m_drain_mutex);
+    using SyncTrigger = Trigger<ClientImpl>;
 
     RandomEngine& get_random() noexcept;
 
@@ -534,10 +532,10 @@ private:
     std::string get_http_request_path() const;
 
     void initiate_reconnect_wait();
-    void handle_reconnect_wait(Status status);
+    void handle_reconnect_wait();
     void initiate_reconnect();
     void initiate_connect_wait();
-    void handle_connect_wait(Status status);
+    void handle_connect_wait();
 
     void handle_connection_established();
     void schedule_urgent_ping();
@@ -553,7 +551,7 @@ private:
     void handle_write_ping();
     void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
-    void handle_disconnect_wait(Status status);
+    void handle_disconnect_wait();
     void close_due_to_protocol_error(Status status);
     void close_due_to_client_side_error(Status, IsFatal is_fatal, ConnectionTerminationReason reason);
     void close_due_to_transient_error(Status status, ConnectionTerminationReason reason);
@@ -1227,12 +1225,11 @@ inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInf
 
 inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
 {
-    REALM_ASSERT(m_on_idle);
     REALM_ASSERT(m_state != ConnectionState::disconnected);
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle->trigger();
+        m_on_idle.trigger();
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {

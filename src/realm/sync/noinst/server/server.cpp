@@ -1093,19 +1093,11 @@ public:
         , m_client_user_agent{std::move(client_user_agent)}
         , m_remote_endpoint{std::move(remote_endpoint)}
         , m_appservices_request_id{std::move(appservices_request_id)}
+        , m_send_trigger{m_server.get_service(), &SyncConnection::send_next_message, this}
     {
         // Make the output buffer stream throw std::bad_alloc if it fails to
         // expand the buffer
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-
-        network::Service& service = m_server.get_service();
-        auto handler = [this](Status status) {
-            if (!status.is_ok())
-                return;
-            if (!m_is_sending)
-                send_next_message(); // Throws
-        };
-        m_send_trigger = std::make_unique<Trigger<network::Service>>(&service, std::move(handler)); // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1347,7 +1339,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    std::unique_ptr<Trigger<network::Service>> m_send_trigger;
+    Trigger<network::Service> m_send_trigger;
 
     milliseconds_type m_last_ping_timestamp = 0;
 
@@ -4228,11 +4220,10 @@ void SyncConnection::terminate_if_dead(SteadyTimePoint now)
 
 void SyncConnection::enlist_to_send(Session* sess) noexcept
 {
-    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     REALM_ASSERT(!sess->is_enlisted_to_send());
     m_sessions_enlisted_to_send.push_back(sess);
-    m_send_trigger->trigger();
+    m_send_trigger.trigger();
 }
 
 
@@ -4442,7 +4433,7 @@ void SyncConnection::send_log_message(util::Logger::Level level, const std::stri
         std::lock_guard lock(m_log_mutex);
         m_log_messages.push(std::move(log_msg));
     }
-    m_send_trigger->trigger();
+    m_send_trigger.trigger();
 }
 
 
@@ -4490,7 +4481,8 @@ void SyncConnection::handle_ping_received(const char* data, size_t size)
 
 void SyncConnection::send_next_message()
 {
-    REALM_ASSERT(!m_is_sending);
+    if (m_is_sending)
+        return;
     REALM_ASSERT(!m_sending_pong);
     if (m_send_pong) {
         send_pong(m_last_ping_timestamp);
@@ -4681,7 +4673,6 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
     REALM_ASSERT(is_session_level_error(error_code) == (session_ident != 0));
     REALM_ASSERT(!is_session_level_error(error_code));
 
-    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     m_is_closing = true;
 
@@ -4696,7 +4687,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
 
     terminate_sessions(); // Throws
 
-    m_send_trigger->trigger();
+    m_send_trigger.trigger();
 }
 
 
