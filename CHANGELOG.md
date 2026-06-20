@@ -192,6 +192,9 @@
 
 ### Internals
 * Update TestAppSession to allow scope-based usage for restarting the local app resources. ([PR #7672](https://github.com/realm/realm-core/pull/7672))
+* Added second optional `scheduler` parameter to `EventLoopDispatcher`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
+* (bindgen) Added second optional `scheduler` parameter to `schedulerWrapBlockingFunction`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
+* (bindgen) Exposing optional `scheduler` property on `RealmConfig`. ([PR #7903](https://github.com/realm/realm-core/pull/7903))
 
 ----------------------------------------------
 
