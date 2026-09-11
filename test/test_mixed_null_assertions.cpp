@@ -884,3 +884,87 @@ TEST_TYPES(Mixed_RemoveRecursiveSingleLink, SingleLink, ListOfMixedLinks, Dictio
     CHECK_EQUAL(top1->size(), 0);
     CHECK_EQUAL(top2->size(), 0);
 }
+
+// ArrayMixed::move() (invoked by Cluster::move() when a full cluster leaf is split by a
+// mid-leaf insert) has the same unguarded-`keys` defect as insert()/erase(): it reads
+// keys.get(i) and calls keys.truncate(ndx) without checking against the (possibly
+// shorter) keys.size(), tripping "ndx < m_size" in Array::get / "new_size <= m_size" in
+// Array::truncate. This forces a real leaf split and then checks that the nested
+// collection which gets physically moved into the new leaf is still readable through the
+// *same* accessor obtained before the split - i.e. that the destination leaf's `keys`
+// array was populated with the correct, non-zero salt at the correct (shifted) index,
+// not just that the split didn't crash.
+TEST(ArrayMixed_LeafSplitMovesNestedCollectionKeys)
+{
+    Group g;
+    auto t = g.add_table("foo");
+    auto col = t->add_column(type_Mixed, "any");
+
+    // Fill one cluster leaf to capacity (Cluster::cluster_node_size == 256) with keys
+    // spaced two apart, so a later insert can land strictly between two existing rows
+    // instead of being appended at the end.
+    constexpr int64_t step = 2;
+    constexpr size_t leaf_size = 256;
+    for (size_t i = 0; i < leaf_size; i++) {
+        t->create_object(ObjKey(int64_t(i) * step));
+    }
+
+    // Row 0 gets a nested collection: this is the row that stays behind in the
+    // (truncated) source leaf after the split.
+    auto obj0 = t->get_object(ObjKey(0));
+    obj0.set_collection(col, CollectionType::Dictionary).get_dictionary(col).insert("who", "row0");
+
+    // Row 200 also gets one: this row ends up moved into the new leaf by the split
+    // below. Capture its Dictionary accessor now, *before* the split physically
+    // relocates the row, so the later access exercises re-resolution through the new
+    // leaf's `keys` array rather than just reading fresh state.
+    constexpr size_t moved_row = 200;
+    auto objR = t->get_object(ObjKey(int64_t(moved_row) * step));
+    auto dictR = objR.set_collection(col, CollectionType::Dictionary).get_dictionary(col);
+    dictR.insert("who", "rowR");
+
+    // Row (leaf_size - 1) is left as a plain null/scalar: no set_key() call ever
+    // touches it, so ArrayMixed's `keys` array stays shorter than ArrayMixed::size()
+    // at the time of the split, which is the precondition for the bug.
+
+    // Insert a new row with a key strictly between row 4 (key 8) and row 5 (key 10).
+    // The leaf is already full, so Cluster::insert() computes ndx=5 (mid-leaf) and
+    // calls Cluster::move(5, new_leaf, ...), which drives ArrayMixed::move(dst, 5).
+    t->create_object(ObjKey(9));
+
+    // The dictionary on the moved row must still be readable, with its content
+    // intact, through the accessor captured before the split.
+    CHECK_EQUAL(dictR.size(), 1);
+    CHECK_EQUAL(dictR.get("who"), Mixed("rowR"));
+
+    // The dictionary on the row that stayed behind must also still be intact.
+    auto dict0 = obj0.get_dictionary(col);
+    CHECK_EQUAL(dict0.size(), 1);
+    CHECK_EQUAL(dict0.get("who"), Mixed("row0"));
+}
+
+// A plain `mixed` property set to a nested collection (dictionary or list) on a row
+// that is not the last row of its cluster leaf leaves ArrayMixed's `keys` payload array
+// shorter than ArrayMixed::size(). A subsequent insert of a new row (e.g. appending a
+// new object) then forwards to ArrayMixed::insert(), which inserts into `keys` without
+// bounds-checking against its (shorter) size, tripping "ndx <= m_size" in Array::insert.
+TEST(ArrayMixed_InsertAfterNestedCollectionOnNonLastRow)
+{
+    Group g;
+    auto t = g.add_table("foo");
+    auto col = t->add_column(type_Mixed, "any");
+
+    auto obj0 = t->create_object();
+    auto obj1 = t->create_object();
+
+    // obj0 is NOT the last row in the leaf. Assigning it a nested collection is what
+    // causes ArrayMixed's keys array to be materialized with size 1 (covering only
+    // obj0), while obj1 (the last row, still scalar/null) leaves the keys array
+    // shorter than ArrayMixed::size() == 2.
+    obj0.set_collection(col, CollectionType::Dictionary);
+    (void)obj1;
+
+    // Appending a third object forces ArrayMixed::insert(ndx=2, ...), which must not
+    // assume keys.size() == ArrayMixed::size().
+    t->create_object();
+}

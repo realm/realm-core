@@ -102,7 +102,8 @@ void ArrayMixed::insert(size_t ndx, Mixed value)
             Array keys(Array::get_alloc());
             keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
             keys.init_from_ref(ref);
-            keys.insert(ndx, 0);
+            if (ndx < keys.size())
+                keys.insert(ndx, 0);
         }
     }
 }
@@ -235,7 +236,9 @@ void ArrayMixed::erase(size_t ndx)
             Array keys(Array::get_alloc());
             keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
             keys.init_from_ref(ref);
-            keys.erase(ndx);
+            // See comment in insert(): `keys` can be shorter than ArrayMixed::size().
+            if (ndx < keys.size())
+                keys.erase(ndx);
         }
     }
 }
@@ -255,10 +258,15 @@ void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
             Array keys(Array::get_alloc());
             keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
             keys.init_from_ref(ref);
+            // See comment in insert(): `keys` can be shorter than ArrayMixed::size(), so
+            // rows at or beyond its span have no key to carry over.
+            size_t keys_size = keys.size();
             for (size_t j = original_dst_size, i = ndx; i < sz; i++, j++) {
-                dst.set_key(j, keys.get(i));
+                if (i < keys_size)
+                    dst.set_key(j, keys.get(i));
             }
-            keys.truncate(ndx);
+            if (ndx < keys_size)
+                keys.truncate(ndx);
         }
     }
     while (i > ndx) {
