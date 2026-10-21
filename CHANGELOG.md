@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix compilation with Xcode 27 ([PR #8096](https://github.com/realm/realm-core/pull/8096))
+* A DOWNLOAD message whose compressed body size exceeded the bytes actually received could cause the sync client to read past the end of the message buffer while decompressing it (since v11.5.0).
 
 ### Breaking changes
 * None.
