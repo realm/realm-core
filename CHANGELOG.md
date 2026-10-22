@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix compilation with Xcode 27 ([PR #8096](https://github.com/realm/realm-core/pull/8096))
+* A chunked HTTP response or request with a chunk larger than 8 KiB could write past the end of the HTTP parser's read buffer. Such chunks are now rejected with `ContentTooLong`. (since v13.26.0)
 
 ### Breaking changes
 * None.
