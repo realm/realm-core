@@ -223,3 +223,68 @@ TEST(Protocol_Codec_Ping)
     protocol.make_ping(out, 1234567890, 23);
     compare_out_string(expected_out_string, out, test_context);
 }
+
+TEST(Protocol_Codec_Download_Compressed_Body_Size_Exceeds_Message)
+{
+    struct FakeConnection {
+        std::shared_ptr<util::Logger> logger_ptr = util::Logger::get_default_logger();
+        util::Logger& logger = *logger_ptr;
+        std::optional<Status> error;
+        bool received_download = false;
+
+        bool is_flx_sync_connection() const noexcept
+        {
+            return false;
+        }
+        void handle_protocol_error(Status status)
+        {
+            error = std::move(status);
+        }
+        void receive_download_message(_impl::ClientProtocol::session_ident_type,
+                                      const _impl::ClientProtocol::DownloadMessage&)
+        {
+            received_download = true;
+        }
+        void receive_pong(_impl::ClientProtocol::milliseconds_type) {}
+        void receive_error_message(const sync::ProtocolErrorInfo&, _impl::ClientProtocol::session_ident_type) {}
+        void receive_query_error_message(int, std::string_view, int64_t, _impl::ClientProtocol::session_ident_type) {}
+        void receive_ident_message(_impl::ClientProtocol::session_ident_type, _impl::ClientProtocol::SaltedFileIdent)
+        {
+        }
+        void receive_mark_message(_impl::ClientProtocol::session_ident_type,
+                                  _impl::ClientProtocol::request_ident_type)
+        {
+        }
+        void receive_unbound_message(_impl::ClientProtocol::session_ident_type) {}
+        void receive_test_command_response(_impl::ClientProtocol::session_ident_type,
+                                           _impl::ClientProtocol::request_ident_type, std::string_view)
+        {
+        }
+        void receive_server_log_message(_impl::ClientProtocol::session_ident_type, util::Logger::Level,
+                                        std::string_view)
+        {
+        }
+        void receive_appservices_request_id(std::string_view) {}
+    };
+
+    std::string body(256, 'x');
+    std::vector<char> compressed(compression::compress_bound(body.size()));
+    size_t compressed_size = 0;
+    CHECK_NOT(compression::compress(body, compressed, compressed_size));
+
+    // Claim more compressed bytes than the message actually carries.
+    std::string msg = util::format("download 1 1 0 1 0 0 0 0 1 %1 %2\n", body.size(), compressed_size + 64);
+    msg.append(compressed.data(), compressed_size);
+
+    // Keep the message in an exactly sized heap buffer so that reads past its end are detectable.
+    auto buffer = std::make_unique<char[]>(msg.size());
+    std::copy(msg.begin(), msg.end(), buffer.get());
+
+    FakeConnection connection;
+    _impl::ClientProtocol protocol;
+    protocol.parse_message_received(connection, std::string_view(buffer.get(), msg.size()));
+
+    CHECK_NOT(connection.received_download);
+    CHECK(connection.error);
+    CHECK_EQUAL(connection.error->code(), ErrorCodes::SyncProtocolInvariantFailed);
+}
