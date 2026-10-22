@@ -333,8 +333,12 @@ struct HTTPParser : protected HTTPParserBase {
         }
         else if (m_has_chunked_encoding) {
             auto content_length_handler = [this](std::error_code ec, size_t chunk_start_index) {
-                if (ec == util::error::operation_aborted) {
+                if (ec) {
                     on_complete(ec);
+                    return;
+                }
+                if (chunk_start_index < 2) {
+                    on_complete(HTTPParserError::BadRequest);
                     return;
                 }
 
@@ -346,9 +350,14 @@ struct HTTPParser : protected HTTPParserBase {
                     on_complete(ec);
                     return;
                 }
+                // The chunk and its trailing \r\n are read into m_read_buffer.
+                if (content_length > read_buffer_size - 2) {
+                    on_complete(HTTPParserError::ContentTooLong);
+                    return;
+                }
 
                 auto handler = [this](std::error_code ec, size_t n) {
-                    if (ec == util::error::operation_aborted) {
+                    if (ec) {
                         on_complete(ec);
                         return;
                     }

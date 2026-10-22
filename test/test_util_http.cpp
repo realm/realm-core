@@ -189,6 +189,56 @@ TEST(HTTP_RequestResponse)
     CHECK_EQUAL(received_response->headers["Content-Type"], "application/json");
 }
 
+TEST(HTTP_ChunkTooLong)
+{
+    network::Service server;
+    network::Acceptor acceptor{server};
+    network::Endpoint ep;
+    acceptor.open(ep.protocol());
+    acceptor.bind(ep);
+    ep = acceptor.local_endpoint();
+    acceptor.listen();
+
+    // A single chunk larger than the parser's read buffer.
+    std::string raw_response = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4000\r\n";
+    raw_response.append(0x4000, 'x');
+    raw_response.append("\r\n0\r\n\r\n");
+
+    std::thread server_thread{[&] {
+        BufferedSocket c(server);
+        HTTPServer<BufferedSocket> http(c, test_context.logger);
+        acceptor.async_accept(c, [&](std::error_code ec) {
+            CHECK(!ec);
+            http.async_receive_request([&](HTTPRequest, std::error_code ec) {
+                CHECK(!ec);
+                c.write(raw_response.data(), raw_response.size());
+                server.stop();
+            });
+        });
+        server.run();
+    }};
+
+    std::error_code response_ec;
+    {
+        network::Service client;
+        BufferedSocket c(client);
+        HTTPClient<BufferedSocket> http(c, test_context.logger);
+        c.async_connect(ep, [&](std::error_code ec) {
+            CHECK(!ec);
+            HTTPRequest req;
+            req.path = "/";
+            req.method = HTTPMethod::Get;
+            http.async_request(req, [&](HTTPResponse, std::error_code ec) {
+                response_ec = ec;
+            });
+        });
+        client.run();
+    }
+    server_thread.join();
+
+    CHECK(response_ec == HTTPParserError::ContentTooLong);
+}
+
 TEST(HTTPHeaders_CaseInsensitive)
 {
     HTTPHeaders headers;
