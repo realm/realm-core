@@ -667,6 +667,8 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
 
          if (subType == 0x04) { // UUID
              UUID::UUIDBytes bytes{};
+             if (decoded_chars->size() != bytes.size())
+                 throw BsonError("invalid extended json $binary UUID length");
              std::copy_n(decoded_chars->data(), bytes.size(), bytes.begin());
              return Bson(UUID(bytes));
          }

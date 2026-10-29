@@ -110,6 +110,14 @@ TEST_CASE("canonical_extjson_fragments", "[bson]") {
         auto uuid = UUID("c8edabc3-f738-4ca3-b68d-ab92a91478a3");
         CHECK((a == uuid));
         CHECK((b == uuid));
+
+        CHECK_THROWS_AS(bson::parse("{ \"$binary\" : {\"base64\" : \"\", \"subType\" : \"04\"}}"),
+                        std::runtime_error);
+        CHECK_THROWS_AS(bson::parse("{ \"$binary\" : {\"base64\" : \"yO2r\", \"subType\" : \"04\"}}"),
+                        std::runtime_error);
+        CHECK_THROWS_AS(
+            bson::parse("{ \"$binary\" : {\"base64\" : \"yO2rw/c4TKO2jauSqRR4o8jt\", \"subType\" : \"04\"}}"),
+            std::runtime_error);
     }
 }
 

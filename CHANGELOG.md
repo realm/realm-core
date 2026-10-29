@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix compilation with Xcode 27 ([PR #8096](https://github.com/realm/realm-core/pull/8096))
+* Parsing Extended JSON with a `$binary` value of subType `04` whose decoded data was not exactly 16 bytes read past the end of the decoded buffer when building the UUID. Such values are now rejected. (since v10.3.0)
 
 ### Breaking changes
 * None.
