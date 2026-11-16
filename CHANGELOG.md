@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix compilation with Xcode 27 ([PR #8096](https://github.com/realm/realm-core/pull/8096))
+* Decoding base64 with a `=` after a complete 4 character group (for example `"Zm9v="`) wrote one byte past the end of the output buffer, and unpadded base64 containing whitespace decoded to the wrong bytes. This affected JWT payloads, `$binary` values in Extended JSON and `B64"..."` query constants (since the beginning).
 
 ### Breaking changes
 * None.
