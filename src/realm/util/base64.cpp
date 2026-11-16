@@ -168,9 +168,11 @@ std::optional<size_t> base64_decode(Span<const char> input, Span<char> out_buffe
     }
 
     // no padding
-    size_t extra = input.size() % 4;
-    if (num_trailing_equals == 0 && extra > 1) {
-        num_trailing_equals = 4 - extra;
+    if (num_trailing_equals == 0 && buffer_size > 1) {
+        num_trailing_equals = 4 - buffer_size;
+    }
+    else if (num_trailing_equals != 0 && buffer_size + num_trailing_equals != 4) {
+        return none; // padding does not complete the final quantum
     }
 
     // trailing bytes

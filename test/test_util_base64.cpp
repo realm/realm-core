@@ -40,9 +40,10 @@ TEST(Base64_Decode)
         "Zmxvbw==",
         "Zmxvb3I=",
         "SGVsb G8sIF\ndvc mxkIQ==", // contains whitespace
+        "Zm9v Zg",                  // unpadded, contains whitespace
     };
 
-    static const char* expected[] = {"", "f", "fo", "foo", "floo", "floor", "Hello, World!"};
+    static const char* expected[] = {"", "f", "fo", "foo", "floo", "floor", "Hello, World!", "foof"};
 
     static const size_t num_tests = sizeof(inputs) / sizeof(inputs[0]);
 
@@ -59,6 +60,9 @@ TEST(Base64_Decode)
         "====",     // only padding
         "()",       // invalid chars
         "Zm9v====", // wrong amount of padding
+        "=",        // padding without data
+        "Zm9v=",    // padding after a complete quantum
+        "Zm9vZ=",   // padding after a single character
     };
     static const size_t num_bad_tests = sizeof(bad_inputs) / sizeof(bad_inputs[0]);
 
